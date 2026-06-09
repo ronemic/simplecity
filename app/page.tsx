@@ -35,8 +35,6 @@ export default async function Home({
     .filter((card) => card.status === "Upcoming vote" || card.meetings?.status === "Upcoming")
     .slice(0, 4);
   const recentCards = filteredCards.slice(0, 4);
-  const featured = announcements[0];
-
   return (
     <div>
       <section className="border-b border-black/10 bg-newsprint">
@@ -80,7 +78,7 @@ export default async function Home({
       </section>
 
       <section className="section-shell py-8">
-        <AnnouncementBanner announcement={featured} />
+        <AnnouncementBanner announcements={announcements} />
       </section>
 
       <section className="section-shell grid gap-8 py-4 lg:grid-cols-[1fr_320px]">
