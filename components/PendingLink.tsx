@@ -78,7 +78,7 @@ export function PendingLink({
           {pending ? (
             <span className="absolute inset-0 flex items-center justify-center gap-2 rounded-[inherit] bg-white/80 text-sm font-semibold text-black/70 backdrop-blur-sm">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin text-civic" />
-              {pendingLabel || "Loading"}
+              <span className="sr-only">{pendingLabel || "Loading"}</span>
             </span>
           ) : null}
         </>
@@ -88,7 +88,7 @@ export function PendingLink({
           {pending ? (
             <span className="inline-flex items-center gap-2 text-current">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-              {pendingLabel || "Loading"}
+              <span className="sr-only">{pendingLabel || "Loading"}</span>
             </span>
           ) : null}
         </>

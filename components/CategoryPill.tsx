@@ -31,6 +31,7 @@ export function CategoryPill({
         href={href}
         className={cn(className, "transition hover:brightness-95 focus-visible:focus-ring")}
         pendingLabel="Loading"
+        mode="overlay"
       >
         {content}
       </PendingLink>
