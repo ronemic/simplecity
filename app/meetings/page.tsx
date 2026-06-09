@@ -1,27 +1,17 @@
 import { MeetingList } from "@/components/MeetingList";
 import { getMeetings } from "@/lib/db/queries";
 
+export const revalidate = 300;
+
 export default async function MeetingsPage({
   searchParams
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
   const params = await searchParams;
-  const meetings = await getMeetings();
-  const search = (params.q || "").toLowerCase();
+  const search = params.q || "";
   const status = params.status || "";
-
-  const filtered = meetings.filter((meeting) => {
-    const matchesSearch =
-      !search ||
-      [meeting.title, meeting.meeting_type, meeting.date_text, meeting.status]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(search);
-    const matchesStatus = !status || meeting.status === status;
-    return matchesSearch && matchesStatus;
-  });
+  const meetings = await getMeetings({ search, status });
 
   return (
     <div className="section-shell py-10">
@@ -53,7 +43,7 @@ export default async function MeetingsPage({
         <button className="action-primary">Filter</button>
       </form>
 
-      <MeetingList meetings={filtered} />
+      <MeetingList meetings={meetings} />
     </div>
   );
 }

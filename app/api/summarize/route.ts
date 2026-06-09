@@ -1,6 +1,7 @@
 import { assertAdminForRoute } from "@/lib/supabase/admin";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { replaceSummaryCardsForMeeting } from "@/lib/db/upsertMeetings";
+import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import type { MeetingRow } from "@/lib/types";
 import { meetingRowToLlmReadyMeeting } from "@/lib/db/meetingTransform";
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
 
   const result = await generateSummaryForMeeting(llmMeeting);
   const cards = await replaceSummaryCardsForMeeting(supabase, row.id, result.summary, result.raw);
+  revalidatePublicContent([`/meetings/${row.id}`]);
 
   return Response.json({ cardsGenerated: cards.length, summary: result.summary });
 }

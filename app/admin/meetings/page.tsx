@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/lib/constants";
 import { getAdminCollections } from "@/lib/db/queries";
 import { meetingRowToLlmReadyMeeting } from "@/lib/db/meetingTransform";
 import { replaceSummaryCardsForMeeting, writeAuditLog } from "@/lib/db/upsertMeetings";
+import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import { getAuthenticatedAdmin, requireAdmin } from "@/lib/supabase/admin";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
@@ -40,8 +41,7 @@ async function regenerateMeetingAction(formData: FormData) {
 
   revalidatePath("/admin/meetings");
   revalidatePath("/admin/cards");
-  revalidatePath(`/meetings/${id}`);
-  revalidatePath("/");
+  revalidatePublicContent([`/meetings/${id}`]);
 }
 
 export default async function AdminMeetingsPage({

@@ -1,5 +1,6 @@
 import { getAuthenticatedAdmin } from "@/lib/supabase/admin";
 import { runSimpleCityPipeline } from "@/lib/pipeline";
+import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -25,6 +26,10 @@ export async function POST(request: Request) {
     persist: true,
     summarize: true
   });
+
+  if (result.status !== "failed") {
+    revalidatePublicContent();
+  }
 
   return Response.json(result, { status: result.status === "failed" ? 500 : 200 });
 }

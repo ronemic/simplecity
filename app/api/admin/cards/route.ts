@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getAuthenticatedAdminFromCookies } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/db/upsertMeetings";
+import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 
 function listFromCommaText(value: unknown) {
   return String(value || "")
@@ -61,7 +62,7 @@ export async function PUT(request: NextRequest) {
   });
 
   revalidatePath("/admin/cards");
-  revalidatePath("/");
+  revalidatePublicContent();
   return NextResponse.json({ ok: true });
 }
 
@@ -87,6 +88,6 @@ export async function DELETE(request: NextRequest) {
   });
 
   revalidatePath("/admin/cards");
-  revalidatePath("/");
+  revalidatePublicContent();
   return NextResponse.json({ ok: true });
 }

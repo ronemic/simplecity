@@ -6,6 +6,8 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
 import type { SummaryCardRow } from "@/lib/types";
 
+export const revalidate = 300;
+
 function matchesSearch(card: SummaryCardRow, search: string) {
   if (!search) return true;
   const haystack = [

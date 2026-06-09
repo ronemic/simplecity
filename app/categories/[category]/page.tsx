@@ -5,6 +5,8 @@ import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
 import { getCategoryCards } from "@/lib/db/queries";
 
+export const revalidate = 300;
+
 function categoryFromSlug(slug: string) {
   return CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
 }

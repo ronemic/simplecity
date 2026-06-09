@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getAuthenticatedAdminFromCookies } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/db/upsertMeetings";
+import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 
 function normalizeAnnouncement(body: {
   title?: string;
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
 
   if (existingId) {
     revalidatePath("/admin/announcements");
-    revalidatePath("/");
+    revalidatePublicContent();
     return NextResponse.json({ ok: true, id: existingId, duplicate: true });
   }
 
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
   });
 
   revalidatePath("/admin/announcements");
-  revalidatePath("/");
+  revalidatePublicContent();
   return NextResponse.json({ ok: true, id: data.id });
 }
 
@@ -101,7 +102,7 @@ export async function PUT(request: NextRequest) {
   });
 
   revalidatePath("/admin/announcements");
-  revalidatePath("/");
+  revalidatePublicContent();
   return NextResponse.json({ ok: true });
 }
 
@@ -127,6 +128,6 @@ export async function DELETE(request: NextRequest) {
   });
 
   revalidatePath("/admin/announcements");
-  revalidatePath("/");
+  revalidatePublicContent();
   return NextResponse.json({ ok: true });
 }
