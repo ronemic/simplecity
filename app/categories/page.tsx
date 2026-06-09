@@ -1,6 +1,6 @@
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
-import { PendingLink } from "@/components/PendingLink";
 
 export default function CategoriesPage() {
   return (
@@ -18,12 +18,10 @@ export default function CategoriesPage() {
           const definition = CATEGORY_DEFINITIONS[category];
           const Icon = definition.icon;
           return (
-            <PendingLink
+            <Link
               key={category}
               href={`/categories/${definition.slug}`}
-              className="quiet-card group p-5 transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(23,23,23,0.12)] focus-visible:focus-ring"
-              pendingLabel={`Opening ${category}`}
-              mode="overlay"
+              className="quiet-card group block p-5 transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(23,23,23,0.12)] focus-visible:focus-ring"
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-civic/10 text-civic shadow-sm">
                 <Icon aria-hidden className="h-5 w-5" />
@@ -33,7 +31,7 @@ export default function CategoriesPage() {
               <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-civic">
                 View cards <ArrowRight aria-hidden className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </span>
-            </PendingLink>
+            </Link>
           );
         })}
       </div>

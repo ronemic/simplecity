@@ -22,7 +22,12 @@ export function AddToGoogleCalendarLink({
       href={calendarUrl}
       target="_blank"
       rel="noreferrer"
-      className={cn("action-secondary", className)}
+      className={cn(
+        compact
+          ? "inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-black/20 bg-white px-4 py-2 text-sm font-medium text-ink shadow-sm transition hover:bg-black/[0.03] hover:shadow-md active:translate-y-px"
+          : "action-secondary",
+        className
+      )}
       aria-label={`Add ${meeting.title} to Google Calendar`}
     >
       <CalendarPlus aria-hidden className="h-4 w-4" />

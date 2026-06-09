@@ -55,9 +55,8 @@ export default async function CategoryDetailPage({
           <PendingLink
             key={item.href}
             href={item.href}
-            className="action-secondary px-4 py-2"
+            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-black/75 shadow-sm transition hover:bg-black/[0.03] focus-visible:focus-ring whitespace-nowrap"
             pendingLabel={`Loading ${item.label.toLowerCase()}`}
-            mode="overlay"
           >
             {item.label}
           </PendingLink>

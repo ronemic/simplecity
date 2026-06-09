@@ -42,6 +42,8 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const compactInformationCard = isInformationOnly && !hasDeadline;
   const showDetails = !compactInformationCard || open;
   const showCommentAction = !isInformationOnly && hasCommentAction(card);
+  const footerButtonClass =
+    "inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-black/75 shadow-sm transition hover:bg-black/[0.03] focus-visible:focus-ring whitespace-nowrap";
 
   return (
     <article
@@ -165,7 +167,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             <button
               type="button"
               onClick={() => setOpen(true)}
-              className="action-primary min-h-10 px-4 py-2"
+              className={footerButtonClass}
             >
               <MessageSquareText aria-hidden className="h-4 w-4" />
               Submit a comment
@@ -174,7 +176,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
           {meeting?.id ? (
             <PendingLink
               href={`/meetings/${meeting.id}`}
-              className="action-secondary min-h-10 px-4 py-2"
+              className={footerButtonClass}
               pendingLabel="Opening meeting"
             >
               <CalendarDays aria-hidden className="h-4 w-4" />
@@ -186,16 +188,16 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
               href={card.source_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border-0 px-2 py-2 text-sm font-medium text-black/55 transition hover:bg-black/[0.035] hover:text-ink"
+              className={footerButtonClass}
             >
               Source
-              <ExternalLink aria-hidden className="h-3.5 w-3.5" />
+              <ExternalLink aria-hidden className="h-4 w-4" />
             </a>
           ) : null}
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="ml-auto inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-black/60 transition hover:bg-black/[0.04] hover:text-ink"
+            className={`${footerButtonClass} ml-auto`}
             aria-expanded={open}
           >
             {open ? (
@@ -203,7 +205,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             ) : (
               <Info aria-hidden className="h-4 w-4" />
             )}
-            {open ? "Show less" : "Details"}
+            {open ? "Show less" : "Show more"}
           </button>
         </div>
       </div>

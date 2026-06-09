@@ -25,12 +25,7 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
           key={meeting.id}
           className="grid gap-4 border-t border-black/10 p-5 transition first:border-t-0 hover:bg-black/[0.025] sm:grid-cols-[1fr_auto] sm:items-center sm:p-6"
         >
-          <PendingLink
-            href={`/meetings/${meeting.id}`}
-            mode="overlay"
-            pendingLabel="Opening meeting"
-            className="min-w-0 rounded-md focus-visible:focus-ring"
-          >
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={meeting.status} />
               <span className="inline-flex items-center gap-1 text-xs font-medium text-black/70">
@@ -40,8 +35,8 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
             </div>
             <h2 className="mt-2 text-xl font-bold leading-snug text-ink">{meeting.title}</h2>
             <p className="mt-1 text-sm text-black/70">{meeting.meeting_type || "Meeting type not listed"}</p>
-          </PendingLink>
-          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          </div>
+          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-10 px-4 py-2" />
             <PendingLink
               href={`/meetings/${meeting.id}`}
