@@ -83,11 +83,11 @@ export const CATEGORY_DEFINITIONS: Record<
 
 export const STATUS_TONES: Record<string, string> = {
   "Upcoming vote": "bg-civic/10 text-civic border-civic/30",
-  "Under discussion": "bg-harbor/10 text-harbor border-harbor/30",
+  "Under discussion": "bg-[#fef3cd] text-[#7d5a00] border-[#e6c663]",
   Passed: "bg-moss/10 text-moss border-moss/30",
   Tabled: "bg-sun/20 text-[#73561a] border-sun/40",
   Cancelled: "bg-clay/10 text-clay border-clay/30",
-  "Information only": "bg-black/5 text-black/70 border-black/20",
+  "Information only": "bg-[#e6f1fb] text-[#0c447c] border-[#9ec8e8]",
   Upcoming: "bg-civic/10 text-civic border-civic/30",
   Past: "bg-black/5 text-black/70 border-black/20"
 };

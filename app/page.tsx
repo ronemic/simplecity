@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, FileText, Mail, MapPin, MessageSquareText, ShieldCheck } from "lucide-react";
+import { ArrowRight, CalendarDays, FileText, MessageSquareText, ShieldCheck } from "lucide-react";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
@@ -56,45 +56,50 @@ export default async function Home({
               Scan upcoming votes, deadlines, and resident impact in plain English. Start with the
               decision, understand what changes, then choose how to speak up.
             </p>
-            <div className="mt-7 flex flex-wrap gap-3">
+            <div className="mt-7">
+              <SearchAndFilters search={search} />
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
               <Link href="#decisions" className="action-primary">
                 Review upcoming decisions <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
               <Link href="/meetings" className="action-secondary">
+                <CalendarDays aria-hidden className="h-4 w-4" />
                 Meeting calendar
               </Link>
             </div>
-            <div className="mt-6">
-              <SearchAndFilters search={search} />
-            </div>
           </div>
 
-          <div className="quiet-card self-end p-5 sm:p-6">
+          <div className="self-end rounded-lg border-2 border-civic/25 bg-white p-5 shadow-[0_18px_48px_rgba(36,87,166,0.14)] sm:p-6">
             <div className="flex items-center justify-between gap-3">
               <p className="label-eyebrow text-civic">Decision to watch</p>
-              <span className="rounded-full border border-civic/20 bg-civic/5 px-3 py-1 text-xs font-bold text-civic">
+              <span className="rounded-full border border-civic/20 bg-civic/5 px-3 py-1 text-xs font-medium text-civic">
                 {decisionCards.length} upcoming
               </span>
             </div>
             {featuredCard ? (
               <div className="mt-5 space-y-4">
-                <h2 className="text-2xl font-extrabold leading-tight text-ink">
+                <h2 className="text-2xl font-bold leading-tight text-ink sm:text-3xl">
                   {featuredCard.agenda_item || "Agenda item not listed"}
                 </h2>
-                <div className="grid gap-3 text-sm font-semibold text-black/75 sm:grid-cols-2">
-                  <div className="rounded-lg border border-black/10 bg-paper/60 p-3">
-                    <CalendarDays aria-hidden className="mb-2 h-5 w-5 text-civic" />
-                    {formatDisplayDate(
-                      featuredCard.meetings?.date_text,
-                      featuredCard.meetings?.meeting_datetime
-                    )}
-                  </div>
-                  <div className="rounded-lg border border-black/10 bg-paper/60 p-3">
-                    <MessageSquareText aria-hidden className="mb-2 h-5 w-5 text-harbor" />
-                    {isListed(featuredCard.comment_window_closes)
-                      ? `Comments close ${featuredCard.comment_window_closes}`
-                      : "Comment deadline not listed"}
-                  </div>
+                <div className="grid gap-2 border-y border-black/10 py-3 text-sm text-black/72 sm:grid-cols-2">
+                  <p className="inline-flex items-center gap-2">
+                    <CalendarDays aria-hidden className="h-4 w-4 text-civic" />
+                    <span>
+                      {formatDisplayDate(
+                        featuredCard.meetings?.date_text,
+                        featuredCard.meetings?.meeting_datetime
+                      )}
+                    </span>
+                  </p>
+                  <p className="inline-flex items-center gap-2">
+                    <MessageSquareText aria-hidden className="h-4 w-4 text-civic" />
+                    <span>
+                      {isListed(featuredCard.comment_window_closes)
+                        ? `Comments close ${featuredCard.comment_window_closes}`
+                        : "Comment deadline not listed"}
+                    </span>
+                  </p>
                 </div>
                 <p className="line-clamp-4 text-sm leading-6 text-black/78">
                   {featuredCard.what_is_happening || "Summary not listed in the source document."}
@@ -119,7 +124,7 @@ export default async function Home({
         <AnnouncementBanner announcements={announcements} />
       </section>
 
-      <section id="decisions" className="section-shell grid scroll-mt-24 gap-6 py-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+      <section id="decisions" className="section-shell scroll-mt-24 py-4">
         <div className="space-y-8">
           <section aria-labelledby="upcoming-decisions-heading">
             <div className="mb-4 flex items-end justify-between gap-4">
@@ -128,9 +133,8 @@ export default async function Home({
                 <h2 id="upcoming-decisions-heading" className="section-title mt-1">
                   What needs attention now
                 </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-black/70">
-                  Prioritized by upcoming meetings, votes, and comment windows so residents can act before
-                  decisions are made.
+                <p className="mt-2 max-w-2xl text-[13px] leading-5 text-black/58">
+                  Sorted by comment deadline — act before decisions are made.
                 </p>
               </div>
               <Link href="/meetings" className="action-ghost px-3 py-2">
@@ -166,32 +170,6 @@ export default async function Home({
             </div>
           </section>
         </div>
-
-        <aside className="space-y-4 lg:pt-24">
-          <div className="quiet-card p-4">
-            <h2 className="text-base font-extrabold text-ink">Take action</h2>
-            <div className="mt-3 space-y-3">
-              <div className="flex gap-3">
-                <MessageSquareText aria-hidden className="mt-1 h-4 w-4 shrink-0 text-civic" />
-                <p className="text-sm leading-6 text-black/75">
-                  Start with <span className="font-semibold text-ink">Show more</span> to see impact and comment options.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <MapPin aria-hidden className="mt-1 h-4 w-4 shrink-0 text-harbor" />
-                <p className="text-sm leading-6 text-black/75">
-                  Open meeting details for date, location, agenda, and packet links.
-                </p>
-              </div>
-              <div className="flex gap-3">
-                <Mail aria-hidden className="mt-1 h-4 w-4 shrink-0 text-clay" />
-                <p className="text-sm leading-6 text-black/75">
-                  Use the listed comment window before the deadline shown on the card.
-                </p>
-              </div>
-            </div>
-          </div>
-        </aside>
       </section>
 
       <section className="mt-6 border-t border-black/10 bg-white/70">

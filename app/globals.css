@@ -10,7 +10,6 @@
 
 * {
   box-sizing: border-box;
-  letter-spacing: 0 !important;
 }
 
 html {
@@ -95,6 +94,15 @@ p {
   @apply text-xs font-bold uppercase text-black/70;
 }
 
+.committee-eyebrow {
+  color: rgba(23, 23, 23, 0.52);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
 .input-control {
   @apply min-h-12 w-full rounded-lg border border-black/20 bg-white px-4 py-3 text-base text-ink shadow-sm transition placeholder:text-black/50 focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/20;
 }
@@ -105,6 +113,13 @@ p {
 
 .input-control--with-icon {
   padding-left: 3rem;
+}
+
+.input-control--hero-search {
+  height: 40px;
+  min-height: 40px;
+  padding-bottom: 0.5rem;
+  padding-top: 0.5rem;
 }
 
 .action-primary {
