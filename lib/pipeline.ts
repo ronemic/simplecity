@@ -1,3 +1,4 @@
+import "@/lib/env/bootstrap";
 import { createServiceSupabaseClient, maybeCreateServiceSupabaseClient } from "@/lib/supabase/service";
 import type { LlmReadyMeeting } from "@/lib/types";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
@@ -40,6 +41,7 @@ export async function runSimpleCityPipeline(
   let documentsDownloaded = 0;
   let cardsGenerated = 0;
   const errors: string[] = [];
+  let persistSummaries = canPersist;
 
   if (persist && !supabase) {
     errors.push("Supabase service environment is not configured; persistence was skipped.");
@@ -82,7 +84,15 @@ export async function runSimpleCityPipeline(
     if (canPersist && supabase) {
       const serviceClient = supabase || createServiceSupabaseClient();
       log("Upserting meetings and documents to Supabase.");
-      upserted = await upsertMeetings(serviceClient, llmReadyMeetings, scrapeResult.scrapedAt);
+      try {
+        upserted = await upsertMeetings(serviceClient, llmReadyMeetings, scrapeResult.scrapedAt);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown persistence error";
+        errors.push(message);
+        log(`Persistence failed; continuing without database writes: ${message}`);
+        upserted = [];
+        persistSummaries = false;
+      }
     } else {
       log("Skipping Supabase persistence.");
     }
@@ -93,7 +103,7 @@ export async function runSimpleCityPipeline(
         log("OPENROUTER_API_KEY is not configured; skipping LLM summaries.");
       } else {
         const summaryTargets =
-          canPersist && upserted.length > 0
+          persistSummaries && upserted.length > 0
             ? upserted
             : llmReadyMeetings.map((meeting) => ({
                 externalId: meeting.id,
@@ -109,7 +119,7 @@ export async function runSimpleCityPipeline(
 
           try {
             const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
-            if (canPersist && supabase) {
+            if (persistSummaries && supabase && item.id) {
               const serviceClient = supabase || createServiceSupabaseClient();
               const inserted = await replaceSummaryCardsForMeeting(serviceClient, item.id, summary, raw);
               cardsGenerated += inserted.length;
@@ -129,18 +139,24 @@ export async function runSimpleCityPipeline(
     log(`Pipeline finished with status ${status}.`);
 
     if (canPersist && supabase && runId) {
-      await supabase
-        .from("scraper_runs")
-        .update({
-          finished_at: new Date().toISOString(),
-          status,
-          meetings_found: meetingsFound,
-          documents_downloaded: documentsDownloaded,
-          cards_generated: cardsGenerated,
-          error: errors.join("\n") || null,
-          logs
-        })
-        .eq("id", runId);
+      try {
+        await supabase
+          .from("scraper_runs")
+          .update({
+            finished_at: new Date().toISOString(),
+            status,
+            meetings_found: meetingsFound,
+            documents_downloaded: documentsDownloaded,
+            cards_generated: cardsGenerated,
+            error: errors.join("\n") || null,
+            logs
+          })
+          .eq("id", runId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown scraper_runs update error";
+        errors.push(message);
+        log(`Failed to update scraper run record: ${message}`);
+      }
     }
 
     return {
@@ -157,18 +173,22 @@ export async function runSimpleCityPipeline(
     log(`Pipeline failed: ${message}`);
 
     if (canPersist && supabase && runId) {
-      await supabase
-        .from("scraper_runs")
-        .update({
-          finished_at: new Date().toISOString(),
-          status: "failed",
-          meetings_found: meetingsFound,
-          documents_downloaded: documentsDownloaded,
-          cards_generated: cardsGenerated,
-          error: message,
-          logs
-        })
-        .eq("id", runId);
+      try {
+        await supabase
+          .from("scraper_runs")
+          .update({
+            finished_at: new Date().toISOString(),
+            status: "failed",
+            meetings_found: meetingsFound,
+            documents_downloaded: documentsDownloaded,
+            cards_generated: cardsGenerated,
+            error: message,
+            logs
+          })
+          .eq("id", runId);
+      } catch {
+        // If scraper run persistence is unavailable, fall through and return the in-memory result.
+      }
     }
 
     return {

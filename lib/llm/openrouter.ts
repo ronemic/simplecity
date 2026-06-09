@@ -1,3 +1,4 @@
+import "@/lib/env/bootstrap";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import { parseAndValidateSummary } from "./validateSummary";
@@ -18,6 +19,9 @@ export async function generateSummaryForMeeting(
 
   options.log?.(`Starting LLM summary for ${meeting.title}.`);
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -26,6 +30,7 @@ export async function generateSummaryForMeeting(
       "HTTP-Referer": referer,
       "X-OpenRouter-Title": "SimpleCity"
     },
+    signal: controller.signal,
     body: JSON.stringify({
       model,
       messages: [
@@ -43,7 +48,7 @@ export async function generateSummaryForMeeting(
         type: "json_object"
       }
     })
-  });
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     const text = await response.text();

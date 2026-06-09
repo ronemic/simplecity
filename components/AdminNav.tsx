@@ -11,12 +11,12 @@ const items = [
 
 export function AdminNav() {
   return (
-    <nav className="flex flex-wrap gap-2">
+    <nav className="flex flex-wrap gap-2 rounded-3xl border border-black/10 bg-white p-2 shadow-sm">
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          className="inline-flex min-h-10 items-center gap-2 rounded-md border border-black/10 bg-white px-3 text-sm font-semibold text-black/70 transition hover:bg-black/5 hover:text-ink focus-visible:focus-ring"
+          className="action-secondary px-4 py-2"
         >
           <item.icon aria-hidden className="h-4 w-4" />
           {item.label}

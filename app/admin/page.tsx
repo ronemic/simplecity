@@ -16,7 +16,7 @@ function Stat({
 }) {
   return (
     <div className="quiet-card p-5">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-black/50">{label}</p>
+      <p className="label-eyebrow">{label}</p>
       <p className="mt-2 text-3xl font-black text-ink">{value}</p>
       {detail ? <p className="mt-1 text-sm text-black/55">{detail}</p> : null}
     </div>
@@ -30,8 +30,9 @@ export default async function AdminPage() {
   if (!hasEnv) {
     return (
       <div className="section-shell py-10">
-        <div className="quiet-card mx-auto max-w-xl p-6">
-          <h1 className="text-2xl font-bold text-ink">Supabase is not configured</h1>
+        <div className="quiet-card mx-auto max-w-xl p-6 sm:p-8">
+          <p className="label-eyebrow text-civic">Admin</p>
+          <h1 className="mt-2 text-3xl font-black text-ink">Supabase is not configured</h1>
           <p className="mt-2 text-sm leading-6 text-black/65">
             Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to `.env.local`, then
             restart the dev server to use the admin portal.
@@ -87,10 +88,10 @@ export default async function AdminPage() {
 
       <section className="mt-8">
         <h2 className="mb-4 text-2xl font-bold text-ink">Recent audit log</h2>
-        <div className="divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white">
+        <div className="divide-y divide-black/10 overflow-hidden rounded-3xl border border-black/10 bg-white shadow-soft">
           {collections.auditLog.length > 0 ? (
             collections.auditLog.slice(0, 8).map((entry) => (
-              <div key={String(entry.id)} className="p-4 text-sm">
+              <div key={String(entry.id)} className="p-5 text-sm">
                 <p className="font-semibold text-ink">
                   {String(entry.action)} · {String(entry.entity_type)}
                 </p>
@@ -101,7 +102,7 @@ export default async function AdminPage() {
               </div>
             ))
           ) : (
-            <p className="p-4 text-sm text-black/60">No audit log entries yet.</p>
+            <p className="p-5 text-sm text-black/60">No audit log entries yet.</p>
           )}
         </div>
       </section>

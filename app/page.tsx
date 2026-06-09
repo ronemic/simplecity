@@ -42,11 +42,11 @@ export default async function Home({
       <section className="border-b border-black/10 bg-newsprint">
         <div className="section-shell grid gap-8 py-10 lg:grid-cols-[1.05fr_0.95fr] lg:py-14">
           <div className="flex flex-col justify-center">
-            <p className="text-sm font-bold uppercase tracking-[0.16em] text-civic">Foster City civic agenda tracker</p>
-            <h1 className="mt-4 text-5xl font-black leading-[1.02] text-ink sm:text-6xl">
+            <p className="label-eyebrow text-civic">Foster City civic agenda tracker</p>
+            <h1 className="page-title mt-4">
               Local decisions, translated.
             </h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-black/68">
+            <p className="page-copy mt-5">
               Local government decisions affect your rent, streets, parks, safety, schools, and taxes.
               SimpleCity turns city meeting agendas into plain-English action cards so you know what is
               happening and how to speak up.
@@ -59,7 +59,7 @@ export default async function Home({
           <div className="quiet-card self-end overflow-hidden">
             <div className="border-b border-black/10 bg-civic px-5 py-4 text-white">
               <p className="text-sm font-bold uppercase tracking-[0.14em] text-white/75">Official-source workflow</p>
-              <h2 className="mt-1 text-2xl font-bold">Agenda packet to action card</h2>
+              <h2 className="mt-1 text-2xl font-bold tracking-tight">Agenda packet to action card</h2>
             </div>
             <div className="grid gap-0 divide-y divide-black/10 bg-white">
               {[
@@ -88,10 +88,10 @@ export default async function Home({
           <section>
             <div className="mb-4 flex items-end justify-between gap-4">
               <div>
-                <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Upcoming decisions</p>
-                <h2 className="mt-1 text-3xl font-bold text-ink">What is coming up</h2>
+                <p className="label-eyebrow text-civic">Upcoming decisions</p>
+                <h2 className="section-title mt-1">What is coming up</h2>
               </div>
-              <Link href="/meetings" className="inline-flex items-center gap-1 text-sm font-bold text-civic">
+              <Link href="/meetings" className="action-ghost px-3 py-2">
                 All meetings <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
             </div>
@@ -112,8 +112,8 @@ export default async function Home({
 
           <section>
             <div className="mb-4">
-              <p className="text-sm font-bold uppercase tracking-[0.14em] text-harbor">Recently discussed</p>
-              <h2 className="mt-1 text-3xl font-bold text-ink">Latest agenda cards</h2>
+              <p className="label-eyebrow text-harbor">Recently discussed</p>
+              <h2 className="section-title mt-1">Latest agenda cards</h2>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
               {recentCards.map((card) => (
@@ -125,7 +125,7 @@ export default async function Home({
 
         <aside className="space-y-4">
           <div className="quiet-card p-5">
-            <h2 className="text-lg font-bold text-ink">How to act</h2>
+            <h2 className="text-xl font-bold text-ink">How to act</h2>
             <div className="mt-4 space-y-4">
               <div className="flex gap-3">
                 <MapPin aria-hidden className="mt-1 h-5 w-5 shrink-0 text-civic" />
@@ -148,7 +148,7 @@ export default async function Home({
             </div>
           </div>
           <div className="quiet-card p-5">
-            <h2 className="text-lg font-bold text-ink">Source transparency</h2>
+            <h2 className="text-xl font-bold text-ink">Source transparency</h2>
             <p className="mt-2 text-sm leading-6 text-black/68">
               Every card links back to an official PrimeGov agenda, packet, or notice document.
             </p>

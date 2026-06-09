@@ -24,15 +24,15 @@ export default async function MeetingDetailPage({
             {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
           </span>
         </div>
-        <h1 className="mt-3 text-4xl font-black leading-tight text-ink">{meeting.title}</h1>
-        <p className="mt-3 text-base text-black/65">{meeting.meeting_type || "Meeting type not listed"}</p>
+        <h1 className="page-title mt-3">{meeting.title}</h1>
+        <p className="page-copy mt-3 text-base">{meeting.meeting_type || "Meeting type not listed"}</p>
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <section className="space-y-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Summary cards</p>
-            <h2 className="mt-1 text-2xl font-bold text-ink">Plain-English agenda items</h2>
+            <p className="label-eyebrow text-civic">Summary cards</p>
+            <h2 className="section-title mt-1">Plain-English agenda items</h2>
           </div>
           {cards.length > 0 ? (
             <div className="grid gap-4">
@@ -42,7 +42,7 @@ export default async function MeetingDetailPage({
             </div>
           ) : (
             <div className="quiet-card p-8">
-              <h3 className="text-lg font-semibold text-ink">No published cards for this meeting yet</h3>
+              <h3 className="text-xl font-bold text-ink">No published cards for this meeting yet</h3>
               <p className="mt-2 text-sm leading-6 text-black/60">
                 Admins can regenerate summaries after agenda text has been extracted.
               </p>
@@ -51,8 +51,8 @@ export default async function MeetingDetailPage({
         </section>
 
         <aside className="space-y-4">
-          <section className="quiet-card p-5">
-            <h2 className="text-lg font-bold text-ink">Official documents</h2>
+          <section className="quiet-card p-5 sm:p-6">
+            <h2 className="text-xl font-bold text-ink">Official documents</h2>
             <div className="mt-4 space-y-2">
               {documents.length > 0 ? (
                 documents.map((doc) => (
@@ -61,7 +61,7 @@ export default async function MeetingDetailPage({
                     href={doc.source_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-start gap-3 rounded-md border border-black/10 p-3 text-sm transition hover:bg-black/5 focus-visible:focus-ring"
+                    className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:bg-black/[0.025] hover:shadow-sm focus-visible:focus-ring"
                   >
                     <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
                     <span className="min-w-0 flex-1">
@@ -77,15 +77,15 @@ export default async function MeetingDetailPage({
             </div>
           </section>
 
-          <section className="quiet-card p-5">
-            <h2 className="text-lg font-bold text-ink">Public comment information</h2>
+          <section className="quiet-card p-5 sm:p-6">
+            <h2 className="text-xl font-bold text-ink">Public comment information</h2>
             <p className="mt-2 text-sm leading-6 text-black/65">
               {meeting.public_comments_input_text || "Not listed in the source document."}
             </p>
           </section>
 
-          <section className="quiet-card p-5">
-            <h2 className="text-lg font-bold text-ink">Source note</h2>
+          <section className="quiet-card p-5 sm:p-6">
+            <h2 className="text-xl font-bold text-ink">Source note</h2>
             <p className="mt-2 text-sm leading-6 text-black/65">
               This summary was generated from official agenda documents. Always check the original source
               before making formal decisions.

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { jsonrepair } from "jsonrepair";
 import { CATEGORIES } from "@/lib/constants";
 import type { SimpleCitySummary } from "@/lib/types";
 
@@ -61,7 +62,13 @@ export function extractJsonObject(raw: string) {
 
 export function parsePossiblyWrappedJson(raw: string) {
   const json = extractJsonObject(raw);
-  return JSON.parse(json) as unknown;
+
+  try {
+    return JSON.parse(json) as unknown;
+  } catch (error) {
+    const repaired = jsonrepair(json);
+    return JSON.parse(repaired) as unknown;
+  }
 }
 
 export function validateSimpleCitySummary(raw: unknown): SimpleCitySummary {

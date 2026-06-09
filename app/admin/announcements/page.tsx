@@ -92,62 +92,62 @@ function AnnouncementForm({
   action: (formData: FormData) => Promise<void>;
 }) {
   return (
-    <form action={action} className="quiet-card space-y-4 p-5">
+    <form action={action} className="quiet-card space-y-4 p-5 sm:p-6">
       {announcement?.id ? <input type="hidden" name="id" value={String(announcement.id)} /> : null}
       <div className="grid gap-3 md:grid-cols-2">
-        <label className="block md:col-span-2">
+        <label className="block space-y-1 md:col-span-2">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Title</span>
           <input
             name="title"
             required
             defaultValue={String(announcement?.title || "")}
-            className="mt-1 min-h-11 w-full rounded-md border border-black/15 px-3 outline-none focus:border-civic focus:ring-2 focus:ring-civic/20"
+            className="input-control"
           />
         </label>
-        <label className="block md:col-span-2">
+        <label className="block space-y-1 md:col-span-2">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Body</span>
           <textarea
             name="body"
             required
             rows={3}
             defaultValue={String(announcement?.body || "")}
-            className="mt-1 w-full rounded-md border border-black/15 px-3 py-2 outline-none focus:border-civic focus:ring-2 focus:ring-civic/20"
+            className="input-control input-control--textarea"
           />
         </label>
-        <label className="block">
+        <label className="block space-y-1">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Type</span>
           <select
             name="type"
             defaultValue={String(announcement?.type || "info")}
-            className="mt-1 min-h-11 w-full rounded-md border border-black/15 px-3"
+            className="input-control"
           >
             <option value="info">Info</option>
             <option value="alert">Alert</option>
             <option value="event">Event</option>
           </select>
         </label>
-        <label className="flex items-end gap-2 text-sm font-semibold">
+        <label className="flex items-end gap-2 rounded-2xl border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">
           <input type="checkbox" name="is_published" defaultChecked={Boolean(announcement?.is_published ?? true)} />
           Published
         </label>
-        <label className="block">
+        <label className="block space-y-1">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Starts at</span>
           <input
             type="datetime-local"
             name="starts_at"
-            className="mt-1 min-h-11 w-full rounded-md border border-black/15 px-3"
+            className="input-control"
           />
         </label>
-        <label className="block">
+        <label className="block space-y-1">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Ends at</span>
           <input
             type="datetime-local"
             name="ends_at"
-            className="mt-1 min-h-11 w-full rounded-md border border-black/15 px-3"
+            className="input-control"
           />
         </label>
       </div>
-      <button className="min-h-10 rounded-md bg-civic px-4 text-sm font-bold text-white">
+      <button className="action-primary">
         {announcement?.id ? "Save announcement" : "Create announcement"}
       </button>
     </form>
@@ -169,8 +169,8 @@ export default async function AdminAnnouncementsPage() {
   return (
     <div className="section-shell py-10">
       <div className="mb-6">
-        <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Admin</p>
-        <h1 className="mt-2 text-4xl font-black text-ink">Announcements</h1>
+        <p className="label-eyebrow text-civic">Admin</p>
+        <h1 className="page-title mt-2">Announcements</h1>
       </div>
       <AdminNav />
 
@@ -187,7 +187,7 @@ export default async function AdminAnnouncementsPage() {
               <AnnouncementForm announcement={announcement as unknown as Record<string, unknown>} action={updateAnnouncementAction} />
               <form action={deleteAnnouncementAction}>
                 <input type="hidden" name="id" value={announcement.id} />
-                <button className="min-h-10 rounded-md border border-clay/30 bg-clay/10 px-4 text-sm font-bold text-clay">
+                <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/15">
                   Delete announcement
                 </button>
               </form>

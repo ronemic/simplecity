@@ -18,8 +18,15 @@ const config: Config = {
         soft: "0 18px 50px rgba(23, 23, 23, 0.08)"
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "Inter", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "ui-monospace", "SFMono-Regular", "monospace"]
+        sans: [
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif"
+        ],
+        mono: ["ui-monospace", "SFMono-Regular", "SF Mono", "Menlo", "monospace"]
       }
     }
   },

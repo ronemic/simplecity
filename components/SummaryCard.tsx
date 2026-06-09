@@ -15,8 +15,8 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const categories = card.category_tags || [];
 
   return (
-    <article className="quiet-card overflow-hidden">
-      <div className="space-y-4 p-5 sm:p-6">
+    <article className="quiet-card overflow-hidden transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(23,23,23,0.12)]">
+      <div className="space-y-5 p-6 sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
           {categories.map((category) => (
             <CategoryPill
@@ -30,7 +30,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
         </div>
 
         <div className="space-y-2">
-          <h3 className="text-xl font-semibold leading-snug text-ink">{card.agenda_item}</h3>
+          <h3 className="text-2xl font-bold leading-tight text-ink">{card.agenda_item}</h3>
           <p className="text-sm font-medium text-black/60">
             {formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime)} ·{" "}
             {meeting?.meeting_type || "Meeting type not listed"}
@@ -89,11 +89,11 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
           ) : null}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-4">
+        <div className="flex flex-wrap items-center gap-3 border-t border-black/10 pt-5">
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="inline-flex min-h-10 items-center gap-2 rounded-md border border-black/15 bg-white px-3 text-sm font-semibold transition hover:bg-black/5 focus-visible:focus-ring"
+            className="action-secondary px-4"
             aria-expanded={open}
           >
             <ChevronDown aria-hidden className={cn("h-4 w-4 transition", open && "rotate-180")} />
@@ -102,7 +102,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
           {meeting?.id ? (
             <Link
               href={`/meetings/${meeting.id}`}
-              className="inline-flex min-h-10 items-center rounded-md border border-black/15 bg-white px-3 text-sm font-semibold transition hover:bg-black/5 focus-visible:focus-ring"
+              className="action-secondary px-4"
             >
               Meeting details
             </Link>
@@ -112,7 +112,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
               href={card.source_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-10 items-center gap-2 rounded-md bg-ink px-3 text-sm font-semibold text-white transition hover:bg-black focus-visible:focus-ring"
+              className="action-primary px-4"
             >
               <ExternalLink aria-hidden className="h-4 w-4" />
               View source

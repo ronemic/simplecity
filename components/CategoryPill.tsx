@@ -13,8 +13,8 @@ export function CategoryPill({
 }) {
   const definition = CATEGORY_DEFINITIONS[category as CategoryName];
   const className = cn(
-    "inline-flex items-center gap-1.5 rounded-md border font-medium",
-    compact ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm",
+    "inline-flex items-center gap-1.5 rounded-full border font-medium shadow-sm",
+    compact ? "px-2.5 py-1 text-xs" : "px-3.5 py-1.5 text-sm",
     definition?.tone || "border-black/15 bg-black/5 text-black/70"
   );
 

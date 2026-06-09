@@ -33,11 +33,11 @@ export default async function CategoryDetailPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-8 max-w-3xl">
-        <span className="flex h-12 w-12 items-center justify-center rounded-md bg-civic/10 text-civic">
+        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-civic/10 text-civic shadow-sm">
           <Icon aria-hidden className="h-6 w-6" />
         </span>
-        <h1 className="mt-4 text-4xl font-black text-ink">{category}</h1>
-        <p className="mt-3 text-base leading-7 text-black/65">{definition.description}</p>
+        <h1 className="page-title mt-4">{category}</h1>
+        <p className="page-copy mt-3 text-base">{definition.description}</p>
         <div className="mt-4">
           <CategoryPill category={category} />
         </div>
@@ -52,7 +52,7 @@ export default async function CategoryDetailPage({
           <a
             key={item.href}
             href={item.href}
-            className="rounded-md border border-black/15 bg-white px-3 py-2 text-sm font-bold transition hover:bg-black/5 focus-visible:focus-ring"
+            className="action-secondary px-4 py-2"
           >
             {item.label}
           </a>
@@ -65,7 +65,7 @@ export default async function CategoryDetailPage({
         ))}
         {filtered.length === 0 ? (
           <div className="quiet-card p-8 text-center">
-            <h2 className="text-lg font-semibold text-ink">No cards in this category yet</h2>
+            <h2 className="text-xl font-bold text-ink">No cards in this category yet</h2>
             <p className="mt-2 text-sm leading-6 text-black/60">
               Cards will appear here once official agenda items are scraped and summarized.
             </p>

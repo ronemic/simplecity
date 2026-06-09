@@ -77,23 +77,23 @@ export default async function AdminMeetingsPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-6">
-        <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Admin</p>
-        <h1 className="mt-2 text-4xl font-black text-ink">Meetings</h1>
+        <p className="label-eyebrow text-civic">Admin</p>
+        <h1 className="page-title mt-2">Meetings</h1>
       </div>
       <AdminNav />
 
-      <form className="mt-8 grid gap-3 rounded-lg border border-black/10 bg-white p-4 md:grid-cols-4 lg:grid-cols-5">
+      <form className="quiet-card mt-8 grid gap-3 p-4 md:grid-cols-4 lg:grid-cols-5 sm:p-5">
         <select
           name="status"
           defaultValue={params.status || ""}
-          className="min-h-11 rounded-md border border-black/15 px-3"
+          className="input-control"
         >
           <option value="">All statuses</option>
           <option value="Upcoming">Upcoming</option>
           <option value="Past">Past</option>
           <option value="Cancelled">Cancelled</option>
         </select>
-        <select name="type" defaultValue={params.type || ""} className="min-h-11 rounded-md border border-black/15 px-3">
+        <select name="type" defaultValue={params.type || ""} className="input-control">
           <option value="">All meeting types</option>
           {meetingTypes.map((type) => (
             <option key={type || ""} value={type || ""}>
@@ -104,7 +104,7 @@ export default async function AdminMeetingsPage({
         <select
           name="category"
           defaultValue={params.category || ""}
-          className="min-h-11 rounded-md border border-black/15 px-3"
+          className="input-control"
         >
           <option value="">All categories</option>
           {CATEGORIES.map((category) => (
@@ -117,9 +117,9 @@ export default async function AdminMeetingsPage({
           name="date"
           defaultValue={params.date || ""}
           placeholder="Date text"
-          className="min-h-11 rounded-md border border-black/15 px-3"
+          className="input-control"
         />
-        <button className="min-h-11 rounded-md bg-civic px-4 text-sm font-bold text-white">Filter</button>
+        <button className="action-primary">Filter</button>
       </form>
 
       <div className="mt-6 grid gap-4">
@@ -146,7 +146,7 @@ export default async function AdminMeetingsPage({
                 </div>
                 <form action={regenerateMeetingAction}>
                   <input type="hidden" name="id" value={meeting.id} />
-                  <button className="min-h-10 rounded-md bg-civic px-4 text-sm font-bold text-white">
+                  <button className="action-primary">
                     Regenerate summaries
                   </button>
                 </form>
