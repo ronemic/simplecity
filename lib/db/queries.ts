@@ -2,6 +2,12 @@ import { maybeCreateServerSupabaseClient } from "@/lib/supabase/server";
 import { maybeCreateServiceSupabaseClient } from "@/lib/supabase/service";
 import type { AnnouncementRow, DocumentRow, MeetingRow, SummaryCardRow } from "@/lib/types";
 
+function logQueryError(context: string, error: unknown) {
+  if (!error) return;
+  const message = error instanceof Error ? error.message : JSON.stringify(error);
+  console.error(`[SimpleCity] ${context}: ${message}`);
+}
+
 export async function getPublishedCards() {
   const supabase = await maybeCreateServerSupabaseClient();
   if (!supabase) return [] as SummaryCardRow[];
@@ -13,7 +19,10 @@ export async function getPublishedCards() {
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false });
 
-  if (error) return [];
+  if (error) {
+    logQueryError("Failed to load published summary cards", error);
+    return [];
+  }
   return (data || []) as SummaryCardRow[];
 }
 
@@ -27,7 +36,10 @@ export async function getActiveAnnouncements() {
     .eq("is_published", true)
     .order("created_at", { ascending: false });
 
-  if (error) return [];
+  if (error) {
+    logQueryError("Failed to load announcements", error);
+    return [];
+  }
   return (data || []) as AnnouncementRow[];
 }
 
@@ -40,7 +52,10 @@ export async function getMeetings() {
     .select("*")
     .order("meeting_datetime", { ascending: false, nullsFirst: false });
 
-  if (error) return [];
+  if (error) {
+    logQueryError("Failed to load meetings", error);
+    return [];
+  }
   return (data || []) as MeetingRow[];
 }
 
@@ -54,7 +69,11 @@ export async function getMeetingDetail(id: string) {
     };
   }
 
-  const [{ data: meeting }, { data: cards }, { data: documents }] = await Promise.all([
+  const [
+    { data: meeting, error: meetingError },
+    { data: cards, error: cardsError },
+    { data: documents, error: documentsError }
+  ] = await Promise.all([
     supabase.from("meetings").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("summary_cards")
@@ -64,6 +83,10 @@ export async function getMeetingDetail(id: string) {
       .order("created_at", { ascending: true }),
     supabase.from("documents").select("*").eq("meeting_id", id).order("type", { ascending: true })
   ]);
+
+  logQueryError(`Failed to load meeting ${id}`, meetingError);
+  logQueryError(`Failed to load cards for meeting ${id}`, cardsError);
+  logQueryError(`Failed to load documents for meeting ${id}`, documentsError);
 
   return {
     meeting: meeting as MeetingRow | null,
@@ -102,6 +125,13 @@ export async function getAdminCollections() {
     supabase.from("scraper_runs").select("*").order("started_at", { ascending: false }).limit(20),
     supabase.from("admin_audit_log").select("*").order("created_at", { ascending: false }).limit(50)
   ]);
+
+  logQueryError("Failed to load admin meetings", meetings.error);
+  logQueryError("Failed to load admin cards", cards.error);
+  logQueryError("Failed to load admin announcements", announcements.error);
+  logQueryError("Failed to load admin documents", documents.error);
+  logQueryError("Failed to load scraper runs", scraperRuns.error);
+  logQueryError("Failed to load audit log", auditLog.error);
 
   return {
     meetings: (meetings.data || []) as MeetingRow[],

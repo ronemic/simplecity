@@ -4,12 +4,13 @@
 
 :root {
   color-scheme: light;
-  background: #faf6ef;
+  background: #f4f6f8;
   color: #171717;
 }
 
 * {
   box-sizing: border-box;
+  letter-spacing: 0 !important;
 }
 
 html {
@@ -23,24 +24,12 @@ body {
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  background:
-    radial-gradient(circle at top left, rgba(36, 87, 166, 0.14), transparent 32%),
-    radial-gradient(circle at top right, rgba(89, 125, 53, 0.1), transparent 26%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(250, 246, 239, 0.9)),
-    #faf6ef;
+  background: linear-gradient(180deg, #fbfcfd 0%, #f4f6f8 100%);
   color: #171717;
 }
 
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image: linear-gradient(rgba(23, 23, 23, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(23, 23, 23, 0.025) 1px, transparent 1px);
-  background-size: 24px 24px;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 85%);
-  opacity: 0.5;
+  display: none;
 }
 
 main {
@@ -67,12 +56,11 @@ h4,
 h5,
 h6 {
   color: #171717;
-  letter-spacing: -0.02em;
   line-height: 1.08;
 }
 
 p {
-  color: rgba(23, 23, 23, 0.78);
+  color: rgba(23, 23, 23, 0.84);
 }
 
 ::selection {
@@ -88,27 +76,27 @@ p {
 }
 
 .quiet-card {
-  @apply rounded-3xl border border-black/10 bg-white/90 shadow-soft backdrop-blur-sm;
+  @apply rounded-lg border border-black/10 bg-white shadow-soft;
 }
 
 .page-title {
-  @apply text-balance text-4xl font-black tracking-tight text-ink sm:text-5xl lg:text-6xl;
+  @apply text-balance text-4xl font-black text-ink sm:text-5xl lg:text-6xl;
 }
 
 .page-copy {
-  @apply max-w-3xl text-lg leading-8 text-black/70;
+  @apply max-w-3xl text-lg leading-8 text-black/80;
 }
 
 .section-title {
-  @apply text-2xl font-bold tracking-tight text-ink sm:text-3xl;
+  @apply text-2xl font-bold text-ink sm:text-3xl;
 }
 
 .label-eyebrow {
-  @apply text-xs font-bold uppercase tracking-[0.16em] text-black/45;
+  @apply text-xs font-bold uppercase text-black/70;
 }
 
 .input-control {
-  @apply min-h-12 w-full rounded-2xl border border-black/15 bg-white px-4 py-3 text-base text-ink shadow-sm transition placeholder:text-black/35 focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/15;
+  @apply min-h-12 w-full rounded-lg border border-black/20 bg-white px-4 py-3 text-base text-ink shadow-sm transition placeholder:text-black/50 focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/20;
 }
 
 .input-control--textarea {
@@ -116,13 +104,13 @@ p {
 }
 
 .action-primary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .action-secondary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-black/12 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-black/[0.03] hover:shadow-md active:translate-y-px;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-black/20 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-black/[0.03] hover:shadow-md active:translate-y-px;
 }
 
 .action-ghost {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-black/70 transition hover:bg-black/[0.03] hover:text-ink;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold text-black/75 transition hover:bg-black/[0.04] hover:text-ink;
 }

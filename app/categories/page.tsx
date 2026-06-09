@@ -23,11 +23,11 @@ export default function CategoriesPage() {
               href={`/categories/${definition.slug}`}
               className="quiet-card group p-5 transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(23,23,23,0.12)] focus-visible:focus-ring"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-civic/10 text-civic shadow-sm">
+              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-civic/10 text-civic shadow-sm">
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <h2 className="mt-4 text-xl font-bold text-ink">{category}</h2>
-              <p className="mt-2 text-sm leading-6 text-black/62">{definition.description}</p>
+              <p className="mt-2 text-sm leading-6 text-black/70">{definition.description}</p>
               <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-civic">
                 View cards <ArrowRight aria-hidden className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </span>

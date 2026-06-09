@@ -5,7 +5,7 @@ export default function NotFound() {
     <div className="section-shell py-10">
       <div className="quiet-card mx-auto max-w-xl p-6 text-center">
         <h1 className="text-2xl font-bold text-ink">Page not found</h1>
-        <p className="mt-2 text-sm leading-6 text-black/65">
+        <p className="mt-2 text-sm leading-6 text-black/75">
           The meeting or category may not exist yet, or it may not have been loaded from PrimeGov.
         </p>
         <Link

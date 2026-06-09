@@ -58,8 +58,8 @@ export default async function Home({
 
           <div className="quiet-card self-end overflow-hidden">
             <div className="border-b border-black/10 bg-civic px-5 py-4 text-white">
-              <p className="text-sm font-bold uppercase tracking-[0.14em] text-white/75">Official-source workflow</p>
-              <h2 className="mt-1 text-2xl font-bold tracking-tight">Agenda packet to action card</h2>
+              <p className="text-sm font-bold uppercase text-white/80">Official-source workflow</p>
+              <h2 className="mt-1 text-2xl font-bold">Agenda packet to action card</h2>
             </div>
             <div className="grid gap-0 divide-y divide-black/10 bg-white">
               {[
@@ -71,7 +71,7 @@ export default async function Home({
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-harbor/10 text-sm font-black text-harbor">
                     {index + 1}
                   </span>
-                  <p className="text-sm leading-6 text-black/68">{item}</p>
+                  <p className="text-sm leading-6 text-black/80">{item}</p>
                 </div>
               ))}
             </div>
@@ -102,7 +102,7 @@ export default async function Home({
               {filteredCards.length === 0 ? (
                 <div className="quiet-card p-8 text-center">
                   <h3 className="text-lg font-semibold text-ink">No cards yet</h3>
-                  <p className="mt-2 text-sm leading-6 text-black/60">
+                  <p className="mt-2 text-sm leading-6 text-black/70">
                     Once the scraper and summarizer run, official Foster City agenda cards will appear here.
                   </p>
                 </div>
@@ -129,19 +129,19 @@ export default async function Home({
             <div className="mt-4 space-y-4">
               <div className="flex gap-3">
                 <MapPin aria-hidden className="mt-1 h-5 w-5 shrink-0 text-civic" />
-                <p className="text-sm leading-6 text-black/68">
+                <p className="text-sm leading-6 text-black/80">
                   Check the meeting detail page for date, location, and official agenda links.
                 </p>
               </div>
               <div className="flex gap-3">
                 <MessageSquareText aria-hidden className="mt-1 h-5 w-5 shrink-0 text-harbor" />
-                <p className="text-sm leading-6 text-black/68">
+                <p className="text-sm leading-6 text-black/80">
                   Use the comment window and submission link exactly as listed in the source document.
                 </p>
               </div>
               <div className="flex gap-3">
                 <Mail aria-hidden className="mt-1 h-5 w-5 shrink-0 text-clay" />
-                <p className="text-sm leading-6 text-black/68">
+                <p className="text-sm leading-6 text-black/80">
                   If no contact is listed, the card will say so instead of guessing.
                 </p>
               </div>
@@ -149,7 +149,7 @@ export default async function Home({
           </div>
           <div className="quiet-card p-5">
             <h2 className="text-xl font-bold text-ink">Source transparency</h2>
-            <p className="mt-2 text-sm leading-6 text-black/68">
+            <p className="mt-2 text-sm leading-6 text-black/80">
               Every card links back to an official PrimeGov agenda, packet, or notice document.
             </p>
           </div>

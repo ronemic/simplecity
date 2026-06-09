@@ -7,17 +7,15 @@ export type GenerateSummaryOptions = {
   log?: (message: string) => void;
 };
 
-export async function generateSummaryForMeeting(
+async function requestSummary(
   meeting: LlmReadyMeeting,
-  options: GenerateSummaryOptions = {}
-): Promise<{ summary: SimpleCitySummary; raw: unknown }> {
+  options: GenerateSummaryOptions
+) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY.");
 
   const model = process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free";
   const referer = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  options.log?.(`Starting LLM summary for ${meeting.title}.`);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
@@ -62,8 +60,31 @@ export async function generateSummaryForMeeting(
   const content = raw.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenRouter response did not include message content.");
 
-  const summary = parseAndValidateSummary(content);
-  options.log?.(`Finished LLM summary for ${meeting.title}: ${summary.cards.length} cards.`);
+  const summary = parseAndValidateSummary(content, meeting.sourceUrl || undefined);
 
   return { summary, raw };
+}
+
+export async function generateSummaryForMeeting(
+  meeting: LlmReadyMeeting,
+  options: GenerateSummaryOptions = {}
+): Promise<{ summary: SimpleCitySummary; raw: unknown }> {
+  options.log?.(`Starting LLM summary for ${meeting.title}.`);
+
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const result = await requestSummary(meeting, options);
+      options.log?.(`Finished LLM summary for ${meeting.title}: ${result.summary.cards.length} cards.`);
+      return result;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : "Unknown LLM error";
+      if (attempt < 2) {
+        options.log?.(`Retrying LLM summary for ${meeting.title}: ${message}`);
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Unknown LLM error");
 }

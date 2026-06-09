@@ -16,7 +16,7 @@ export function AdminCardEditor({
         <input type="hidden" name="id" value={card.id} />
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Agenda item</span>
+            <span className="text-xs font-bold uppercase text-black/70">Agenda item</span>
             <input
               name="agenda_item"
               defaultValue={card.agenda_item || ""}
@@ -24,7 +24,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">What is happening</span>
+            <span className="text-xs font-bold uppercase text-black/70">What is happening</span>
             <textarea
               name="what_is_happening"
               defaultValue={card.what_is_happening || ""}
@@ -33,7 +33,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Why it matters</span>
+            <span className="text-xs font-bold uppercase text-black/70">Why it matters</span>
             <textarea
               name="why_it_matters"
               defaultValue={card.why_it_matters || ""}
@@ -42,7 +42,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Status</span>
+            <span className="text-xs font-bold uppercase text-black/70">Status</span>
             <input
               name="status"
               defaultValue={card.status || ""}
@@ -50,7 +50,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Who it affects</span>
+            <span className="text-xs font-bold uppercase text-black/70">Who it affects</span>
             <input
               name="who_it_affects"
               defaultValue={(card.who_it_affects || []).join(", ")}
@@ -58,7 +58,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Source URL</span>
+            <span className="text-xs font-bold uppercase text-black/70">Source URL</span>
             <input
               name="source_url"
               defaultValue={card.source_url || ""}
@@ -66,10 +66,10 @@ export function AdminCardEditor({
             />
           </label>
           <fieldset className="md:col-span-2">
-            <legend className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Categories</legend>
-            <div className="mt-2 flex flex-wrap gap-2 rounded-2xl bg-black/[0.02] p-2">
+            <legend className="text-xs font-bold uppercase text-black/70">Categories</legend>
+            <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.02] p-2">
               {CATEGORIES.map((category) => (
-                <label key={category} className="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-white px-3 py-2 text-sm shadow-sm">
+                <label key={category} className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm shadow-sm">
                   <input
                     type="checkbox"
                     name="category_tags"
@@ -82,7 +82,7 @@ export function AdminCardEditor({
             </div>
           </fieldset>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Comment opens</span>
+            <span className="text-xs font-bold uppercase text-black/70">Comment opens</span>
             <input
               name="comment_window_opens"
               defaultValue={card.comment_window_opens || ""}
@@ -90,7 +90,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Comment closes</span>
+            <span className="text-xs font-bold uppercase text-black/70">Comment closes</span>
             <input
               name="comment_window_closes"
               defaultValue={card.comment_window_closes || ""}
@@ -98,7 +98,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Attend</span>
+            <span className="text-xs font-bold uppercase text-black/70">Attend</span>
             <textarea
               name="how_to_act_attend"
               defaultValue={card.how_to_act_attend || ""}
@@ -107,7 +107,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Email</span>
+            <span className="text-xs font-bold uppercase text-black/70">Email</span>
             <textarea
               name="how_to_act_email"
               defaultValue={card.how_to_act_email || ""}
@@ -116,7 +116,7 @@ export function AdminCardEditor({
             />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Submit comment</span>
+            <span className="text-xs font-bold uppercase text-black/70">Submit comment</span>
             <textarea
               name="how_to_act_submit_comment"
               defaultValue={card.how_to_act_submit_comment || ""}
@@ -124,16 +124,16 @@ export function AdminCardEditor({
               className="input-control input-control--textarea"
             />
           </label>
-          <label className="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-black/[0.02] px-3 py-2 text-sm font-semibold">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-sm font-semibold">
             <input type="checkbox" name="is_published" defaultChecked={Boolean(card.is_published)} />
             Published
           </label>
-          <label className="inline-flex items-center gap-2 rounded-2xl border border-black/10 bg-black/[0.02] px-3 py-2 text-sm font-semibold">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-sm font-semibold">
             <input type="checkbox" name="is_featured" defaultChecked={Boolean(card.is_featured)} />
             Featured
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Admin notes</span>
+            <span className="text-xs font-bold uppercase text-black/70">Admin notes</span>
             <textarea
               name="admin_notes"
               defaultValue={card.admin_notes || ""}
@@ -150,7 +150,7 @@ export function AdminCardEditor({
       </form>
       <form action={deleteAction} className="mt-3">
         <input type="hidden" name="id" value={card.id} />
-        <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/15">
+        <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20">
           Delete card
         </button>
       </form>

@@ -33,7 +33,7 @@ export default async function CategoryDetailPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-8 max-w-3xl">
-        <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-civic/10 text-civic shadow-sm">
+        <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-civic/10 text-civic shadow-sm">
           <Icon aria-hidden className="h-6 w-6" />
         </span>
         <h1 className="page-title mt-4">{category}</h1>
@@ -66,7 +66,7 @@ export default async function CategoryDetailPage({
         {filtered.length === 0 ? (
           <div className="quiet-card p-8 text-center">
             <h2 className="text-xl font-bold text-ink">No cards in this category yet</h2>
-            <p className="mt-2 text-sm leading-6 text-black/60">
+            <p className="mt-2 text-sm leading-6 text-black/70">
               Cards will appear here once official agenda items are scraped and summarized.
             </p>
           </div>

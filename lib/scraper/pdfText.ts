@@ -13,6 +13,7 @@ export type PdfTextResult = {
 export function cleanPdfText(text = "") {
   return text
     .replace(/\r/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

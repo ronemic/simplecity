@@ -20,7 +20,7 @@ export default async function AdminScraperRunsPage() {
   return (
     <div className="section-shell py-10">
       <div className="mb-6">
-        <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Admin</p>
+        <p className="text-sm font-bold uppercase text-civic">Admin</p>
         <h1 className="mt-2 text-4xl font-black text-ink">Scraper runs</h1>
       </div>
       <AdminNav />
@@ -38,7 +38,7 @@ export default async function AdminScraperRunsPage() {
                 <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                   <div>
                     <h3 className="text-lg font-bold text-ink">{String(run.status || "Unknown")}</h3>
-                    <p className="mt-1 text-sm text-black/55">
+                    <p className="mt-1 text-sm text-black/70">
                       Started {run.started_at ? new Date(String(run.started_at)).toLocaleString() : "No date"}
                       {run.finished_at ? ` · Finished ${new Date(String(run.finished_at)).toLocaleString()}` : ""}
                     </p>
@@ -63,7 +63,7 @@ export default async function AdminScraperRunsPage() {
                 ) : null}
                 <details className="mt-4 rounded-md border border-black/10 bg-black/[0.025] p-3">
                   <summary className="cursor-pointer text-sm font-bold text-ink">Logs</summary>
-                  <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-5 text-black/65">
+                  <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-5 text-black/75">
                     {Array.isArray(run.logs)
                       ? run.logs.join("\n")
                       : typeof run.logs === "string"
@@ -88,12 +88,12 @@ export default async function AdminScraperRunsPage() {
             failedDocuments.map((doc) => (
               <div key={doc.id} className="p-4 text-sm">
                 <p className="font-semibold text-ink">{doc.type || "Document"}</p>
-                <p className="mt-1 break-words text-black/55">{doc.source_url}</p>
+                <p className="mt-1 break-words text-black/70">{doc.source_url}</p>
                 <p className="mt-1 text-clay">{doc.download_error}</p>
               </div>
             ))
           ) : (
-            <p className="p-4 text-sm text-black/60">No failed document downloads in the latest records.</p>
+            <p className="p-4 text-sm text-black/70">No failed document downloads in the latest records.</p>
           )}
         </div>
       </section>

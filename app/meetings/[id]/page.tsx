@@ -20,7 +20,7 @@ export default async function MeetingDetailPage({
       <div className="mb-8 max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={meeting.status} />
-          <span className="text-sm font-semibold text-black/55">
+          <span className="text-sm font-semibold text-black/70">
             {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
           </span>
         </div>
@@ -43,7 +43,7 @@ export default async function MeetingDetailPage({
           ) : (
             <div className="quiet-card p-8">
               <h3 className="text-xl font-bold text-ink">No published cards for this meeting yet</h3>
-              <p className="mt-2 text-sm leading-6 text-black/60">
+              <p className="mt-2 text-sm leading-6 text-black/70">
                 Admins can regenerate summaries after agenda text has been extracted.
               </p>
             </div>
@@ -61,32 +61,32 @@ export default async function MeetingDetailPage({
                     href={doc.source_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-start gap-3 rounded-2xl border border-black/10 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:bg-black/[0.025] hover:shadow-sm focus-visible:focus-ring"
+                    className="flex items-start gap-3 rounded-lg border border-black/10 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:bg-black/[0.025] hover:shadow-sm focus-visible:focus-ring"
                   >
                     <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold text-ink">{doc.type || "Document"}</span>
-                      <span className="block break-words text-black/55">{doc.label || "Official source"}</span>
+                      <span className="block break-words text-black/70">{doc.label || "Official source"}</span>
                     </span>
                     <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-black/40" />
                   </a>
                 ))
               ) : (
-                <p className="text-sm leading-6 text-black/60">No source documents are stored for this meeting yet.</p>
+                <p className="text-sm leading-6 text-black/70">No source documents are stored for this meeting yet.</p>
               )}
             </div>
           </section>
 
           <section className="quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">Public comment information</h2>
-            <p className="mt-2 text-sm leading-6 text-black/65">
+            <p className="mt-2 text-sm leading-6 text-black/75">
               {meeting.public_comments_input_text || "Not listed in the source document."}
             </p>
           </section>
 
           <section className="quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">Source note</h2>
-            <p className="mt-2 text-sm leading-6 text-black/65">
+            <p className="mt-2 text-sm leading-6 text-black/75">
               This summary was generated from official agenda documents. Always check the original source
               before making formal decisions.
             </p>

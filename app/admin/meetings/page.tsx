@@ -134,7 +134,7 @@ export default async function AdminMeetingsPage({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusPill status={meeting.status} />
-                    <span className="text-sm font-semibold text-black/55">
+                    <span className="text-sm font-semibold text-black/70">
                       {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
                     </span>
                     {categories.map((category) => (
@@ -142,7 +142,7 @@ export default async function AdminMeetingsPage({
                     ))}
                   </div>
                   <h2 className="mt-3 text-xl font-bold text-ink">{meeting.title}</h2>
-                  <p className="mt-1 text-sm text-black/60">{meeting.meeting_type || "Meeting type not listed"}</p>
+                  <p className="mt-1 text-sm text-black/70">{meeting.meeting_type || "Meeting type not listed"}</p>
                 </div>
                 <form action={regenerateMeetingAction}>
                   <input type="hidden" name="id" value={meeting.id} />
@@ -154,7 +154,7 @@ export default async function AdminMeetingsPage({
 
               <div className="mt-5 grid gap-4 lg:grid-cols-2">
                 <section>
-                  <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-black/55">Documents</h3>
+                  <h3 className="text-sm font-bold uppercase text-black/70">Documents</h3>
                   <div className="mt-2 space-y-2">
                     {docs.length > 0 ? (
                       docs.map((doc) => (
@@ -166,23 +166,23 @@ export default async function AdminMeetingsPage({
                           className="block rounded-md border border-black/10 p-3 text-sm hover:bg-black/5"
                         >
                           <span className="font-semibold text-ink">{doc.type || "Document"}</span>
-                          <span className="block break-words text-black/55">{doc.source_url}</span>
+                          <span className="block break-words text-black/70">{doc.source_url}</span>
                           {doc.download_error ? (
                             <span className="mt-1 block text-clay">{doc.download_error}</span>
                           ) : null}
                         </a>
                       ))
                     ) : (
-                      <p className="text-sm text-black/60">No documents saved.</p>
+                      <p className="text-sm text-black/70">No documents saved.</p>
                     )}
                   </div>
                 </section>
                 <section>
-                  <h3 className="text-sm font-bold uppercase tracking-[0.12em] text-black/55">Generated cards</h3>
-                  <p className="mt-2 text-sm text-black/65">{meetingCards.length} cards for this meeting.</p>
+                  <h3 className="text-sm font-bold uppercase text-black/70">Generated cards</h3>
+                  <p className="mt-2 text-sm text-black/75">{meetingCards.length} cards for this meeting.</p>
                   <details className="mt-3 rounded-md border border-black/10 bg-black/[0.025] p-3">
                     <summary className="cursor-pointer text-sm font-bold text-ink">Raw extracted text</summary>
-                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-5 text-black/65">
+                    <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap text-xs leading-5 text-black/75">
                       {meeting.llm_input_text || "No LLM input text stored."}
                     </pre>
                   </details>

@@ -85,9 +85,9 @@ export const STATUS_TONES: Record<string, string> = {
   "Upcoming vote": "bg-civic/10 text-civic border-civic/30",
   "Under discussion": "bg-harbor/10 text-harbor border-harbor/30",
   Passed: "bg-moss/10 text-moss border-moss/30",
-  Tabled: "bg-sun/15 text-[#73561a] border-sun/40",
+  Tabled: "bg-sun/20 text-[#73561a] border-sun/40",
   Cancelled: "bg-clay/10 text-clay border-clay/30",
-  "Information only": "bg-black/5 text-black/70 border-black/15",
+  "Information only": "bg-black/5 text-black/70 border-black/20",
   Upcoming: "bg-civic/10 text-civic border-civic/30",
-  Past: "bg-black/5 text-black/70 border-black/15"
+  Past: "bg-black/5 text-black/70 border-black/20"
 };

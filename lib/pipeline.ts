@@ -16,6 +16,7 @@ export type PipelineResult = {
   runId: string | null;
   status: "success" | "success_with_errors" | "failed";
   logs: string[];
+  errors: string[];
   meetingsFound: number;
   documentsDownloaded: number;
   cardsGenerated: number;
@@ -55,7 +56,13 @@ export async function runSimpleCityPipeline(
       .select("id")
       .single();
 
-    if (!error) runId = data?.id || null;
+    if (error) {
+      const message = `Failed to create scraper run record: ${error.message}`;
+      errors.push(message);
+      log(message);
+    } else {
+      runId = data?.id || null;
+    }
   }
 
   try {
@@ -101,15 +108,19 @@ export async function runSimpleCityPipeline(
       if (!process.env.OPENROUTER_API_KEY) {
         errors.push("OPENROUTER_API_KEY is not configured; summaries were not generated.");
         log("OPENROUTER_API_KEY is not configured; skipping LLM summaries.");
+      } else if (persist && !persistSummaries) {
+        const message =
+          "Skipping LLM summaries because database persistence failed; generated cards would not appear on the frontend.";
+        errors.push(message);
+        log(message);
       } else {
-        const summaryTargets =
-          persistSummaries && upserted.length > 0
-            ? upserted
-            : llmReadyMeetings.map((meeting) => ({
-                externalId: meeting.id,
-                id: "",
-                meeting
-              }));
+        const summaryTargets = persistSummaries
+          ? upserted
+          : llmReadyMeetings.map((meeting) => ({
+              externalId: meeting.id,
+              id: "",
+              meeting
+            }));
 
         for (const item of summaryTargets) {
           if (!item.meeting.llmInputText) {
@@ -163,6 +174,7 @@ export async function runSimpleCityPipeline(
       runId,
       status,
       logs,
+      errors,
       meetingsFound,
       documentsDownloaded,
       cardsGenerated,
@@ -170,6 +182,7 @@ export async function runSimpleCityPipeline(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown pipeline error";
+    errors.push(message);
     log(`Pipeline failed: ${message}`);
 
     if (canPersist && supabase && runId) {
@@ -195,6 +208,7 @@ export async function runSimpleCityPipeline(
       runId,
       status: "failed",
       logs,
+      errors,
       meetingsFound,
       documentsDownloaded,
       cardsGenerated,

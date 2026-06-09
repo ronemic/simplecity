@@ -95,7 +95,7 @@ export default async function AdminCardsPage() {
   return (
     <div className="section-shell py-10">
       <div className="mb-6">
-        <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Admin</p>
+        <p className="text-sm font-bold uppercase text-civic">Admin</p>
         <h1 className="mt-2 text-4xl font-black text-ink">Cards</h1>
       </div>
       <AdminNav />
@@ -113,7 +113,7 @@ export default async function AdminCardsPage() {
         ) : (
           <div className="quiet-card p-8 text-center">
             <h2 className="text-lg font-semibold text-ink">No cards generated yet</h2>
-            <p className="mt-2 text-sm text-black/60">Run the scraper after configuring OpenRouter.</p>
+            <p className="mt-2 text-sm text-black/70">Run the scraper after configuring OpenRouter.</p>
           </div>
         )}
       </div>

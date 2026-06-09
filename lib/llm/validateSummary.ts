@@ -32,7 +32,7 @@ const CardSchema = z.object({
       email: "Not listed in the source document.",
       submitComment: "Not listed in the source document."
     }),
-  source: z.string().min(1),
+  source: z.string().default(""),
   confidence: z.enum(["high", "medium", "low"]).default("medium")
 });
 
@@ -71,7 +71,7 @@ export function parsePossiblyWrappedJson(raw: string) {
   }
 }
 
-export function validateSimpleCitySummary(raw: unknown): SimpleCitySummary {
+export function validateSimpleCitySummary(raw: unknown, fallbackSource = ""): SimpleCitySummary {
   const parsed = SummarySchema.parse(raw);
 
   const cards = parsed.cards
@@ -84,7 +84,7 @@ export function validateSimpleCitySummary(raw: unknown): SimpleCitySummary {
       categoryTags: card.categoryTags
         .map((tag) => tag.trim())
         .filter((tag) => allowedCategories.has(tag)),
-      source: card.source.trim()
+      source: card.source.trim() || fallbackSource
     }))
     .filter(
       (card) =>
@@ -101,7 +101,7 @@ export function validateSimpleCitySummary(raw: unknown): SimpleCitySummary {
   };
 }
 
-export function parseAndValidateSummary(rawContent: string) {
+export function parseAndValidateSummary(rawContent: string, fallbackSource = "") {
   const parsed = parsePossiblyWrappedJson(rawContent);
-  return validateSimpleCitySummary(parsed);
+  return validateSimpleCitySummary(parsed, fallbackSource);
 }

@@ -9,6 +9,26 @@ type UpsertedMeeting = {
   meeting: LlmReadyMeeting;
 };
 
+function sanitizeDatabaseString(value: string) {
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ");
+}
+
+function sanitizeForDatabase<T>(value: T): T {
+  if (typeof value === "string") return sanitizeDatabaseString(value) as T;
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeForDatabase(item)) as T;
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, sanitizeForDatabase(item)])
+    ) as T;
+  }
+
+  return value;
+}
+
 export async function upsertMeetings(
   supabase: SupabaseClient,
   meetings: LlmReadyMeeting[],
@@ -17,6 +37,7 @@ export async function upsertMeetings(
   const upserted: UpsertedMeeting[] = [];
 
   for (const meeting of meetings) {
+    const safeMeeting = sanitizeForDatabase(meeting);
     const firstSourceUrl = meeting.sourceUrl || meeting.documents[0]?.url || null;
     const externalId = externalMeetingId(meeting.dateText, meeting.title, firstSourceUrl);
 
@@ -25,21 +46,21 @@ export async function upsertMeetings(
       .upsert(
         {
           external_id: externalId,
-          title: meeting.title,
-          meeting_type: meeting.meetingType,
-          date_text: meeting.dateText,
-          meeting_datetime: parseMeetingDate(meeting.dateText),
-          section: meeting.section,
-          status: meeting.status,
-          source_type: meeting.sourceType,
+          title: safeMeeting.title,
+          meeting_type: safeMeeting.meetingType,
+          date_text: safeMeeting.dateText,
+          meeting_datetime: parseMeetingDate(safeMeeting.dateText),
+          section: safeMeeting.section,
+          status: safeMeeting.status,
+          source_type: safeMeeting.sourceType,
           source_url: firstSourceUrl,
-          row_text: meeting.rowText,
-          has_html_agenda: meeting.hasHtmlAgenda,
-          has_pdf: meeting.hasPdf,
-          llm_input_text: meeting.llmInputText,
-          public_comments_input_text: meeting.publicCommentsInputText,
-          extraction_notes: meeting.extractionNotes,
-          raw: meeting,
+          row_text: safeMeeting.rowText,
+          has_html_agenda: safeMeeting.hasHtmlAgenda,
+          has_pdf: safeMeeting.hasPdf,
+          llm_input_text: safeMeeting.llmInputText,
+          public_comments_input_text: safeMeeting.publicCommentsInputText,
+          extraction_notes: safeMeeting.extractionNotes,
+          raw: safeMeeting,
           scraped_at: scrapedAt || new Date().toISOString()
         },
         { onConflict: "external_id" }
@@ -50,7 +71,7 @@ export async function upsertMeetings(
     if (error) throw new Error(`Failed to upsert meeting ${meeting.title}: ${error.message}`);
     if (!data?.id) throw new Error(`Failed to read meeting id for ${meeting.title}.`);
 
-    for (const doc of meeting.documents) {
+    for (const doc of safeMeeting.documents) {
       const { error: docError } = await supabase.from("documents").upsert(
         {
           meeting_id: data.id,
@@ -73,7 +94,7 @@ export async function upsertMeetings(
       }
     }
 
-    upserted.push({ externalId, id: data.id, meeting });
+    upserted.push({ externalId, id: data.id, meeting: safeMeeting });
   }
 
   return upserted;
@@ -94,7 +115,7 @@ export async function replaceSummaryCardsForMeeting(
 
   if (summary.cards.length === 0) return [];
 
-  const rows = summary.cards.map((card) => ({
+  const rows = summary.cards.map((card) => sanitizeForDatabase({
     meeting_id: meetingId,
     agenda_item: card.agendaItem,
     what_is_happening: card.whatIsHappening,

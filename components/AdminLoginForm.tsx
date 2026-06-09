@@ -42,7 +42,7 @@ export function AdminLoginForm() {
     <div className="quiet-card mx-auto max-w-md p-6 sm:p-8">
       <p className="label-eyebrow">Admin access</p>
       <h1 className="mt-2 text-3xl font-black text-ink">Admin login</h1>
-      <p className="mt-2 text-sm leading-6 text-black/60">
+      <p className="mt-2 text-sm leading-6 text-black/70">
         Sign in with Supabase Auth. Access is limited to configured SimpleCity admin emails.
       </p>
       <div className="mt-6 space-y-3">
@@ -64,7 +64,7 @@ export function AdminLoginForm() {
             className="input-control"
           />
         </label>
-        {message ? <p className="rounded-2xl bg-black/5 p-3 text-sm text-black/65">{message}</p> : null}
+        {message ? <p className="rounded-lg bg-black/5 p-3 text-sm text-black/75">{message}</p> : null}
         <div className="flex flex-wrap gap-2">
           <button
             type="button"

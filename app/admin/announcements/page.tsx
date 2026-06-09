@@ -96,7 +96,7 @@ function AnnouncementForm({
       {announcement?.id ? <input type="hidden" name="id" value={String(announcement.id)} /> : null}
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block space-y-1 md:col-span-2">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Title</span>
+          <span className="text-xs font-bold uppercase text-black/70">Title</span>
           <input
             name="title"
             required
@@ -105,7 +105,7 @@ function AnnouncementForm({
           />
         </label>
         <label className="block space-y-1 md:col-span-2">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Body</span>
+          <span className="text-xs font-bold uppercase text-black/70">Body</span>
           <textarea
             name="body"
             required
@@ -115,7 +115,7 @@ function AnnouncementForm({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Type</span>
+          <span className="text-xs font-bold uppercase text-black/70">Type</span>
           <select
             name="type"
             defaultValue={String(announcement?.type || "info")}
@@ -126,12 +126,12 @@ function AnnouncementForm({
             <option value="event">Event</option>
           </select>
         </label>
-        <label className="flex items-end gap-2 rounded-2xl border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">
+        <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">
           <input type="checkbox" name="is_published" defaultChecked={Boolean(announcement?.is_published ?? true)} />
           Published
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Starts at</span>
+          <span className="text-xs font-bold uppercase text-black/70">Starts at</span>
           <input
             type="datetime-local"
             name="starts_at"
@@ -139,7 +139,7 @@ function AnnouncementForm({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-black/55">Ends at</span>
+          <span className="text-xs font-bold uppercase text-black/70">Ends at</span>
           <input
             type="datetime-local"
             name="ends_at"
@@ -187,7 +187,7 @@ export default async function AdminAnnouncementsPage() {
               <AnnouncementForm announcement={announcement as unknown as Record<string, unknown>} action={updateAnnouncementAction} />
               <form action={deleteAnnouncementAction}>
                 <input type="hidden" name="id" value={announcement.id} />
-                <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/15">
+                <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20">
                   Delete announcement
                 </button>
               </form>
