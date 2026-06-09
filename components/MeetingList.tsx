@@ -1,4 +1,5 @@
 import { CalendarDays, FileText } from "lucide-react";
+import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { StatusPill } from "@/components/StatusPill";
 import { PendingLink } from "@/components/PendingLink";
 import type { MeetingRow } from "@/lib/types";
@@ -20,14 +21,16 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
   return (
     <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-soft">
       {meetings.map((meeting) => (
-        <PendingLink
+        <article
           key={meeting.id}
-          href={`/meetings/${meeting.id}`}
-          mode="overlay"
-          pendingLabel="Opening meeting"
-          className="grid gap-3 border-t border-black/10 p-5 transition first:border-t-0 hover:bg-black/[0.025] focus-visible:focus-ring sm:grid-cols-[1fr_auto] sm:p-6"
+          className="grid gap-4 border-t border-black/10 p-5 transition first:border-t-0 hover:bg-black/[0.025] sm:grid-cols-[1fr_auto] sm:items-center sm:p-6"
         >
-          <div>
+          <PendingLink
+            href={`/meetings/${meeting.id}`}
+            mode="overlay"
+            pendingLabel="Opening meeting"
+            className="min-w-0 rounded-md focus-visible:focus-ring"
+          >
             <div className="flex flex-wrap items-center gap-2">
               <StatusPill status={meeting.status} />
               <span className="inline-flex items-center gap-1 text-xs font-medium text-black/70">
@@ -37,9 +40,18 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
             </div>
             <h2 className="mt-2 text-xl font-bold leading-snug text-ink">{meeting.title}</h2>
             <p className="mt-1 text-sm text-black/70">{meeting.meeting_type || "Meeting type not listed"}</p>
+          </PendingLink>
+          <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-10 px-4 py-2" />
+            <PendingLink
+              href={`/meetings/${meeting.id}`}
+              className="action-tertiary min-h-10 px-3 py-2 text-civic"
+              pendingLabel="Opening meeting"
+            >
+              Open
+            </PendingLink>
           </div>
-          <span className="self-center text-sm font-bold text-civic">Open</span>
-        </PendingLink>
+        </article>
       ))}
     </div>
   );

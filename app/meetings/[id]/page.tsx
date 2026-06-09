@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { ExternalLink, FileText } from "lucide-react";
+import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
 import { getMeetingDetail } from "@/lib/db/queries";
@@ -28,6 +29,7 @@ export default async function MeetingDetailPage({
         </div>
         <h1 className="page-title mt-3">{meeting.title}</h1>
         <p className="page-copy mt-3 text-base">{meeting.meeting_type || "Meeting type not listed"}</p>
+        <AddToGoogleCalendarLink meeting={meeting} className="mt-5" />
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
