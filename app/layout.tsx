@@ -5,7 +5,10 @@ import { Footer } from "@/components/Footer";
 
 export const metadata: Metadata = {
   title: "SimpleCity",
-  description: "Local decisions, translated into plain-English civic action cards."
+  description: "Local decisions, translated into plain-English civic action cards.",
+  icons: {
+    icon: "/favicon.svg"
+  }
 };
 
 export default function RootLayout({
