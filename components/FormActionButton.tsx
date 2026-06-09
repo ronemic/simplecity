@@ -20,7 +20,9 @@ export function FormActionButton({
     <button
       type="submit"
       disabled={pending}
-      onClick={() => setPending(true)}
+      onClick={() => {
+        if (!pending) setPending(true);
+      }}
       className={cn(className, pending && "pointer-events-none")}
     >
       {pending ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : null}

@@ -194,6 +194,23 @@ export async function getAuthenticatedAdmin(): Promise<AuthenticatedAdmin | null
   };
 }
 
+export function getAuthenticatedAdminFromCookies(cookieReader: CookieReader): AuthenticatedAdmin | null {
+  const secret = getAdminAuthSecret();
+  if (!secret) return null;
+
+  const payload = getSessionPayload(cookieReader.get(ADMIN_SESSION_COOKIE)?.value);
+  if (!payload) return null;
+
+  return {
+    email: ADMIN_LABEL,
+    sessionExpiresAt: payload.expiresAt
+  };
+}
+
+export function isRequestAdmin(cookieReader: CookieReader) {
+  return Boolean(getAuthenticatedAdminFromCookies(cookieReader));
+}
+
 export async function requireAdmin() {
   const admin = await getAuthenticatedAdmin();
   if (!admin) redirect("/admin");
