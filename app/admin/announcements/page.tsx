@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminNav } from "@/components/AdminNav";
+import { FormActionButton } from "@/components/FormActionButton";
 import { getAdminCollections } from "@/lib/db/queries";
 import { writeAuditLog } from "@/lib/db/upsertMeetings";
 import { getAuthenticatedAdmin, requireAdmin } from "@/lib/supabase/admin";
@@ -147,9 +148,12 @@ function AnnouncementForm({
           />
         </label>
       </div>
-      <button className="action-primary">
+      <FormActionButton
+        className="action-primary"
+        pendingLabel={announcement?.id ? "Saving announcement" : "Creating announcement"}
+      >
         {announcement?.id ? "Save announcement" : "Create announcement"}
-      </button>
+      </FormActionButton>
     </form>
   );
 }
@@ -187,9 +191,12 @@ export default async function AdminAnnouncementsPage() {
               <AnnouncementForm announcement={announcement as unknown as Record<string, unknown>} action={updateAnnouncementAction} />
               <form action={deleteAnnouncementAction}>
                 <input type="hidden" name="id" value={announcement.id} />
-                <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20">
+                <FormActionButton
+                  className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20"
+                  pendingLabel="Deleting announcement"
+                >
                   Delete announcement
-                </button>
+                </FormActionButton>
               </form>
             </div>
           ))}

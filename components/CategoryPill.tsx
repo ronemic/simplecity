@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import { cn } from "@/lib/utils/cn";
+import { PendingLink } from "@/components/PendingLink";
 
 export function CategoryPill({
   category,
@@ -27,9 +27,13 @@ export function CategoryPill({
 
   if (href) {
     return (
-      <Link href={href} className={cn(className, "transition hover:brightness-95 focus-visible:focus-ring")}>
+      <PendingLink
+        href={href}
+        className={cn(className, "transition hover:brightness-95 focus-visible:focus-ring")}
+        pendingLabel="Loading"
+      >
         {content}
-      </Link>
+      </PendingLink>
     );
   }
 

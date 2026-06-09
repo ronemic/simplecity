@@ -1,6 +1,7 @@
 import { revalidatePath } from "next/cache";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminNav } from "@/components/AdminNav";
+import { FormActionButton } from "@/components/FormActionButton";
 import { CategoryPill } from "@/components/CategoryPill";
 import { StatusPill } from "@/components/StatusPill";
 import { CATEGORIES } from "@/lib/constants";
@@ -146,9 +147,9 @@ export default async function AdminMeetingsPage({
                 </div>
                 <form action={regenerateMeetingAction}>
                   <input type="hidden" name="id" value={meeting.id} />
-                  <button className="action-primary">
+                  <FormActionButton className="action-primary" pendingLabel="Regenerating">
                     Regenerate summaries
-                  </button>
+                  </FormActionButton>
                 </form>
               </div>
 

@@ -1,5 +1,6 @@
 import { CATEGORIES } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
+import { FormActionButton } from "./FormActionButton";
 
 export function AdminCardEditor({
   card,
@@ -143,16 +144,19 @@ export function AdminCardEditor({
           </label>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="action-primary">
+          <FormActionButton className="action-primary" pendingLabel="Saving card">
             Save card
-          </button>
+          </FormActionButton>
         </div>
       </form>
       <form action={deleteAction} className="mt-3">
         <input type="hidden" name="id" value={card.id} />
-        <button className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20">
+        <FormActionButton
+          className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20"
+          pendingLabel="Deleting card"
+        >
           Delete card
-        </button>
+        </FormActionButton>
       </form>
     </article>
   );

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CategoryPill } from "@/components/CategoryPill";
+import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
 import { getCategoryCards } from "@/lib/db/queries";
 
@@ -49,13 +50,14 @@ export default async function CategoryDetailPage({
           { href: `/categories/${slug}?period=upcoming`, label: "Upcoming" },
           { href: `/categories/${slug}?period=past`, label: "Past" }
         ].map((item) => (
-          <a
+          <PendingLink
             key={item.href}
             href={item.href}
             className="action-secondary px-4 py-2"
+            pendingLabel={`Loading ${item.label.toLowerCase()}`}
           >
             {item.label}
-          </a>
+          </PendingLink>
         ))}
       </div>
 

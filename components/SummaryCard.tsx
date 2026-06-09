@@ -1,10 +1,10 @@
 "use client";
 
 import { ChevronDown, ExternalLink } from "lucide-react";
-import Link from "next/link";
 import { useState } from "react";
 import { CategoryPill } from "@/components/CategoryPill";
 import { StatusPill } from "@/components/StatusPill";
+import { PendingLink } from "@/components/PendingLink";
 import type { SummaryCardRow } from "@/lib/types";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
@@ -100,12 +100,13 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             {open ? "Show less" : "Read more"}
           </button>
           {meeting?.id ? (
-            <Link
+            <PendingLink
               href={`/meetings/${meeting.id}`}
               className="action-secondary px-4"
+              pendingLabel="Opening meeting"
             >
               Meeting details
-            </Link>
+            </PendingLink>
           ) : null}
           {card.source_url ? (
             <a

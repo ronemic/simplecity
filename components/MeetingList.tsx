@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { CalendarDays, FileText } from "lucide-react";
 import { StatusPill } from "@/components/StatusPill";
+import { PendingLink } from "@/components/PendingLink";
 import type { MeetingRow } from "@/lib/types";
 import { formatDisplayDate } from "@/lib/utils/date";
 
@@ -20,9 +20,11 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
   return (
     <div className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-soft">
       {meetings.map((meeting) => (
-        <Link
+        <PendingLink
           key={meeting.id}
           href={`/meetings/${meeting.id}`}
+          mode="overlay"
+          pendingLabel="Opening meeting"
           className="grid gap-3 border-t border-black/10 p-5 transition first:border-t-0 hover:bg-black/[0.025] focus-visible:focus-ring sm:grid-cols-[1fr_auto] sm:p-6"
         >
           <div>
@@ -37,7 +39,7 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
             <p className="mt-1 text-sm text-black/70">{meeting.meeting_type || "Meeting type not listed"}</p>
           </div>
           <span className="self-center text-sm font-bold text-civic">Open</span>
-        </Link>
+        </PendingLink>
       ))}
     </div>
   );
