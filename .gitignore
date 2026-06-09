@@ -1,0 +1,11 @@
+.next
+node_modules
+dist
+coverage
+.env
+.env.local
+.env.*.local
+scraped-primegov
+playwright-report
+test-results
+*.tsbuildinfo

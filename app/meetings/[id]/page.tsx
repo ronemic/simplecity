@@ -1,0 +1,98 @@
+import { notFound } from "next/navigation";
+import { ExternalLink, FileText } from "lucide-react";
+import { SummaryCard } from "@/components/SummaryCard";
+import { StatusPill } from "@/components/StatusPill";
+import { getMeetingDetail } from "@/lib/db/queries";
+import { formatDisplayDate } from "@/lib/utils/date";
+
+export default async function MeetingDetailPage({
+  params
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const { meeting, cards, documents } = await getMeetingDetail(id);
+
+  if (!meeting) notFound();
+
+  return (
+    <div className="section-shell py-10">
+      <div className="mb-8 max-w-4xl">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusPill status={meeting.status} />
+          <span className="text-sm font-semibold text-black/55">
+            {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
+          </span>
+        </div>
+        <h1 className="mt-3 text-4xl font-black leading-tight text-ink">{meeting.title}</h1>
+        <p className="mt-3 text-base text-black/65">{meeting.meeting_type || "Meeting type not listed"}</p>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
+        <section className="space-y-4">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.14em] text-civic">Summary cards</p>
+            <h2 className="mt-1 text-2xl font-bold text-ink">Plain-English agenda items</h2>
+          </div>
+          {cards.length > 0 ? (
+            <div className="grid gap-4">
+              {cards.map((card) => (
+                <SummaryCard key={card.id} card={card} />
+              ))}
+            </div>
+          ) : (
+            <div className="quiet-card p-8">
+              <h3 className="text-lg font-semibold text-ink">No published cards for this meeting yet</h3>
+              <p className="mt-2 text-sm leading-6 text-black/60">
+                Admins can regenerate summaries after agenda text has been extracted.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <aside className="space-y-4">
+          <section className="quiet-card p-5">
+            <h2 className="text-lg font-bold text-ink">Official documents</h2>
+            <div className="mt-4 space-y-2">
+              {documents.length > 0 ? (
+                documents.map((doc) => (
+                  <a
+                    key={doc.id}
+                    href={doc.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-start gap-3 rounded-md border border-black/10 p-3 text-sm transition hover:bg-black/5 focus-visible:focus-ring"
+                  >
+                    <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-ink">{doc.type || "Document"}</span>
+                      <span className="block break-words text-black/55">{doc.label || "Official source"}</span>
+                    </span>
+                    <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-black/40" />
+                  </a>
+                ))
+              ) : (
+                <p className="text-sm leading-6 text-black/60">No source documents are stored for this meeting yet.</p>
+              )}
+            </div>
+          </section>
+
+          <section className="quiet-card p-5">
+            <h2 className="text-lg font-bold text-ink">Public comment information</h2>
+            <p className="mt-2 text-sm leading-6 text-black/65">
+              {meeting.public_comments_input_text || "Not listed in the source document."}
+            </p>
+          </section>
+
+          <section className="quiet-card p-5">
+            <h2 className="text-lg font-bold text-ink">Source note</h2>
+            <p className="mt-2 text-sm leading-6 text-black/65">
+              This summary was generated from official agenda documents. Always check the original source
+              before making formal decisions.
+            </p>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+}
