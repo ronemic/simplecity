@@ -108,13 +108,17 @@ p {
 }
 
 .action-primary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .action-secondary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-black/20 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-black/[0.03] hover:shadow-md active:translate-y-px;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-black/20 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-black/[0.03] hover:shadow-md active:translate-y-px;
+}
+
+.action-tertiary {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 py-3 text-sm font-semibold text-black/60 transition hover:bg-black/[0.04] hover:text-ink active:translate-y-px;
 }
 
 .action-ghost {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 rounded-lg px-5 py-3 text-sm font-semibold text-black/75 transition hover:bg-black/[0.04] hover:text-ink;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 py-3 text-sm font-semibold text-black/75 transition hover:bg-black/[0.04] hover:text-ink;
 }
