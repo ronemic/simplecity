@@ -1,7 +1,8 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { useFormStatus } from "react-dom";
+import { useState } from "react";
+import { cn } from "@/lib/utils/cn";
 
 export function FormActionButton({
   children,
@@ -12,11 +13,16 @@ export function FormActionButton({
   pendingLabel?: string;
   className?: string;
 }) {
-  const { pending } = useFormStatus();
+  const [pending, setPending] = useState(false);
   const label = pending ? pendingLabel || children : children;
 
   return (
-    <button type="submit" disabled={pending} className={className}>
+    <button
+      type="submit"
+      disabled={pending}
+      onClick={() => setPending(true)}
+      className={cn(className, pending && "pointer-events-none")}
+    >
       {pending ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : null}
       {label}
     </button>
