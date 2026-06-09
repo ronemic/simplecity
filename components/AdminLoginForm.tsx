@@ -93,9 +93,6 @@ export function AdminLoginForm() {
     <div className="quiet-card mx-auto max-w-md p-6 sm:p-8">
       <p className="label-eyebrow">Admin access</p>
       <h1 className="mt-2 text-3xl font-black text-ink">Admin login</h1>
-      <p className="mt-2 text-sm leading-6 text-black/70">
-        Enter the shared admin password from your `.env` file.
-      </p>
       <form className="mt-6 space-y-3" onSubmit={signIn}>
         <label className="block space-y-1">
           <span className="text-sm font-semibold text-black/70">Password</span>

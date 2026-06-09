@@ -174,7 +174,7 @@ export default async function Home({
               <div className="flex gap-3">
                 <MessageSquareText aria-hidden className="mt-1 h-4 w-4 shrink-0 text-civic" />
                 <p className="text-sm leading-6 text-black/75">
-                  Start with <span className="font-semibold text-ink">Understand issue</span> to see impact and comment options.
+                  Start with <span className="font-semibold text-ink">Show more</span> to see impact and comment options.
                 </p>
               </div>
               <div className="flex gap-3">

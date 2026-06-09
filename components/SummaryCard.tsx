@@ -143,7 +143,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             ) : (
               <Info aria-hidden className="h-4 w-4" />
             )}
-            {open ? "Show less" : "Understand issue"}
+            {open ? "Show less" : "Show more"}
           </button>
           {meeting?.id ? (
             <PendingLink
