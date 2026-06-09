@@ -26,7 +26,7 @@ SimpleCity turns Foster City PrimeGov meeting agendas into plain-English civic a
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    SCRAPER_BASE_URL=https://fostercity.primegov.com/public/portal
    NEXT_PUBLIC_APP_URL=http://localhost:3000
-   ADMIN_EMAILS=comma,separated,emails
+   ADMIN_PASSWORD=choose-a-long-random-password
    ```
 
 4. Apply Supabase migrations from `supabase/migrations`.
@@ -53,7 +53,7 @@ Local scraper output is written to `scraped-primegov/`. Source URLs are always t
 
 ## Admin
 
-The admin portal lives at `/admin` and uses Supabase Auth. Server-side admin checks require the signed-in email to be listed in `ADMIN_EMAILS` or present in the optional `admins` table.
+The admin portal lives at `/admin` and uses a single shared password from `ADMIN_PASSWORD` in your `.env.local` file. After 3 failed login attempts, the browser session is locked out for 15 minutes.
 
 ## Source Transparency
 

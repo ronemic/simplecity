@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ClipboardList, FilePenLine, Gauge, Megaphone, ScrollText } from "lucide-react";
+import { ClipboardList, FilePenLine, Gauge, LogOut, Megaphone, ScrollText } from "lucide-react";
 
 const items = [
   { href: "/admin", label: "Dashboard", icon: Gauge },
@@ -22,6 +22,12 @@ export function AdminNav() {
           {item.label}
         </Link>
       ))}
+      <form action="/api/admin/logout" method="post" className="ml-auto">
+        <button type="submit" className="action-secondary px-4 py-2">
+          <LogOut aria-hidden className="h-4 w-4" />
+          Log out
+        </button>
+      </form>
     </nav>
   );
 }

@@ -63,7 +63,7 @@ export default async function AdminPage() {
         <div>
           <p className="text-sm font-bold uppercase text-civic">Admin</p>
           <h1 className="mt-2 text-4xl font-black text-ink">SimpleCity dashboard</h1>
-          <p className="mt-2 text-sm text-black/70">Signed in as {admin.email}</p>
+          <p className="mt-2 text-sm text-black/70">Signed in as the shared admin account</p>
         </div>
       </div>
 

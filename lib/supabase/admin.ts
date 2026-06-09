@@ -1,52 +1,197 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { createServerSupabaseClient } from "./server";
 
-export function getConfiguredAdminEmails() {
-  return (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+const ADMIN_SESSION_COOKIE = "simplecity_admin_session";
+const ADMIN_LOCKOUT_COOKIE = "simplecity_admin_login_state";
+const ADMIN_SESSION_DURATION_MS = 1000 * 60 * 60 * 12;
+const ADMIN_LOCKOUT_DURATION_MS = 1000 * 60 * 15;
+const ADMIN_SESSION_MARKER = "simplecity-admin-session" as const;
+const ADMIN_LOCKOUT_MARKER = "simplecity-admin-lockout" as const;
+const ADMIN_LABEL = "admin";
+
+type CookieReader = {
+  get(name: string): { value: string } | undefined;
+};
+
+type AdminSessionPayload = {
+  marker: typeof ADMIN_SESSION_MARKER;
+  issuedAt: number;
+  expiresAt: number;
+};
+
+type AdminLockoutPayload = {
+  marker: typeof ADMIN_LOCKOUT_MARKER;
+  attempts: number;
+  lockedUntil: number | null;
+  updatedAt: number;
+};
+
+export type AuthenticatedAdmin = {
+  email: string;
+  sessionExpiresAt: number;
+};
+
+function getAdminAuthSecret() {
+  return process.env.ADMIN_PASSWORD?.trim() || null;
 }
 
-export async function isAdminEmail(email: string | null | undefined) {
-  if (!email) return false;
+export function hasAdminPassword() {
+  return Boolean(getAdminAuthSecret());
+}
 
-  const normalized = email.toLowerCase();
-  const configured = getConfiguredAdminEmails();
-  if (configured.includes(normalized)) return true;
+function baseCookieOptions(maxAgeSeconds: number) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: maxAgeSeconds
+  };
+}
+
+function safeCompare(left: string, right: string) {
+  const leftBuffer = Buffer.from(left);
+  const rightBuffer = Buffer.from(right);
+
+  if (leftBuffer.length !== rightBuffer.length) return false;
+  return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function signPayload(payload: string, secret: string) {
+  return createHmac("sha256", secret).update(payload).digest("base64url");
+}
+
+function encodeSignedValue<T>(value: T, secret: string) {
+  const payload = Buffer.from(JSON.stringify(value)).toString("base64url");
+  const signature = signPayload(payload, secret);
+  return `${payload}.${signature}`;
+}
+
+function decodeSignedValue<T>(value: string | undefined, secret: string) {
+  if (!value) return null;
+
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) return null;
+
+  const expectedSignature = signPayload(payload, secret);
+  if (!safeCompare(signature, expectedSignature)) return null;
 
   try {
-    const supabase = await createServerSupabaseClient();
-    const { data } = await supabase
-      .from("admins")
-      .select("email")
-      .ilike("email", normalized)
-      .maybeSingle();
-
-    return Boolean(data?.email);
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as T;
   } catch {
-    return false;
+    return null;
   }
 }
 
-export async function getAuthenticatedAdmin() {
-  let supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+function getSecretOrNull() {
+  return getAdminAuthSecret();
+}
 
+function getSessionPayload(cookieValue: string | undefined) {
+  const secret = getSecretOrNull();
+  if (!secret) return null;
+
+  const payload = decodeSignedValue<AdminSessionPayload>(cookieValue, secret);
+  if (!payload || payload.marker !== ADMIN_SESSION_MARKER) return null;
+  if (payload.expiresAt <= Date.now()) return null;
+  return payload;
+}
+
+function getLockoutPayload(cookieValue: string | undefined) {
+  const secret = getSecretOrNull();
+  if (!secret) return null;
+
+  const payload = decodeSignedValue<AdminLockoutPayload>(cookieValue, secret);
+  if (!payload || payload.marker !== ADMIN_LOCKOUT_MARKER) return null;
+  return payload;
+}
+
+function normalizeLockoutPayload(payload: AdminLockoutPayload | null) {
+  if (!payload) {
+    return {
+      marker: ADMIN_LOCKOUT_MARKER,
+      attempts: 0,
+      lockedUntil: null,
+      updatedAt: Date.now()
+    };
+  }
+
+  if (payload.lockedUntil && payload.lockedUntil <= Date.now()) {
+    return {
+      marker: ADMIN_LOCKOUT_MARKER,
+      attempts: 0,
+      lockedUntil: null,
+      updatedAt: Date.now()
+    };
+  }
+
+  return payload;
+}
+
+export function readAdminLockoutState(cookieReader: CookieReader) {
+  return normalizeLockoutPayload(getLockoutPayload(cookieReader.get(ADMIN_LOCKOUT_COOKIE)?.value));
+}
+
+export function isAdminLockedOut(cookieReader: CookieReader) {
+  const state = readAdminLockoutState(cookieReader);
+  return Boolean(state.lockedUntil && state.lockedUntil > Date.now());
+}
+
+export function createAdminSessionCookieValue(now = Date.now()) {
+  const secret = getAdminAuthSecret();
+  if (!secret) {
+    throw new Error("Missing ADMIN_PASSWORD.");
+  }
+
+  return encodeSignedValue<AdminSessionPayload>(
+    {
+      marker: ADMIN_SESSION_MARKER,
+      issuedAt: now,
+      expiresAt: now + ADMIN_SESSION_DURATION_MS
+    },
+    secret
+  );
+}
+
+export function createAdminLockoutCookieValue(state: AdminLockoutPayload) {
+  const secret = getAdminAuthSecret();
+  if (!secret) {
+    throw new Error("Missing ADMIN_PASSWORD.");
+  }
+
+  return encodeSignedValue(state, secret);
+}
+
+export function getAdminCookieOptions() {
+  return baseCookieOptions(Math.ceil(ADMIN_SESSION_DURATION_MS / 1000));
+}
+
+export function getAdminLockoutCookieOptions(lockoutUntil?: number | null) {
+  const durationSeconds = lockoutUntil && lockoutUntil > Date.now()
+    ? Math.max(1, Math.ceil((lockoutUntil - Date.now()) / 1000))
+    : Math.ceil(ADMIN_LOCKOUT_DURATION_MS / 1000);
+  return baseCookieOptions(durationSeconds);
+}
+
+export async function getAuthenticatedAdmin(): Promise<AuthenticatedAdmin | null> {
+  const secret = getAdminAuthSecret();
+  if (!secret) return null;
+
+  let cookieStore;
   try {
-    supabase = await createServerSupabaseClient();
+    cookieStore = await cookies();
   } catch {
     return null;
   }
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const payload = getSessionPayload(cookieStore.get(ADMIN_SESSION_COOKIE)?.value);
+  if (!payload) return null;
 
-  if (!user?.email) return null;
-  const allowed = await isAdminEmail(user.email);
-  if (!allowed) return null;
-
-  return { supabase, user, email: user.email };
+  return {
+    email: ADMIN_LABEL,
+    sessionExpiresAt: payload.expiresAt
+  };
 }
 
 export async function requireAdmin() {
@@ -65,4 +210,38 @@ export async function assertAdminForRoute() {
   }
 
   return { admin, response: null };
+}
+
+export function createAdminSessionCookieOptions() {
+  return baseCookieOptions(Math.ceil(ADMIN_SESSION_DURATION_MS / 1000));
+}
+
+export function createAdminLockoutPayload(attempts: number, lockedUntil: number | null, updatedAt = Date.now()) {
+  return {
+    marker: ADMIN_LOCKOUT_MARKER,
+    attempts,
+    lockedUntil,
+    updatedAt
+  };
+}
+
+export function getAdminLockoutStatus(cookieReader: CookieReader) {
+  const state = readAdminLockoutState(cookieReader);
+  const locked = Boolean(state.lockedUntil && state.lockedUntil > Date.now());
+  return {
+    state,
+    locked
+  };
+}
+
+export function getFailedLoginMessage(attemptsRemaining: number) {
+  if (attemptsRemaining <= 0) {
+    return "Too many failed attempts. Try again in 15 minutes.";
+  }
+
+  return `Incorrect password. ${attemptsRemaining} attempt${attemptsRemaining === 1 ? "" : "s"} left before lockout.`;
+}
+
+export function getAdminLoginResult(cookieReader: CookieReader) {
+  return getAdminLockoutStatus(cookieReader);
 }
