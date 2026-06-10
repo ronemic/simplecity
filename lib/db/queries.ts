@@ -132,10 +132,7 @@ function withDocumentJurisdictionFallback(
   };
 }
 
-function withAnnouncementJurisdictionFallback(
-  row: AnnouncementRow,
-  jurisdiction: JurisdictionConfig
-): AnnouncementRow {
+function withAnnouncementJurisdictionFallback(row: AnnouncementRow): AnnouncementRow {
   return {
     ...row,
     jurisdiction_slug:
@@ -263,7 +260,7 @@ const getCachedActiveAnnouncements = unstable_cache(
         }
 
         return ((data || []) as unknown as AnnouncementRow[]).map((row) =>
-          withAnnouncementJurisdictionFallback(row, jurisdiction)
+          withAnnouncementJurisdictionFallback(row)
         );
       })
     );
@@ -493,7 +490,7 @@ export async function getAdminCollections(
         ),
         announcements: ((announcements.data || []) as AnnouncementRow[]).map((row) =>
           ({
-            ...withAnnouncementJurisdictionFallback(row, jurisdiction),
+            ...withAnnouncementJurisdictionFallback(row),
             source_jurisdiction_slug: jurisdiction.slug
           })
         ),

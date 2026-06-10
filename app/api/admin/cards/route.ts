@@ -50,7 +50,14 @@ export async function PUT(request: NextRequest) {
   }
 
   const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
-  const { data: before } = await supabase.from("summary_cards").select("*").eq("id", id).maybeSingle();
+  const { data: before, error: beforeError } = await supabase
+    .from("summary_cards")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 500 });
+  if (!before) return NextResponse.json({ error: "Summary card not found." }, { status: 404 });
 
   const update = {
     agenda_item: String(body.agenda_item || ""),
@@ -70,8 +77,14 @@ export async function PUT(request: NextRequest) {
     admin_notes: String(body.admin_notes || "")
   };
 
-  const { error } = await supabase.from("summary_cards").update(update).eq("id", id);
+  const { data: updated, error } = await supabase
+    .from("summary_cards")
+    .update(update)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!updated) return NextResponse.json({ error: "Summary card not found." }, { status: 404 });
 
   await writeAuditLog(supabase, {
     adminEmail: admin.email,
@@ -106,9 +119,23 @@ export async function DELETE(request: NextRequest) {
   }
 
   const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
-  const { data: before } = await supabase.from("summary_cards").select("*").eq("id", id).maybeSingle();
-  const { error } = await supabase.from("summary_cards").delete().eq("id", id);
+  const { data: before, error: beforeError } = await supabase
+    .from("summary_cards")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 500 });
+  if (!before) return NextResponse.json({ error: "Summary card not found." }, { status: 404 });
+
+  const { data: deleted, error } = await supabase
+    .from("summary_cards")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!deleted) return NextResponse.json({ error: "Summary card not found." }, { status: 404 });
 
   await writeAuditLog(supabase, {
     adminEmail: admin.email,

@@ -51,7 +51,8 @@ export function PendingLink({
 
     const currentHref = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
     if (currentHref === normalizeHref(href)) {
-      setPending(false);
+      const timer = window.setTimeout(() => setPending(false), 0);
+      return () => window.clearTimeout(timer);
     }
   }, [pending, pathname, searchParams, href]);
 

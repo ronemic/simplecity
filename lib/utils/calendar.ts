@@ -1,7 +1,7 @@
 import type { MeetingRow } from "@/lib/types";
+import { CIVIC_TIME_ZONE, parseMeetingDate } from "@/lib/utils/date";
 
 const DEFAULT_MEETING_DURATION_MINUTES = 120;
-const DEFAULT_TIME_ZONE = "America/Los_Angeles";
 
 type CalendarMeeting = Pick<
   MeetingRow,
@@ -19,7 +19,7 @@ export function buildGoogleCalendarUrl(
   meeting: CalendarMeeting,
   durationMinutes = DEFAULT_MEETING_DURATION_MINUTES
 ) {
-  const startValue = meeting.meeting_datetime || meeting.date_text;
+  const startValue = meeting.meeting_datetime || parseMeetingDate(meeting.date_text);
   if (!startValue) return null;
 
   const start = new Date(startValue);
@@ -37,7 +37,7 @@ export function buildGoogleCalendarUrl(
     action: "TEMPLATE",
     text: meeting.title,
     dates: `${toGoogleCalendarDate(start)}/${toGoogleCalendarDate(end)}`,
-    ctz: DEFAULT_TIME_ZONE
+    ctz: CIVIC_TIME_ZONE
   });
 
   if (details) params.set("details", details);

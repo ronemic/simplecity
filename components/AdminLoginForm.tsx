@@ -27,8 +27,12 @@ export function AdminLoginForm() {
       return;
     }
 
-    setLockedUntil(parsed);
-    setMessage(formatLockoutMessage(parsed));
+    const timer = window.setTimeout(() => {
+      setLockedUntil(parsed);
+      setMessage(formatLockoutMessage(parsed));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -87,7 +91,7 @@ export function AdminLoginForm() {
     }
   }
 
-  const isLocked = lockedUntil ? lockedUntil > Date.now() : false;
+  const isLocked = Boolean(lockedUntil);
 
   return (
     <div className="quiet-card mx-auto max-w-md p-6 sm:p-8">

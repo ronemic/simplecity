@@ -1,4 +1,3 @@
-import "@/lib/env/bootstrap";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import { parseAndValidateSummary } from "./validateSummary";
@@ -7,10 +6,7 @@ export type GenerateSummaryOptions = {
   log?: (message: string) => void;
 };
 
-async function requestSummary(
-  meeting: LlmReadyMeeting,
-  options: GenerateSummaryOptions
-) {
+async function requestSummary(meeting: LlmReadyMeeting) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY.");
 
@@ -74,7 +70,7 @@ export async function generateSummaryForMeeting(
   let lastError: unknown;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const result = await requestSummary(meeting, options);
+      const result = await requestSummary(meeting);
       options.log?.(`Finished LLM summary for ${meeting.title}: ${result.summary.cards.length} cards.`);
       return result;
     } catch (error) {

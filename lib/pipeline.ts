@@ -1,4 +1,3 @@
-import "@/lib/env/bootstrap";
 import type { LlmReadyMeeting, PrimeGovMeeting } from "@/lib/types";
 import {
   ALL_JURISDICTIONS_SLUG,

@@ -1,4 +1,3 @@
-import "@/lib/env/bootstrap";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import type { PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
@@ -215,7 +214,7 @@ export async function scrapeHtmlAgendaText(context: BrowserContext, meeting: Pri
     await page.waitForTimeout(3000);
     const text = await page.locator("body").innerText();
     return cleanText(text);
-  } catch (error) {
+  } catch {
     return null;
   } finally {
     await page.close();
@@ -259,6 +258,12 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
     log(`Found ${archivedMeetings.length} archived meetings.`);
 
     const meetings = dedupeMeetings([...currentMeetings, ...archivedMeetings]);
+    const dedupedCurrentMeetings = meetings.filter(
+      (meeting) => meeting.section === "Current And Upcoming Meetings"
+    );
+    const dedupedArchivedMeetings = meetings.filter(
+      (meeting) => meeting.section === "Archived Meetings"
+    );
 
     if (options.scrapeHtmlAgendas) {
       log("Scraping HTML agenda text where available...");
@@ -285,8 +290,8 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
       source: portalUrl,
       scrapedAt: new Date().toISOString(),
       totalMeetingCount: meetings.length,
-      currentAndUpcomingCount: currentMeetings.length,
-      archivedCount: archivedMeetings.length,
+      currentAndUpcomingCount: dedupedCurrentMeetings.length,
+      archivedCount: dedupedArchivedMeetings.length,
       meetings
     };
   } finally {

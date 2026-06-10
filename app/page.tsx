@@ -8,6 +8,7 @@ import {
   getJurisdictionLabel,
   normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
+import { formatCompactDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
 
 export const revalidate = 300;
@@ -39,22 +40,6 @@ function isActionable(card: SummaryCardRow) {
     card.meetings?.status === "Upcoming" ||
     isListed(card.comment_window_closes)
   );
-}
-
-function formatCompactDate(dateText?: string | null, iso?: string | null) {
-  const value = iso || dateText;
-  if (!value) return "TBD";
-
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric"
-    }).format(parsed);
-  }
-
-  const compactMatch = value.match(/[A-Za-z]{3,9}\.?\s+\d{1,2}/);
-  return compactMatch?.[0].replace(".", "") || value;
 }
 
 const TOPIC_LABELS: Partial<Record<CategoryName, string>> = {
@@ -95,8 +80,8 @@ export default async function Home({
   const nextDeadlineCard = filteredCards.find((card) => isListed(card.comment_window_closes)) || decisionCards[0];
   const nextDeadline = nextDeadlineCard
     ? isListed(nextDeadlineCard.comment_window_closes)
-      ? formatCompactDate(nextDeadlineCard.comment_window_closes)
-      : formatCompactDate(nextDeadlineCard.meetings?.date_text, nextDeadlineCard.meetings?.meeting_datetime)
+      ? formatCompactDisplayDate(nextDeadlineCard.comment_window_closes)
+      : formatCompactDisplayDate(nextDeadlineCard.meetings?.date_text, nextDeadlineCard.meetings?.meeting_datetime)
     : "TBD";
   const inputCount = openForCommentCount || decisionCards.length;
   const inputText = inputCount === 1 ? "1 decision needs your input" : `${inputCount} decisions need your input`;

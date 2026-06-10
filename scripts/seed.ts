@@ -1,3 +1,4 @@
+import "@/lib/env/bootstrap";
 import { createServiceSupabaseClient } from "@/lib/supabase/service";
 
 async function main() {

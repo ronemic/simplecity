@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { HeaderNav, HeaderNavFallback } from "@/components/HeaderNav";
 
@@ -10,7 +11,14 @@ export function Header() {
           href="/"
           className="flex items-center gap-3 text-[22px] font-bold leading-none text-ink focus-visible:focus-ring"
         >
-          <img src="/favicon.svg" alt="" className="h-9 w-9 shrink-0 rounded-lg shadow-sm" />
+          <Image
+            src="/favicon.svg"
+            alt=""
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 rounded-lg shadow-sm"
+            priority
+          />
           <span>SimpleCity</span>
         </Link>
         <Suspense fallback={<HeaderNavFallback />}>

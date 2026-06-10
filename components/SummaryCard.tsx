@@ -5,7 +5,7 @@ import { useState } from "react";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
-import { formatDisplayDate } from "@/lib/utils/date";
+import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 
 function summaryPoints(text?: string | null) {
@@ -28,22 +28,6 @@ function hasCommentAction(card: SummaryCardRow) {
   return ["Upcoming vote", "Under discussion", "Upcoming"].includes(card.status || "") || isListed(card.comment_window_closes);
 }
 
-function formatCompactDate(dateText?: string | null, iso?: string | null) {
-  const value = iso || dateText;
-  if (!value) return "Date not listed";
-
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime())) {
-    return new Intl.DateTimeFormat("en-US", {
-      month: "short",
-      day: "numeric"
-    }).format(parsed);
-  }
-
-  const compactMatch = value.match(/[A-Za-z]{3,9}\.?\s+\d{1,2}/);
-  return compactMatch?.[0].replace(".", "") || value;
-}
-
 const TOPIC_TONES: Partial<Record<CategoryName, string>> = {
   Housing: "bg-[#eef4ff] text-civic",
   Transportation: "bg-[#fff5df] text-[#bd6200]",
@@ -63,7 +47,7 @@ function getPrimaryCategory(card: SummaryCardRow) {
 function statusSummary(card: SummaryCardRow) {
   if (isListed(card.comment_window_closes)) {
     return {
-      label: `Closes ${formatCompactDate(card.comment_window_closes)}`,
+      label: `Closes ${formatCompactDisplayDate(card.comment_window_closes)}`,
       className: "border-[#f3b6b6] bg-[#fff1f1] text-[#a32121]",
       icon: Clock
     };
@@ -115,7 +99,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const meeting = card.meetings;
   const points = summaryPoints(card.what_is_happening);
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
-  const compactMeetingDate = formatCompactDate(meeting?.date_text, meeting?.meeting_datetime);
+  const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
   const affectedResidents = compactList(card.who_it_affects);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const primaryCategory = getPrimaryCategory(card);

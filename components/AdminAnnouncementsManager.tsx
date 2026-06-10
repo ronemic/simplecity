@@ -105,7 +105,7 @@ function AnnouncementEditor({
           <span className="text-xs font-bold uppercase text-black/70">Jurisdiction</span>
           <select
             name="jurisdiction"
-            defaultValue={announcement?.jurisdiction_slug || selectedJurisdiction}
+            defaultValue={announcement ? announcement.jurisdiction_slug || "all" : selectedJurisdiction}
             className="input-control"
           >
             <option value="all">All</option>

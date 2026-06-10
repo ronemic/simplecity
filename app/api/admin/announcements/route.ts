@@ -112,6 +112,7 @@ export async function POST(request: NextRequest) {
 
   const clients = getServiceSupabaseClientsForSelection(selection);
   const ids: string[] = [];
+  let duplicate = false;
 
   for (const { jurisdiction, supabase } of clients) {
     const insertRow = {
@@ -121,6 +122,7 @@ export async function POST(request: NextRequest) {
     const existingId = await findMatchingAnnouncement(supabase, insertRow);
 
     if (existingId) {
+      duplicate = true;
       ids.push(existingId);
       continue;
     }
@@ -140,7 +142,7 @@ export async function POST(request: NextRequest) {
 
   revalidatePath("/admin/announcements");
   revalidatePublicContent();
-  return NextResponse.json({ ok: true, ids, duplicate: ids.length > 0 });
+  return NextResponse.json({ ok: true, ids, duplicate });
 }
 
 export async function PUT(request: NextRequest) {
@@ -157,10 +159,7 @@ export async function PUT(request: NextRequest) {
   let row;
   try {
     jurisdiction = getConcreteJurisdiction(body);
-    row = normalizeAnnouncement({
-      ...body,
-      jurisdiction_slug: body.jurisdiction_slug ?? null
-    });
+    row = normalizeAnnouncement(body);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
@@ -169,9 +168,23 @@ export async function PUT(request: NextRequest) {
   }
 
   const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
-  const { data: before } = await supabase.from("announcements").select("*").eq("id", id).maybeSingle();
-  const { error } = await supabase.from("announcements").update(row).eq("id", id);
+  const { data: before, error: beforeError } = await supabase
+    .from("announcements")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 500 });
+  if (!before) return NextResponse.json({ error: "Announcement not found." }, { status: 404 });
+
+  const { data: updated, error } = await supabase
+    .from("announcements")
+    .update(row)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!updated) return NextResponse.json({ error: "Announcement not found." }, { status: 404 });
 
   await writeAuditLog(supabase, {
     adminEmail: admin.email,
@@ -211,9 +224,23 @@ export async function DELETE(request: NextRequest) {
   }
 
   const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
-  const { data: before } = await supabase.from("announcements").select("*").eq("id", id).maybeSingle();
-  const { error } = await supabase.from("announcements").delete().eq("id", id);
+  const { data: before, error: beforeError } = await supabase
+    .from("announcements")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 500 });
+  if (!before) return NextResponse.json({ error: "Announcement not found." }, { status: 404 });
+
+  const { data: deleted, error } = await supabase
+    .from("announcements")
+    .delete()
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!deleted) return NextResponse.json({ error: "Announcement not found." }, { status: 404 });
 
   await writeAuditLog(supabase, {
     adminEmail: admin.email,

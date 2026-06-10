@@ -65,7 +65,7 @@ export function parsePossiblyWrappedJson(raw: string) {
 
   try {
     return JSON.parse(json) as unknown;
-  } catch (error) {
+  } catch {
     const repaired = jsonrepair(json);
     return JSON.parse(repaired) as unknown;
   }
