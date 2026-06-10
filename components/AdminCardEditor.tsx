@@ -101,11 +101,16 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
     }
   }
 
+  const jurisdictionLabel =
+    card.jurisdiction_slug === "san-mateo-city" || card.meetings?.jurisdiction_slug === "san-mateo-city"
+      ? "San Mateo"
+      : card.jurisdiction_name || "Foster City";
+
   return (
     <article className="quiet-card p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
-          {card.jurisdiction_name || "Foster City"}
+          {jurisdictionLabel}
         </span>
         <span className="text-xs font-semibold text-black/55">
           {card.meetings?.title || "Meeting not linked"}

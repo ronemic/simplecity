@@ -9,7 +9,7 @@ const icons = {
 
 function jurisdictionLabel(slug?: string | null) {
   if (!slug) return "All cities";
-  return slug === "san-mateo-city" ? "San Mateo City" : "Foster City";
+  return slug === "san-mateo-city" ? "San Mateo" : "Foster City";
 }
 
 export function AnnouncementBanner({ announcements }: { announcements?: AnnouncementRow[] | null }) {

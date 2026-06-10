@@ -6,7 +6,8 @@ import type { MeetingRow } from "@/lib/types";
 import { formatDisplayDate } from "@/lib/utils/date";
 
 function jurisdictionLabel(meeting: MeetingRow) {
-  return meeting.jurisdiction_name || (meeting.jurisdiction_slug === "san-mateo-city" ? "San Mateo City" : "Foster City");
+  if (meeting.jurisdiction_slug === "san-mateo-city") return "San Mateo";
+  return meeting.jurisdiction_name || "Foster City";
 }
 
 export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {

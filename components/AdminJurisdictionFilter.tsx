@@ -12,11 +12,10 @@ export function AdminJurisdictionFilter({
         <select name="jurisdiction" defaultValue={selected} className="input-control mt-1">
           {includeAll ? <option value="all">All</option> : null}
           <option value="foster-city">Foster City</option>
-          <option value="san-mateo-city">San Mateo City</option>
+          <option value="san-mateo-city">San Mateo</option>
         </select>
       </label>
       <button className="action-primary sm:mt-6">View</button>
     </form>
   );
 }
-

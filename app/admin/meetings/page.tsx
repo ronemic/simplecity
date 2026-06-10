@@ -152,6 +152,8 @@ export default async function AdminMeetingsPage({
           const docs = documents.filter((doc) => doc.meeting_id === meeting.id);
           const meetingCards = cards.filter((card) => card.meeting_id === meeting.id);
           const categories = Array.from(new Set(meetingCards.flatMap((card) => card.category_tags || [])));
+          const jurisdictionLabel =
+            meeting.jurisdiction_slug === "san-mateo-city" ? "San Mateo" : meeting.jurisdiction_name || "Foster City";
 
           return (
             <article key={meeting.id} className="quiet-card p-5">
@@ -160,7 +162,7 @@ export default async function AdminMeetingsPage({
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusPill status={meeting.status} />
                     <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
-                      {meeting.jurisdiction_name || "Foster City"}
+                      {jurisdictionLabel}
                     </span>
                     <span className="text-sm font-semibold text-black/70">
                       {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}

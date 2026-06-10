@@ -110,7 +110,7 @@ function AnnouncementEditor({
           >
             <option value="all">All</option>
             <option value="foster-city">Foster City</option>
-            <option value="san-mateo-city">San Mateo City</option>
+            <option value="san-mateo-city">San Mateo</option>
           </select>
         </label>
         <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">

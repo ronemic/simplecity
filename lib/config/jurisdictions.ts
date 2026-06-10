@@ -53,7 +53,7 @@ export function getJurisdictions(): JurisdictionConfig[] {
         process.env.SUPABASE_SERVICE_ROLE_KEY
     },
     {
-      name: "San Mateo City",
+      name: "San Mateo",
       slug: "san-mateo-city",
       platform: "primegov",
       primegovUrl:

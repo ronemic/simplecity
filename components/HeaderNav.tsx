@@ -13,7 +13,7 @@ const nav = [
 const jurisdictions = [
   { slug: "all", label: "All" },
   { slug: "foster-city", label: "Foster City" },
-  { slug: "san-mateo-city", label: "San Mateo City" }
+  { slug: "san-mateo-city", label: "San Mateo" }
 ];
 
 export function HeaderNav() {
@@ -94,4 +94,3 @@ export function HeaderNavFallback() {
     </nav>
   );
 }
-

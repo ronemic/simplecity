@@ -95,13 +95,14 @@ function statusSummary(card: SummaryCardRow) {
 }
 
 function jurisdictionLabel(card: SummaryCardRow) {
+  if (card.jurisdiction_slug === "san-mateo-city" || card.meetings?.jurisdiction_slug === "san-mateo-city") {
+    return "San Mateo";
+  }
+
   return (
     card.jurisdiction_name ||
     card.meetings?.jurisdiction_name ||
-    (card.jurisdiction_slug === "san-mateo-city" ||
-    card.meetings?.jurisdiction_slug === "san-mateo-city"
-      ? "San Mateo City"
-      : "Foster City")
+    "Foster City"
   );
 }
 

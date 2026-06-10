@@ -14,9 +14,9 @@ export function SearchAndFilters({
   const resultLabel = resultCount === 1 ? "1 result" : `${resultCount ?? 0} results`;
 
   return (
-    <div className="mx-auto w-full max-w-[940px]">
+    <div className="mx-auto w-full max-w-[760px]">
       <form
-        className="mx-auto flex w-full max-w-[840px] flex-col gap-2 sm:flex-row sm:gap-0"
+        className="mx-auto flex w-full max-w-[760px] flex-col gap-2 sm:flex-row sm:gap-0"
         action="/#search-results"
         role="search"
       >
@@ -42,7 +42,7 @@ export function SearchAndFilters({
       {hasSearch ? (
         <div
           role="status"
-          className="mx-auto mt-3 flex max-w-[840px] flex-col items-center justify-between gap-2 rounded-lg border border-civic/15 bg-[#eef5ff] px-4 py-3 text-sm font-semibold text-[#1646b8] sm:flex-row sm:text-left"
+          className="mx-auto mt-3 flex max-w-[760px] flex-col items-center justify-between gap-2 rounded-lg border border-civic/15 bg-[#eef5ff] px-4 py-3 text-sm font-semibold text-[#1646b8] sm:flex-row sm:text-left"
         >
           <span>
             Showing {resultLabel} for &ldquo;{search.trim()}&rdquo;.
@@ -53,7 +53,7 @@ export function SearchAndFilters({
         </div>
       ) : null}
 
-      <div className="mx-auto mt-3 grid max-w-[840px] gap-3 sm:mt-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="mx-auto mt-3 grid max-w-[760px] gap-3 sm:mt-4 sm:grid-cols-[minmax(0,1fr)_auto]">
         <Link
           href={`/?jurisdiction=${jurisdiction}#decisions`}
           className="inline-flex min-h-14 items-center justify-center gap-3 rounded-lg bg-civic px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md focus-visible:focus-ring active:translate-y-px"
