@@ -8,6 +8,7 @@ import { CATEGORIES } from "@/lib/constants";
 import { getAdminCollections } from "@/lib/db/queries";
 import { meetingRowToLlmReadyMeeting } from "@/lib/db/meetingTransform";
 import { replaceSummaryCardsForMeeting, writeAuditLog } from "@/lib/db/upsertMeetings";
+import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
 import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import { getAuthenticatedAdmin, requireAdmin } from "@/lib/supabase/admin";
@@ -29,14 +30,18 @@ async function regenerateMeetingAction(formData: FormData) {
   if (!llmMeeting.llmInputText) throw new Error("Meeting does not have LLM input text.");
 
   const result = await generateSummaryForMeeting(llmMeeting);
-  const cards = await replaceSummaryCardsForMeeting(supabase, id, result.summary, result.raw);
+  const sourceHash = meeting.source_hash || meetingSourceHash(llmMeeting);
+  const cards = await replaceSummaryCardsForMeeting(supabase, id, result.summary, result.raw, {
+    allowEmptyReplacement: true,
+    sourceHash
+  });
 
   await writeAuditLog(supabase, {
     adminEmail: admin.email,
     action: "regenerate",
     entityType: "meeting",
     entityId: id,
-    after: { cardsGenerated: cards.length }
+    after: { cardsGenerated: cards.length, sourceHash }
   });
 
   revalidatePath("/admin/meetings");

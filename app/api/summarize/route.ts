@@ -5,6 +5,7 @@ import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import type { MeetingRow } from "@/lib/types";
 import { meetingRowToLlmReadyMeeting } from "@/lib/db/meetingTransform";
+import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -32,7 +33,11 @@ export async function POST(request: Request) {
   const llmMeeting = meetingRowToLlmReadyMeeting(row);
 
   const result = await generateSummaryForMeeting(llmMeeting);
-  const cards = await replaceSummaryCardsForMeeting(supabase, row.id, result.summary, result.raw);
+  const sourceHash = row.source_hash || meetingSourceHash(llmMeeting);
+  const cards = await replaceSummaryCardsForMeeting(supabase, row.id, result.summary, result.raw, {
+    allowEmptyReplacement: true,
+    sourceHash
+  });
   revalidatePublicContent([`/meetings/${row.id}`]);
 
   return Response.json({ cardsGenerated: cards.length, summary: result.summary });

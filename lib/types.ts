@@ -131,6 +131,9 @@ export type MeetingRow = {
   has_pdf: boolean | null;
   llm_input_text: string | null;
   public_comments_input_text: string | null;
+  source_hash: string | null;
+  summarized_source_hash: string | null;
+  cards_generated_at: string | null;
   extraction_notes: unknown;
   raw: unknown;
   scraped_at: string | null;

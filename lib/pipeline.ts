@@ -2,7 +2,11 @@ import "@/lib/env/bootstrap";
 import { createServiceSupabaseClient, maybeCreateServiceSupabaseClient } from "@/lib/supabase/service";
 import type { LlmReadyMeeting } from "@/lib/types";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
-import { replaceSummaryCardsForMeeting, upsertMeetings } from "@/lib/db/upsertMeetings";
+import {
+  replaceSummaryCardsForMeeting,
+  setMeetingSummarizedSourceHash,
+  upsertMeetings
+} from "@/lib/db/upsertMeetings";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
 import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
@@ -119,7 +123,10 @@ export async function runSimpleCityPipeline(
           : llmReadyMeetings.map((meeting) => ({
               externalId: meeting.id,
               id: "",
-              meeting
+              meeting,
+              sourceHash: null,
+              summarizedSourceHash: null,
+              existingCardCount: 0
             }));
 
         for (const item of summaryTargets) {
@@ -129,10 +136,30 @@ export async function runSimpleCityPipeline(
           }
 
           try {
+            if (persistSummaries && supabase && item.id && item.existingCardCount > 0) {
+              if (item.summarizedSourceHash === item.sourceHash) {
+                log(`Skipping ${item.meeting.title}; source unchanged and cards already exist.`);
+                continue;
+              }
+
+              if (!item.summarizedSourceHash && item.sourceHash) {
+                const serviceClient = supabase || createServiceSupabaseClient();
+                await setMeetingSummarizedSourceHash(serviceClient, item.id, item.sourceHash);
+                log(`Skipping ${item.meeting.title}; existing cards kept and source hash baseline saved.`);
+                continue;
+              }
+            }
+
             const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
             if (persistSummaries && supabase && item.id) {
+              if (item.existingCardCount > 0 && summary.cards.length === 0) {
+                log(`Keeping existing cards for ${item.meeting.title}; regenerated summary returned no cards.`);
+              }
+
               const serviceClient = supabase || createServiceSupabaseClient();
-              const inserted = await replaceSummaryCardsForMeeting(serviceClient, item.id, summary, raw);
+              const inserted = await replaceSummaryCardsForMeeting(serviceClient, item.id, summary, raw, {
+                sourceHash: item.sourceHash
+              });
               cardsGenerated += inserted.length;
             } else {
               cardsGenerated += summary.cards.length;

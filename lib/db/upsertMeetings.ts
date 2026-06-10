@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
+import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
 import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 
@@ -7,6 +8,15 @@ type UpsertedMeeting = {
   externalId: string;
   id: string;
   meeting: LlmReadyMeeting;
+  sourceHash: string;
+  summarizedSourceHash: string | null;
+  existingCardCount: number;
+};
+
+type PreservedCardAdminState = {
+  is_published: boolean | null;
+  is_featured: boolean | null;
+  admin_notes: string | null;
 };
 
 function sanitizeDatabaseString(value: string) {
@@ -29,6 +39,55 @@ function sanitizeForDatabase<T>(value: T): T {
   return value;
 }
 
+function normalizeCardKey(value?: string | null) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+}
+
+function exactCardKey(agendaItem?: string | null, sourceUrl?: string | null) {
+  return `${normalizeCardKey(agendaItem)}|${normalizeCardKey(sourceUrl)}`;
+}
+
+async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string) {
+  const { count, error } = await supabase
+    .from("summary_cards")
+    .select("id", { count: "exact", head: true })
+    .eq("meeting_id", meetingId);
+
+  if (error) throw new Error(`Failed to count existing cards: ${error.message}`);
+  return count || 0;
+}
+
+export async function markMeetingSummarized(
+  supabase: SupabaseClient,
+  meetingId: string,
+  sourceHash?: string | null
+) {
+  const update: Record<string, string> = {
+    cards_generated_at: new Date().toISOString()
+  };
+
+  if (sourceHash) update.summarized_source_hash = sourceHash;
+
+  const { error } = await supabase.from("meetings").update(update).eq("id", meetingId);
+  if (error) throw new Error(`Failed to mark meeting summarized: ${error.message}`);
+}
+
+export async function setMeetingSummarizedSourceHash(
+  supabase: SupabaseClient,
+  meetingId: string,
+  sourceHash: string
+) {
+  const { error } = await supabase
+    .from("meetings")
+    .update({ summarized_source_hash: sourceHash })
+    .eq("id", meetingId);
+
+  if (error) throw new Error(`Failed to backfill summarized source hash: ${error.message}`);
+}
+
 export async function upsertMeetings(
   supabase: SupabaseClient,
   meetings: LlmReadyMeeting[],
@@ -40,6 +99,7 @@ export async function upsertMeetings(
     const safeMeeting = sanitizeForDatabase(meeting);
     const firstSourceUrl = meeting.sourceUrl || meeting.documents[0]?.url || null;
     const externalId = externalMeetingId(meeting.dateText, meeting.title, firstSourceUrl);
+    const sourceHash = meetingSourceHash(safeMeeting);
 
     const { data, error } = await supabase
       .from("meetings")
@@ -59,13 +119,14 @@ export async function upsertMeetings(
           has_pdf: safeMeeting.hasPdf,
           llm_input_text: safeMeeting.llmInputText,
           public_comments_input_text: safeMeeting.publicCommentsInputText,
+          source_hash: sourceHash,
           extraction_notes: safeMeeting.extractionNotes,
           raw: safeMeeting,
           scraped_at: scrapedAt || new Date().toISOString()
         },
         { onConflict: "external_id" }
       )
-      .select("id")
+      .select("id,summarized_source_hash")
       .single();
 
     if (error) throw new Error(`Failed to upsert meeting ${meeting.title}: ${error.message}`);
@@ -94,7 +155,16 @@ export async function upsertMeetings(
       }
     }
 
-    upserted.push({ externalId, id: data.id, meeting: safeMeeting });
+    const existingCardCount = await countCardsForMeeting(supabase, data.id);
+
+    upserted.push({
+      externalId,
+      id: data.id,
+      meeting: safeMeeting,
+      sourceHash,
+      summarizedSourceHash: data.summarized_source_hash || null,
+      existingCardCount
+    });
   }
 
   return upserted;
@@ -104,8 +174,49 @@ export async function replaceSummaryCardsForMeeting(
   supabase: SupabaseClient,
   meetingId: string,
   summary: SimpleCitySummary,
-  rawLlmJson: unknown
+  rawLlmJson: unknown,
+  options: { allowEmptyReplacement?: boolean; sourceHash?: string | null } = {}
 ) {
+  const { data: existingCards, error: existingError } = await supabase
+    .from("summary_cards")
+    .select("agenda_item,source_url,is_published,is_featured,admin_notes")
+    .eq("meeting_id", meetingId);
+
+  if (existingError) throw new Error(`Failed to read old cards: ${existingError.message}`);
+
+  const preservedByExactKey = new Map<string, PreservedCardAdminState>();
+  const preservedByAgendaKey = new Map<string, PreservedCardAdminState>();
+
+  for (const card of existingCards || []) {
+    const state = {
+      is_published: card.is_published,
+      is_featured: card.is_featured,
+      admin_notes: card.admin_notes
+    };
+
+    preservedByExactKey.set(exactCardKey(card.agenda_item, card.source_url), state);
+    preservedByAgendaKey.set(normalizeCardKey(card.agenda_item), state);
+  }
+
+  if (summary.cards.length === 0) {
+    if (existingCards?.length && !options.allowEmptyReplacement) {
+      return [];
+    }
+
+    const { error: deleteError } = await supabase
+      .from("summary_cards")
+      .delete()
+      .eq("meeting_id", meetingId);
+
+    if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
+
+    if (!existingCards?.length) {
+      await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+    }
+
+    return [];
+  }
+
   const { error: deleteError } = await supabase
     .from("summary_cards")
     .delete()
@@ -113,30 +224,40 @@ export async function replaceSummaryCardsForMeeting(
 
   if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
-  if (summary.cards.length === 0) return [];
+  const rows = summary.cards.map((card) => {
+    const preserved =
+      preservedByExactKey.get(exactCardKey(card.agendaItem, card.source)) ||
+      preservedByAgendaKey.get(normalizeCardKey(card.agendaItem));
 
-  const rows = summary.cards.map((card) => sanitizeForDatabase({
-    meeting_id: meetingId,
-    agenda_item: card.agendaItem,
-    what_is_happening: card.whatIsHappening,
-    why_it_matters: card.whyItMatters,
-    who_it_affects: card.whoItAffects,
-    category_tags: card.categoryTags,
-    status: card.status,
-    comment_window_opens: card.commentWindow.opens,
-    comment_window_closes: card.commentWindow.closes,
-    how_to_act_attend: card.howToAct.attend,
-    how_to_act_email: card.howToAct.email,
-    how_to_act_submit_comment: card.howToAct.submitComment,
-    source_url: card.source,
-    confidence: card.confidence,
-    is_published: true,
-    raw_llm_json: rawLlmJson
-  }));
+    return sanitizeForDatabase({
+      meeting_id: meetingId,
+      agenda_item: card.agendaItem,
+      what_is_happening: card.whatIsHappening,
+      why_it_matters: card.whyItMatters,
+      who_it_affects: card.whoItAffects,
+      category_tags: card.categoryTags,
+      status: card.status,
+      comment_window_opens: card.commentWindow.opens,
+      comment_window_closes: card.commentWindow.closes,
+      how_to_act_attend: card.howToAct.attend,
+      how_to_act_email: card.howToAct.email,
+      how_to_act_submit_comment: card.howToAct.submitComment,
+      source_url: card.source,
+      confidence: card.confidence,
+      is_published:
+        typeof preserved?.is_published === "boolean" ? preserved.is_published : true,
+      is_featured:
+        typeof preserved?.is_featured === "boolean" ? preserved.is_featured : false,
+      admin_notes: preserved?.admin_notes || null,
+      raw_llm_json: rawLlmJson
+    });
+  });
 
   const { data, error } = await supabase.from("summary_cards").insert(rows).select("id");
 
   if (error) throw new Error(`Failed to insert summary cards: ${error.message}`);
+
+  await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
   return data || [];
 }
