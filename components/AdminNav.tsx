@@ -9,7 +9,7 @@ const items = [
   { href: "/admin/scraper-runs", label: "Scraper runs", icon: ScrollText }
 ];
 
-export function AdminNav({ jurisdiction = "foster-city" }: { jurisdiction?: string }) {
+export function AdminNav({ jurisdiction = "san-mateo-city" }: { jurisdiction?: string }) {
   return (
     <nav className="flex flex-wrap gap-2 rounded-lg border border-black/10 bg-white p-2 shadow-sm">
       {items.map((item) => (

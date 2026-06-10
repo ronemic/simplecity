@@ -24,10 +24,10 @@ export function HeaderNav() {
   const searchParams = useSearchParams();
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
-  const requested = searchParams.get("jurisdiction") || "foster-city";
+  const requested = searchParams.get("jurisdiction") || "san-mateo-city";
   const selected = jurisdictions.some((jurisdiction) => jurisdiction.slug === requested)
     ? requested
-    : "foster-city";
+    : "san-mateo-city";
   const selectedJurisdiction =
     jurisdictions.find((jurisdiction) => jurisdiction.slug === selected) || jurisdictions[1];
 
@@ -136,7 +136,7 @@ export function HeaderNavFallback() {
       <label className="col-span-2 flex min-h-12 items-center gap-2 rounded-lg border border-black/25 bg-white px-3 py-2 shadow-sm sm:col-span-1">
         <span className="sr-only">Jurisdiction</span>
         <select
-          defaultValue="foster-city"
+          defaultValue="san-mateo-city"
           className="w-full bg-transparent text-sm font-bold text-ink outline-none"
         >
           {jurisdictions.map((jurisdiction) => (
@@ -149,7 +149,7 @@ export function HeaderNavFallback() {
       {nav.map((item) => (
         <Link
           key={item.href}
-          href={`${item.href}?jurisdiction=foster-city`}
+          href={`${item.href}?jurisdiction=san-mateo-city`}
           className="inline-flex min-h-12 items-center justify-center rounded-lg border border-black/25 bg-white px-5 py-2 text-center transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring"
         >
           {item.label}

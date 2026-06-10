@@ -4,7 +4,7 @@ import { Play, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
-export function ScraperRunStatus({ jurisdiction = "foster-city" }: { jurisdiction?: string }) {
+export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdiction?: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [hasIssue, setHasIssue] = useState(false);

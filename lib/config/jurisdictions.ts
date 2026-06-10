@@ -76,8 +76,8 @@ export function getPublicJurisdictionOptions(): JurisdictionPublicOption[] {
 }
 
 export function getDefaultJurisdiction() {
-  const jurisdiction = getJurisdictionBySlug("foster-city");
-  if (!jurisdiction) throw new Error("Default jurisdiction foster-city is not configured.");
+  const jurisdiction = getJurisdictionBySlug("san-mateo-city");
+  if (!jurisdiction) throw new Error("Default jurisdiction san-mateo-city is not configured.");
   return jurisdiction;
 }
 

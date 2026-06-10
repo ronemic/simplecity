@@ -2,7 +2,7 @@ import { ArrowRight, CalendarDays } from "lucide-react";
 import Link from "next/link";
 
 export function SearchAndFilters({
-  jurisdiction = "foster-city",
+  jurisdiction = "san-mateo-city",
   resultCount,
   search = ""
 }: {
