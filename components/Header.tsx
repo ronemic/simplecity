@@ -4,8 +4,7 @@ import { Landmark } from "lucide-react";
 const nav = [
   { href: "/meetings", label: "Meetings" },
   { href: "/categories", label: "Categories" },
-  { href: "/about", label: "About" },
-  { href: "/admin", label: "Admin" }
+  { href: "/about", label: "About" }
 ];
 
 export function Header() {
@@ -18,7 +17,7 @@ export function Header() {
           </span>
           <span className="text-lg">SimpleCity</span>
         </Link>
-        <nav className="grid w-full grid-cols-4 gap-1 text-sm font-semibold text-black/75 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
+        <nav className="grid w-full grid-cols-3 gap-1 text-sm font-semibold text-black/75 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:justify-end sm:gap-2">
           {nav.map((item) => (
             <Link
               key={item.href}

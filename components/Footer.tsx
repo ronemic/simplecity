@@ -21,9 +21,6 @@ export function Footer() {
           <Link className="action-ghost px-3 py-2" href="/about">
             Source transparency
           </Link>
-          <Link className="action-ghost px-3 py-2" href="/admin">
-            Admin
-          </Link>
         </div>
       </div>
     </footer>
