@@ -1,10 +1,10 @@
 import Link from "next/link";
 
 const nav = [
+  { href: "/", label: "Home" },
   { href: "/meetings", label: "Meetings" },
   { href: "/categories", label: "Categories" },
-  { href: "/about", label: "About" },
-  { href: "/admin", label: "Sign in" }
+  { href: "/about", label: "About" }
 ];
 
 export function Header() {
