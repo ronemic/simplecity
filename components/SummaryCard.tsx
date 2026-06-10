@@ -2,6 +2,7 @@
 
 import { CalendarDays, Clock, ExternalLink, FileText } from "lucide-react";
 import { useState } from "react";
+import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
@@ -102,6 +103,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
   const affectedResidents = compactList(card.who_it_affects);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
+  const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
   const primaryCategory = getPrimaryCategory(card);
   const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
   const TopicIcon = categoryDefinition?.icon || FileText;
@@ -141,6 +143,13 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
           <h3 className="mt-1 line-clamp-2 text-xl font-bold leading-snug text-ink">
             {card.agenda_item || "Agenda item not listed"}
           </h3>
+          {categoryTags.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {categoryTags.map((category) => (
+                <CategoryPill key={category} category={category} compact />
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="flex flex-col gap-3 sm:items-end">
