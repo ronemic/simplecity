@@ -1,3 +1,4 @@
+import { ListboxSelect } from "@/components/ListboxSelect";
 import { MeetingList } from "@/components/MeetingList";
 import { getMeetings } from "@/lib/db/queries";
 import {
@@ -18,6 +19,12 @@ export default async function MeetingsPage({
   const search = params.q || "";
   const status = params.status || "";
   const meetings = await getMeetings({ search, status, jurisdiction });
+  const statusOptions = [
+    { value: "", label: "All statuses" },
+    { value: "Upcoming", label: "Upcoming" },
+    { value: "Past", label: "Past" },
+    { value: "Cancelled", label: "Cancelled" }
+  ];
 
   return (
     <div className="section-shell py-10">
@@ -37,16 +44,7 @@ export default async function MeetingsPage({
           placeholder="Search meetings..."
           className="input-control"
         />
-        <select
-          name="status"
-          defaultValue={status}
-          className="input-control"
-        >
-          <option value="">All statuses</option>
-          <option value="Upcoming">Upcoming</option>
-          <option value="Past">Past</option>
-          <option value="Cancelled">Cancelled</option>
-        </select>
+        <ListboxSelect name="status" label="Status" value={status} options={statusOptions} />
         <button className="action-primary">Filter</button>
       </form>
 
