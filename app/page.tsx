@@ -1,11 +1,9 @@
 import Link from "next/link";
-import { ArrowRight, CalendarDays, FileText, MessageSquareText, ShieldCheck } from "lucide-react";
-import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
-import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
+import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
+import { getPublishedCards } from "@/lib/db/queries";
 import type { SummaryCardRow } from "@/lib/types";
-import { formatDisplayDate } from "@/lib/utils/date";
 
 export const revalidate = 300;
 
@@ -29,6 +27,41 @@ function isListed(value?: string | null) {
   return Boolean(value && !/not listed/i.test(value));
 }
 
+function isActionable(card: SummaryCardRow) {
+  return (
+    card.status === "Upcoming vote" ||
+    card.status === "Under discussion" ||
+    card.meetings?.status === "Upcoming" ||
+    isListed(card.comment_window_closes)
+  );
+}
+
+function formatCompactDate(dateText?: string | null, iso?: string | null) {
+  const value = iso || dateText;
+  if (!value) return "TBD";
+
+  const parsed = new Date(value);
+  if (!Number.isNaN(parsed.getTime())) {
+    return new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric"
+    }).format(parsed);
+  }
+
+  const compactMatch = value.match(/[A-Za-z]{3,9}\.?\s+\d{1,2}/);
+  return compactMatch?.[0].replace(".", "") || value;
+}
+
+const TOPIC_LABELS: Partial<Record<CategoryName, string>> = {
+  Transportation: "Transport",
+  "Public Safety": "Safety",
+  "Parks & Environment": "Parks",
+  "Budget & Taxes": "Budget",
+  "Business & Development": "Business",
+  "Schools & Youth": "Schools",
+  "City Services": "Services"
+};
+
 export default async function Home({
   searchParams
 }: {
@@ -36,177 +69,107 @@ export default async function Home({
 }) {
   const params = await searchParams;
   const search = params.q || "";
-  const [cards, announcements] = await Promise.all([getPublishedCards(), getActiveAnnouncements()]);
+  const cards = await getPublishedCards();
   const filteredCards = cards.filter((card) => matchesSearch(card, search));
-  const upcomingCards = filteredCards
-    .filter((card) => card.status === "Upcoming vote" || card.meetings?.status === "Upcoming")
-    .slice(0, 4);
+  const upcomingCards = filteredCards.filter(isActionable).slice(0, 4);
   const recentCards = filteredCards.slice(0, 4);
   const decisionCards = upcomingCards.length > 0 ? upcomingCards : recentCards;
-  const featuredCard = decisionCards[0];
+  const openForCommentCount = filteredCards.filter((card) => isListed(card.comment_window_closes)).length;
+  const upcomingMeetingCount = new Set(
+    filteredCards
+      .filter((card) => card.meetings?.status === "Upcoming" || card.status === "Upcoming vote")
+      .map((card) => card.meeting_id || card.meetings?.id || card.id)
+  ).size;
+  const nextDeadlineCard = filteredCards.find((card) => isListed(card.comment_window_closes)) || decisionCards[0];
+  const nextDeadline = nextDeadlineCard
+    ? isListed(nextDeadlineCard.comment_window_closes)
+      ? formatCompactDate(nextDeadlineCard.comment_window_closes)
+      : formatCompactDate(nextDeadlineCard.meetings?.date_text, nextDeadlineCard.meetings?.meeting_datetime)
+    : "TBD";
+  const inputCount = openForCommentCount || decisionCards.length;
+  const inputText = inputCount === 1 ? "1 decision needs your input" : `${inputCount} decisions need your input`;
 
   return (
     <div>
-      <section className="border-b border-black/10 bg-newsprint">
-        <div className="section-shell grid gap-8 py-10 lg:grid-cols-[1.08fr_0.92fr] lg:py-14">
-          <div className="flex flex-col justify-center">
-            <p className="label-eyebrow text-civic">Foster City decision tracker</p>
-            <h1 className="page-title mt-4">Know what City Hall is deciding next.</h1>
-            <p className="page-copy mt-5">
-              Scan upcoming votes, deadlines, and resident impact in plain English. Start with the
-              decision, understand what changes, then choose how to speak up.
-            </p>
-            <div className="mt-7">
-              <SearchAndFilters search={search} />
-            </div>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="#decisions" className="action-primary">
-                Review upcoming decisions <ArrowRight aria-hidden className="h-4 w-4" />
-              </Link>
-              <Link href="/meetings" className="action-secondary">
-                <CalendarDays aria-hidden className="h-4 w-4" />
-                Meeting calendar
-              </Link>
-            </div>
+      <section className="bg-newsprint">
+        <div className="section-shell flex min-h-[690px] flex-col items-center justify-center gap-8 py-16 text-center sm:py-20">
+          <div className="inline-flex items-center gap-2 rounded-full border border-civic/20 bg-[#eef5ff] px-5 py-2 text-base font-bold text-[#1646b8]">
+            <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#2f65e8]" />
+            Foster City · {inputText}
           </div>
 
-          <div className="self-end rounded-lg border-2 border-civic/25 bg-white p-5 shadow-[0_18px_48px_rgba(36,87,166,0.14)] sm:p-6">
-            <div className="flex items-center justify-between gap-3">
-              <p className="label-eyebrow text-civic">Decision to watch</p>
-              <span className="rounded-full border border-civic/20 bg-civic/5 px-3 py-1 text-xs font-medium text-civic">
-                {decisionCards.length} upcoming
-              </span>
-            </div>
-            {featuredCard ? (
-              <div className="mt-5 space-y-4">
-                <h2 className="text-2xl font-bold leading-tight text-ink sm:text-3xl">
-                  {featuredCard.agenda_item || "Agenda item not listed"}
-                </h2>
-                <div className="grid gap-2 border-y border-black/10 py-3 text-sm text-black/72 sm:grid-cols-2">
-                  <p className="inline-flex items-center gap-2">
-                    <CalendarDays aria-hidden className="h-4 w-4 text-civic" />
-                    <span>
-                      {formatDisplayDate(
-                        featuredCard.meetings?.date_text,
-                        featuredCard.meetings?.meeting_datetime
-                      )}
-                    </span>
-                  </p>
-                  <p className="inline-flex items-center gap-2">
-                    <MessageSquareText aria-hidden className="h-4 w-4 text-civic" />
-                    <span>
-                      {isListed(featuredCard.comment_window_closes)
-                        ? `Comments close ${featuredCard.comment_window_closes}`
-                        : "Comment deadline not listed"}
-                    </span>
-                  </p>
-                </div>
-                <p className="line-clamp-4 text-sm leading-6 text-black/78">
-                  {featuredCard.what_is_happening || "Summary not listed in the source document."}
-                </p>
-                <Link href="#decisions" className="action-ghost min-h-10 px-0 py-0 text-civic">
-                  See the full decision card <ArrowRight aria-hidden className="h-4 w-4" />
-                </Link>
-              </div>
-            ) : (
-              <div className="mt-5 rounded-lg border border-dashed border-black/20 bg-paper/60 p-5">
-                <h2 className="text-xl font-bold text-ink">No published decision cards yet</h2>
-                <p className="mt-2 text-sm leading-6 text-black/70">
-                  Once the scraper and summarizer run, official Foster City agenda cards will appear here.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <section className="section-shell py-8">
-        <AnnouncementBanner announcements={announcements} />
-      </section>
-
-      <section id="decisions" className="section-shell scroll-mt-24 py-4">
-        <div className="space-y-8">
-          <section aria-labelledby="upcoming-decisions-heading">
-            <div className="mb-4 flex items-end justify-between gap-4">
-              <div>
-                <p className="label-eyebrow text-civic">Upcoming decisions</p>
-                <h2 id="upcoming-decisions-heading" className="section-title mt-1">
-                  What needs attention now
-                </h2>
-                <p className="mt-2 max-w-2xl text-[13px] leading-5 text-black/58">
-                  Sorted by comment deadline — act before decisions are made.
-                </p>
-              </div>
-              <Link href="/meetings" className="action-ghost px-3 py-2">
-                All meetings <ArrowRight aria-hidden className="h-4 w-4" />
-              </Link>
-            </div>
-            <div className="grid gap-4">
-              {decisionCards.map((card) => (
-                <SummaryCard key={card.id} card={card} />
-              ))}
-              {filteredCards.length === 0 ? (
-                <div className="quiet-card p-8 text-center">
-                  <h3 className="text-lg font-semibold text-ink">No cards yet</h3>
-                  <p className="mt-2 text-sm leading-6 text-black/70">
-                    Once the scraper and summarizer run, official Foster City agenda cards will appear here.
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </section>
-
-          <section aria-labelledby="latest-cards-heading">
-            <div className="mb-4">
-              <p className="label-eyebrow text-harbor">Recently discussed</p>
-              <h2 id="latest-cards-heading" className="section-title mt-1">
-                Latest agenda cards
-              </h2>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              {recentCards.map((card) => (
-                <SummaryCard key={card.id} card={card} />
-              ))}
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section className="mt-6 border-t border-black/10 bg-white/70">
-        <div className="section-shell grid gap-5 py-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
-            <p className="label-eyebrow text-black/55">Trust and sources</p>
-            <h2 className="section-title mt-1">Official records stay one click away.</h2>
-            <p className="mt-3 max-w-xl text-sm leading-6 text-black/70">
-              SimpleCity keeps the decision card focused on what residents need first, while preserving
-              source links for anyone who wants to audit the original agenda or packet.
+            <h1 className="text-balance text-[56px] font-black leading-[0.98] text-ink sm:text-[74px] lg:text-[84px]">
+              Your city,
+              <span className="block text-[#2f65e8]">made simple.</span>
+            </h1>
+            <p className="mx-auto mt-7 max-w-3xl text-balance text-xl font-medium leading-8 text-black/[0.74] sm:text-2xl sm:leading-9">
+              See what City Hall is deciding, understand how it affects you, and speak up before it&apos;s too late.
             </p>
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+
+          <div className="w-full">
+            <SearchAndFilters search={search} />
+          </div>
+
+          <div className="grid w-full max-w-[740px] overflow-hidden rounded-lg border border-black/10 bg-white shadow-sm sm:grid-cols-3">
             {[
-              {
-                icon: CalendarDays,
-                title: "Dates first",
-                body: "Meeting dates, vote timing, and comment windows are surfaced on every card."
-              },
-              {
-                icon: ShieldCheck,
-                title: "Official links",
-                body: "Cards link back to PrimeGov agendas, packets, and notices when available."
-              },
-              {
-                icon: FileText,
-                title: "Plain English",
-                body: "Summaries separate what is changing, why it matters, and how residents can act."
-              }
-            ].map((item) => (
-              <div key={item.title} className="rounded-lg border border-black/10 bg-white p-4">
-                <item.icon aria-hidden className="h-5 w-5 text-civic" />
-                <h3 className="mt-3 text-sm font-extrabold text-ink">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-black/70">{item.body}</p>
+              { value: openForCommentCount, label: "Open for comment" },
+              { value: upcomingMeetingCount, label: "Upcoming meetings" },
+              { value: nextDeadline, label: "Next deadline" }
+            ].map((stat) => (
+              <div key={stat.label} className="border-t border-black/10 px-6 py-5 first:border-t-0 sm:border-l sm:border-t-0 sm:first:border-l-0">
+                <p className="text-3xl font-black leading-none text-ink">{stat.value}</p>
+                <p className="mt-2 text-base font-semibold leading-5 text-black/[0.56]">{stat.label}</p>
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section id="decisions" className="section-shell scroll-mt-24 py-10">
+        <div className="mb-7">
+          <p className="label-eyebrow text-black/55">Decisions</p>
+          <h2 className="mt-1 text-3xl font-black leading-tight text-ink">What needs your attention</h2>
+        </div>
+        <div className="grid gap-4">
+          {decisionCards.map((card) => (
+            <SummaryCard key={card.id} card={card} />
+          ))}
+          {filteredCards.length === 0 ? (
+            <div className="quiet-card p-8 text-center">
+              <h3 className="text-lg font-semibold text-ink">No cards yet</h3>
+              <p className="mt-2 text-sm leading-6 text-black/70">
+                Once the scraper and summarizer run, official Foster City agenda cards will appear here.
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="section-shell pb-16 pt-12">
+        <div className="mb-5">
+          <p className="label-eyebrow text-black/55">Browse by topic</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8">
+          {CATEGORIES.map((category) => {
+            const definition = CATEGORY_DEFINITIONS[category];
+            const Icon = definition.icon;
+            return (
+              <Link
+                key={category}
+                href={`/categories/${definition.slug}`}
+                className="group flex min-h-[118px] flex-col items-center justify-center gap-3 rounded-lg border border-black/10 bg-white px-4 py-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_12px_28px_rgba(23,23,23,0.08)] focus-visible:focus-ring"
+              >
+                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-black/[0.025] text-black/[0.74] transition group-hover:bg-civic/10 group-hover:text-civic">
+                  <Icon aria-hidden className="h-5 w-5" />
+                </span>
+                <span className="text-base font-semibold leading-5 text-black/[0.78]">
+                  {TOPIC_LABELS[category] || category}
+                </span>
+              </Link>
+            );
+          })}
         </div>
       </section>
     </div>

@@ -1,45 +1,26 @@
-import { Search } from "lucide-react";
-import { CategoryPill } from "@/components/CategoryPill";
-import { CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
-
 export function SearchAndFilters({
-  search = "",
-  activeCategory
+  search = ""
 }: {
   search?: string;
-  activeCategory?: string;
 }) {
   return (
-    <div className="space-y-3">
-      <form className="flex w-full max-w-[560px] flex-col gap-2 rounded-lg border border-black/10 bg-white p-1.5 shadow-soft sm:flex-row sm:items-stretch" action="/" role="search">
-        <label className="relative flex flex-1">
-          <Search aria-hidden className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-black/50" />
-          <span className="sr-only">Search agenda cards</span>
-          <input
-            name="q"
-            defaultValue={search}
-            placeholder="Search agenda items, impacts, meetings..."
-            className="input-control input-control--with-icon input-control--hero-search h-12 border-transparent text-sm shadow-none focus:border-civic sm:h-full"
-          />
-        </label>
-        <button className="action-primary h-12 px-4 py-2 sm:h-auto sm:px-5">
-          Search
-        </button>
-      </form>
-
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((category) => {
-          const href = `/categories/${CATEGORY_DEFINITIONS[category].slug}`;
-          return (
-            <CategoryPill
-              key={category}
-              category={category}
-              href={href}
-              compact={activeCategory !== category}
-            />
-          );
-        })}
-      </div>
-    </div>
+    <form
+      className="mx-auto flex w-full max-w-[840px] flex-col gap-2 sm:flex-row sm:gap-0"
+      action="/"
+      role="search"
+    >
+      <label className="flex flex-1">
+        <span className="sr-only">Search agenda cards</span>
+        <input
+          name="q"
+          defaultValue={search}
+          placeholder="Search decisions, topics, meetings..."
+          className="min-h-14 w-full rounded-lg border border-black/15 bg-white px-5 py-3 text-lg font-semibold text-ink shadow-sm transition placeholder:text-black/55 focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/15 sm:rounded-r-none"
+        />
+      </label>
+      <button className="inline-flex min-h-14 items-center justify-center rounded-lg border border-black/25 bg-white px-6 py-3 text-lg font-bold text-ink shadow-sm transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring sm:-ml-px sm:rounded-l-none">
+        Search
+      </button>
+    </form>
   );
 }
