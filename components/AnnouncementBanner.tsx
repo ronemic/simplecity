@@ -7,6 +7,11 @@ const icons = {
   event: CalendarClock
 };
 
+function jurisdictionLabel(slug?: string | null) {
+  if (!slug) return "All cities";
+  return slug === "san-mateo-city" ? "San Mateo City" : "Foster City";
+}
+
 export function AnnouncementBanner({ announcements }: { announcements?: AnnouncementRow[] | null }) {
   if (!announcements || announcements.length === 0) return null;
 
@@ -22,7 +27,9 @@ export function AnnouncementBanner({ announcements }: { announcements?: Announce
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <div>
-                <p className="label-eyebrow">Announcement</p>
+                <p className="label-eyebrow">
+                  Announcement · {jurisdictionLabel(announcement.jurisdiction_slug)}
+                </p>
                 <h2 className="mt-1 text-xl font-bold text-ink">{announcement.title}</h2>
                 <p className="mt-2 text-sm leading-6 text-black/75">{announcement.body}</p>
               </div>

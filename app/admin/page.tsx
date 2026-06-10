@@ -1,7 +1,12 @@
+import { AdminJurisdictionFilter } from "@/components/AdminJurisdictionFilter";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminNav } from "@/components/AdminNav";
 import { ScraperRunStatus } from "@/components/ScraperRunStatus";
 import { getAdminCollections } from "@/lib/db/queries";
+import {
+  getJurisdictionLabel,
+  normalizeJurisdictionSelection
+} from "@/lib/config/jurisdictions";
 import { getAuthenticatedAdmin } from "@/lib/supabase/admin";
 import { hasPublicSupabaseEnv } from "@/lib/supabase/env";
 
@@ -23,7 +28,14 @@ function Stat({
   );
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({
+  searchParams
+}: {
+  searchParams: Promise<{ jurisdiction?: string }>;
+}) {
+  const params = await searchParams;
+  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasEnv = hasPublicSupabaseEnv();
   const admin = await getAuthenticatedAdmin();
 
@@ -50,7 +62,7 @@ export default async function AdminPage() {
     );
   }
 
-  const collections = await getAdminCollections();
+  const collections = await getAdminCollections(jurisdiction);
   const upcoming = collections.meetings.filter((meeting) => meeting.status === "Upcoming").length;
   const publishedCards = collections.cards.filter((card) => card.is_published).length;
   const failedDocuments = collections.documents.filter((doc) => doc.download_error).length;
@@ -63,11 +75,14 @@ export default async function AdminPage() {
         <div>
           <p className="text-sm font-bold uppercase text-civic">Admin</p>
           <h1 className="mt-2 text-4xl font-black text-ink">SimpleCity dashboard</h1>
-          <p className="mt-2 text-sm text-black/70">Signed in as the shared admin account</p>
+          <p className="mt-2 text-sm text-black/70">
+            Signed in as the shared admin account · {jurisdictionLabel}
+          </p>
         </div>
       </div>
 
-      <AdminNav />
+      <AdminNav jurisdiction={jurisdiction} />
+      <AdminJurisdictionFilter selected={jurisdiction} />
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Stat label="Total meetings" value={collections.meetings.length} />
@@ -83,7 +98,7 @@ export default async function AdminPage() {
       </div>
 
       <div className="mt-8">
-        <ScraperRunStatus />
+        <ScraperRunStatus jurisdiction={jurisdiction} />
       </div>
 
       <section className="mt-8">

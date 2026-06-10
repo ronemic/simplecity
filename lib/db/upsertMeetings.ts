@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
+import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
 import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
@@ -91,7 +92,8 @@ export async function setMeetingSummarizedSourceHash(
 export async function upsertMeetings(
   supabase: SupabaseClient,
   meetings: LlmReadyMeeting[],
-  scrapedAt?: string
+  scrapedAt?: string,
+  jurisdiction?: JurisdictionConfig
 ) {
   const upserted: UpsertedMeeting[] = [];
 
@@ -100,11 +102,19 @@ export async function upsertMeetings(
     const firstSourceUrl = meeting.sourceUrl || meeting.documents[0]?.url || null;
     const externalId = externalMeetingId(meeting.dateText, meeting.title, firstSourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
+    const jurisdictionColumns = jurisdiction
+      ? {
+          jurisdiction_name: jurisdiction.name,
+          jurisdiction_slug: jurisdiction.slug,
+          platform: jurisdiction.platform
+        }
+      : {};
 
     const { data, error } = await supabase
       .from("meetings")
       .upsert(
         {
+          ...jurisdictionColumns,
           external_id: externalId,
           title: safeMeeting.title,
           meeting_type: safeMeeting.meetingType,
@@ -135,6 +145,7 @@ export async function upsertMeetings(
     for (const doc of safeMeeting.documents) {
       const { error: docError } = await supabase.from("documents").upsert(
         {
+          ...jurisdictionColumns,
           meeting_id: data.id,
           type: doc.type,
           label: doc.label,
@@ -175,7 +186,11 @@ export async function replaceSummaryCardsForMeeting(
   meetingId: string,
   summary: SimpleCitySummary,
   rawLlmJson: unknown,
-  options: { allowEmptyReplacement?: boolean; sourceHash?: string | null } = {}
+  options: {
+    allowEmptyReplacement?: boolean;
+    sourceHash?: string | null;
+    jurisdiction?: JurisdictionConfig | null;
+  } = {}
 ) {
   const { data: existingCards, error: existingError } = await supabase
     .from("summary_cards")
@@ -230,6 +245,13 @@ export async function replaceSummaryCardsForMeeting(
       preservedByAgendaKey.get(normalizeCardKey(card.agendaItem));
 
     return sanitizeForDatabase({
+      ...(options.jurisdiction
+        ? {
+            jurisdiction_name: options.jurisdiction.name,
+            jurisdiction_slug: options.jurisdiction.slug,
+            platform: options.jurisdiction.platform
+          }
+        : {}),
       meeting_id: meetingId,
       agenda_item: card.agendaItem,
       what_is_happening: card.whatIsHappening,

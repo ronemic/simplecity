@@ -1,9 +1,10 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getPublicSupabaseEnv, getRequiredPublicSupabaseEnv, getServiceRoleKey } from "./env";
+import type { JurisdictionSlug } from "@/lib/config/jurisdictions";
 
-export function createServiceSupabaseClient() {
-  const { url } = getRequiredPublicSupabaseEnv();
-  const serviceRoleKey = getServiceRoleKey();
+export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
+  const { url } = getRequiredPublicSupabaseEnv(slug);
+  const serviceRoleKey = getServiceRoleKey(slug);
 
   if (!serviceRoleKey) {
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY.");
@@ -17,9 +18,9 @@ export function createServiceSupabaseClient() {
   });
 }
 
-export function maybeCreateServiceSupabaseClient() {
-  const env = getPublicSupabaseEnv();
-  const serviceRoleKey = getServiceRoleKey();
+export function maybeCreateServiceSupabaseClient(slug?: JurisdictionSlug) {
+  const env = getPublicSupabaseEnv(slug);
+  const serviceRoleKey = getServiceRoleKey(slug);
   if (!env.url || !env.anonKey || !serviceRoleKey) return null;
-  return createServiceSupabaseClient();
+  return createServiceSupabaseClient(slug);
 }

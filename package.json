@@ -12,9 +12,20 @@
     "scrape:headful": "node --import tsx/esm scripts/scrape-primegov.ts --headful",
     "scrape:download": "node --import tsx/esm scripts/scrape-primegov.ts --download",
     "scrape:html": "node --import tsx/esm scripts/scrape-primegov.ts --html",
+    "scrape:foster-city": "node --import tsx/esm scripts/scrape-primegov.ts --jurisdiction=foster-city",
+    "scrape:foster-city:full": "node --import tsx/esm scripts/scrape-primegov.ts --jurisdiction=foster-city --headful --html --download",
+    "scrape:san-mateo-city": "node --import tsx/esm scripts/scrape-primegov.ts --jurisdiction=san-mateo-city",
+    "scrape:san-mateo-city:full": "node --import tsx/esm scripts/scrape-primegov.ts --jurisdiction=san-mateo-city --headful --html --download",
     "prepare-llm": "node --import tsx/esm scripts/prepare-llm-input.ts",
+    "prepare-llm:foster-city": "node --import tsx/esm scripts/prepare-llm-input.ts --jurisdiction=foster-city",
+    "prepare-llm:san-mateo-city": "node --import tsx/esm scripts/prepare-llm-input.ts --jurisdiction=san-mateo-city",
     "summarize": "node --import tsx/esm scripts/generate-simplecity-cards.ts",
-    "pipeline": "node --import tsx/esm scripts/run-pipeline.ts"
+    "summarize:foster-city": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=foster-city",
+    "summarize:san-mateo-city": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=san-mateo-city",
+    "pipeline": "node --import tsx/esm scripts/run-pipeline.ts",
+    "pipeline:foster-city": "node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=foster-city",
+    "pipeline:san-mateo-city": "node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=san-mateo-city",
+    "pipeline:all": "node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=all"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

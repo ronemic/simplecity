@@ -11,6 +11,7 @@ export type ScrapePortalOptions = {
   headful?: boolean;
   scrapeHtmlAgendas?: boolean;
   downloadDocuments?: boolean;
+  documentOutputDir?: string;
   allYears?: boolean;
   log?: (message: string) => void;
 };
@@ -274,7 +275,10 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
     if (options.downloadDocuments) {
       const { downloadCompiledDocuments } = await import("./downloadDocuments");
       log("Downloading PDFs where available...");
-      await downloadCompiledDocuments(context, meetings, { log });
+      await downloadCompiledDocuments(context, meetings, {
+        log,
+        outputDir: options.documentOutputDir
+      });
     }
 
     return {

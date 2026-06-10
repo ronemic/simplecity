@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getAuthenticatedAdminFromCookies } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/db/upsertMeetings";
 import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
+import {
+  getDefaultJurisdiction,
+  getServiceSupabaseClientForJurisdiction,
+  requireValidJurisdictionSlug
+} from "@/lib/config/jurisdictions";
 
 function listFromCommaText(value: unknown) {
   return String(value || "")
@@ -20,6 +24,13 @@ async function requireAdmin(request: NextRequest) {
   return admin;
 }
 
+function getConcreteJurisdiction(body: Record<string, unknown>) {
+  const requested = String(body.jurisdiction || body.jurisdiction_slug || getDefaultJurisdiction().slug);
+  const slug = requireValidJurisdictionSlug(requested);
+  if (slug === "all") throw new Error("A concrete jurisdiction is required.");
+  return slug;
+}
+
 export async function PUT(request: NextRequest) {
   const admin = await requireAdmin(request);
   if (admin instanceof NextResponse) return admin;
@@ -28,7 +39,17 @@ export async function PUT(request: NextRequest) {
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
 
-  const supabase = createServiceSupabaseClient();
+  let jurisdiction;
+  try {
+    jurisdiction = getConcreteJurisdiction(body);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
   const { data: before } = await supabase.from("summary_cards").select("*").eq("id", id).maybeSingle();
 
   const update = {
@@ -74,7 +95,17 @@ export async function DELETE(request: NextRequest) {
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
 
-  const supabase = createServiceSupabaseClient();
+  let jurisdiction;
+  try {
+    jurisdiction = getConcreteJurisdiction(body as Record<string, unknown>);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
   const { data: before } = await supabase.from("summary_cards").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("summary_cards").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

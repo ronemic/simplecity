@@ -37,6 +37,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: card.id,
+          jurisdiction: card.jurisdiction_slug || "foster-city",
           agenda_item: String(formData.get("agenda_item") || ""),
           what_is_happening: String(formData.get("what_is_happening") || ""),
           why_it_matters: String(formData.get("why_it_matters") || ""),
@@ -83,7 +84,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
       const response = await fetch("/api/admin/cards", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: card.id })
+        body: JSON.stringify({ id: card.id, jurisdiction: card.jurisdiction_slug || "foster-city" })
       });
 
       const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -102,6 +103,14 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
 
   return (
     <article className="quiet-card p-5 sm:p-6">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
+          {card.jurisdiction_name || "Foster City"}
+        </span>
+        <span className="text-xs font-semibold text-black/55">
+          {card.meetings?.title || "Meeting not linked"}
+        </span>
+      </div>
       <form className="space-y-4" onSubmit={submitUpdate}>
         <input type="hidden" name="id" value={card.id} />
         <div className="grid gap-3 md:grid-cols-2">

@@ -1,6 +1,6 @@
 # SimpleCity
 
-SimpleCity turns Foster City PrimeGov meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov scraper, PDF extraction, and OpenRouter summarization pipeline.
+SimpleCity turns PrimeGov meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov scraper, PDF extraction, and OpenRouter summarization pipeline for Foster City and San Mateo City.
 
 ## Setup
 
@@ -16,15 +16,17 @@ SimpleCity turns Foster City PrimeGov meeting agendas into plain-English civic a
    cp .env.example .env.local
    ```
 
-3. Fill in Supabase and OpenRouter values:
+3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo City uses its own Supabase project:
 
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=
    NEXT_PUBLIC_SUPABASE_ANON_KEY=
    SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL=
+   NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY=
+   SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY=
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
-   SCRAPER_BASE_URL=https://fostercity.primegov.com/public/portal
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ADMIN_PASSWORD=choose-a-long-random-password
    ```
@@ -47,9 +49,12 @@ npm run scrape:html
 npm run prepare-llm
 npm run summarize
 npm run pipeline
+npm run pipeline:foster-city
+npm run pipeline:san-mateo-city
+npm run pipeline:all
 ```
 
-Local scraper output is written to `scraped-primegov/`. Source URLs are always the official PrimeGov URLs, even when PDF downloads redirect behind the scenes.
+Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Source URLs are always the official PrimeGov URLs, even when PDF downloads redirect behind the scenes.
 
 ## Admin
 

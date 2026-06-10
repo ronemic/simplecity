@@ -6,10 +6,14 @@ import { useState } from "react";
 import type { AnnouncementRow } from "@/lib/types";
 
 function toAnnouncementPayload(formData: FormData) {
+  const jurisdiction = String(formData.get("jurisdiction") || "all");
+
   return {
     title: String(formData.get("title") || ""),
     body: String(formData.get("body") || ""),
     type: String(formData.get("type") || "info"),
+    jurisdiction,
+    jurisdiction_slug: jurisdiction === "all" ? null : jurisdiction,
     starts_at: String(formData.get("starts_at") || "") || null,
     ends_at: String(formData.get("ends_at") || "") || null,
     is_published: formData.get("is_published") === "on"
@@ -18,10 +22,12 @@ function toAnnouncementPayload(formData: FormData) {
 
 function AnnouncementEditor({
   announcement,
-  mode
+  mode,
+  selectedJurisdiction
 }: {
   announcement?: AnnouncementRow;
   mode: "create" | "update";
+  selectedJurisdiction: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -42,6 +48,14 @@ function AnnouncementEditor({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...(mode === "update" ? { id: announcement?.id } : {}),
+          ...(mode === "update"
+            ? {
+                target_jurisdiction:
+                  announcement?.source_jurisdiction_slug ||
+                  announcement?.jurisdiction_slug ||
+                  selectedJurisdiction
+              }
+            : {}),
           ...payload
         })
       });
@@ -87,6 +101,18 @@ function AnnouncementEditor({
             <option value="event">Event</option>
           </select>
         </label>
+        <label className="block space-y-1">
+          <span className="text-xs font-bold uppercase text-black/70">Jurisdiction</span>
+          <select
+            name="jurisdiction"
+            defaultValue={announcement?.jurisdiction_slug || selectedJurisdiction}
+            className="input-control"
+          >
+            <option value="all">All</option>
+            <option value="foster-city">Foster City</option>
+            <option value="san-mateo-city">San Mateo City</option>
+          </select>
+        </label>
         <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">
           <input type="checkbox" name="is_published" defaultChecked={Boolean(announcement?.is_published ?? true)} />
           Published
@@ -108,7 +134,13 @@ function AnnouncementEditor({
   );
 }
 
-function AnnouncementDeleteButton({ id }: { id: string }) {
+function AnnouncementDeleteButton({
+  id,
+  targetJurisdiction
+}: {
+  id: string;
+  targetJurisdiction: string;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -124,7 +156,7 @@ function AnnouncementDeleteButton({ id }: { id: string }) {
       const response = await fetch("/api/admin/announcements", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, target_jurisdiction: targetJurisdiction })
       });
 
       const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -156,12 +188,18 @@ function AnnouncementDeleteButton({ id }: { id: string }) {
   );
 }
 
-export function AdminAnnouncementsManager({ announcements }: { announcements: AnnouncementRow[] }) {
+export function AdminAnnouncementsManager({
+  announcements,
+  selectedJurisdiction
+}: {
+  announcements: AnnouncementRow[];
+  selectedJurisdiction: string;
+}) {
   return (
     <div className="space-y-8">
       <section>
         <h2 className="mb-3 text-2xl font-bold text-ink">Create announcement</h2>
-        <AnnouncementEditor mode="create" />
+        <AnnouncementEditor mode="create" selectedJurisdiction={selectedJurisdiction} />
       </section>
 
       <section>
@@ -169,8 +207,19 @@ export function AdminAnnouncementsManager({ announcements }: { announcements: An
         <div className="grid gap-4">
           {announcements.map((announcement) => (
             <div key={announcement.id} className="space-y-3">
-              <AnnouncementEditor announcement={announcement} mode="update" />
-              <AnnouncementDeleteButton id={String(announcement.id)} />
+              <AnnouncementEditor
+                announcement={announcement}
+                mode="update"
+                selectedJurisdiction={selectedJurisdiction}
+              />
+              <AnnouncementDeleteButton
+                id={String(announcement.id)}
+                targetJurisdiction={
+                  announcement.source_jurisdiction_slug ||
+                  announcement.jurisdiction_slug ||
+                  selectedJurisdiction
+                }
+              />
             </div>
           ))}
           {announcements.length === 0 ? (

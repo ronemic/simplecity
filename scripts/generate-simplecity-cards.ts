@@ -2,13 +2,52 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { LlmReadyMeeting } from "@/lib/types";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
-import { SCRAPED_DIR } from "@/lib/scraper/downloadDocuments";
+import { SCRAPED_DIR, getJurisdictionScrapedDir } from "@/lib/scraper/downloadDocuments";
+import {
+  getDefaultJurisdiction,
+  requireValidJurisdictionSlug,
+  type JurisdictionSlug
+} from "@/lib/config/jurisdictions";
 
-const INPUT_JSON = path.join(SCRAPED_DIR, "llm-ready-meetings.json");
-const OUTPUT_JSON = path.join(SCRAPED_DIR, "simplecity-summaries.json");
+function getArgValue(name: string) {
+  const prefix = `--${name}=`;
+  const match = process.argv.find((arg) => arg.startsWith(prefix));
+  return match ? match.slice(prefix.length) : null;
+}
+
+function getRequestedJurisdiction(): JurisdictionSlug {
+  const raw = getArgValue("jurisdiction");
+  if (!raw) return getDefaultJurisdiction().slug;
+  const slug = requireValidJurisdictionSlug(raw);
+  if (slug === "all") {
+    throw new Error("Use a concrete jurisdiction with generate-simplecity-cards.ts.");
+  }
+  return slug;
+}
+
+async function readInputJson(inputJson: string, legacyInputJson: string, allowLegacyFallback: boolean) {
+  try {
+    return await fs.readFile(inputJson, "utf8");
+  } catch (error) {
+    if (allowLegacyFallback && inputJson !== legacyInputJson) {
+      return fs.readFile(legacyInputJson, "utf8");
+    }
+    throw error;
+  }
+}
 
 async function main() {
-  const raw = JSON.parse(await fs.readFile(INPUT_JSON, "utf8")) as {
+  const jurisdictionSlug = getRequestedJurisdiction();
+  const outputDir = getJurisdictionScrapedDir(jurisdictionSlug);
+  const inputJson = path.join(outputDir, "llm-ready-meetings.json");
+  const legacyInputJson = path.join(SCRAPED_DIR, "llm-ready-meetings.json");
+  const outputJson = path.join(outputDir, "simplecity-summaries.json");
+
+  await fs.mkdir(outputDir, { recursive: true });
+
+  const raw = JSON.parse(
+    await readInputJson(inputJson, legacyInputJson, jurisdictionSlug === "foster-city")
+  ) as {
     meetings: LlmReadyMeeting[];
   };
 
@@ -41,7 +80,7 @@ async function main() {
   }
 
   await fs.writeFile(
-    OUTPUT_JSON,
+    outputJson,
     JSON.stringify(
       {
         generatedAt: new Date().toISOString(),
@@ -52,7 +91,7 @@ async function main() {
     )
   );
 
-  console.log(`Saved summaries to ${OUTPUT_JSON}`);
+  console.log(`Saved summaries to ${outputJson}`);
 }
 
 main().catch((error) => {

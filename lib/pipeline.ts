@@ -1,6 +1,15 @@
 import "@/lib/env/bootstrap";
-import { createServiceSupabaseClient, maybeCreateServiceSupabaseClient } from "@/lib/supabase/service";
-import type { LlmReadyMeeting } from "@/lib/types";
+import type { LlmReadyMeeting, PrimeGovMeeting } from "@/lib/types";
+import {
+  ALL_JURISDICTIONS_SLUG,
+  getDefaultJurisdiction,
+  getJurisdictionBySlug,
+  getJurisdictions,
+  getServiceSupabaseClientForJurisdiction,
+  type JurisdictionConfig,
+  type JurisdictionSelection,
+  type JurisdictionSlug
+} from "@/lib/config/jurisdictions";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import {
   replaceSummaryCardsForMeeting,
@@ -10,8 +19,10 @@ import {
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
 import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
+import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
+  jurisdiction?: JurisdictionSlug | JurisdictionConfig;
   persist?: boolean;
   summarize?: boolean;
 };
@@ -27,25 +38,85 @@ export type PipelineResult = {
   meetings: LlmReadyMeeting[];
 };
 
+export type MultiJurisdictionPipelineResult = {
+  status: PipelineResult["status"];
+  logs: string[];
+  errors: string[];
+  results: Record<JurisdictionSlug, PipelineResult>;
+  meetingsFound: number;
+  documentsDownloaded: number;
+  cardsGenerated: number;
+};
+
+function resolvePipelineJurisdiction(
+  input?: JurisdictionSlug | JurisdictionConfig
+): JurisdictionConfig {
+  if (!input) return getDefaultJurisdiction();
+  if (typeof input !== "string") return input;
+
+  const jurisdiction = getJurisdictionBySlug(input);
+  if (!jurisdiction) throw new Error(`Invalid jurisdiction slug: ${input}`);
+  return jurisdiction;
+}
+
+function applyJurisdictionMetadata(meetings: PrimeGovMeeting[], jurisdiction: JurisdictionConfig) {
+  for (const meeting of meetings) {
+    meeting.jurisdictionName = jurisdiction.name;
+    meeting.jurisdictionSlug = jurisdiction.slug;
+    meeting.platform = jurisdiction.platform;
+
+    for (const doc of meeting.documents) {
+      doc.jurisdictionName = jurisdiction.name;
+      doc.jurisdictionSlug = jurisdiction.slug;
+      doc.platform = jurisdiction.platform;
+    }
+  }
+}
+
 export async function runSimpleCityPipeline(
   options: RunSimpleCityPipelineOptions = {}
 ): Promise<PipelineResult> {
+  const jurisdiction = resolvePipelineJurisdiction(options.jurisdiction);
   const logs: string[] = [];
   const log = (message: string) => {
-    const line = `${new Date().toISOString()} ${message}`;
+    const line = `${new Date().toISOString()} [${jurisdiction.slug}] ${message}`;
     logs.push(line);
     options.log?.(message);
   };
 
   const persist = options.persist ?? true;
   const shouldSummarize = options.summarize ?? true;
-  const supabase = persist ? maybeCreateServiceSupabaseClient() : null;
+  let supabase = null as ReturnType<typeof getServiceSupabaseClientForJurisdiction> | null;
+  const errors: string[] = [];
+
+  if (persist) {
+    try {
+      supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Supabase service environment is not configured.";
+      errors.push(message);
+      log(message);
+
+      if (jurisdiction.slug === "san-mateo-city") {
+        return {
+          runId: null,
+          status: "failed",
+          logs,
+          errors,
+          meetingsFound: 0,
+          documentsDownloaded: 0,
+          cardsGenerated: 0,
+          meetings: []
+        };
+      }
+    }
+  }
+
   const canPersist = Boolean(persist && supabase);
   let runId: string | null = null;
   let meetingsFound = 0;
   let documentsDownloaded = 0;
   let cardsGenerated = 0;
-  const errors: string[] = [];
   let persistSummaries = canPersist;
 
   if (persist && !supabase) {
@@ -56,7 +127,12 @@ export async function runSimpleCityPipeline(
   if (canPersist && supabase) {
     const { data, error } = await supabase
       .from("scraper_runs")
-      .insert({ status: "running", logs: [] })
+      .insert({
+        jurisdiction_slug: jurisdiction.slug,
+        platform: jurisdiction.platform,
+        status: "running",
+        logs: []
+      })
       .select("id")
       .single();
 
@@ -70,14 +146,18 @@ export async function runSimpleCityPipeline(
   }
 
   try {
-    log("Starting SimpleCity pipeline.");
+    log(`Starting SimpleCity pipeline for ${jurisdiction.name}.`);
 
     const scrapeResult = await scrapePortal({
       ...options,
+      portalUrl: options.portalUrl || jurisdiction.primegovUrl,
+      documentOutputDir:
+        options.documentOutputDir || getJurisdictionDocumentsDir(jurisdiction.slug),
       scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
       downloadDocuments: options.downloadDocuments ?? true,
       log
     });
+    applyJurisdictionMetadata(scrapeResult.meetings, jurisdiction);
 
     meetingsFound = scrapeResult.totalMeetingCount;
     documentsDownloaded = scrapeResult.meetings
@@ -93,10 +173,14 @@ export async function runSimpleCityPipeline(
 
     let upserted: Awaited<ReturnType<typeof upsertMeetings>> = [];
     if (canPersist && supabase) {
-      const serviceClient = supabase || createServiceSupabaseClient();
-      log("Upserting meetings and documents to Supabase.");
+      log(`Upserting meetings and documents to Supabase for ${jurisdiction.name}.`);
       try {
-        upserted = await upsertMeetings(serviceClient, llmReadyMeetings, scrapeResult.scrapedAt);
+        upserted = await upsertMeetings(
+          supabase,
+          llmReadyMeetings,
+          scrapeResult.scrapedAt,
+          jurisdiction
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown persistence error";
         errors.push(message);
@@ -143,8 +227,7 @@ export async function runSimpleCityPipeline(
               }
 
               if (!item.summarizedSourceHash && item.sourceHash) {
-                const serviceClient = supabase || createServiceSupabaseClient();
-                await setMeetingSummarizedSourceHash(serviceClient, item.id, item.sourceHash);
+                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
                 log(`Skipping ${item.meeting.title}; existing cards kept and source hash baseline saved.`);
                 continue;
               }
@@ -156,10 +239,16 @@ export async function runSimpleCityPipeline(
                 log(`Keeping existing cards for ${item.meeting.title}; regenerated summary returned no cards.`);
               }
 
-              const serviceClient = supabase || createServiceSupabaseClient();
-              const inserted = await replaceSummaryCardsForMeeting(serviceClient, item.id, summary, raw, {
-                sourceHash: item.sourceHash
-              });
+              const inserted = await replaceSummaryCardsForMeeting(
+                supabase,
+                item.id,
+                summary,
+                raw,
+                {
+                  jurisdiction,
+                  sourceHash: item.sourceHash
+                }
+              );
               cardsGenerated += inserted.length;
             } else {
               cardsGenerated += summary.cards.length;
@@ -183,6 +272,8 @@ export async function runSimpleCityPipeline(
           .update({
             finished_at: new Date().toISOString(),
             status,
+            jurisdiction_slug: jurisdiction.slug,
+            platform: jurisdiction.platform,
             meetings_found: meetingsFound,
             documents_downloaded: documentsDownloaded,
             cards_generated: cardsGenerated,
@@ -219,6 +310,8 @@ export async function runSimpleCityPipeline(
           .update({
             finished_at: new Date().toISOString(),
             status: "failed",
+            jurisdiction_slug: jurisdiction.slug,
+            platform: jurisdiction.platform,
             meetings_found: meetingsFound,
             documents_downloaded: documentsDownloaded,
             cards_generated: cardsGenerated,
@@ -242,4 +335,63 @@ export async function runSimpleCityPipeline(
       meetings: []
     };
   }
+}
+
+export async function runJurisdictionPipelines(
+  selection: JurisdictionSelection = ALL_JURISDICTIONS_SLUG,
+  options: Omit<RunSimpleCityPipelineOptions, "jurisdiction"> = {}
+): Promise<MultiJurisdictionPipelineResult> {
+  const jurisdictions =
+    selection === ALL_JURISDICTIONS_SLUG
+      ? getJurisdictions()
+      : [resolvePipelineJurisdiction(selection)];
+  const results = {} as Record<JurisdictionSlug, PipelineResult>;
+  const logs: string[] = [];
+  const errors: string[] = [];
+
+  for (const jurisdiction of jurisdictions) {
+    try {
+      const result = await runSimpleCityPipeline({
+        ...options,
+        jurisdiction
+      });
+      results[jurisdiction.slug] = result;
+      logs.push(...result.logs);
+      errors.push(...result.errors.map((error) => `${jurisdiction.name}: ${error}`));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown jurisdiction pipeline error";
+      errors.push(`${jurisdiction.name}: ${message}`);
+      const failed: PipelineResult = {
+        runId: null,
+        status: "failed",
+        logs: [`${new Date().toISOString()} [${jurisdiction.slug}] ${message}`],
+        errors: [message],
+        meetingsFound: 0,
+        documentsDownloaded: 0,
+        cardsGenerated: 0,
+        meetings: []
+      };
+      results[jurisdiction.slug] = failed;
+      logs.push(...failed.logs);
+    }
+  }
+
+  const resultList = Object.values(results);
+  const status = resultList.some((result) => result.status === "failed")
+    ? resultList.some((result) => result.status !== "failed")
+      ? "success_with_errors"
+      : "failed"
+    : errors.length > 0 || resultList.some((result) => result.status === "success_with_errors")
+      ? "success_with_errors"
+      : "success";
+
+  return {
+    status,
+    logs,
+    errors,
+    results,
+    meetingsFound: resultList.reduce((sum, result) => sum + result.meetingsFound, 0),
+    documentsDownloaded: resultList.reduce((sum, result) => sum + result.documentsDownloaded, 0),
+    cardsGenerated: resultList.reduce((sum, result) => sum + result.cardsGenerated, 0)
+  };
 }

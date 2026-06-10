@@ -1,36 +1,81 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { SCRAPED_DIR } from "@/lib/scraper/downloadDocuments";
+import {
+  getJurisdictionDocumentsDir,
+  getJurisdictionScrapedDir
+} from "@/lib/scraper/downloadDocuments";
 import { scrapeAllArchivePages, scrapePortal } from "@/lib/scraper/primegov";
-
-const JSON_OUTPUT = path.join(SCRAPED_DIR, "meetings.json");
+import {
+  getDefaultJurisdiction,
+  getJurisdictionBySlug,
+  requireValidJurisdictionSlug,
+  type JurisdictionSlug
+} from "@/lib/config/jurisdictions";
 
 const SHOULD_DOWNLOAD = process.argv.includes("--download");
 const SHOULD_SCRAPE_HTML_AGENDAS = process.argv.includes("--html");
 const SCRAPE_ALL_YEARS = process.argv.includes("--all-years");
 const HEADFUL = process.argv.includes("--headful");
 
+function getArgValue(name: string) {
+  const prefix = `--${name}=`;
+  const match = process.argv.find((arg) => arg.startsWith(prefix));
+  return match ? match.slice(prefix.length) : null;
+}
+
+function getRequestedJurisdiction(): JurisdictionSlug {
+  const raw = getArgValue("jurisdiction");
+  if (!raw) return getDefaultJurisdiction().slug;
+  const slug = requireValidJurisdictionSlug(raw);
+  if (slug === "all") {
+    throw new Error("Use a concrete jurisdiction with scrape-primegov.ts.");
+  }
+  return slug;
+}
+
 async function main() {
-  await fs.mkdir(SCRAPED_DIR, { recursive: true });
+  const jurisdiction = getJurisdictionBySlug(getRequestedJurisdiction());
+  if (!jurisdiction) throw new Error("Unknown jurisdiction.");
+
+  const outputDir = getJurisdictionScrapedDir(jurisdiction.slug);
+  const documentsDir = getJurisdictionDocumentsDir(jurisdiction.slug);
+  const jsonOutput = path.join(outputDir, "meetings.json");
+
+  await fs.mkdir(outputDir, { recursive: true });
 
   const result = SCRAPE_ALL_YEARS
     ? await scrapeAllArchivePages({
+        portalUrl: jurisdiction.primegovUrl,
         headful: HEADFUL,
         downloadDocuments: SHOULD_DOWNLOAD,
+        documentOutputDir: documentsDir,
         scrapeHtmlAgendas: SHOULD_SCRAPE_HTML_AGENDAS,
         allYears: true,
         log: console.log
       })
     : await scrapePortal({
+        portalUrl: jurisdiction.primegovUrl,
         headful: HEADFUL,
         downloadDocuments: SHOULD_DOWNLOAD,
+        documentOutputDir: documentsDir,
         scrapeHtmlAgendas: SHOULD_SCRAPE_HTML_AGENDAS,
         log: console.log
       });
 
-  await fs.writeFile(JSON_OUTPUT, JSON.stringify(result, null, 2));
+  for (const meeting of result.meetings) {
+    meeting.jurisdictionName = jurisdiction.name;
+    meeting.jurisdictionSlug = jurisdiction.slug;
+    meeting.platform = jurisdiction.platform;
+    for (const doc of meeting.documents) {
+      doc.jurisdictionName = jurisdiction.name;
+      doc.jurisdictionSlug = jurisdiction.slug;
+      doc.platform = jurisdiction.platform;
+    }
+  }
 
-  console.log(`Saved output to ${JSON_OUTPUT}`);
+  await fs.writeFile(jsonOutput, JSON.stringify(result, null, 2));
+
+  console.log(`Saved output to ${jsonOutput}`);
 }
 
 main().catch((error) => {

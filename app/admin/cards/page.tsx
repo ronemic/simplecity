@@ -1,10 +1,16 @@
+import { AdminJurisdictionFilter } from "@/components/AdminJurisdictionFilter";
 import { AdminCardEditor } from "@/components/AdminCardEditor";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminNav } from "@/components/AdminNav";
 import { getAdminCollections } from "@/lib/db/queries";
+import { normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
 import { getAuthenticatedAdmin } from "@/lib/supabase/admin";
 
-export default async function AdminCardsPage() {
+export default async function AdminCardsPage({
+  searchParams
+}: {
+  searchParams: Promise<{ jurisdiction?: string }>;
+}) {
   const admin = await getAuthenticatedAdmin();
   if (!admin) {
     return (
@@ -14,7 +20,9 @@ export default async function AdminCardsPage() {
     );
   }
 
-  const { cards } = await getAdminCollections();
+  const params = await searchParams;
+  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const { cards } = await getAdminCollections(jurisdiction);
 
   return (
     <div className="section-shell py-10">
@@ -22,7 +30,8 @@ export default async function AdminCardsPage() {
         <p className="text-sm font-bold uppercase text-civic">Admin</p>
         <h1 className="mt-2 text-4xl font-black text-ink">Cards</h1>
       </div>
-      <AdminNav />
+      <AdminNav jurisdiction={jurisdiction} />
+      <AdminJurisdictionFilter selected={jurisdiction} />
 
       <div className="mt-8 grid gap-4">
         {cards.length > 0 ? (

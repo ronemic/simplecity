@@ -4,7 +4,7 @@ import { Play, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
-export function ScraperRunStatus() {
+export function ScraperRunStatus({ jurisdiction = "foster-city" }: { jurisdiction?: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [hasIssue, setHasIssue] = useState(false);
@@ -15,7 +15,11 @@ export function ScraperRunStatus() {
     setHasIssue(false);
 
     try {
-      const response = await fetch("/api/admin/run-scraper", { method: "POST" });
+      const response = await fetch("/api/admin/run-scraper", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jurisdiction })
+      });
       const body = await response.json();
       const errors = Array.isArray(body.errors) ? body.errors : [];
       const logTail = Array.isArray(body.logs) ? body.logs.slice(-4) : [];
@@ -42,7 +46,9 @@ export function ScraperRunStatus() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-ink">Manual scraper run</h2>
-          <p className="mt-1 text-sm text-black/70">Scrape PrimeGov, extract PDFs, summarize, and save cards.</p>
+          <p className="mt-1 text-sm text-black/70">
+            Scrape PrimeGov, extract PDFs, summarize, and save cards for the selected jurisdiction.
+          </p>
         </div>
         <button
           type="button"

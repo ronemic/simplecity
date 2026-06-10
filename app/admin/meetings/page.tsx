@@ -1,4 +1,5 @@
 import { revalidatePath } from "next/cache";
+import { AdminJurisdictionFilter } from "@/components/AdminJurisdictionFilter";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminNav } from "@/components/AdminNav";
 import { FormActionButton } from "@/components/FormActionButton";
@@ -12,15 +13,26 @@ import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
 import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import { getAuthenticatedAdmin, requireAdmin } from "@/lib/supabase/admin";
-import { createServiceSupabaseClient } from "@/lib/supabase/service";
+import {
+  getDefaultJurisdiction,
+  getJurisdictionBySlug,
+  getJurisdictionSlugFromRow,
+  getServiceSupabaseClientForJurisdiction,
+  normalizeJurisdictionSelection,
+  requireValidJurisdictionSlug
+} from "@/lib/config/jurisdictions";
 import { formatDisplayDate } from "@/lib/utils/date";
 
 async function regenerateMeetingAction(formData: FormData) {
   "use server";
 
   const admin = await requireAdmin();
-  const supabase = createServiceSupabaseClient();
   const id = String(formData.get("id"));
+  const requestedJurisdiction = String(formData.get("jurisdiction") || getDefaultJurisdiction().slug);
+  const validJurisdiction = requireValidJurisdictionSlug(requestedJurisdiction);
+  if (validJurisdiction === "all") throw new Error("A concrete jurisdiction is required.");
+
+  const supabase = getServiceSupabaseClientForJurisdiction(validJurisdiction);
 
   const { data: meeting, error } = await supabase.from("meetings").select("*").eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
@@ -29,10 +41,14 @@ async function regenerateMeetingAction(formData: FormData) {
   const llmMeeting = meetingRowToLlmReadyMeeting(meeting);
   if (!llmMeeting.llmInputText) throw new Error("Meeting does not have LLM input text.");
 
+  const jurisdiction =
+    getJurisdictionBySlug(getJurisdictionSlugFromRow(meeting.jurisdiction_slug || validJurisdiction)) ||
+    getDefaultJurisdiction();
   const result = await generateSummaryForMeeting(llmMeeting);
   const sourceHash = meeting.source_hash || meetingSourceHash(llmMeeting);
   const cards = await replaceSummaryCardsForMeeting(supabase, id, result.summary, result.raw, {
     allowEmptyReplacement: true,
+    jurisdiction,
     sourceHash
   });
 
@@ -46,13 +62,13 @@ async function regenerateMeetingAction(formData: FormData) {
 
   revalidatePath("/admin/meetings");
   revalidatePath("/admin/cards");
-  revalidatePublicContent([`/meetings/${id}`]);
+  revalidatePublicContent([`/meetings/${id}?jurisdiction=${jurisdiction.slug}`]);
 }
 
 export default async function AdminMeetingsPage({
   searchParams
 }: {
-  searchParams: Promise<{ status?: string; type?: string; category?: string; date?: string }>;
+  searchParams: Promise<{ status?: string; type?: string; category?: string; date?: string; jurisdiction?: string }>;
 }) {
   const admin = await getAuthenticatedAdmin();
   if (!admin) {
@@ -64,7 +80,8 @@ export default async function AdminMeetingsPage({
   }
 
   const params = await searchParams;
-  const { meetings, documents, cards } = await getAdminCollections();
+  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const { meetings, documents, cards } = await getAdminCollections(jurisdiction);
   const meetingTypes = Array.from(new Set(meetings.map((meeting) => meeting.meeting_type).filter(Boolean)));
   const matchingMeetingIdsByCategory = new Set(
     cards
@@ -86,9 +103,11 @@ export default async function AdminMeetingsPage({
         <p className="label-eyebrow text-civic">Admin</p>
         <h1 className="page-title mt-2">Meetings</h1>
       </div>
-      <AdminNav />
+      <AdminNav jurisdiction={jurisdiction} />
+      <AdminJurisdictionFilter selected={jurisdiction} />
 
       <form className="quiet-card mt-8 grid gap-3 p-4 md:grid-cols-4 lg:grid-cols-5 sm:p-5">
+        <input type="hidden" name="jurisdiction" value={jurisdiction} />
         <select
           name="status"
           defaultValue={params.status || ""}
@@ -140,6 +159,9 @@ export default async function AdminMeetingsPage({
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusPill status={meeting.status} />
+                    <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
+                      {meeting.jurisdiction_name || "Foster City"}
+                    </span>
                     <span className="text-sm font-semibold text-black/70">
                       {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
                     </span>
@@ -152,6 +174,7 @@ export default async function AdminMeetingsPage({
                 </div>
                 <form action={regenerateMeetingAction}>
                   <input type="hidden" name="id" value={meeting.id} />
+                  <input type="hidden" name="jurisdiction" value={meeting.jurisdiction_slug || "foster-city"} />
                   <FormActionButton className="action-primary" pendingLabel="Regenerating">
                     Regenerate summaries
                   </FormActionButton>

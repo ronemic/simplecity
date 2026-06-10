@@ -94,6 +94,21 @@ function statusSummary(card: SummaryCardRow) {
   };
 }
 
+function jurisdictionLabel(card: SummaryCardRow) {
+  return (
+    card.jurisdiction_name ||
+    card.meetings?.jurisdiction_name ||
+    (card.jurisdiction_slug === "san-mateo-city" ||
+    card.meetings?.jurisdiction_slug === "san-mateo-city"
+      ? "San Mateo City"
+      : "Foster City")
+  );
+}
+
+function jurisdictionSlug(card: SummaryCardRow) {
+  return card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
+}
+
 export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const [open, setOpen] = useState(false);
   const meeting = card.meetings;
@@ -109,6 +124,8 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const StatusIcon = status.icon;
   const isInformationOnly = card.status === "Information only";
   const showCommentAction = !isInformationOnly && hasCommentAction(card);
+  const cardJurisdictionLabel = jurisdictionLabel(card);
+  const cardJurisdictionSlug = jurisdictionSlug(card);
   const buttonClass =
     "inline-flex min-h-12 items-center justify-center rounded-lg border border-black/25 bg-white px-5 py-2 text-base font-bold text-ink shadow-sm transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring whitespace-nowrap";
 
@@ -128,9 +145,14 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
         </span>
 
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-5 text-black/[0.58]">
-            {meeting?.meeting_type || "Meeting type not listed"}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
+              {cardJurisdictionLabel}
+            </span>
+            <p className="text-sm font-semibold leading-5 text-black/[0.58]">
+              {meeting?.meeting_type || "Meeting type not listed"}
+            </p>
+          </div>
           <h3 className="mt-1 line-clamp-2 text-xl font-bold leading-snug text-ink">
             {card.agenda_item || "Agenda item not listed"}
           </h3>
@@ -232,7 +254,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             <span>{meetingDate}</span>
             {meeting?.id ? (
               <PendingLink
-                href={`/meetings/${meeting.id}`}
+                href={`/meetings/${meeting.id}?jurisdiction=${cardJurisdictionSlug}`}
                 className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
                 pendingLabel="Opening meeting"
               >

@@ -7,7 +7,7 @@ export default function AboutPage() {
         <p className="text-sm font-bold uppercase text-civic">About SimpleCity</p>
         <h1 className="mt-2 text-4xl font-black text-ink">Plain-English access to local decisions</h1>
         <p className="mt-4 text-lg leading-8 text-black/80">
-          SimpleCity helps residents understand Foster City meeting agendas without needing to decode
+          SimpleCity helps residents understand city meeting agendas without needing to decode
           government language or dig through packet PDFs.
         </p>
       </div>
@@ -17,7 +17,7 @@ export default function AboutPage() {
           {
             icon: FileSearch,
             title: "Official documents first",
-            body: "The scraper reads Foster City PrimeGov agenda tables and preserves each official source URL."
+            body: "The scraper reads PrimeGov agenda tables and preserves each official source URL."
           },
           {
             icon: ShieldCheck,

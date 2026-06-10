@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { createServiceSupabaseClient } from "@/lib/supabase/service";
 import { getAuthenticatedAdminFromCookies } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/db/upsertMeetings";
 import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
+import {
+  ALL_JURISDICTIONS_SLUG,
+  getDefaultJurisdiction,
+  getServiceSupabaseClientForJurisdiction,
+  getServiceSupabaseClientsForSelection,
+  requireValidJurisdictionSlug,
+  type JurisdictionSelection
+} from "@/lib/config/jurisdictions";
 
 function normalizeAnnouncement(body: {
   title?: string;
@@ -12,11 +19,24 @@ function normalizeAnnouncement(body: {
   starts_at?: string | null;
   ends_at?: string | null;
   is_published?: boolean;
+  jurisdiction?: string | null;
+  jurisdiction_slug?: string | null;
+  target_jurisdiction?: string | null;
 }) {
+  const rawJurisdiction =
+    body.jurisdiction_slug !== undefined
+      ? body.jurisdiction_slug
+      : body.jurisdiction !== undefined
+        ? body.jurisdiction
+        : ALL_JURISDICTIONS_SLUG;
+  const requestedJurisdiction = String(rawJurisdiction || ALL_JURISDICTIONS_SLUG);
+  const jurisdiction = requireValidJurisdictionSlug(requestedJurisdiction);
+
   return {
     title: String(body.title || ""),
     body: String(body.body || ""),
     type: String(body.type || "info"),
+    jurisdiction_slug: jurisdiction === ALL_JURISDICTIONS_SLUG ? null : jurisdiction,
     starts_at: body.starts_at || null,
     ends_at: body.ends_at || null,
     is_published: Boolean(body.is_published)
@@ -31,7 +51,10 @@ async function requireAdmin(request: NextRequest) {
   return admin;
 }
 
-async function findMatchingAnnouncement(supabase: ReturnType<typeof createServiceSupabaseClient>, row: ReturnType<typeof normalizeAnnouncement>) {
+async function findMatchingAnnouncement(
+  supabase: ReturnType<typeof getServiceSupabaseClientForJurisdiction>,
+  row: ReturnType<typeof normalizeAnnouncement>
+) {
   const query = supabase
     .from("announcements")
     .select("id")
@@ -40,54 +63,112 @@ async function findMatchingAnnouncement(supabase: ReturnType<typeof createServic
     .eq("type", row.type)
     .eq("is_published", row.is_published);
 
-  const withStarts = row.starts_at ? query.eq("starts_at", row.starts_at) : query.is("starts_at", null);
+  const withJurisdiction = row.jurisdiction_slug
+    ? query.eq("jurisdiction_slug", row.jurisdiction_slug)
+    : query.is("jurisdiction_slug", null);
+  const withStarts = row.starts_at
+    ? withJurisdiction.eq("starts_at", row.starts_at)
+    : withJurisdiction.is("starts_at", null);
   const withEnds = row.ends_at ? withStarts.eq("ends_at", row.ends_at) : withStarts.is("ends_at", null);
   const { data, error } = await withEnds.maybeSingle();
   if (error) throw new Error(error.message);
   return data?.id ? String(data.id) : null;
 }
 
+function getConcreteJurisdiction(body: {
+  jurisdiction?: string | null;
+  jurisdiction_slug?: string | null;
+  target_jurisdiction?: string | null;
+}) {
+  const requested = String(
+    body.target_jurisdiction ||
+      body.jurisdiction ||
+      body.jurisdiction_slug ||
+      getDefaultJurisdiction().slug
+  );
+  const slug = requireValidJurisdictionSlug(requested);
+  if (slug === ALL_JURISDICTIONS_SLUG) throw new Error("A concrete jurisdiction is required.");
+  return slug;
+}
+
 export async function POST(request: NextRequest) {
   const admin = await requireAdmin(request);
   if (admin instanceof NextResponse) return admin;
 
-  const body = (await request.json().catch(() => ({}))) as ReturnType<typeof normalizeAnnouncement>;
-  const supabase = createServiceSupabaseClient();
-  const row = normalizeAnnouncement(body);
-  const existingId = await findMatchingAnnouncement(supabase, row);
-
-  if (existingId) {
-    revalidatePath("/admin/announcements");
-    revalidatePublicContent();
-    return NextResponse.json({ ok: true, id: existingId, duplicate: true });
+  const body = (await request.json().catch(() => ({}))) as Parameters<typeof normalizeAnnouncement>[0];
+  let row;
+  let selection: JurisdictionSelection;
+  try {
+    row = normalizeAnnouncement(body);
+    selection = requireValidJurisdictionSlug(
+      String(body.jurisdiction || body.jurisdiction_slug || ALL_JURISDICTIONS_SLUG)
+    );
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
+      { status: 400 }
+    );
   }
 
-  const { data, error } = await supabase.from("announcements").insert(row).select("id").single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const clients = getServiceSupabaseClientsForSelection(selection);
+  const ids: string[] = [];
 
-  await writeAuditLog(supabase, {
-    adminEmail: admin.email,
-    action: "create",
-    entityType: "announcement",
-    entityId: data.id,
-    after: row
-  });
+  for (const { jurisdiction, supabase } of clients) {
+    const insertRow = {
+      ...row,
+      jurisdiction_slug: selection === ALL_JURISDICTIONS_SLUG ? null : jurisdiction.slug
+    };
+    const existingId = await findMatchingAnnouncement(supabase, insertRow);
+
+    if (existingId) {
+      ids.push(existingId);
+      continue;
+    }
+
+    const { data, error } = await supabase.from("announcements").insert(insertRow).select("id").single();
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    ids.push(data.id);
+
+    await writeAuditLog(supabase, {
+      adminEmail: admin.email,
+      action: "create",
+      entityType: "announcement",
+      entityId: data.id,
+      after: insertRow
+    });
+  }
 
   revalidatePath("/admin/announcements");
   revalidatePublicContent();
-  return NextResponse.json({ ok: true, id: data.id });
+  return NextResponse.json({ ok: true, ids, duplicate: ids.length > 0 });
 }
 
 export async function PUT(request: NextRequest) {
   const admin = await requireAdmin(request);
   if (admin instanceof NextResponse) return admin;
 
-  const body = (await request.json().catch(() => ({}))) as { id?: string } & ReturnType<typeof normalizeAnnouncement>;
+  const body = (await request.json().catch(() => ({}))) as { id?: string } & Parameters<
+    typeof normalizeAnnouncement
+  >[0];
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
 
-  const supabase = createServiceSupabaseClient();
-  const row = normalizeAnnouncement(body);
+  let jurisdiction;
+  let row;
+  try {
+    jurisdiction = getConcreteJurisdiction(body);
+    row = normalizeAnnouncement({
+      ...body,
+      jurisdiction_slug: body.jurisdiction_slug ?? null
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
   const { data: before } = await supabase.from("announcements").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("announcements").update(row).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -110,11 +191,26 @@ export async function DELETE(request: NextRequest) {
   const admin = await requireAdmin(request);
   if (admin instanceof NextResponse) return admin;
 
-  const body = (await request.json().catch(() => ({}))) as { id?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    id?: string;
+    jurisdiction?: string | null;
+    jurisdiction_slug?: string | null;
+    target_jurisdiction?: string | null;
+  };
   const id = String(body.id || "");
   if (!id) return NextResponse.json({ error: "id is required." }, { status: 400 });
 
-  const supabase = createServiceSupabaseClient();
+  let jurisdiction;
+  try {
+    jurisdiction = getConcreteJurisdiction(body);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
+      { status: 400 }
+    );
+  }
+
+  const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction);
   const { data: before } = await supabase.from("announcements").select("*").eq("id", id).maybeSingle();
   const { error } = await supabase.from("announcements").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -1,7 +1,8 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getPublicSupabaseEnv, getRequiredPublicSupabaseEnv } from "./env";
+import type { JurisdictionSlug } from "@/lib/config/jurisdictions";
 
-let publicClient: SupabaseClient | null = null;
+const publicClients = new Map<JurisdictionSlug | "default", SupabaseClient>();
 
 function createAnonClient(url: string, anonKey: string) {
   return createClient(url, anonKey, {
@@ -13,15 +14,20 @@ function createAnonClient(url: string, anonKey: string) {
   });
 }
 
-export function createPublicSupabaseClient() {
-  const { url, anonKey } = getRequiredPublicSupabaseEnv();
+export function createPublicSupabaseClient(slug?: JurisdictionSlug) {
+  const { url, anonKey } = getRequiredPublicSupabaseEnv(slug);
   return createAnonClient(url, anonKey);
 }
 
-export function maybeCreatePublicSupabaseClient() {
-  const env = getPublicSupabaseEnv();
+export function maybeCreatePublicSupabaseClient(slug?: JurisdictionSlug) {
+  const env = getPublicSupabaseEnv(slug);
   if (!env.url || !env.anonKey) return null;
 
-  publicClient ||= createAnonClient(env.url, env.anonKey);
-  return publicClient;
+  const key = slug || "default";
+  const existing = publicClients.get(key);
+  if (existing) return existing;
+
+  const client = createAnonClient(env.url, env.anonKey);
+  publicClients.set(key, client);
+  return client;
 }

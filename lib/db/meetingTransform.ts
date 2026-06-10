@@ -4,6 +4,9 @@ export function meetingRowToLlmReadyMeeting(row: MeetingRow): LlmReadyMeeting {
   const raw = (row.raw || {}) as Partial<LlmReadyMeeting>;
 
   return {
+    jurisdictionName: row.jurisdiction_name || raw.jurisdictionName || null,
+    jurisdictionSlug: row.jurisdiction_slug || raw.jurisdictionSlug || null,
+    platform: row.platform || raw.platform || null,
     section: (row.section || raw.section || "Unknown") as LlmReadyMeeting["section"],
     title: row.title,
     dateText: row.date_text,

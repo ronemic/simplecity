@@ -7,6 +7,14 @@ import { buildDownloadFilename } from "./primegov";
 export const SCRAPED_DIR = path.join(process.cwd(), "scraped-primegov");
 export const DOCUMENTS_DIR = path.join(SCRAPED_DIR, "documents");
 
+export function getJurisdictionScrapedDir(jurisdictionSlug: string) {
+  return path.join(SCRAPED_DIR, jurisdictionSlug);
+}
+
+export function getJurisdictionDocumentsDir(jurisdictionSlug: string) {
+  return path.join(getJurisdictionScrapedDir(jurisdictionSlug), "documents");
+}
+
 export type DownloadDocumentsOptions = {
   outputDir?: string;
   log?: (message: string) => void;

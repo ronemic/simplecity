@@ -2,9 +2,11 @@ import { ArrowRight, CalendarDays } from "lucide-react";
 import Link from "next/link";
 
 export function SearchAndFilters({
+  jurisdiction = "foster-city",
   resultCount,
   search = ""
 }: {
+  jurisdiction?: string;
   resultCount?: number;
   search?: string;
 }) {
@@ -20,6 +22,11 @@ export function SearchAndFilters({
       >
         <label className="flex flex-1">
           <span className="sr-only">Search agenda cards</span>
+          <input
+            type="hidden"
+            name="jurisdiction"
+            value={jurisdiction}
+          />
           <input
             name="q"
             defaultValue={search}
@@ -48,14 +55,14 @@ export function SearchAndFilters({
 
       <div className="mx-auto mt-3 grid max-w-[840px] gap-3 sm:mt-4 sm:grid-cols-[minmax(0,1fr)_auto]">
         <Link
-          href="/#decisions"
+          href={`/?jurisdiction=${jurisdiction}#decisions`}
           className="inline-flex min-h-14 items-center justify-center gap-3 rounded-lg bg-civic px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md focus-visible:focus-ring active:translate-y-px"
         >
           Review upcoming decisions
           <ArrowRight aria-hidden className="h-6 w-6" />
         </Link>
         <Link
-          href="/meetings"
+          href={`/meetings?jurisdiction=${jurisdiction}`}
           className="inline-flex min-h-14 items-center justify-center gap-2 rounded-lg border border-black/20 bg-white px-6 py-3 text-lg font-bold text-ink shadow-sm transition hover:-translate-y-0.5 hover:border-black/30 hover:bg-black/[0.025] hover:shadow-md focus-visible:focus-ring active:translate-y-px"
         >
           <CalendarDays aria-hidden className="h-5 w-5 text-civic" />

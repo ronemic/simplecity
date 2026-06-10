@@ -4,17 +4,21 @@ import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
 import { getMeetingDetail } from "@/lib/db/queries";
+import { normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
 import { formatDisplayDate } from "@/lib/utils/date";
 
 export const revalidate = 300;
 
 export default async function MeetingDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ jurisdiction?: string }>;
 }) {
-  const { id } = await params;
-  const { meeting, cards, documents } = await getMeetingDetail(id);
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
+  const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction);
 
   if (!meeting) notFound();
 
@@ -23,6 +27,9 @@ export default async function MeetingDetailPage({
       <div className="mb-8 max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={meeting.status} />
+          <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
+            {meeting.jurisdiction_name || "Foster City"}
+          </span>
           <span className="text-sm font-semibold text-black/70">
             {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
           </span>
@@ -91,7 +98,7 @@ export default async function MeetingDetailPage({
           <section className="quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">Source note</h2>
             <p className="mt-2 text-sm leading-6 text-black/75">
-              This summary was generated from official agenda documents. Always check the original source
+              SimpleCity summarizes official public meeting documents. Always check the original source
               before making formal decisions.
             </p>
           </section>

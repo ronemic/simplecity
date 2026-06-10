@@ -1,10 +1,16 @@
+import { AdminJurisdictionFilter } from "@/components/AdminJurisdictionFilter";
 import { AdminLoginForm } from "@/components/AdminLoginForm";
 import { AdminNav } from "@/components/AdminNav";
 import { ScraperRunStatus } from "@/components/ScraperRunStatus";
 import { getAdminCollections } from "@/lib/db/queries";
+import { normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
 import { getAuthenticatedAdmin } from "@/lib/supabase/admin";
 
-export default async function AdminScraperRunsPage() {
+export default async function AdminScraperRunsPage({
+  searchParams
+}: {
+  searchParams: Promise<{ jurisdiction?: string }>;
+}) {
   const admin = await getAuthenticatedAdmin();
   if (!admin) {
     return (
@@ -14,7 +20,9 @@ export default async function AdminScraperRunsPage() {
     );
   }
 
-  const { scraperRuns, documents } = await getAdminCollections();
+  const params = await searchParams;
+  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const { scraperRuns, documents } = await getAdminCollections(jurisdiction);
   const failedDocuments = documents.filter((doc) => doc.download_error);
 
   return (
@@ -23,10 +31,11 @@ export default async function AdminScraperRunsPage() {
         <p className="text-sm font-bold uppercase text-civic">Admin</p>
         <h1 className="mt-2 text-4xl font-black text-ink">Scraper runs</h1>
       </div>
-      <AdminNav />
+      <AdminNav jurisdiction={jurisdiction} />
+      <AdminJurisdictionFilter selected={jurisdiction} />
 
       <div className="mt-8">
-        <ScraperRunStatus />
+        <ScraperRunStatus jurisdiction={jurisdiction} />
       </div>
 
       <section className="mt-8">
@@ -39,6 +48,7 @@ export default async function AdminScraperRunsPage() {
                   <div>
                     <h3 className="text-lg font-bold text-ink">{String(run.status || "Unknown")}</h3>
                     <p className="mt-1 text-sm text-black/70">
+                      {String(run.jurisdiction_slug || "foster-city")} ·{" "}
                       Started {run.started_at ? new Date(String(run.started_at)).toLocaleString() : "No date"}
                       {run.finished_at ? ` · Finished ${new Date(String(run.finished_at)).toLocaleString()}` : ""}
                     </p>

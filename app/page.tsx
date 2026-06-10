@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
-import { getPublishedCards } from "@/lib/db/queries";
+import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
+import {
+  getJurisdictionLabel,
+  normalizeJurisdictionSelection
+} from "@/lib/config/jurisdictions";
 import type { SummaryCardRow } from "@/lib/types";
 
 export const revalidate = 300;
@@ -65,12 +70,17 @@ const TOPIC_LABELS: Partial<Record<CategoryName, string>> = {
 export default async function Home({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; jurisdiction?: string }>;
 }) {
   const params = await searchParams;
   const search = (params.q || "").trim();
+  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasSearch = search.length > 0;
-  const cards = await getPublishedCards();
+  const [cards, announcements] = await Promise.all([
+    getPublishedCards(jurisdiction),
+    getActiveAnnouncements(jurisdiction)
+  ]);
   const filteredCards = cards.filter((card) => matchesSearch(card, search));
   const upcomingCards = filteredCards.filter(isActionable).slice(0, 4);
   const recentCards = filteredCards.slice(0, 4);
@@ -101,7 +111,7 @@ export default async function Home({
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-civic/20 bg-[#eef5ff] px-5 py-2 text-base font-bold text-[#1646b8]">
             <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#2f65e8]" />
-            Foster City · {inputText}
+            {jurisdictionLabel} · {inputText}
           </div>
 
           {!hasSearch ? (
@@ -117,7 +127,11 @@ export default async function Home({
           ) : null}
 
           <div className="w-full">
-            <SearchAndFilters resultCount={filteredCards.length} search={search} />
+            <SearchAndFilters
+              jurisdiction={jurisdiction}
+              resultCount={filteredCards.length}
+              search={search}
+            />
           </div>
 
           {!hasSearch ? (
@@ -138,8 +152,9 @@ export default async function Home({
       </section>
 
       <section id="decisions" className="section-shell scroll-mt-24 py-10">
+        <AnnouncementBanner announcements={announcements} />
         <div id="search-results" className="scroll-mt-24">
-          <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="mb-7 mt-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="label-eyebrow text-black/55">{hasSearch ? "Search results" : "Decisions"}</p>
               <h2 className="mt-1 text-3xl font-black leading-tight text-ink">
@@ -163,7 +178,7 @@ export default async function Home({
               <p className="mt-2 text-sm leading-6 text-black/70">
                 {hasSearch
                   ? "Try searching for a topic, department, meeting title, or everyday impact."
-                  : "Once the scraper and summarizer run, official Foster City agenda cards will appear here."}
+                  : `Once the scraper and summarizer run, official ${jurisdictionLabel} agenda cards will appear here.`}
               </p>
             </div>
           ) : null}
@@ -181,7 +196,7 @@ export default async function Home({
             return (
               <Link
                 key={category}
-                href={`/categories/${definition.slug}`}
+                href={`/categories/${definition.slug}?jurisdiction=${jurisdiction}`}
                 className="group flex min-h-[118px] flex-col items-center justify-center gap-3 rounded-lg border border-black/10 bg-white px-4 py-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_12px_28px_rgba(23,23,23,0.08)] focus-visible:focus-ring"
               >
                 <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-black/[0.025] text-black/[0.74] transition group-hover:bg-civic/10 group-hover:text-civic">

@@ -12,6 +12,9 @@ export type DocumentType =
   | "Other";
 
 export type PrimeGovDocument = {
+  jurisdictionName?: string | null;
+  jurisdictionSlug?: string | null;
+  platform?: string | null;
   type: DocumentType;
   label: string;
   url: string;
@@ -25,6 +28,9 @@ export type PrimeGovDocument = {
 };
 
 export type PrimeGovMeeting = {
+  jurisdictionName?: string | null;
+  jurisdictionSlug?: string | null;
+  platform?: string | null;
   section: MeetingSection;
   title: string;
   dateText: string | null;
@@ -94,6 +100,9 @@ export type SimpleCitySummary = {
 export type SummaryCardRow = {
   id: string;
   meeting_id: string | null;
+  jurisdiction_name: string | null;
+  jurisdiction_slug: string | null;
+  platform: string | null;
   agenda_item: string | null;
   what_is_happening: string | null;
   why_it_matters: string | null;
@@ -118,6 +127,9 @@ export type SummaryCardRow = {
 export type MeetingRow = {
   id: string;
   external_id: string | null;
+  jurisdiction_name: string | null;
+  jurisdiction_slug: string | null;
+  platform: string | null;
   title: string;
   meeting_type: string | null;
   date_text: string | null;
@@ -144,6 +156,9 @@ export type MeetingRow = {
 export type DocumentRow = {
   id: string;
   meeting_id: string | null;
+  jurisdiction_name: string | null;
+  jurisdiction_slug: string | null;
+  platform: string | null;
   type: string | null;
   label: string | null;
   source_url: string;
@@ -162,6 +177,8 @@ export type AnnouncementRow = {
   title: string;
   body: string;
   type: string | null;
+  jurisdiction_slug: string | null;
+  source_jurisdiction_slug?: string | null;
   starts_at: string | null;
   ends_at: string | null;
   is_published: boolean | null;

@@ -2,10 +2,11 @@ import { createServerClient } from "@supabase/ssr";
 import type { SetAllCookies } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getPublicSupabaseEnv, getRequiredPublicSupabaseEnv } from "./env";
+import type { JurisdictionSlug } from "@/lib/config/jurisdictions";
 export { createServiceSupabaseClient, maybeCreateServiceSupabaseClient } from "./service";
 
-export async function createServerSupabaseClient() {
-  const { url, anonKey } = getRequiredPublicSupabaseEnv();
+export async function createServerSupabaseClient(slug?: JurisdictionSlug) {
+  const { url, anonKey } = getRequiredPublicSupabaseEnv(slug);
   const cookieStore = await cookies();
 
   return createServerClient(url, anonKey, {
@@ -26,8 +27,8 @@ export async function createServerSupabaseClient() {
   });
 }
 
-export async function maybeCreateServerSupabaseClient() {
-  const env = getPublicSupabaseEnv();
+export async function maybeCreateServerSupabaseClient(slug?: JurisdictionSlug) {
+  const env = getPublicSupabaseEnv(slug);
   if (!env.url || !env.anonKey) return null;
-  return createServerSupabaseClient();
+  return createServerSupabaseClient(slug);
 }
