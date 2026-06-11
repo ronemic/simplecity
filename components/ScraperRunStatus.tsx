@@ -6,12 +6,8 @@ import { cn } from "@/lib/utils/cn";
 
 type ScraperRunResponse = {
   error?: string;
-  errors?: unknown[];
-  logs?: unknown[];
   status?: string;
-  meetingsFound?: number;
-  documentsDownloaded?: number;
-  cardsGenerated?: number;
+  jurisdiction?: string;
 };
 
 export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdiction?: string }) {
@@ -21,15 +17,12 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdic
 
   async function runScraper() {
     setLoading(true);
-    setMessage("Starting scraper...");
+    setMessage("Starting scraper in the background...");
     setHasIssue(false);
 
     try {
-      const response = await fetch("/api/admin/run-scraper", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ jurisdiction })
-      });
+      const params = new URLSearchParams({ background: "true", jurisdiction });
+      const response = await fetch(`/api/scrape?${params.toString()}`, { method: "POST" });
       const rawBody = await response.text();
       let body: ScraperRunResponse = {};
       try {
@@ -37,25 +30,21 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdic
       } catch {
         body = {};
       }
-      const errors = Array.isArray(body.errors) ? body.errors : [];
-      const logTail = Array.isArray(body.logs) ? body.logs.slice(-4) : [];
-      const issue = !response.ok || body.status !== "success" || errors.length > 0;
 
       if (!response.ok) {
         throw new Error(
           body.error ||
-            errors.join("\n") ||
             rawBody ||
-            `Scraper run failed with HTTP ${response.status}. Check Render logs for the server error.`
+            `Could not start scraper with HTTP ${response.status}. Check Render logs for the server error.`
         );
       }
 
-      setHasIssue(issue);
-      setMessage([
-        `Finished with ${body.status}: ${body.meetingsFound} meetings, ${body.documentsDownloaded} documents, ${body.cardsGenerated} cards.`,
-        errors.length > 0 ? `Issues:\n${errors.join("\n")}` : "",
-        issue && logTail.length > 0 ? `Recent logs:\n${logTail.join("\n")}` : ""
-      ].filter(Boolean).join("\n\n"));
+      setHasIssue(false);
+      setMessage(
+        body.status === "already_running"
+          ? `A scraper is already running for ${body.jurisdiction || jurisdiction}. Check scraper runs again in a few minutes.`
+          : `Scraper started in the background for ${body.jurisdiction || jurisdiction}. It can take several minutes to finish.`
+      );
     } catch (error) {
       setHasIssue(true);
       setMessage(error instanceof Error ? error.message : "Scraper run failed.");
@@ -70,7 +59,7 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdic
         <div>
           <h2 className="text-xl font-bold text-ink">Manual scraper run</h2>
           <p className="mt-1 text-sm text-black/70">
-            Scrape PrimeGov, extract PDFs, summarize, and save cards for the selected jurisdiction.
+            Start the PrimeGov scraper for the selected jurisdiction without waiting for it to finish in this request.
           </p>
         </div>
         <button
@@ -80,7 +69,7 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdic
           className="action-primary"
         >
           {loading ? <RefreshCw aria-hidden className="h-4 w-4 animate-spin" /> : <Play aria-hidden className="h-4 w-4" />}
-          Run scraper now
+          Start scraper
         </button>
       </div>
       {message ? (
