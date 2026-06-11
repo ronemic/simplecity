@@ -13,6 +13,7 @@ Deno.serve(async (request) => {
   const jurisdiction = url.searchParams.get("jurisdiction") || "san-mateo-city";
   const scrapeUrl = new URL("/api/scrape", appUrl.replace(/\/$/, ""));
   scrapeUrl.searchParams.set("jurisdiction", jurisdiction);
+  scrapeUrl.searchParams.set("background", "true");
 
   const response = await fetch(scrapeUrl, {
     method: "POST",
