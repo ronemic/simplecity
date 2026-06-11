@@ -59,6 +59,17 @@ Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Sour
 
 Deployments run `npm run playwright:install` automatically before `next build` and start with `PLAYWRIGHT_BROWSERS_PATH=0`, so the Render runtime uses the Chromium revision bundled with the deployed app instead of depending on Render's global Playwright cache.
 
+## Render Cron Jobs
+
+Run the production scraper as Render Cron Jobs instead of a web request. Create two Cron Job services from this repo, copy the same environment variables used by the web service, and use these settings:
+
+| Job | Schedule | Build command | Command |
+| --- | --- | --- | --- |
+| San Mateo scraper | `0 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:san-mateo-city` |
+| Foster City scraper | `30 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:foster-city` |
+
+Render schedules use UTC, so these examples run at 3:00 AM and 3:30 AM Pacific during daylight saving time. Keep the jobs separate so one city can fail or run long without blocking the other.
+
 ## Admin
 
 The admin portal lives at `/admin` and uses a single shared password from `ADMIN_PASSWORD` in your `.env.local` file. After 3 failed login attempts, the browser session is locked out for 15 minutes.
