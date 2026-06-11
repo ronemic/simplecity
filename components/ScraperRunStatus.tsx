@@ -4,6 +4,16 @@ import { Play, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 
+type ScraperRunResponse = {
+  error?: string;
+  errors?: unknown[];
+  logs?: unknown[];
+  status?: string;
+  meetingsFound?: number;
+  documentsDownloaded?: number;
+  cardsGenerated?: number;
+};
+
 export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdiction?: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
@@ -20,12 +30,25 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdic
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ jurisdiction })
       });
-      const body = await response.json();
+      const rawBody = await response.text();
+      let body: ScraperRunResponse = {};
+      try {
+        body = rawBody ? JSON.parse(rawBody) : {};
+      } catch {
+        body = {};
+      }
       const errors = Array.isArray(body.errors) ? body.errors : [];
       const logTail = Array.isArray(body.logs) ? body.logs.slice(-4) : [];
       const issue = !response.ok || body.status !== "success" || errors.length > 0;
 
-      if (!response.ok) throw new Error(body.error || errors.join("\n") || "Scraper run failed.");
+      if (!response.ok) {
+        throw new Error(
+          body.error ||
+            errors.join("\n") ||
+            rawBody ||
+            `Scraper run failed with HTTP ${response.status}. Check Render logs for the server error.`
+        );
+      }
 
       setHasIssue(issue);
       setMessage([

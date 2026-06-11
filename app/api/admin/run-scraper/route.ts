@@ -23,37 +23,44 @@ async function getRequestedJurisdiction(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { response } = await assertAdminForRoute();
-  if (response) return response;
-
-  let jurisdiction;
   try {
-    jurisdiction = await getRequestedJurisdiction(request);
+    const { response } = await assertAdminForRoute();
+    if (response) return response;
+
+    let jurisdiction;
+    try {
+      jurisdiction = await getRequestedJurisdiction(request);
+    } catch (error) {
+      return Response.json(
+        { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
+        { status: 400 }
+      );
+    }
+
+    const options = {
+      scrapeHtmlAgendas: true,
+      downloadDocuments: true,
+      persist: true,
+      summarize: true
+    };
+
+    const result =
+      jurisdiction === ALL_JURISDICTIONS_SLUG
+        ? await runJurisdictionPipelines(jurisdiction, options)
+        : await runSimpleCityPipeline({
+            ...options,
+            jurisdiction
+          });
+
+    if (result.status !== "failed") {
+      revalidatePublicContent();
+    }
+
+    return Response.json(result, { status: result.status === "failed" ? 500 : 200 });
   } catch (error) {
     return Response.json(
-      { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
-      { status: 400 }
+      { error: error instanceof Error ? error.message : "Unknown scraper route error." },
+      { status: 500 }
     );
   }
-
-  const options = {
-    scrapeHtmlAgendas: true,
-    downloadDocuments: true,
-    persist: true,
-    summarize: true
-  };
-
-  const result =
-    jurisdiction === ALL_JURISDICTIONS_SLUG
-      ? await runJurisdictionPipelines(jurisdiction, options)
-      : await runSimpleCityPipeline({
-          ...options,
-          jurisdiction
-        });
-
-  if (result.status !== "failed") {
-    revalidatePublicContent();
-  }
-
-  return Response.json(result, { status: result.status === "failed" ? 500 : 200 });
 }
