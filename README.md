@@ -59,9 +59,9 @@ Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Sour
 
 Deployments run `npm run playwright:install` automatically before `next build` and start with `PLAYWRIGHT_BROWSERS_PATH=0`, so the Render runtime uses the Chromium revision bundled with the deployed app instead of depending on Render's global Playwright cache.
 
-## Render Cron Jobs
+## Scheduled Scrapers
 
-Run the production scraper as Render Cron Jobs instead of a web request. Create two Cron Job services from this repo, copy the same environment variables used by the web service, and use these settings:
+If Render Cron Jobs are available, run the production scraper outside the web request lifecycle. Create two Cron Job services from this repo, copy the same environment variables used by the web service, and use these settings:
 
 | Job | Schedule | Build command | Command |
 | --- | --- | --- | --- |
@@ -69,6 +69,30 @@ Run the production scraper as Render Cron Jobs instead of a web request. Create 
 | Foster City scraper | `30 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:foster-city` |
 
 Render schedules use UTC, so these examples run at 3:00 AM and 3:30 AM Pacific during daylight saving time. Keep the jobs separate so one city can fail or run long without blocking the other.
+
+If Render Cron Jobs are not available, keep the Supabase `nightly-scraper` Edge Function and create two Supabase cron jobs that call it with one jurisdiction at a time:
+
+```sql
+select cron.schedule(
+  'simplecity-san-mateo-scraper',
+  '0 10 * * *',
+  $$
+  select net.http_post(
+    url := 'https://depmismpaqqxefynaoaw.supabase.co/functions/v1/nightly-scraper?jurisdiction=san-mateo-city'
+  );
+  $$
+);
+
+select cron.schedule(
+  'simplecity-foster-city-scraper',
+  '30 10 * * *',
+  $$
+  select net.http_post(
+    url := 'https://bdlxkdejlhrxbiribqyo.supabase.co/functions/v1/nightly-scraper?jurisdiction=foster-city'
+  );
+  $$
+);
+```
 
 ## Admin
 
