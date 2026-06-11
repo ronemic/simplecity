@@ -57,7 +57,7 @@ npm run pipeline:all
 
 Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Source URLs are always the official PrimeGov URLs, even when PDF downloads redirect behind the scenes.
 
-Deployments run `npm run playwright:install` automatically before `next build` so the Render runtime has the Chromium revision required by the installed Playwright package.
+Deployments run `npm run playwright:install` automatically before `next build` and start with `PLAYWRIGHT_BROWSERS_PATH=0`, so the Render runtime uses the Chromium revision bundled with the deployed app instead of depending on Render's global Playwright cache.
 
 ## Admin
 
