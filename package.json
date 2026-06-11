@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "next dev",
+    "playwright:install": "playwright install chromium",
+    "prebuild": "npm run playwright:install",
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings=0",

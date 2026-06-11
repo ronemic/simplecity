@@ -8,6 +8,7 @@ SimpleCity turns PrimeGov meeting agendas into plain-English civic action cards.
 
    ```bash
    npm install
+   npm run playwright:install
    ```
 
 2. Copy environment variables:
@@ -55,6 +56,8 @@ npm run pipeline:all
 ```
 
 Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Source URLs are always the official PrimeGov URLs, even when PDF downloads redirect behind the scenes.
+
+Deployments run `npm run playwright:install` automatically before `next build` so the Render runtime has the Chromium revision required by the installed Playwright package.
 
 ## Admin
 
