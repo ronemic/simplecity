@@ -4,6 +4,7 @@ on:
   schedule:
     - cron: "0 10 * * *"
     - cron: "30 10 * * *"
+    - cron: "0 11 * * *"
   workflow_dispatch:
     inputs:
       jurisdiction:
@@ -105,8 +106,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     if: >
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 11 * * *')
     concurrency:
       group: nightly-scraper-santa-clara-county
       cancel-in-progress: false
