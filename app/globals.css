@@ -94,6 +94,45 @@ p {
   @apply text-xs font-bold uppercase text-black/70;
 }
 
+.status-dot-pulse {
+  position: relative;
+  display: inline-flex;
+  width: 0.625rem;
+  height: 0.625rem;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: #2f65e8;
+  box-shadow: 0 0 0 0 rgba(47, 101, 232, 0.42);
+}
+
+.status-dot-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(47, 101, 232, 0.34);
+  animation: status-dot-ripple 2.2s ease-out infinite;
+}
+
+@keyframes status-dot-ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(3.15);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .status-dot-pulse::before {
+    animation: none;
+  }
+}
+
 .committee-eyebrow {
   color: rgba(23, 23, 23, 0.52);
   font-size: 11px;

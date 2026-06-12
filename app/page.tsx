@@ -95,7 +95,7 @@ export default async function Home({
           }`}
         >
           <div className="inline-flex items-center gap-2 rounded-full border border-civic/20 bg-[#eef5ff] px-5 py-2 text-base font-bold text-[#1646b8]">
-            <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-[#2f65e8]" />
+            <span aria-hidden className="status-dot-pulse" />
             {jurisdictionLabel} · {inputText}
           </div>
 
