@@ -7,7 +7,12 @@ import { formatDisplayDate } from "@/lib/utils/date";
 
 function jurisdictionLabel(meeting: MeetingRow) {
   if (meeting.jurisdiction_slug === "san-mateo-city") return "San Mateo";
+  if (meeting.jurisdiction_slug === "santa-clara-county") return "Santa Clara County";
   return meeting.jurisdiction_name || "Foster City";
+}
+
+function publicJurisdictionSlug(slug?: string | null) {
+  return slug === "san-mateo-city" ? "san-mateo" : slug || "foster-city";
 }
 
 export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
@@ -47,7 +52,7 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-10 px-4 py-2" />
             <PendingLink
-              href={`/meetings/${meeting.id}?jurisdiction=${meeting.jurisdiction_slug || "foster-city"}`}
+              href={`/meetings/${meeting.id}?jurisdiction=${publicJurisdictionSlug(meeting.jurisdiction_slug)}`}
               className="action-tertiary min-h-10 px-3 py-2 text-civic"
               pendingLabel="Opening meeting"
             >

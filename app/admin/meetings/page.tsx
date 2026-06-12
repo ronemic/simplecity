@@ -153,7 +153,11 @@ export default async function AdminMeetingsPage({
           const meetingCards = cards.filter((card) => card.meeting_id === meeting.id);
           const categories = Array.from(new Set(meetingCards.flatMap((card) => card.category_tags || [])));
           const jurisdictionLabel =
-            meeting.jurisdiction_slug === "san-mateo-city" ? "San Mateo" : meeting.jurisdiction_name || "Foster City";
+            meeting.jurisdiction_slug === "san-mateo-city"
+              ? "San Mateo"
+              : meeting.jurisdiction_slug === "santa-clara-county"
+                ? "Santa Clara County"
+                : meeting.jurisdiction_name || "Foster City";
 
           return (
             <article key={meeting.id} className="quiet-card p-5">

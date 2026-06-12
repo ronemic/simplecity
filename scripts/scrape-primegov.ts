@@ -37,6 +37,9 @@ function getRequestedJurisdiction(): JurisdictionSlug {
 async function main() {
   const jurisdiction = getJurisdictionBySlug(getRequestedJurisdiction());
   if (!jurisdiction) throw new Error("Unknown jurisdiction.");
+  if (jurisdiction.platform !== "primegov") {
+    throw new Error(`${jurisdiction.name} is configured for ${jurisdiction.platform}, not PrimeGov.`);
+  }
 
   const outputDir = getJurisdictionScrapedDir(jurisdiction.slug);
   const documentsDir = getJurisdictionDocumentsDir(jurisdiction.slug);

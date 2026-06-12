@@ -9,13 +9,19 @@ const items = [
   { href: "/admin/scraper-runs", label: "Scraper runs", icon: ScrollText }
 ];
 
-export function AdminNav({ jurisdiction = "san-mateo-city" }: { jurisdiction?: string }) {
+function publicJurisdictionSlug(slug: string) {
+  return slug === "san-mateo-city" ? "san-mateo" : slug;
+}
+
+export function AdminNav({ jurisdiction = "san-mateo" }: { jurisdiction?: string }) {
+  const publicJurisdiction = publicJurisdictionSlug(jurisdiction);
+
   return (
     <nav className="flex flex-wrap gap-2 rounded-lg border border-black/10 bg-white p-2 shadow-sm">
       {items.map((item) => (
         <Link
           key={item.href}
-          href={`${item.href}?jurisdiction=${jurisdiction}`}
+          href={`${item.href}?jurisdiction=${publicJurisdiction}`}
           className="action-secondary px-4 py-2"
         >
           <item.icon aria-hidden className="h-4 w-4" />

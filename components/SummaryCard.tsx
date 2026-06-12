@@ -84,6 +84,13 @@ function jurisdictionLabel(card: SummaryCardRow) {
     return "San Mateo";
   }
 
+  if (
+    card.jurisdiction_slug === "santa-clara-county" ||
+    card.meetings?.jurisdiction_slug === "santa-clara-county"
+  ) {
+    return "Santa Clara County";
+  }
+
   return (
     card.jurisdiction_name ||
     card.meetings?.jurisdiction_name ||
@@ -92,7 +99,8 @@ function jurisdictionLabel(card: SummaryCardRow) {
 }
 
 function jurisdictionSlug(card: SummaryCardRow) {
-  return card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
+  const slug = card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
+  return slug === "san-mateo-city" ? "san-mateo" : slug;
 }
 
 export function SummaryCard({ card }: { card: SummaryCardRow }) {

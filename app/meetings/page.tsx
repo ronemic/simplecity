@@ -3,7 +3,8 @@ import { MeetingList } from "@/components/MeetingList";
 import { getMeetings } from "@/lib/db/queries";
 import {
   getJurisdictionLabel,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 
 export const revalidate = 300;
@@ -15,6 +16,7 @@ export default async function MeetingsPage({
 }) {
   const params = await searchParams;
   const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = params.q || "";
   const status = params.status || "";
@@ -37,14 +39,20 @@ export default async function MeetingsPage({
       </div>
 
       <form className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px_auto] sm:p-5">
-        <input type="hidden" name="jurisdiction" value={jurisdiction} />
+        <input type="hidden" name="jurisdiction" value={publicJurisdiction} />
         <input
           name="q"
           defaultValue={params.q || ""}
           placeholder="Search meetings..."
           className="input-control"
         />
-        <ListboxSelect name="status" label="Status" value={status} options={statusOptions} />
+        <ListboxSelect
+          key={status}
+          name="status"
+          label="Status"
+          value={status}
+          options={statusOptions}
+        />
         <button className="action-primary">Filter</button>
       </form>
 

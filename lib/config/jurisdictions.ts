@@ -2,15 +2,21 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const ALL_JURISDICTIONS_SLUG = "all" as const;
 
-export type JurisdictionSlug = "foster-city" | "san-mateo-city";
+export type JurisdictionSlug = "foster-city" | "san-mateo-city" | "santa-clara-county";
+export type PublicJurisdictionSlug = "foster-city" | "san-mateo" | "santa-clara-county";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
-export type CivicPlatform = "primegov";
+export type PublicJurisdictionSelection =
+  | PublicJurisdictionSlug
+  | typeof ALL_JURISDICTIONS_SLUG;
+export type CivicPlatform = "primegov" | "iqm2";
 
 export type JurisdictionConfig = {
   name: string;
   slug: JurisdictionSlug;
   platform: CivicPlatform;
-  primegovUrl: string;
+  sourceUrl: string;
+  primegovUrl?: string;
+  iqm2Url?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
@@ -18,19 +24,36 @@ export type JurisdictionConfig = {
 
 export type JurisdictionPublicOption = {
   name: string;
-  slug: JurisdictionSelection;
+  slug: PublicJurisdictionSelection;
 };
 
 const DEFAULT_FOSTER_CITY_PRIMEGOV_URL = "https://fostercity.primegov.com/public/portal";
 const DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL = "https://sanmateo.primegov.com/public/portal";
+const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
+  "https://sccgov.iqm2.com/Citizens/Default.aspx?frame=no";
 
 const publicClients = new Map<JurisdictionSlug, SupabaseClient>();
 const serviceClients = new Map<JurisdictionSlug, SupabaseClient>();
 
 export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "foster-city",
-  "san-mateo-city"
+  "san-mateo-city",
+  "santa-clara-county"
 ];
+
+export function toInternalJurisdictionSlug(
+  slug: string | null | undefined
+): string | null | undefined {
+  if (slug === "san-mateo") return "san-mateo-city";
+  return slug;
+}
+
+export function toPublicJurisdictionSlug(
+  slug: JurisdictionSelection
+): PublicJurisdictionSelection {
+  if (slug === "san-mateo-city") return "san-mateo";
+  return slug;
+}
 
 export function getJurisdictions(): JurisdictionConfig[] {
   return [
@@ -38,6 +61,10 @@ export function getJurisdictions(): JurisdictionConfig[] {
       name: "Foster City",
       slug: "foster-city",
       platform: "primegov",
+      sourceUrl:
+        process.env.FOSTER_CITY_PRIMEGOV_URL ||
+        process.env.SCRAPER_BASE_URL ||
+        DEFAULT_FOSTER_CITY_PRIMEGOV_URL,
       primegovUrl:
         process.env.FOSTER_CITY_PRIMEGOV_URL ||
         process.env.SCRAPER_BASE_URL ||
@@ -56,11 +83,25 @@ export function getJurisdictions(): JurisdictionConfig[] {
       name: "San Mateo",
       slug: "san-mateo-city",
       platform: "primegov",
+      sourceUrl:
+        process.env.SAN_MATEO_CITY_PRIMEGOV_URL || DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL,
       primegovUrl:
         process.env.SAN_MATEO_CITY_PRIMEGOV_URL || DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL,
       supabaseUrl: process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL,
       supabaseAnonKey: process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY
+    },
+    {
+      name: "Santa Clara County",
+      slug: "santa-clara-county",
+      platform: "iqm2",
+      sourceUrl:
+        process.env.SANTA_CLARA_COUNTY_IQM2_URL || DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL,
+      iqm2Url:
+        process.env.SANTA_CLARA_COUNTY_IQM2_URL || DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL,
+      supabaseUrl: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
+      supabaseAnonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey: process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     }
   ];
 }
@@ -70,7 +111,7 @@ export function getPublicJurisdictionOptions(): JurisdictionPublicOption[] {
     { name: "All", slug: ALL_JURISDICTIONS_SLUG },
     ...getJurisdictions().map((jurisdiction) => ({
       name: jurisdiction.name,
-      slug: jurisdiction.slug
+      slug: toPublicJurisdictionSlug(jurisdiction.slug)
     }))
   ];
 }
@@ -82,14 +123,22 @@ export function getDefaultJurisdiction() {
 }
 
 export function getJurisdictionBySlug(slug: string | null | undefined) {
-  return getJurisdictions().find((jurisdiction) => jurisdiction.slug === slug) || null;
+  const internalSlug = toInternalJurisdictionSlug(slug);
+  return getJurisdictions().find((jurisdiction) => jurisdiction.slug === internalSlug) || null;
 }
 
 export function requireValidJurisdictionSlug(
   slug: string | null | undefined
 ): JurisdictionSelection {
+  slug = toInternalJurisdictionSlug(slug);
   if (slug === ALL_JURISDICTIONS_SLUG) return ALL_JURISDICTIONS_SLUG;
-  if (slug === "foster-city" || slug === "san-mateo-city") return slug;
+  if (
+    slug === "foster-city" ||
+    slug === "san-mateo-city" ||
+    slug === "santa-clara-county"
+  ) {
+    return slug;
+  }
   throw new Error(`Invalid jurisdiction slug: ${String(slug || "")}`);
 }
 
@@ -104,23 +153,29 @@ export function normalizeJurisdictionSelection(
 }
 
 export function getJurisdictionLabel(slug: JurisdictionSelection) {
-  if (slug === ALL_JURISDICTIONS_SLUG) return "All cities";
+  if (slug === ALL_JURISDICTIONS_SLUG) return "All";
   return getJurisdictionBySlug(slug)?.name || "Foster City";
 }
 
 export function getJurisdictionSlugFromRow(
   value: string | null | undefined
 ): JurisdictionSlug {
-  return value === "san-mateo-city" ? "san-mateo-city" : "foster-city";
+  return KNOWN_JURISDICTION_SLUGS.includes(value as JurisdictionSlug)
+    ? (value as JurisdictionSlug)
+    : "foster-city";
 }
 
 function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" | "service") {
+  if (jurisdiction.slug === "santa-clara-county") {
+    return "Santa Clara County Supabase configuration is missing. Set NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY, and SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY.";
+  }
+
   if (jurisdiction.slug === "san-mateo-city") {
     if (scope === "service") {
-      return "San Mateo City Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL, NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY, and SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY.";
+      return "San Mateo Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL, NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY, and SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY.";
     }
 
-    return "San Mateo City public Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL and NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY.";
+    return "San Mateo public Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL and NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY.";
   }
 
   if (scope === "service") {

@@ -1,0 +1,48 @@
+name: Santa Clara County Pipeline
+
+on:
+  schedule:
+    - cron: "0 11 * * *"
+  workflow_dispatch:
+
+env:
+  CI: true
+  NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'https://simplecity.app' }}
+  ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+  SUPABASE_CRON_SECRET: ${{ secrets.SUPABASE_CRON_SECRET }}
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-oss-120b:free' }}
+  NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL }}
+  NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY }}
+  SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY }}
+  SANTA_CLARA_COUNTY_IQM2_URL: https://sccgov.iqm2.com/Citizens/Default.aspx?frame=no
+
+permissions:
+  contents: read
+
+jobs:
+  run-santa-clara-county:
+    name: Run Santa Clara County pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: santa-clara-county-pipeline
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Run Santa Clara County pipeline
+        run: npm run pipeline:santa-clara-county

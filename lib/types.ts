@@ -1,14 +1,26 @@
 export type MeetingStatus = "Upcoming" | "Past" | "Cancelled" | "Unknown";
 
-export type MeetingSection = "Current And Upcoming Meetings" | "Archived Meetings" | "Unknown";
+export type MeetingSection =
+  | "Current And Upcoming Meetings"
+  | "Archived Meetings"
+  | "Upcoming Meetings"
+  | "Past Meetings"
+  | "Unknown";
 
 export type DocumentType =
   | "HTML Agenda"
   | "Agenda"
+  | "Agenda Packet"
   | "Packet"
   | "Public Comments"
   | "Minutes"
   | "Notice of Cancellation"
+  | "Video"
+  | "Audio"
+  | "Captions"
+  | "Meeting Details"
+  | "Calendar"
+  | "Document"
   | "Other";
 
 export type PrimeGovDocument = {
@@ -34,15 +46,21 @@ export type PrimeGovMeeting = {
   section: MeetingSection;
   title: string;
   dateText: string | null;
+  timeText?: string | null;
   meetingType: string;
+  bodyName?: string | null;
+  location?: string | null;
   rowText: string;
   status?: MeetingStatus;
   sourceType?: string | null;
   sourceUrl?: string | null;
+  source?: string | null;
+  meetingDetailsUrl?: string | null;
   hasHtmlAgenda: boolean;
   hasPdf: boolean;
   documents: PrimeGovDocument[];
   htmlAgendaText?: string | null;
+  detailText?: string | null;
   extractionNotes?: string[];
   llmInputText?: string;
   publicCommentsInputText?: string | null;

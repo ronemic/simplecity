@@ -1,6 +1,6 @@
 # SimpleCity
 
-SimpleCity turns PrimeGov meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov scraper, PDF extraction, and OpenRouter summarization pipeline for Foster City and San Mateo City.
+SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov and IQM2 scrapers, PDF extraction, and OpenRouter summarization pipeline for Foster City, San Mateo, and Santa Clara County.
 
 ## Setup
 
@@ -17,7 +17,7 @@ SimpleCity turns PrimeGov meeting agendas into plain-English civic action cards.
    cp .env.example .env.local
    ```
 
-3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo City uses its own Supabase project:
+3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo and Santa Clara County each use their own Supabase project:
 
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=
@@ -26,6 +26,9 @@ SimpleCity turns PrimeGov meeting agendas into plain-English civic action cards.
    NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL=
    NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY=
    SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL=
+   NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY=
+   SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY=
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -52,10 +55,12 @@ npm run summarize
 npm run pipeline
 npm run pipeline:foster-city
 npm run pipeline:san-mateo-city
+npm run scrape:santa-clara-county
+npm run pipeline:santa-clara-county
 npm run pipeline:all
 ```
 
-Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Source URLs are always the official PrimeGov URLs, even when PDF downloads redirect behind the scenes.
+Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Source URLs are always the official source portal URLs, even when document downloads redirect behind the scenes.
 
 Deployments run `npm run playwright:install` automatically before `next build` and start with `PLAYWRIGHT_BROWSERS_PATH=0`, so the Render runtime uses the Chromium revision bundled with the deployed app instead of depending on Render's global Playwright cache.
 
@@ -67,8 +72,9 @@ If Render Cron Jobs are available, run the production scraper outside the web re
 | --- | --- | --- | --- |
 | San Mateo scraper | `0 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:san-mateo-city` |
 | Foster City scraper | `30 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:foster-city` |
+| Santa Clara County scraper | `0 11 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:santa-clara-county` |
 
-Render schedules use UTC, so these examples run at 3:00 AM and 3:30 AM Pacific during daylight saving time. Keep the jobs separate so one city can fail or run long without blocking the other.
+Render schedules use UTC, so these examples run at 3:00 AM, 3:30 AM, and 4:00 AM Pacific during daylight saving time. Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
 
 If Render Cron Jobs are not available, keep the Supabase `nightly-scraper` Edge Function and create two Supabase cron jobs that call it with one jurisdiction at a time:
 
@@ -78,7 +84,7 @@ select cron.schedule(
   '0 10 * * *',
   $$
   select net.http_post(
-    url := 'https://depmismpaqqxefynaoaw.supabase.co/functions/v1/nightly-scraper?jurisdiction=san-mateo-city'
+    url := 'https://depmismpaqqxefynaoaw.supabase.co/functions/v1/nightly-scraper?jurisdiction=san-mateo'
   );
   $$
 );

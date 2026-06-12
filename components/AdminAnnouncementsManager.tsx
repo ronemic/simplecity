@@ -32,6 +32,12 @@ function AnnouncementEditor({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const selectedPublicJurisdiction =
+    selectedJurisdiction === "san-mateo-city" ? "san-mateo" : selectedJurisdiction;
+  const announcementPublicJurisdiction =
+    announcement?.jurisdiction_slug === "san-mateo-city"
+      ? "san-mateo"
+      : announcement?.jurisdiction_slug;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -105,12 +111,13 @@ function AnnouncementEditor({
           <span className="text-xs font-bold uppercase text-black/70">Jurisdiction</span>
           <select
             name="jurisdiction"
-            defaultValue={announcement ? announcement.jurisdiction_slug || "all" : selectedJurisdiction}
+            defaultValue={announcement ? announcementPublicJurisdiction || "all" : selectedPublicJurisdiction}
             className="input-control"
           >
             <option value="all">All</option>
             <option value="foster-city">Foster City</option>
-            <option value="san-mateo-city">San Mateo</option>
+            <option value="san-mateo">San Mateo</option>
+            <option value="santa-clara-county">Santa Clara County</option>
           </select>
         </label>
         <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">

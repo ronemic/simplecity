@@ -19,11 +19,15 @@ import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
 import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
+import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
   persist?: boolean;
   summarize?: boolean;
+  enrichDetails?: boolean;
+  clickSeeMore?: boolean;
+  limit?: number;
 };
 
 export type PipelineResult = {
@@ -96,7 +100,7 @@ export async function runSimpleCityPipeline(
       errors.push(message);
       log(message);
 
-      if (jurisdiction.slug === "san-mateo-city") {
+      if (jurisdiction.slug !== "foster-city") {
         return {
           runId: null,
           status: "failed",
@@ -147,15 +151,26 @@ export async function runSimpleCityPipeline(
   try {
     log(`Starting SimpleCity pipeline for ${jurisdiction.name}.`);
 
-    const scrapeResult = await scrapePortal({
-      ...options,
-      portalUrl: options.portalUrl || jurisdiction.primegovUrl,
-      documentOutputDir:
-        options.documentOutputDir || getJurisdictionDocumentsDir(jurisdiction.slug),
-      scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
-      downloadDocuments: options.downloadDocuments ?? true,
-      log
-    });
+    const documentOutputDir =
+      options.documentOutputDir || getJurisdictionDocumentsDir(jurisdiction.slug);
+    const scrapeResult =
+      jurisdiction.platform === "iqm2"
+        ? await scrapeIqm2Meetings({
+            ...options,
+            jurisdiction,
+            portalUrl: options.portalUrl || jurisdiction.iqm2Url || jurisdiction.sourceUrl,
+            documentOutputDir,
+            downloadDocuments: options.downloadDocuments ?? true,
+            log
+          })
+        : await scrapePortal({
+            ...options,
+            portalUrl: options.portalUrl || jurisdiction.primegovUrl || jurisdiction.sourceUrl,
+            documentOutputDir,
+            scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
+            downloadDocuments: options.downloadDocuments ?? true,
+            log
+          });
     applyJurisdictionMetadata(scrapeResult.meetings, jurisdiction);
 
     meetingsFound = scrapeResult.totalMeetingCount;

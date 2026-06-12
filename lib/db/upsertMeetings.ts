@@ -51,6 +51,14 @@ function exactCardKey(agendaItem?: string | null, sourceUrl?: string | null) {
   return `${normalizeCardKey(agendaItem)}|${normalizeCardKey(sourceUrl)}`;
 }
 
+function meetingDateTimeText(meeting: LlmReadyMeeting) {
+  const dateText = meeting.dateText || "";
+  const timeText = meeting.timeText || "";
+  if (!dateText) return null;
+  if (!timeText || dateText.toLowerCase().includes(timeText.toLowerCase())) return dateText;
+  return `${dateText} ${timeText}`.trim();
+}
+
 async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string) {
   const { count, error } = await supabase
     .from("summary_cards")
@@ -100,7 +108,7 @@ export async function upsertMeetings(
   for (const meeting of meetings) {
     const safeMeeting = sanitizeForDatabase(meeting);
     const firstSourceUrl = meeting.sourceUrl || meeting.documents[0]?.url || null;
-    const externalId = externalMeetingId(meeting.dateText, meeting.title, firstSourceUrl);
+    const externalId = externalMeetingId(meetingDateTimeText(meeting), meeting.title, firstSourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
     const jurisdictionColumns = jurisdiction
       ? {
@@ -119,7 +127,7 @@ export async function upsertMeetings(
           title: safeMeeting.title,
           meeting_type: safeMeeting.meetingType,
           date_text: safeMeeting.dateText,
-          meeting_datetime: parseMeetingDate(safeMeeting.dateText),
+          meeting_datetime: parseMeetingDate(meetingDateTimeText(safeMeeting)),
           section: safeMeeting.section,
           status: safeMeeting.status,
           source_type: safeMeeting.sourceType,

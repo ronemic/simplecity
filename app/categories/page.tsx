@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
-import { normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
+import {
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
+} from "@/lib/config/jurisdictions";
 
 export default async function CategoriesPage({
   searchParams
@@ -10,6 +13,7 @@ export default async function CategoriesPage({
 }) {
   const params = await searchParams;
   const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
 
   return (
     <div className="section-shell py-10">
@@ -28,7 +32,7 @@ export default async function CategoriesPage({
           return (
             <Link
               key={category}
-              href={`/categories/${definition.slug}?jurisdiction=${jurisdiction}`}
+              href={`/categories/${definition.slug}?jurisdiction=${publicJurisdiction}`}
               className="quiet-card group block p-5 transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(23,23,23,0.12)] focus-visible:focus-ring"
             >
               <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-civic/10 text-civic shadow-sm">

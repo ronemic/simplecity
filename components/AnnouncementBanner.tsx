@@ -8,8 +8,10 @@ const icons = {
 };
 
 function jurisdictionLabel(slug?: string | null) {
-  if (!slug) return "All cities";
-  return slug === "san-mateo-city" ? "San Mateo" : "Foster City";
+  if (!slug) return "All";
+  if (slug === "san-mateo-city") return "San Mateo";
+  if (slug === "santa-clara-county") return "Santa Clara County";
+  return "Foster City";
 }
 
 export function AnnouncementBanner({ announcements }: { announcements?: AnnouncementRow[] | null }) {

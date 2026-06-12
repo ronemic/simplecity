@@ -21,7 +21,12 @@ export default async function MeetingDetailPage({
   const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction);
 
   if (!meeting) notFound();
-  const jurisdictionLabel = meeting.jurisdiction_slug === "san-mateo-city" ? "San Mateo" : meeting.jurisdiction_name || "Foster City";
+  const jurisdictionLabel =
+    meeting.jurisdiction_slug === "san-mateo-city"
+      ? "San Mateo"
+      : meeting.jurisdiction_slug === "santa-clara-county"
+        ? "Santa Clara County"
+        : meeting.jurisdiction_name || "Foster City";
 
   return (
     <div className="section-shell py-10">

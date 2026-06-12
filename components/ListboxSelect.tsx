@@ -14,7 +14,7 @@ export function ListboxSelect({
   value,
   options,
   className
-  }: {
+}: {
   name: string;
   label: string;
   value: string;
@@ -25,10 +25,6 @@ export function ListboxSelect({
   const [selectedValue, setSelectedValue] = useState(value);
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find((option) => option.value === selectedValue) || options[0];
-
-  useEffect(() => {
-    setSelectedValue(value);
-  }, [value]);
 
   useEffect(() => {
     if (!isOpen) return;

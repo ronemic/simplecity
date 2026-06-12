@@ -22,6 +22,18 @@ function getRequestedJurisdiction(): JurisdictionSelection {
   return requireValidJurisdictionSlug(raw);
 }
 
+function getLimit() {
+  const raw = getArgValue("limit");
+  if (!raw) return undefined;
+
+  const limit = Number(raw);
+  if (!Number.isFinite(limit) || limit <= 0) {
+    throw new Error("--limit must be a positive number.");
+  }
+
+  return Math.floor(limit);
+}
+
 async function main() {
   const jurisdiction = getRequestedJurisdiction();
   const outputDir =
@@ -36,6 +48,9 @@ async function main() {
     headful: process.argv.includes("--headful"),
     scrapeHtmlAgendas: true,
     downloadDocuments: true,
+    enrichDetails: !process.argv.includes("--no-enrich"),
+    clickSeeMore: process.argv.includes("--see-more"),
+    limit: getLimit(),
     persist: !process.argv.includes("--no-persist"),
     summarize: !process.argv.includes("--no-summarize"),
     log: console.log

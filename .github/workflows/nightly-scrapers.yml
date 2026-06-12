@@ -15,6 +15,7 @@ on:
           - all
           - san-mateo-city
           - foster-city
+          - santa-clara-county
 
 env:
   CI: true
@@ -28,6 +29,10 @@ env:
   NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL }}
   NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY }}
   SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY }}
+  NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL }}
+  NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY }}
+  SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY }}
+  SANTA_CLARA_COUNTY_IQM2_URL: https://sccgov.iqm2.com/Citizens/Default.aspx?frame=no
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
 
@@ -94,3 +99,32 @@ jobs:
 
       - name: Run Foster City pipeline
         run: npm run pipeline:foster-city
+
+  santa-clara-county:
+    name: Santa Clara County scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: >
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')
+    concurrency:
+      group: nightly-scraper-santa-clara-county
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Run Santa Clara County pipeline
+        run: npm run pipeline:santa-clara-county

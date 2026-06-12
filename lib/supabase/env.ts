@@ -21,6 +21,12 @@ export function hasPublicSupabaseEnv(slug?: JurisdictionSlug) {
 export function getRequiredPublicSupabaseEnv(slug?: JurisdictionSlug) {
   const env = getPublicSupabaseEnv(slug);
   if (!env.url || !env.anonKey) {
+    if (slug === "santa-clara-county") {
+      throw new Error(
+        "Santa Clara County Supabase configuration is missing. Set NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY, and SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY."
+      );
+    }
+
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.");
   }
   return env as { url: string; anonKey: string };

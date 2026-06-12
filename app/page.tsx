@@ -6,7 +6,8 @@ import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/const
 import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
 import {
   getJurisdictionLabel,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { formatCompactDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
@@ -60,6 +61,7 @@ export default async function Home({
   const params = await searchParams;
   const search = (params.q || "").trim();
   const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
+  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasSearch = search.length > 0;
   const [cards, announcements] = await Promise.all([
@@ -113,7 +115,7 @@ export default async function Home({
 
           <div className="w-full">
             <SearchAndFilters
-              jurisdiction={jurisdiction}
+              jurisdiction={publicJurisdiction}
               resultCount={filteredCards.length}
               search={search}
             />
@@ -181,7 +183,7 @@ export default async function Home({
             return (
               <Link
                 key={category}
-                href={`/categories/${definition.slug}?jurisdiction=${jurisdiction}`}
+                href={`/categories/${definition.slug}?jurisdiction=${publicJurisdiction}`}
                 className="group flex min-h-[118px] flex-col items-center justify-center gap-3 rounded-lg border border-black/10 bg-white px-4 py-5 text-center shadow-sm transition hover:-translate-y-0.5 hover:border-black/20 hover:shadow-[0_12px_28px_rgba(23,23,23,0.08)] focus-visible:focus-ring"
               >
                 <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-black/[0.025] text-black/[0.74] transition group-hover:bg-civic/10 group-hover:text-civic">

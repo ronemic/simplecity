@@ -75,10 +75,15 @@ Rules:
 - If information is missing, write “Not listed in the source document.”`;
 
 export function buildSimpleCityUserPrompt(meeting: LlmReadyMeeting) {
+  const dateTime =
+    meeting.dateText && meeting.timeText && !meeting.dateText.includes(meeting.timeText)
+      ? `${meeting.dateText} ${meeting.timeText}`
+      : meeting.dateText;
+
   return `Meeting metadata:
 Title: ${meeting.title}
 Meeting type: ${meeting.meetingType}
-Date/time: ${meeting.dateText || "Not listed in the source document."}
+Date/time: ${dateTime || "Not listed in the source document."}
 Status: ${meeting.status}
 Source type: ${meeting.sourceType || "Not listed in the source document."}
 Source URL: ${meeting.sourceUrl || "Not listed in the source document."}

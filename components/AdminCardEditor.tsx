@@ -22,6 +22,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
+  const cardJurisdictionSlug = card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
 
   async function submitUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -37,7 +38,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: card.id,
-          jurisdiction: card.jurisdiction_slug || "foster-city",
+          jurisdiction: cardJurisdictionSlug,
           agenda_item: String(formData.get("agenda_item") || ""),
           what_is_happening: String(formData.get("what_is_happening") || ""),
           why_it_matters: String(formData.get("why_it_matters") || ""),
@@ -84,7 +85,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
       const response = await fetch("/api/admin/cards", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: card.id, jurisdiction: card.jurisdiction_slug || "foster-city" })
+        body: JSON.stringify({ id: card.id, jurisdiction: cardJurisdictionSlug })
       });
 
       const body = (await response.json().catch(() => ({}))) as { error?: string };
@@ -104,7 +105,10 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
   const jurisdictionLabel =
     card.jurisdiction_slug === "san-mateo-city" || card.meetings?.jurisdiction_slug === "san-mateo-city"
       ? "San Mateo"
-      : card.jurisdiction_name || "Foster City";
+      : card.jurisdiction_slug === "santa-clara-county" ||
+          card.meetings?.jurisdiction_slug === "santa-clara-county"
+        ? "Santa Clara County"
+        : card.jurisdiction_name || "Foster City";
 
   return (
     <article className="quiet-card p-5 sm:p-6">

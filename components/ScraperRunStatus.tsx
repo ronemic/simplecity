@@ -10,7 +10,7 @@ type ScraperRunResponse = {
   jurisdiction?: string;
 };
 
-export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdiction?: string }) {
+export function ScraperRunStatus({ jurisdiction = "san-mateo" }: { jurisdiction?: string }) {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [hasIssue, setHasIssue] = useState(false);
@@ -59,7 +59,7 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo-city" }: { jurisdic
         <div>
           <h2 className="text-xl font-bold text-ink">Manual scraper run</h2>
           <p className="mt-1 text-sm text-black/70">
-            Start the PrimeGov scraper for the selected jurisdiction without waiting for it to finish in this request.
+            Start the scraper for the selected jurisdiction without waiting for it to finish in this request.
           </p>
         </div>
         <button
