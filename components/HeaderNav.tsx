@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown } from "lucide-react";
+import { Check, ChevronDown, MapPin } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -86,7 +86,10 @@ export function HeaderNav() {
           className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:focus-ring"
           onClick={() => setIsJurisdictionMenuOpen((isOpen) => !isOpen)}
         >
-          <span className="truncate">{selectedJurisdiction.label}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
+            <span className="truncate">{selectedJurisdiction.label}</span>
+          </span>
           <ChevronDown
             aria-hidden="true"
             className={`h-4 w-4 shrink-0 text-black/60 transition ${
@@ -154,6 +157,7 @@ export function HeaderNavFallback() {
       className="grid w-full grid-cols-4 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
     >
       <label className="col-span-4 flex min-h-11 items-center gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 shadow-sm md:col-span-1 md:mr-2 md:w-48">
+        <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
           defaultValue="san-mateo"
