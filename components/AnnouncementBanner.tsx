@@ -25,17 +25,17 @@ export function AnnouncementBanner({ announcements }: { announcements?: Announce
         return (
           <aside
             key={announcement.id}
-            className="rounded-lg border border-civic/20 border-l-4 bg-white px-4 py-4 shadow-[0_1px_2px_rgba(23,23,23,0.04)] sm:px-5"
+            className="overflow-hidden rounded-[10px] border border-black/10 bg-white shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
           >
-            <div className="flex gap-4">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-civic/10 text-civic">
+            <div className="grid gap-4 p-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:p-5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f]">
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
-              <div>
-                <p className="label-eyebrow text-civic">
-                  Announcement · {jurisdictionLabel(announcement.jurisdiction_slug)}
+              <div className="min-w-0">
+                <p className="label-eyebrow text-black/[0.65]">
+                  Admin announcement · {jurisdictionLabel(announcement.jurisdiction_slug)}
                 </p>
-                <h2 className="mt-1 text-lg font-black text-ink">{announcement.title}</h2>
+                <h2 className="mt-1 text-xl font-black leading-snug text-ink">{announcement.title}</h2>
                 <p className="mt-2 text-sm leading-6 text-black/75">{announcement.body}</p>
               </div>
             </div>
