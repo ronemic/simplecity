@@ -2,6 +2,7 @@ import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
 import { CATEGORIES } from "@/lib/constants";
 import type { SimpleCitySummary } from "@/lib/types";
+import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 
 const allowedCategories = new Set<string>(CATEGORIES);
 
@@ -75,17 +76,38 @@ export function validateSimpleCitySummary(raw: unknown, fallbackSource = ""): Si
   const parsed = SummarySchema.parse(raw);
 
   const cards = parsed.cards
-    .map((card) => ({
-      ...card,
-      agendaItem: card.agendaItem.trim(),
-      whatIsHappening: card.whatIsHappening.trim(),
-      whyItMatters: card.whyItMatters.trim(),
-      whoItAffects: card.whoItAffects.map((item) => item.trim()).filter(Boolean),
-      categoryTags: card.categoryTags
-        .map((tag) => tag.trim())
-        .filter((tag) => allowedCategories.has(tag)),
-      source: card.source.trim() || fallbackSource
-    }))
+    .map((card) => {
+      const howToAct = {
+        attend: card.howToAct.attend.trim(),
+        email: card.howToAct.email.trim(),
+        submitComment: card.howToAct.submitComment.trim()
+      };
+      const commentWindow = {
+        opens: card.commentWindow.opens.trim(),
+        closes: card.commentWindow.closes.trim()
+      };
+      const commentDeadline = getCommentDeadlineInfo({
+        closes: commentWindow.closes,
+        actionTexts: [howToAct.submitComment, howToAct.email]
+      });
+
+      return {
+        ...card,
+        agendaItem: card.agendaItem.trim(),
+        whatIsHappening: card.whatIsHappening.trim(),
+        whyItMatters: card.whyItMatters.trim(),
+        whoItAffects: card.whoItAffects.map((item) => item.trim()).filter(Boolean),
+        categoryTags: card.categoryTags
+          .map((tag) => tag.trim())
+          .filter((tag) => allowedCategories.has(tag)),
+        commentWindow: {
+          ...commentWindow,
+          closes: commentDeadline?.value || commentWindow.closes
+        },
+        howToAct,
+        source: card.source.trim() || fallbackSource
+      };
+    })
     .filter(
       (card) =>
         card.source &&

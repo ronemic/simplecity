@@ -5,14 +5,18 @@ import { useState } from "react";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
+import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 
 function summaryPoints(text?: string | null) {
   const fallback = "Not listed in the source document.";
-  const content = text?.trim() || fallback;
-  const matches = content.match(/[^.!?]+[.!?]?/g);
-  return (matches || [content]).map((item) => item.trim()).filter(Boolean).slice(0, 3);
+  const content = (text?.trim() || fallback).replace(/\s+/g, " ");
+  return content
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9"$“])/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 function compactList(items?: string[] | null) {
@@ -20,15 +24,24 @@ function compactList(items?: string[] | null) {
   return items.slice(0, 3).join(", ");
 }
 
-function isListed(value?: string | null) {
-  const normalized = String(value || "").trim().toLowerCase();
-  const unavailable = /not listed|not applicable|not provided|n\/a|^na$|^none$|^null$|^tbd$|to be determined/;
-
-  return Boolean(normalized && !unavailable.test(normalized));
+function getCardCommentDeadlineInfo(card: SummaryCardRow) {
+  return getCommentDeadlineInfo({
+    closes: card.comment_window_closes,
+    actionTexts: [
+      card.how_to_act_submit_comment,
+      card.how_to_act_email
+    ]
+  });
 }
 
-function hasCommentAction(card: SummaryCardRow) {
-  return ["Upcoming vote", "Under discussion", "Upcoming"].includes(card.status || "") || isListed(card.comment_window_closes);
+function hasCardCommentOptionInfo(card: SummaryCardRow) {
+  return hasCommentOptionInfo({
+    closes: card.comment_window_closes,
+    actionTexts: [
+      card.how_to_act_submit_comment,
+      card.how_to_act_email
+    ]
+  });
 }
 
 function getPrimaryCategory(card: SummaryCardRow) {
@@ -36,12 +49,20 @@ function getPrimaryCategory(card: SummaryCardRow) {
   return category as CategoryName | undefined;
 }
 
-function statusSummary(card: SummaryCardRow) {
-  if (isListed(card.comment_window_closes)) {
+function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInfo | null, hasCommentOption: boolean) {
+  if (commentDeadline) {
     return {
-      label: `Comment deadline ${formatCompactDisplayDate(card.comment_window_closes)}`,
+      label: `Comment deadline ${formatCompactDisplayDate(commentDeadline.value)}`,
       className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
       icon: Clock
+    };
+  }
+
+  if (hasCommentOption) {
+    return {
+      label: "Comment option listed",
+      className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]",
+      icon: MessageSquare
     };
   }
 
@@ -124,19 +145,15 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const primaryCategory = getPrimaryCategory(card);
   const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
   const TopicIcon = categoryDefinition?.icon || FileText;
-  const status = statusSummary(card);
+  const commentDeadline = getCardCommentDeadlineInfo(card);
+  const hasCommentOption = hasCardCommentOptionInfo(card);
+  const status = statusSummary(card, commentDeadline, hasCommentOption);
   const StatusIcon = status.icon;
-  const isInformationOnly = card.status === "Information only";
-  const showCommentAction = !isInformationOnly && hasCommentAction(card);
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const cardJurisdictionSlug = jurisdictionSlug(card);
-  const deadlineLabel = isListed(card.comment_window_closes)
-    ? `Comment deadline ${formatCompactDisplayDate(card.comment_window_closes)}`
-    : "Comment deadline not provided";
   const primaryButtonClass =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12365f] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#0d2949] focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
-  const secondaryButtonClass =
-    "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-civic transition hover:bg-civic/5 focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
+  const noCommentLabel = "No comment option listed";
 
   return (
     <article
@@ -175,23 +192,16 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
               </span>
               {topicLabel}
             </span>
-            {!isListed(card.comment_window_closes) && showCommentAction ? (
-              <span>{deadlineLabel}</span>
+            {!hasCommentOption ? (
+              <span className="inline-flex items-center gap-1.5 text-black/[0.5]">
+                <MessageSquare aria-hidden className="h-4 w-4" />
+                {noCommentLabel}
+              </span>
             ) : null}
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          {showCommentAction ? (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className={secondaryButtonClass}
-            >
-              <MessageSquare aria-hidden className="h-4 w-4" />
-              How to comment
-            </button>
-          ) : null}
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}

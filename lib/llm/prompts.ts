@@ -65,11 +65,13 @@ Rules:
 - “whyItMatters” must explain concrete impact.
 - “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or city taxpayers.
 - “categoryTags” must only use allowed categories.
+- Preserve money amounts, tax rates, percentages, dates, times, item numbers, and decimals exactly as written in the source text. For example, keep “$0.0030” as “$0.0030”; do not rewrite it as “$0.” or “0030”.
 - Skip routine items like call to order, roll call, pledge, adjournment, generic approval of minutes, and generic staff reports unless there is a meaningful action or public impact.
 - Consent calendar items can be summarized if they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or city services.
 - If the meeting is cancelled, return exactly one card explaining the cancellation.
 - If an item is a public hearing, mark status as “Upcoming vote” or “Under discussion” depending on source wording.
 - If the source only says receive report or presentation, mark status as “Information only.”
+- If the agenda or public-comment instructions say written comments must be submitted by a specific date or time, put that exact date/time in “commentWindow.closes”. If participation instructions exist but no deadline is listed, keep “commentWindow.closes” as “Not listed in the source document.” and explain the method in “howToAct”.
 - Always include the source URL.
 - Do not invent facts.
 - If information is missing, write “Not listed in the source document.”`;

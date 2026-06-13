@@ -10,6 +10,7 @@ import {
   normalizeJurisdictionSelection,
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
+import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
 import { formatDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
 
@@ -31,11 +32,14 @@ function matchesSearch(card: SummaryCardRow, search: string) {
   return haystack.includes(search.toLowerCase());
 }
 
-function isListed(value?: string | null) {
-  const normalized = String(value || "").trim().toLowerCase();
-  const unavailable = /not listed|not applicable|not provided|n\/a|^na$|^none$|^null$|^tbd$|to be determined/;
-
-  return Boolean(normalized && !unavailable.test(normalized));
+function hasCardCommentOptionInfo(card: SummaryCardRow) {
+  return hasCommentOptionInfo({
+    closes: card.comment_window_closes,
+    actionTexts: [
+      card.how_to_act_submit_comment,
+      card.how_to_act_email
+    ]
+  });
 }
 
 function isActionable(card: SummaryCardRow) {
@@ -43,7 +47,7 @@ function isActionable(card: SummaryCardRow) {
     card.status === "Upcoming vote" ||
     card.status === "Under discussion" ||
     card.meetings?.status === "Upcoming" ||
-    isListed(card.comment_window_closes)
+    hasCardCommentOptionInfo(card)
   );
 }
 
@@ -110,7 +114,7 @@ export default async function Home({
   const recentCards = filteredCards.slice(0, 4);
   const decisionCards = upcomingCards.length > 0 ? upcomingCards : recentCards;
   const visibleCards = hasSearch ? filteredCards : decisionCards;
-  const openForCommentCount = filteredCards.filter((card) => isListed(card.comment_window_closes)).length;
+  const commentOptionCount = filteredCards.filter((card) => hasCardCommentOptionInfo(card)).length;
   const upcomingMeetingCount = new Set(
     filteredCards
       .filter((card) => card.meetings?.status === "Upcoming" || card.status === "Upcoming vote")
@@ -120,7 +124,7 @@ export default async function Home({
   const introLabel =
     jurisdiction === "all" ? "Public meetings across jurisdictions" : `${jurisdictionLabel} public meetings`;
   const summaryItems = [
-    openForCommentCount > 0 ? pluralize(openForCommentCount, "decision has a listed comment deadline", "decisions have listed comment deadlines") : null,
+    commentOptionCount > 0 ? pluralize(commentOptionCount, "decision lists a comment option", "decisions list comment options") : null,
     upcomingMeetingCount > 0 ? pluralize(upcomingMeetingCount, "upcoming meeting", "upcoming meetings") : null
   ].filter(Boolean);
   const summarySentence =
@@ -128,11 +132,15 @@ export default async function Home({
       ? summaryItems.join(" · ")
       : `${pluralize(filteredCards.length, "published decision", "published decisions")} available`;
   const decisionSectionTitle =
-    hasSearch ? `Results for "${search}"` : openForCommentCount > 0 ? "Open for public input" : "What needs your attention";
+    hasSearch
+      ? `Results for "${search}"`
+      : commentOptionCount > 0
+        ? "Public input information"
+        : "What needs your attention";
   const decisionSectionDescription = hasSearch
     ? "Matching decisions from the currently selected jurisdiction."
-    : openForCommentCount > 0
-      ? "Decisions with a listed comment deadline, shown in the current order."
+    : commentOptionCount > 0
+      ? "Decisions with upcoming activity or listed comment options. Each card shows whether comment instructions are available."
       : "Recent and upcoming decisions from official meeting documents.";
 
   return (
@@ -179,7 +187,7 @@ export default async function Home({
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">
               <p className="label-eyebrow text-civic">
-                {hasSearch ? "Search results" : openForCommentCount > 0 ? "Public input" : "Decisions"}
+                {hasSearch ? "Search results" : commentOptionCount > 0 ? "Public input" : "Decisions"}
               </p>
               <h2 className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
                 {decisionSectionTitle}
