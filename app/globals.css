@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: light;
-  background: #f4f6f8;
+  background: #f2f5f7;
   color: #171717;
 }
 
@@ -23,7 +23,9 @@ body {
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  background: linear-gradient(180deg, #fbfcfd 0%, #f4f6f8 100%);
+  background:
+    radial-gradient(circle at 12% -10%, rgba(36, 87, 166, 0.1), transparent 32rem),
+    linear-gradient(180deg, #f8fafb 0%, #eef3f6 50%, #f7f8f6 100%);
   color: #171717;
 }
 
@@ -67,19 +69,19 @@ p {
 }
 
 .focus-ring {
-  @apply outline-none ring-2 ring-civic ring-offset-2 ring-offset-newsprint;
+  @apply outline-none ring-2 ring-civic ring-offset-2 ring-offset-white;
 }
 
 .section-shell {
-  @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  @apply mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8;
 }
 
 .quiet-card {
-  @apply rounded-lg border border-black/10 bg-white shadow-soft;
+  @apply rounded-lg border border-black/10 bg-white shadow-[0_1px_2px_rgba(23,23,23,0.04)];
 }
 
 .page-title {
-  @apply text-balance text-4xl font-black text-ink sm:text-5xl lg:text-6xl;
+  @apply text-balance text-4xl font-black text-ink sm:text-5xl;
 }
 
 .page-copy {
@@ -87,11 +89,11 @@ p {
 }
 
 .section-title {
-  @apply text-2xl font-bold text-ink sm:text-3xl;
+  @apply text-2xl font-black text-ink sm:text-3xl;
 }
 
 .label-eyebrow {
-  @apply text-xs font-bold uppercase text-black/70;
+  @apply text-xs font-bold uppercase text-black/[0.65];
 }
 
 .status-dot-pulse {
@@ -128,6 +130,19 @@ p {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
   .status-dot-pulse::before {
     animation: none;
   }
@@ -162,17 +177,55 @@ p {
 }
 
 .action-primary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1c4788] hover:shadow-md active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4d92] active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
 }
 
 .action-secondary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-black/20 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:-translate-y-0.5 hover:bg-black/[0.03] hover:shadow-md active:translate-y-px;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-black/15 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-black/25 hover:bg-black/[0.035] active:translate-y-px;
 }
 
 .action-tertiary {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 py-3 text-sm font-semibold text-black/60 transition hover:bg-black/[0.04] hover:text-ink active:translate-y-px;
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-sm font-semibold text-black/[0.65] transition hover:bg-black/[0.04] hover:text-ink active:translate-y-px;
 }
 
 .action-ghost {
-  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-5 py-3 text-sm font-semibold text-black/75 transition hover:bg-black/[0.04] hover:text-ink;
+  @apply inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold text-black/70 transition hover:bg-black/[0.04] hover:text-ink;
+}
+
+.civic-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(85, 139, 205, 0.34), transparent 26rem),
+    radial-gradient(circle at 84% 0%, rgba(35, 114, 119, 0.2), transparent 24rem),
+    linear-gradient(135deg, #0d1828 0%, #142234 48%, #0a111d 100%);
+  color: #f7f3ea;
+}
+
+.civic-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 32px,
+      rgba(255, 255, 255, 0.035) 33px,
+      transparent 34px
+    );
+  background-size: 72px 72px, 72px 72px, 100% 34px;
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.8), transparent 88%);
+  opacity: 0.75;
+}
+
+.civic-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
 }

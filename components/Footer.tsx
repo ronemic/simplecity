@@ -2,25 +2,26 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="mt-16 border-t border-black/10 bg-transparent">
-      <div className="section-shell grid gap-6 py-10 text-sm text-black/70 md:grid-cols-[1fr_auto]">
-        <div className="space-y-3">
-          <p>
-            SimpleCity summarizes official public meeting documents. Always check the original source before
-            making formal decisions.
-          </p>
-          <p>
-            Contact us at{" "}
-            <a className="font-semibold text-ink underline" href="mailto:simplecityadmin@gmail.com">
-              simplecityadmin@gmail.com
-            </a>
-            .
+    <footer className="mt-10 border-t border-black/10 bg-[#eef3f6]">
+      <div className="section-shell grid gap-6 py-9 text-sm text-black/70 md:grid-cols-[1fr_auto] md:items-start">
+        <div className="max-w-2xl space-y-3">
+          <p className="font-semibold text-ink">SimpleCity</p>
+          <p className="leading-6">
+            SimpleCity summarizes official public meeting documents to make them easier to understand. Always
+            review the original source before making formal decisions.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2 font-semibold">
-          <Link className="action-ghost px-3 py-2" href="/about">
+
+        <div className="flex flex-wrap gap-2 font-bold">
+          <Link className="action-ghost" href="/about">
+            About
+          </Link>
+          <Link className="action-ghost" href="/about">
             Source transparency
           </Link>
+          <a className="action-ghost" href="mailto:simplecityadmin@gmail.com">
+            Contact
+          </a>
         </div>
       </div>
     </footer>

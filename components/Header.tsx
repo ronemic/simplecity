@@ -5,18 +5,18 @@ import { HeaderNav, HeaderNavFallback } from "@/components/HeaderNav";
 
 export function Header() {
   return (
-    <header className="sticky top-0 z-50 border-b border-black/10 bg-newsprint/95 backdrop-blur-xl">
-      <div className="section-shell flex min-h-[88px] flex-col items-stretch justify-between gap-4 py-4 sm:flex-row sm:items-center">
+    <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f8fafb]/95 backdrop-blur-md">
+      <div className="section-shell flex min-h-[70px] flex-col items-stretch justify-between gap-3 py-3 md:flex-row md:items-center">
         <Link
           href="/"
-          className="flex items-center gap-3 text-[22px] font-bold leading-none text-ink focus-visible:focus-ring"
+          className="flex items-center gap-3 text-[21px] font-black leading-none text-ink focus-visible:focus-ring"
         >
           <Image
             src="/favicon.svg"
             alt=""
             width={36}
             height={36}
-            className="h-9 w-9 shrink-0 rounded-lg shadow-sm"
+            className="h-9 w-9 shrink-0 rounded-lg"
             priority
           />
           <span>SimpleCity</span>

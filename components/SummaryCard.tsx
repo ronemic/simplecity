@@ -1,8 +1,7 @@
 "use client";
 
-import { CalendarDays, Clock, ExternalLink, FileText } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
-import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
@@ -22,23 +21,15 @@ function compactList(items?: string[] | null) {
 }
 
 function isListed(value?: string | null) {
-  return Boolean(value && !/not listed/i.test(value));
+  const normalized = String(value || "").trim().toLowerCase();
+  const unavailable = /not listed|not applicable|not provided|n\/a|^na$|^none$|^null$|^tbd$|to be determined/;
+
+  return Boolean(normalized && !unavailable.test(normalized));
 }
 
 function hasCommentAction(card: SummaryCardRow) {
   return ["Upcoming vote", "Under discussion", "Upcoming"].includes(card.status || "") || isListed(card.comment_window_closes);
 }
-
-const TOPIC_TONES: Partial<Record<CategoryName, string>> = {
-  Housing: "bg-[#eef4ff] text-civic",
-  Transportation: "bg-[#fff5df] text-[#bd6200]",
-  "Public Safety": "bg-[#eefaf3] text-[#16823f]",
-  "Parks & Environment": "bg-[#eff9f1] text-[#1f8f42]",
-  "Budget & Taxes": "bg-[#fff8e8] text-[#e16800]",
-  "Business & Development": "bg-[#f2f5ff] text-[#4b5f95]",
-  "Schools & Youth": "bg-[#f7f1ff] text-[#6c4aa2]",
-  "City Services": "bg-[#eef7f8] text-[#237277]"
-};
 
 function getPrimaryCategory(card: SummaryCardRow) {
   const category = (card.category_tags || []).find((item) => item in CATEGORY_DEFINITIONS);
@@ -48,17 +39,34 @@ function getPrimaryCategory(card: SummaryCardRow) {
 function statusSummary(card: SummaryCardRow) {
   if (isListed(card.comment_window_closes)) {
     return {
-      label: `Closes ${formatCompactDisplayDate(card.comment_window_closes)}`,
-      className: "border-[#f3b6b6] bg-[#fff1f1] text-[#a32121]",
+      label: `Comment deadline ${formatCompactDisplayDate(card.comment_window_closes)}`,
+      className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
       icon: Clock
     };
   }
 
   const status = card.status || card.meetings?.status || "Info only";
+  const compactMeetingDate = formatCompactDisplayDate(
+    card.meetings?.date_text,
+    card.meetings?.meeting_datetime
+  );
+
+  if (status === "Cancelled" || status === "Canceled" || card.meetings?.status === "Cancelled") {
+    return {
+      label: "Meeting canceled",
+      className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]",
+      icon: null
+    };
+  }
 
   if (status === "Upcoming vote" || status === "Upcoming") {
     return {
-      label: "Vote upcoming",
+      label:
+        compactMeetingDate === "Date not listed"
+          ? "Vote upcoming"
+          : status === "Upcoming vote"
+            ? `Vote scheduled ${compactMeetingDate}`
+            : `Meeting ${compactMeetingDate}`,
       className: "border-[#f0c75e] bg-[#fff9e9] text-[#a54f00]",
       icon: null
     };
@@ -74,7 +82,7 @@ function statusSummary(card: SummaryCardRow) {
 
   return {
     label: status,
-    className: "border-black/15 bg-black/[0.035] text-black/65",
+    className: "border-black/15 bg-black/[0.035] text-black/[0.65]",
     icon: null
   };
 }
@@ -112,6 +120,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const affectedResidents = compactList(card.who_it_affects);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
+  const topicLabel = categoryTags[0] || "Topic not listed";
   const primaryCategory = getPrimaryCategory(card);
   const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
   const TopicIcon = categoryDefinition?.icon || FileText;
@@ -121,91 +130,88 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const showCommentAction = !isInformationOnly && hasCommentAction(card);
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const cardJurisdictionSlug = jurisdictionSlug(card);
-  const buttonClass =
-    "inline-flex min-h-12 items-center justify-center rounded-lg border border-black/25 bg-white px-5 py-2 text-base font-bold text-ink shadow-sm transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring whitespace-nowrap";
+  const deadlineLabel = isListed(card.comment_window_closes)
+    ? `Comment deadline ${formatCompactDisplayDate(card.comment_window_closes)}`
+    : "Comment deadline not provided";
+  const primaryButtonClass =
+    "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12365f] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#0d2949] focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
+  const secondaryButtonClass =
+    "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-civic transition hover:bg-civic/5 focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
 
   return (
     <article
-      className="overflow-hidden rounded-lg border border-black/10 bg-white shadow-sm transition duration-200 hover:border-black/15 hover:shadow-[0_16px_36px_rgba(23,23,23,0.08)]"
+      className="overflow-hidden rounded-[10px] border border-black/10 bg-white shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition duration-200 hover:border-civic/25"
     >
-      <div className="grid gap-4 p-5 sm:grid-cols-[56px_minmax(0,1fr)_auto] sm:items-center sm:p-6">
-        <span
-          aria-hidden
-          className={cn(
-            "flex h-14 w-14 items-center justify-center rounded-lg",
-            primaryCategory ? TOPIC_TONES[primaryCategory] : "bg-black/[0.035] text-black/65"
-          )}
-        >
-          <TopicIcon className="h-6 w-6" />
-        </span>
-
+      <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
-              {cardJurisdictionLabel}
-            </span>
-            <p className="text-sm font-semibold leading-5 text-black/[0.58]">
-              {meeting?.meeting_type || "Meeting type not listed"}
-            </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
+            <span>{meeting?.meeting_type || "Meeting type not listed"}</span>
+            <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
+            <span>{cardJurisdictionLabel}</span>
           </div>
-          <h3 className="mt-1 line-clamp-2 text-xl font-bold leading-snug text-ink">
+          <h3 className="mt-1 line-clamp-2 text-xl font-black leading-snug text-ink">
             {card.agenda_item || "Agenda item not listed"}
           </h3>
-          {categoryTags.length > 0 ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {categoryTags.map((category) => (
-                <CategoryPill key={category} category={category} compact />
-              ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="flex flex-col gap-3 sm:items-end">
-          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
             <span
               className={cn(
-                "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-semibold",
+                "inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-black",
                 status.className
               )}
             >
               {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
               {status.label}
             </span>
-            {isListed(card.comment_window_closes) ? null : (
-              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-black/[0.55]">
-                <CalendarDays aria-hidden className="h-4 w-4" />
-                {compactMeetingDate}
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3 sm:justify-end">
-            {showCommentAction ? (
-              <button
-                type="button"
-                onClick={() => setOpen(true)}
-                className={buttonClass}
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
+              {compactMeetingDate}
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="flex h-5 w-5 items-center justify-center rounded bg-[#eef3f6] text-[#12365f]"
               >
-                Comment
-              </button>
+                <TopicIcon className="h-3.5 w-3.5" />
+              </span>
+              {topicLabel}
+            </span>
+            {!isListed(card.comment_window_closes) && showCommentAction ? (
+              <span>{deadlineLabel}</span>
             ) : null}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {showCommentAction ? (
             <button
               type="button"
-              onClick={() => setOpen((value) => !value)}
-              className={buttonClass}
-              aria-expanded={open}
+              onClick={() => setOpen(true)}
+              className={secondaryButtonClass}
             >
-              {open ? "Hide" : "Details"}
+              <MessageSquare aria-hidden className="h-4 w-4" />
+              How to comment
             </button>
-          </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className={primaryButtonClass}
+            aria-expanded={open}
+          >
+            {open ? "Hide summary" : "Read summary"}
+            <ChevronDown
+              aria-hidden
+              className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
       </div>
 
       {open ? (
-        <div className="border-t border-black/10 px-5 py-5 sm:px-6">
+        <div className="border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6">
           <div className="grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]">
             <section>
-              <p className="text-xs font-bold uppercase text-civic">What&apos;s happening</p>
+              <p className="text-xs font-black uppercase text-civic">What&apos;s happening</p>
               <ul className="mt-2 space-y-2">
                 {points.map((point) => (
                   <li key={point} className="flex gap-2">
@@ -217,13 +223,13 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             </section>
 
             <section>
-              <p className="text-xs font-bold uppercase text-black/55">Why it matters</p>
+              <p className="text-xs font-black uppercase text-black/[0.55]">Why it matters</p>
               <p className="mt-2">{card.why_it_matters || "Not listed in the source document."}</p>
-              <p className="mt-4 text-xs font-bold uppercase text-black/55">Who is affected</p>
+              <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">Who is affected</p>
               {affectedTags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {affectedTags.map((resident) => (
-                    <span key={resident} className="rounded-full border border-black/10 bg-white px-2.5 py-1 text-xs text-black/70">
+                    <span key={resident} className="rounded-md border border-black/10 bg-white px-2.5 py-1 text-xs text-black/70">
                       {resident}
                     </span>
                   ))}
@@ -234,7 +240,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             </section>
 
             <section>
-              <p className="text-xs font-bold uppercase text-clay">How to act</p>
+              <p className="text-xs font-black uppercase text-[#8e452e]">How to act</p>
               <div className="mt-2 grid gap-3">
                 <p>
                   <span className="font-bold text-ink">Attend: </span>
@@ -257,7 +263,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             {meeting?.id ? (
               <PendingLink
                 href={`/meetings/${meeting.id}?jurisdiction=${cardJurisdictionSlug}`}
-                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
                 pendingLabel="Opening meeting"
               >
                 Meeting page
@@ -268,7 +274,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
                 href={card.source_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
+                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
               >
                 Source
                 <ExternalLink aria-hidden className="h-4 w-4" />

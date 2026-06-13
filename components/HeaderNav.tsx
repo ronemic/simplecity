@@ -6,9 +6,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const nav = [
-  { href: "/", label: "Home" },
+  { href: "/#decisions", label: "Decisions" },
   { href: "/meetings", label: "Meetings" },
-  { href: "/categories", label: "Categories" },
+  { href: "/categories", label: "Topics" },
   { href: "/about", label: "About" }
 ];
 
@@ -60,9 +60,10 @@ export function HeaderNav() {
   }, [isJurisdictionMenuOpen]);
 
   function hrefWithJurisdiction(href: string) {
+    const [path, hash] = href.split("#");
     const params = new URLSearchParams();
     params.set("jurisdiction", selected);
-    return `${href}?${params.toString()}`;
+    return `${path || "/"}?${params.toString()}${hash ? `#${hash}` : ""}`;
   }
 
   function changeJurisdiction(value: string) {
@@ -73,13 +74,16 @@ export function HeaderNav() {
   }
 
   return (
-    <nav className="grid w-full grid-cols-2 gap-2 text-base font-semibold text-ink sm:flex sm:w-auto sm:items-center sm:justify-end sm:gap-2">
-      <div ref={jurisdictionMenuRef} className="relative col-span-2 sm:col-span-1 sm:w-44">
+    <nav
+      aria-label="Primary navigation"
+      className="grid w-full grid-cols-4 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
+    >
+      <div ref={jurisdictionMenuRef} className="relative col-span-4 md:col-span-1 md:mr-2 md:w-48">
         <button
           type="button"
           aria-haspopup="listbox"
           aria-expanded={isJurisdictionMenuOpen}
-          className="flex min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-black/25 bg-white px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring"
+          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:focus-ring"
           onClick={() => setIsJurisdictionMenuOpen((isOpen) => !isOpen)}
         >
           <span className="truncate">{selectedJurisdiction.label}</span>
@@ -91,7 +95,7 @@ export function HeaderNav() {
           />
         </button>
         {isJurisdictionMenuOpen ? (
-          <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/20 bg-white py-1 shadow-soft">
+          <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)]">
             <div role="listbox" aria-label="Jurisdiction" className="max-h-64 overflow-auto">
               {jurisdictions.map((jurisdiction) => {
                 const isSelected = jurisdiction.slug === selected;
@@ -104,8 +108,8 @@ export function HeaderNav() {
                     aria-selected={isSelected}
                     className={`grid min-h-10 w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm font-bold transition ${
                       isSelected
-                        ? "bg-civic text-white"
-                        : "text-ink hover:bg-black/[0.04] focus-visible:bg-black/[0.04]"
+                        ? "bg-[#12365f] text-white"
+                        : "text-ink hover:bg-[#eef4f8] focus-visible:bg-[#eef4f8]"
                     }`}
                     onClick={() => changeJurisdiction(jurisdiction.slug)}
                   >
@@ -121,23 +125,35 @@ export function HeaderNav() {
           </div>
         ) : null}
       </div>
-      {nav.map((item) => (
-        <Link
-          key={item.href}
-          href={hrefWithJurisdiction(item.href)}
-          className="inline-flex min-h-12 items-center justify-center rounded-lg border border-black/25 bg-white px-5 py-2 text-center transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring"
-        >
-          {item.label}
-        </Link>
-      ))}
+      {nav.map((item) => {
+        const isActive = item.href === "/#decisions" ? pathname === "/" : pathname === item.href;
+
+        return (
+          <Link
+            key={item.href}
+            href={hrefWithJurisdiction(item.href)}
+            aria-current={isActive ? "page" : undefined}
+            className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center transition focus-visible:focus-ring md:px-3.5 ${
+              isActive
+                ? "bg-[#e8eef3] text-[#102134]"
+                : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
+            }`}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }
 
 export function HeaderNavFallback() {
   return (
-    <nav className="grid w-full grid-cols-2 gap-2 text-base font-semibold text-ink sm:flex sm:w-auto sm:items-center sm:justify-end sm:gap-2">
-      <label className="col-span-2 flex min-h-12 items-center gap-2 rounded-lg border border-black/25 bg-white px-3 py-2 shadow-sm sm:col-span-1">
+    <nav
+      aria-label="Primary navigation"
+      className="grid w-full grid-cols-4 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
+    >
+      <label className="col-span-4 flex min-h-11 items-center gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 shadow-sm md:col-span-1 md:mr-2 md:w-48">
         <span className="sr-only">Jurisdiction</span>
         <select
           defaultValue="san-mateo"
@@ -153,8 +169,10 @@ export function HeaderNavFallback() {
       {nav.map((item) => (
         <Link
           key={item.href}
-          href={`${item.href}?jurisdiction=san-mateo`}
-          className="inline-flex min-h-12 items-center justify-center rounded-lg border border-black/25 bg-white px-5 py-2 text-center transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring"
+          href={`${item.href.split("#")[0] || "/"}?jurisdiction=san-mateo${
+            item.href.includes("#") ? `#${item.href.split("#")[1]}` : ""
+          }`}
+          className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring md:px-3.5"
         >
           {item.label}
         </Link>
