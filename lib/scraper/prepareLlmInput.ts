@@ -3,6 +3,9 @@ import { cleanText, slugify } from "@/lib/utils/slug";
 import { extractPdfTextForDocument } from "./pdfText";
 
 export const MAX_CHARS_FOR_LLM = 30000;
+const MIN_PRIMARY_SOURCE_CHARS = 300;
+const MIN_HTML_AGENDA_CHARS = 500;
+const MIN_ROW_SOURCE_CHARS = 40;
 
 function findDoc(meeting: PrimeGovMeeting, type: PrimeGovDocument["type"]) {
   return meeting.documents.find((doc) => doc.type === type);
@@ -65,6 +68,58 @@ async function extractTextForDocument(doc: PrimeGovDocument | undefined | null) 
   return extracted?.text || "";
 }
 
+type SourceCandidate = {
+  sourceType: string;
+  sourceUrl: string | null;
+  minimumCharacters: number;
+  loadText: () => Promise<string> | string;
+  emptyNote: string;
+  selectedNote?: string;
+};
+
+async function selectFirstUsableSource(
+  candidates: SourceCandidate[],
+  extractionNotes: string[]
+) {
+  let firstNonEmpty: {
+    sourceType: string;
+    sourceUrl: string | null;
+    text: string;
+  } | null = null;
+
+  for (const candidate of candidates) {
+    const text = cleanText(await candidate.loadText());
+
+    if (text && !firstNonEmpty) {
+      firstNonEmpty = {
+        sourceType: candidate.sourceType,
+        sourceUrl: candidate.sourceUrl,
+        text
+      };
+    }
+
+    if (text.length >= candidate.minimumCharacters) {
+      if (candidate.selectedNote) extractionNotes.push(candidate.selectedNote);
+      return {
+        sourceType: candidate.sourceType,
+        sourceUrl: candidate.sourceUrl,
+        text
+      };
+    }
+
+    extractionNotes.push(candidate.emptyNote);
+  }
+
+  if (firstNonEmpty) {
+    extractionNotes.push(
+      `Used ${firstNonEmpty.sourceType} even though it had less text than expected.`
+    );
+    return firstNonEmpty;
+  }
+
+  return null;
+}
+
 export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<LlmReadyMeeting> {
   const isCancelled = isMeetingCancelled(meeting);
   const htmlAgenda = findDoc(meeting, "HTML Agenda");
@@ -96,44 +151,79 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
           : "No cancellation document was available; used IQM2 row text."
       );
     }
-  } else if (meeting.htmlAgendaText && meeting.htmlAgendaText.length > 500) {
-    selectedSourceType = "HTML Agenda";
-    selectedSourceUrl = htmlAgenda?.url || fallbackSourceUrl;
-    selectedText = cleanText(meeting.htmlAgendaText);
-  } else if (agendaPdf?.localPath || agendaPdf?.extractedText) {
-    selectedSourceType = documentSourceType(agendaPdf, "Agenda");
-    selectedSourceUrl = agendaPdf.url;
-
-    selectedText = await extractTextForDocument(agendaPdf);
-
-    if (!selectedText || selectedText.length < 300) {
-      extractionNotes.push("Agenda document had little or no extractable text.");
-    }
-  } else if (packetPdf?.localPath || packetPdf?.extractedText) {
-    selectedSourceType = documentSourceType(
-      packetPdf,
-      packetPdf.type === "Agenda Packet" ? "Agenda Packet" : "Packet"
-    );
-    selectedSourceUrl = packetPdf.url;
-
-    selectedText = await extractTextForDocument(packetPdf);
-
-    extractionNotes.push("Used packet document because no HTML agenda or agenda document was available.");
-  } else if (meeting.detailText && meeting.detailText.length > 300) {
-    selectedSourceType = "Detail Page";
-    selectedSourceUrl = meeting.meetingDetailsUrl || fallbackSourceUrl;
-    selectedText = cleanText(meeting.detailText);
-    extractionNotes.push("Used IQM2 detail page text because no agenda document text was available.");
-  } else if (meeting.rowText) {
-    selectedSourceType = "Row Text";
-    selectedSourceUrl = fallbackSourceUrl;
-    selectedText = cleanText(meeting.rowText);
-    extractionNotes.push("Used IQM2 row text because no usable agenda document text was available.");
   } else {
-    selectedSourceType = htmlAgenda ? "HTML Agenda" : null;
-    selectedSourceUrl =
-      htmlAgenda?.url || agendaPdf?.url || packetPdf?.url || cancellationPdf?.url || fallbackSourceUrl;
-    extractionNotes.push("No usable HTML agenda, agenda PDF, or packet PDF text was available.");
+    const candidates: SourceCandidate[] = [];
+
+    const htmlAgendaText = meeting.htmlAgendaText;
+    if (htmlAgendaText) {
+      candidates.push({
+        sourceType: "HTML Agenda",
+        sourceUrl: htmlAgenda?.url || fallbackSourceUrl,
+        minimumCharacters: MIN_HTML_AGENDA_CHARS,
+        loadText: () => cleanText(htmlAgendaText),
+        emptyNote: "HTML agenda had little or no usable agenda text."
+      });
+    }
+
+    if (agendaPdf?.localPath || agendaPdf?.extractedText) {
+      candidates.push({
+        sourceType: documentSourceType(agendaPdf, "Agenda"),
+        sourceUrl: agendaPdf.url,
+        minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
+        loadText: () => extractTextForDocument(agendaPdf),
+        emptyNote: "Agenda document had little or no extractable text."
+      });
+    }
+
+    if (packetPdf?.localPath || packetPdf?.extractedText) {
+      candidates.push({
+        sourceType: documentSourceType(
+          packetPdf,
+          packetPdf.type === "Agenda Packet" ? "Agenda Packet" : "Packet"
+        ),
+        sourceUrl: packetPdf.url,
+        minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
+        loadText: () => extractTextForDocument(packetPdf),
+        emptyNote: "Packet document had little or no extractable text.",
+        selectedNote: "Used packet document because a higher-priority agenda source was unavailable or unreadable."
+      });
+    }
+
+    const detailText = meeting.detailText;
+    if (detailText) {
+      candidates.push({
+        sourceType: "Detail Page",
+        sourceUrl: meeting.meetingDetailsUrl || fallbackSourceUrl,
+        minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
+        loadText: () => cleanText(detailText),
+        emptyNote: "Detail page had little or no usable agenda text.",
+        selectedNote: "Used IQM2 detail page text because no agenda document text was available."
+      });
+    }
+
+    if (meeting.rowText) {
+      candidates.push({
+        sourceType: "Row Text",
+        sourceUrl: fallbackSourceUrl,
+        minimumCharacters: MIN_ROW_SOURCE_CHARS,
+        loadText: () => cleanText(meeting.rowText),
+        emptyNote: "Meeting row text had little or no usable agenda text.",
+        selectedNote: "Used IQM2 row text because no usable agenda document text was available."
+      });
+    }
+
+    const selectedSource = await selectFirstUsableSource(candidates, extractionNotes);
+
+    if (selectedSource) {
+      selectedSourceType = selectedSource.sourceType;
+      selectedSourceUrl = selectedSource.sourceUrl;
+      selectedText = selectedSource.text;
+    } else {
+      selectedSourceType = htmlAgenda ? "HTML Agenda" : null;
+      selectedSourceUrl =
+        htmlAgenda?.url || agendaPdf?.url || packetPdf?.url || cancellationPdf?.url || fallbackSourceUrl;
+      extractionNotes.push("No usable HTML agenda, agenda PDF, packet PDF, detail text, or row text was available.");
+    }
   }
 
   let publicCommentsSummaryInput: string | null = null;

@@ -37,7 +37,7 @@ export default async function MeetingDetailPage({
             {jurisdictionLabel}
           </span>
           <span className="text-sm font-semibold text-black/70">
-            {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
+            {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
           </span>
         </div>
         <h1 className="page-title mt-3">{meeting.title}</h1>

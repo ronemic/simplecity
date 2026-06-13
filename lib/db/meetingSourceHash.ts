@@ -19,6 +19,8 @@ export function meetingSourceHash(meeting: LlmReadyMeeting) {
     title: meeting.title,
     meetingType: meeting.meetingType,
     dateText: meeting.dateText,
+    timeText: meeting.timeText,
+    location: meeting.location,
     status: meeting.status,
     sourceType: meeting.sourceType,
     sourceUrl: meeting.sourceUrl,

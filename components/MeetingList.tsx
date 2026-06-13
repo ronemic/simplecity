@@ -43,7 +43,7 @@ export function MeetingList({ meetings }: { meetings: MeetingRow[] }) {
               </span>
               <span className="inline-flex items-center gap-1 text-xs font-medium text-black/70">
                 <CalendarDays aria-hidden className="h-3.5 w-3.5" />
-                {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
+                {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
               </span>
             </div>
             <h2 className="mt-2 text-xl font-bold leading-snug text-ink">{meeting.title}</h2>

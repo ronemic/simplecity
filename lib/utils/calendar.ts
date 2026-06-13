@@ -1,5 +1,5 @@
 import type { MeetingRow } from "@/lib/types";
-import { CIVIC_TIME_ZONE, parseMeetingDate } from "@/lib/utils/date";
+import { CIVIC_TIME_ZONE, hasDisplayableMeetingTime, parseMeetingDate } from "@/lib/utils/date";
 
 const DEFAULT_MEETING_DURATION_MINUTES = 120;
 
@@ -21,6 +21,7 @@ export function buildGoogleCalendarUrl(
 ) {
   const startValue = meeting.meeting_datetime || parseMeetingDate(meeting.date_text);
   if (!startValue) return null;
+  if (!hasDisplayableMeetingTime(meeting.date_text, startValue)) return null;
 
   const start = new Date(startValue);
   if (Number.isNaN(start.getTime())) return null;

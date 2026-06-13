@@ -132,11 +132,17 @@ function jurisdictionSlug(card: SummaryCardRow) {
   return slug === "san-mateo-city" ? "san-mateo" : slug;
 }
 
+function confidenceLabel(card: SummaryCardRow) {
+  const confidence = String(card.confidence || "").trim().toLowerCase();
+  if (!["high", "medium", "low"].includes(confidence)) return null;
+  return `Summary confidence: ${confidence}`;
+}
+
 export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const [open, setOpen] = useState(false);
   const meeting = card.meetings;
   const points = summaryPoints(card.what_is_happening);
-  const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
+  const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
   const affectedResidents = compactList(card.who_it_affects);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
@@ -148,6 +154,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
   const status = statusSummary(card, commentDeadline, hasCommentOption);
+  const summaryConfidence = confidenceLabel(card);
   const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const cardJurisdictionSlug = jurisdictionSlug(card);
@@ -289,6 +296,11 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
                 Source
                 <ExternalLink aria-hidden className="h-4 w-4" />
               </a>
+            ) : null}
+            {summaryConfidence ? (
+              <span className="rounded-md border border-black/10 bg-white px-2 py-1 text-xs font-bold uppercase tracking-normal text-black/50">
+                {summaryConfidence}
+              </span>
             ) : null}
           </div>
         </div>

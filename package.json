@@ -34,7 +34,8 @@
     "pipeline:foster-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=foster-city",
     "pipeline:san-mateo-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=san-mateo-city",
     "pipeline:santa-clara-county": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=santa-clara-county",
-    "pipeline:all": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=all"
+    "pipeline:all": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=all",
+    "test": "node --import tsx/esm --test tests/*.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.2",

@@ -151,6 +151,8 @@ export type MeetingRow = {
   title: string;
   meeting_type: string | null;
   date_text: string | null;
+  time_text?: string | null;
+  location?: string | null;
   meeting_datetime: string | null;
   section: string | null;
   status: string | null;

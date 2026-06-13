@@ -253,7 +253,7 @@ export default async function Home({
                   >
                     <div className="flex items-center gap-2 text-sm font-black text-[#12365f]">
                       <CalendarDays aria-hidden className="h-4 w-4" />
-                      <span>{formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}</span>
+                      <span>{formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}</span>
                     </div>
                     <div className="min-w-0">
                       <h3 className="line-clamp-2 text-base font-black leading-snug text-ink">

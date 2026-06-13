@@ -1,12 +1,16 @@
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
-import { parseAndValidateSummary } from "./validateSummary";
+import {
+  parseAndValidateSummary,
+  validationOptionsForMeeting,
+  type SummaryValidationIssue
+} from "./validateSummary";
 
 export type GenerateSummaryOptions = {
   log?: (message: string) => void;
 };
 
-async function requestSummary(meeting: LlmReadyMeeting) {
+async function requestSummary(meeting: LlmReadyMeeting, options: GenerateSummaryOptions = {}) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY.");
 
@@ -56,9 +60,29 @@ async function requestSummary(meeting: LlmReadyMeeting) {
   const content = raw.choices?.[0]?.message?.content;
   if (!content) throw new Error("OpenRouter response did not include message content.");
 
-  const summary = parseAndValidateSummary(content, meeting.sourceUrl || undefined);
+  const validationIssues: SummaryValidationIssue[] = [];
+  const summary = parseAndValidateSummary(
+    content,
+    validationOptionsForMeeting(meeting, (issue) => validationIssues.push(issue))
+  );
 
-  return { summary, raw };
+  for (const issue of validationIssues) {
+    options.log?.(
+      `Summary validation issue for ${meeting.title}: ${issue.reason}${
+        issue.value ? ` (${issue.value})` : ""
+      }`
+    );
+  }
+
+  return {
+    summary,
+    raw: {
+      ...raw,
+      simplecityValidation: {
+        issues: validationIssues
+      }
+    }
+  };
 }
 
 export async function generateSummaryForMeeting(
@@ -70,7 +94,7 @@ export async function generateSummaryForMeeting(
   let lastError: unknown;
   for (let attempt = 1; attempt <= 2; attempt += 1) {
     try {
-      const result = await requestSummary(meeting);
+      const result = await requestSummary(meeting, options);
       options.log?.(`Finished LLM summary for ${meeting.title}: ${result.summary.cards.length} cards.`);
       return result;
     } catch (error) {

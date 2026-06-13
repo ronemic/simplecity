@@ -110,6 +110,10 @@ function hasExplicitTimeZone(value: string) {
   return /(?:z|gmt|utc|[+-]\d{2}:?\d{2})$/i.test(value.trim());
 }
 
+export function hasExplicitClockTime(value?: string | null) {
+  return /\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/i.test(String(value || ""));
+}
+
 export function parseMeetingDate(dateText?: string | null) {
   if (!dateText) return null;
 
@@ -130,21 +134,60 @@ function parseDisplayDate(value: string) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-export function formatDisplayDate(dateText?: string | null, iso?: string | null) {
+function civicClockParts(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: CIVIC_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+
+  return {
+    hour: Number(values.hour),
+    minute: Number(values.minute)
+  };
+}
+
+export function hasDisplayableMeetingTime(
+  dateText?: string | null,
+  iso?: string | null,
+  timeText?: string | null
+) {
+  if (hasExplicitClockTime(dateText) || hasExplicitClockTime(timeText)) return true;
+  if (!iso) return false;
+
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return false;
+
+  const clock = civicClockParts(parsed);
+  return clock.hour !== 0 || clock.minute !== 0;
+}
+
+export function formatDisplayDate(
+  dateText?: string | null,
+  iso?: string | null,
+  timeText?: string | null
+) {
   const value = iso || dateText;
   if (!value) return "Date not listed";
 
   const parsed = parseDisplayDate(value);
   if (!parsed) return dateText || value;
 
-  return new Intl.DateTimeFormat("en-US", {
+  const options: Intl.DateTimeFormatOptions = {
     timeZone: CIVIC_TIME_ZONE,
     month: "short",
     day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit"
-  }).format(parsed);
+    year: "numeric"
+  };
+
+  if (hasDisplayableMeetingTime(dateText, iso, timeText)) {
+    options.hour = "numeric";
+    options.minute = "2-digit";
+  }
+
+  return new Intl.DateTimeFormat("en-US", options).format(parsed);
 }
 
 export function formatCompactDisplayDate(dateText?: string | null, iso?: string | null) {

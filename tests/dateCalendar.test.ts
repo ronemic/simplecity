@@ -1,0 +1,42 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildGoogleCalendarUrl } from "@/lib/utils/calendar";
+import { formatDisplayDate, hasDisplayableMeetingTime } from "@/lib/utils/date";
+
+test("date-only meetings render without an invented midnight time", () => {
+  const formatted = formatDisplayDate("June 13, 2026", "2026-06-13T07:00:00.000Z");
+
+  assert.equal(formatted, "Jun 13, 2026");
+  assert.equal(hasDisplayableMeetingTime("June 13, 2026", "2026-06-13T07:00:00.000Z"), false);
+});
+
+test("meetings with a real stored time still render the time", () => {
+  const formatted = formatDisplayDate("June 13, 2026", "2026-06-13T17:00:00.000Z");
+
+  assert.match(formatted, /10:00 AM/);
+  assert.equal(hasDisplayableMeetingTime("June 13, 2026", "2026-06-13T17:00:00.000Z"), true);
+});
+
+test("calendar links are omitted for date-only meetings", () => {
+  const calendarUrl = buildGoogleCalendarUrl({
+    title: "City Council",
+    meeting_type: "Regular Meeting",
+    date_text: "June 13, 2026",
+    meeting_datetime: "2026-06-13T07:00:00.000Z",
+    source_url: "https://city.example/meeting"
+  });
+
+  assert.equal(calendarUrl, null);
+});
+
+test("calendar links are available when an actual meeting time exists", () => {
+  const calendarUrl = buildGoogleCalendarUrl({
+    title: "City Council",
+    meeting_type: "Regular Meeting",
+    date_text: "June 13, 2026",
+    meeting_datetime: "2026-06-13T17:00:00.000Z",
+    source_url: "https://city.example/meeting"
+  });
+
+  assert.ok(calendarUrl?.startsWith("https://calendar.google.com/calendar/render?"));
+});

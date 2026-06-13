@@ -169,7 +169,7 @@ export default async function AdminMeetingsPage({
                       {jurisdictionLabel}
                     </span>
                     <span className="text-sm font-semibold text-black/70">
-                      {formatDisplayDate(meeting.date_text, meeting.meeting_datetime)}
+                      {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
                     </span>
                     {categories.map((category) => (
                       <CategoryPill key={category} category={category} compact />

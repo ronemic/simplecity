@@ -59,6 +59,16 @@ function meetingDateTimeText(meeting: LlmReadyMeeting) {
   return `${dateText} ${timeText}`.trim();
 }
 
+function canonicalMeetingSourceUrl(meeting: LlmReadyMeeting) {
+  return (
+    meeting.meetingDetailsUrl ||
+    meeting.documents.find((doc) => doc.type === "Meeting Details")?.url ||
+    meeting.documents[0]?.url ||
+    meeting.sourceUrl ||
+    null
+  );
+}
+
 async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string) {
   const { count, error } = await supabase
     .from("summary_cards")
@@ -107,8 +117,9 @@ export async function upsertMeetings(
 
   for (const meeting of meetings) {
     const safeMeeting = sanitizeForDatabase(meeting);
-    const firstSourceUrl = meeting.sourceUrl || meeting.documents[0]?.url || null;
-    const externalId = externalMeetingId(meetingDateTimeText(meeting), meeting.title, firstSourceUrl);
+    const identitySourceUrl = canonicalMeetingSourceUrl(meeting);
+    const selectedSourceUrl = meeting.sourceUrl || identitySourceUrl;
+    const externalId = externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
     const jurisdictionColumns = jurisdiction
       ? {
@@ -131,7 +142,7 @@ export async function upsertMeetings(
           section: safeMeeting.section,
           status: safeMeeting.status,
           source_type: safeMeeting.sourceType,
-          source_url: firstSourceUrl,
+          source_url: selectedSourceUrl,
           row_text: safeMeeting.rowText,
           has_html_agenda: safeMeeting.hasHtmlAgenda,
           has_pdf: safeMeeting.hasPdf,
@@ -233,9 +244,7 @@ export async function replaceSummaryCardsForMeeting(
 
     if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
-    if (!existingCards?.length) {
-      await markMeetingSummarized(supabase, meetingId, options.sourceHash);
-    }
+    await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
     return [];
   }

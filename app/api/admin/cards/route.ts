@@ -3,11 +3,14 @@ import { revalidatePath } from "next/cache";
 import { getAuthenticatedAdminFromCookies } from "@/lib/supabase/admin";
 import { writeAuditLog } from "@/lib/db/upsertMeetings";
 import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
+import { meetingRowToLlmReadyMeeting } from "@/lib/db/meetingTransform";
+import { validateSimpleCitySummary, validationOptionsForMeeting } from "@/lib/llm/validateSummary";
 import {
   getDefaultJurisdiction,
   getServiceSupabaseClientForJurisdiction,
   requireValidJurisdictionSlug
 } from "@/lib/config/jurisdictions";
+import type { MeetingRow } from "@/lib/types";
 
 function listFromCommaText(value: unknown) {
   return String(value || "")
@@ -29,6 +32,94 @@ function getConcreteJurisdiction(body: Record<string, unknown>) {
   const slug = requireValidJurisdictionSlug(requested);
   if (slug === "all") throw new Error("A concrete jurisdiction is required.");
   return slug;
+}
+
+async function validatePublishedCardUpdate(
+  supabase: ReturnType<typeof getServiceSupabaseClientForJurisdiction>,
+  before: Record<string, unknown>,
+  update: {
+    agenda_item: string;
+    what_is_happening: string;
+    why_it_matters: string;
+    who_it_affects: string[];
+    category_tags: string[];
+    status: string;
+    comment_window_opens: string;
+    comment_window_closes: string;
+    how_to_act_attend: string;
+    how_to_act_email: string;
+    how_to_act_submit_comment: string;
+    source_url: string;
+    is_published: boolean;
+  }
+) {
+  if (!update.is_published) return null;
+
+  const meetingId = String(before.meeting_id || "");
+  if (!meetingId) {
+    return "Published cards must be linked to a meeting so their facts can be checked against source text.";
+  }
+
+  const { data: meeting, error } = await supabase
+    .from("meetings")
+    .select("*")
+    .eq("id", meetingId)
+    .maybeSingle();
+
+  if (error) return error.message;
+  if (!meeting) return "Meeting not found for card validation.";
+
+  const llmMeeting = meetingRowToLlmReadyMeeting(meeting as MeetingRow);
+  const issues: string[] = [];
+  const validated = validateSimpleCitySummary(
+    {
+      meetingSummary: {
+        title: llmMeeting.title,
+        date: llmMeeting.dateText || "",
+        status: llmMeeting.status,
+        oneSentenceSummary: ""
+      },
+      cards: [
+        {
+          agendaItem: update.agenda_item,
+          whatIsHappening: update.what_is_happening,
+          whyItMatters: update.why_it_matters,
+          whoItAffects: update.who_it_affects,
+          categoryTags: update.category_tags,
+          status: update.status,
+          commentWindow: {
+            opens: update.comment_window_opens,
+            closes: update.comment_window_closes
+          },
+          howToAct: {
+            attend: update.how_to_act_attend,
+            email: update.how_to_act_email,
+            submitComment: update.how_to_act_submit_comment
+          },
+          source: update.source_url,
+          confidence:
+            before.confidence === "high" || before.confidence === "low" || before.confidence === "medium"
+              ? before.confidence
+              : "medium"
+        }
+      ]
+    },
+    validationOptionsForMeeting(llmMeeting, (issue) => {
+      issues.push(`${issue.reason}${issue.value ? ` (${issue.value})` : ""}`);
+    })
+  );
+
+  if (validated.cards.length === 1) {
+    const card = validated.cards[0];
+    update.source_url = card.source;
+    update.status = card.status;
+    update.category_tags = card.categoryTags;
+    update.comment_window_opens = card.commentWindow.opens;
+    update.comment_window_closes = card.commentWindow.closes;
+    return null;
+  }
+
+  return issues[0] || "Published card did not pass source-grounding validation.";
 }
 
 export async function PUT(request: NextRequest) {
@@ -76,6 +167,11 @@ export async function PUT(request: NextRequest) {
     is_featured: Boolean(body.is_featured),
     admin_notes: String(body.admin_notes || "")
   };
+
+  const validationError = await validatePublishedCardUpdate(supabase, before, update);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
+  }
 
   const { data: updated, error } = await supabase
     .from("summary_cards")
