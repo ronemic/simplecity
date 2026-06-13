@@ -6,6 +6,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
 import {
+  ALL_JURISDICTIONS_SLUG,
   getJurisdictionLabel,
   normalizeJurisdictionSelection,
   toPublicJurisdictionSlug
@@ -107,7 +108,7 @@ export default async function Home({
   const hasSearch = search.length > 0;
   const [cards, announcements] = await Promise.all([
     getPublishedCards(jurisdiction),
-    getActiveAnnouncements(jurisdiction)
+    getActiveAnnouncements(ALL_JURISDICTIONS_SLUG)
   ]);
   const filteredCards = cards.filter((card) => matchesSearch(card, search));
   const upcomingCards = filteredCards.filter(isActionable).slice(0, 4);
@@ -177,12 +178,13 @@ export default async function Home({
         </div>
       </section>
 
-      <section id="decisions" className="section-shell scroll-mt-24 py-8 sm:py-10">
-        {announcements.length > 0 ? (
-          <div className="mb-6">
-            <AnnouncementBanner announcements={announcements} />
-          </div>
-        ) : null}
+      {announcements.length > 0 ? (
+        <section className="section-shell py-6 sm:py-8">
+          <AnnouncementBanner announcements={announcements} />
+        </section>
+      ) : null}
+
+      <section id="decisions" className="section-shell scroll-mt-24 pb-6 sm:pb-8">
         <div id="search-results" className="scroll-mt-24">
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">

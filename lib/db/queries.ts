@@ -195,14 +195,6 @@ function dedupeAnnouncements(rows: AnnouncementRow[]) {
   return deduped;
 }
 
-function announcementJurisdictionFilter<T extends { or: (filter: string) => T }>(
-  query: T,
-  selection: JurisdictionSelection
-) {
-  if (selection === ALL_JURISDICTIONS_SLUG) return query;
-  return query.or(`jurisdiction_slug.is.null,jurisdiction_slug.eq.${selection}`);
-}
-
 const getCachedPublishedCards = unstable_cache(
   async (selection: JurisdictionSelection) => {
     const clients = getSafePublicClients(selection);
@@ -234,42 +226,34 @@ const getCachedPublishedCards = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
-const getCachedActiveAnnouncements = unstable_cache(
-  async (selection: JurisdictionSelection) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return [] as AnnouncementRow[];
+async function getCachedActiveAnnouncements(selection: JurisdictionSelection) {
+  const clients = getSafeServiceClients(selection);
+  if (clients.length === 0) return [] as AnnouncementRow[];
 
-    const now = new Date().toISOString();
-    const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
-        let query = supabase
-          .from("announcements")
-          .select(PUBLIC_ANNOUNCEMENT_COLUMNS)
-          .eq("is_published", true)
-          .or(`starts_at.is.null,starts_at.lte.${now}`)
-          .or(`ends_at.is.null,ends_at.gte.${now}`)
-          .order("created_at", { ascending: false });
+  const results = await Promise.all(
+    clients.map(async ({ jurisdiction, supabase }) => {
+      const { data, error } = await supabase
+        .from("announcements")
+        .select(PUBLIC_ANNOUNCEMENT_COLUMNS)
+        .eq("is_published", true)
+        .order("created_at", { ascending: false });
 
-        query = announcementJurisdictionFilter(query, selection);
+      if (error) {
+        logQueryError(`Failed to load ${jurisdiction.name} announcements`, error);
+        return [] as AnnouncementRow[];
+      }
 
-        const { data, error } = await query;
+      return ((data || []) as unknown as AnnouncementRow[])
+        .map((row) => withAnnouncementJurisdictionFallback(row))
+        .filter((row) => {
+          if (selection === ALL_JURISDICTIONS_SLUG) return true;
+          return row.jurisdiction_slug === null || row.jurisdiction_slug === selection;
+        });
+    })
+  );
 
-        if (error) {
-          logQueryError(`Failed to load ${jurisdiction.name} announcements`, error);
-          return [] as AnnouncementRow[];
-        }
-
-        return ((data || []) as unknown as AnnouncementRow[]).map((row) =>
-          withAnnouncementJurisdictionFallback(row)
-        );
-      })
-    );
-
-    return dedupeAnnouncements(sortByCreatedAt(results.flat()));
-  },
-  ["active-announcements"],
-  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
-);
+  return dedupeAnnouncements(sortByCreatedAt(results.flat()));
+}
 
 const getCachedMeetings = unstable_cache(
   async (selection: JurisdictionSelection, search: string, status: string) => {
