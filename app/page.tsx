@@ -179,7 +179,12 @@ export default async function Home({
         </section>
       ) : null}
 
-      <section id="decisions" className="section-shell scroll-mt-24 pb-6 sm:pb-8">
+      <section
+        id="decisions"
+        className={`section-shell scroll-mt-24 pb-6 sm:pb-8 ${
+          announcements.length === 0 ? "pt-6 sm:pt-8" : "pt-0"
+        }`}
+      >
         <div id="search-results" className="scroll-mt-24">
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">
