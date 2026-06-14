@@ -222,6 +222,15 @@ export default async function Home({
             </div>
           ) : null}
         </div>
+        {!hasSearch && filteredCards.length > 4 ? (
+          <Link
+            href={`/decisions?jurisdiction=${publicJurisdiction}`}
+            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
+          >
+            View all decisions
+            <ArrowRight aria-hidden className="h-4 w-4" />
+          </Link>
+        ) : null}
       </section>
 
       {meetingPreviewCards.length > 0 ? (

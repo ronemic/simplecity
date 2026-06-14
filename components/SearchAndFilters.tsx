@@ -59,7 +59,7 @@ export function SearchAndFilters({
 
       <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold sm:mt-4 sm:items-center">
         <Link
-          href={`/?jurisdiction=${jurisdiction}#decisions`}
+          href={`/decisions?jurisdiction=${jurisdiction}`}
           className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/[0.16] px-4 py-2 text-[#e7f0fb] transition hover:border-white/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
         >
           See current decisions

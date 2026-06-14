@@ -45,6 +45,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     },
     {
+      url: `${appUrl}/decisions`,
+      lastModified: new Date(),
+      changeFrequency: "daily",
+      priority: 0.9,
+    },
+    {
       url: `${appUrl}/meetings`,
       lastModified: new Date(),
       changeFrequency: "daily",
@@ -67,6 +73,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: new Date(),
         changeFrequency: "daily",
         priority: 0.9,
+      },
+      {
+        url: `${appUrl}/decisions?jurisdiction=${j}`,
+        lastModified: new Date(),
+        changeFrequency: "daily",
+        priority: 0.8,
       },
       {
         url: `${appUrl}/meetings?jurisdiction=${j}`,

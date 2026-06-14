@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 const nav = [
-  { href: "/#decisions", label: "Decisions" },
+  { href: "/decisions", label: "Decisions" },
   { href: "/meetings", label: "Meetings" },
   { href: "/categories", label: "Topics" },
   { href: "/about", label: "About" }
@@ -129,7 +129,7 @@ export function HeaderNav() {
         ) : null}
       </div>
       {nav.map((item) => {
-        const isActive = item.href === "/#decisions" ? pathname === "/" : pathname === item.href;
+        const isActive = pathname === item.href;
 
         return (
           <Link
