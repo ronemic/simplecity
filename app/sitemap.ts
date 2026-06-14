@@ -2,20 +2,24 @@ import { getPublicJurisdictionOptions } from "@/lib/config/jurisdictions";
 import { MetadataRoute } from "next";
 import { headers } from "next/headers";
 
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  let appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  let appUrl: string | undefined;
+
+  try {
+    const headersList = await headers();
+    const host = headersList.get("x-forwarded-host") || headersList.get("host");
+    if (host) {
+      const proto = headersList.get("x-forwarded-proto") || (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
+      appUrl = `${proto}://${host}`;
+    }
+  } catch {
+    // Fallback if headers() is called outside of request context (e.g. static build or tests)
+  }
 
   if (!appUrl) {
-    try {
-      const headersList = await headers();
-      const host = headersList.get("host");
-      if (host) {
-        const proto = headersList.get("x-forwarded-proto") || "https";
-        appUrl = `${proto}://${host}`;
-      }
-    } catch {
-      // Fallback if headers() is called outside of request context (e.g. static build or tests)
-    }
+    appUrl = process.env.NEXT_PUBLIC_APP_URL;
   }
 
   // Final fallback
