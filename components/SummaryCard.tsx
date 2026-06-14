@@ -6,6 +6,7 @@ import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
 import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
+import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 
@@ -141,6 +142,7 @@ function confidenceLabel(card: SummaryCardRow) {
 export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const [open, setOpen] = useState(false);
   const meeting = card.meetings;
+  const agendaTitle = publicAgendaTitle(card);
   const points = summaryPoints(card.what_is_happening);
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
@@ -174,7 +176,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             <span>{cardJurisdictionLabel}</span>
           </div>
           <h3 className="mt-1 line-clamp-2 text-xl font-black leading-snug text-ink">
-            {card.agenda_item || "Agenda item not listed"}
+            {agendaTitle}
           </h3>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
             <span

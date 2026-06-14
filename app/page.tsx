@@ -12,6 +12,11 @@ import {
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
+import {
+  compareCardsByPublicInterest,
+  isPublicInterestCard,
+  publicAgendaTitle
+} from "@/lib/utils/civicPriority";
 import { formatDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
 
@@ -41,15 +46,6 @@ function hasCardCommentOptionInfo(card: SummaryCardRow) {
       card.how_to_act_email
     ]
   });
-}
-
-function isActionable(card: SummaryCardRow) {
-  return (
-    card.status === "Upcoming vote" ||
-    card.status === "Under discussion" ||
-    card.meetings?.status === "Upcoming" ||
-    hasCardCommentOptionInfo(card)
-  );
 }
 
 const TOPIC_LABELS: Partial<Record<CategoryName, string>> = {
@@ -111,17 +107,20 @@ export default async function Home({
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG)
   ]);
   const filteredCards = cards.filter((card) => matchesSearch(card, search));
-  const upcomingCards = filteredCards.filter(isActionable).slice(0, 4);
-  const recentCards = filteredCards.slice(0, 4);
-  const decisionCards = upcomingCards.length > 0 ? upcomingCards : recentCards;
-  const visibleCards = hasSearch ? filteredCards : decisionCards;
+  const prioritizedCards = [...filteredCards].sort(compareCardsByPublicInterest);
+  const publicInterestCards = prioritizedCards.filter(isPublicInterestCard);
+  const decisionCards =
+    publicInterestCards.length > 0 ? publicInterestCards.slice(0, 4) : prioritizedCards.slice(0, 4);
+  const visibleCards = hasSearch ? prioritizedCards : decisionCards;
   const commentOptionCount = filteredCards.filter((card) => hasCardCommentOptionInfo(card)).length;
   const upcomingMeetingCount = new Set(
     filteredCards
       .filter((card) => card.meetings?.status === "Upcoming" || card.status === "Upcoming vote")
       .map((card) => card.meeting_id || card.meetings?.id || card.id)
   ).size;
-  const meetingPreviewCards = getMeetingPreviewCards(filteredCards);
+  const meetingPreviewCards = getMeetingPreviewCards(
+    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards
+  );
   const introLabel =
     jurisdiction === "all" ? "Public meetings across jurisdictions" : `${jurisdictionLabel} public meetings`;
   const summaryItems = [
@@ -135,14 +134,10 @@ export default async function Home({
   const decisionSectionTitle =
     hasSearch
       ? `Results for "${search}"`
-      : commentOptionCount > 0
-        ? "Public input information"
-        : "What needs your attention";
+      : "Decisions that may affect daily life";
   const decisionSectionDescription = hasSearch
-    ? "Matching decisions from the currently selected jurisdiction."
-    : commentOptionCount > 0
-      ? "Decisions with upcoming activity or listed comment options. Each card shows whether comment instructions are available."
-      : "Recent and upcoming decisions from official meeting documents.";
+    ? "Matching decisions from the currently selected jurisdiction, with everyday-impact items ranked first."
+    : "Ranked to put budgets, housing, safety, transportation, services, public hearings, contracts, and fees before ceremonial or internal process items.";
 
   return (
     <div className="overflow-hidden">
@@ -189,7 +184,7 @@ export default async function Home({
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">
               <p className="label-eyebrow text-civic">
-                {hasSearch ? "Search results" : commentOptionCount > 0 ? "Public input" : "Decisions"}
+                {hasSearch ? "Search results" : "Top public decisions"}
               </p>
               <h2 className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
                 {decisionSectionTitle}
@@ -230,10 +225,10 @@ export default async function Home({
             <div>
               <p className="label-eyebrow text-civic">Upcoming meetings</p>
               <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">
-                Meetings connected to these decisions
+                Meetings tied to the top decisions
               </h2>
               <p className="mt-3 max-w-md text-base leading-7 text-black/[0.68]">
-                Dates are shown from the existing meeting records attached to published decision summaries.
+                Upcoming meetings connected to the higher-impact cards shown first.
               </p>
               <Link
                 href={`/meetings?jurisdiction=${publicJurisdiction}`}
@@ -264,6 +259,9 @@ export default async function Home({
                       <p className="mt-1 text-sm font-semibold text-black/[0.58]">
                         {meeting.meeting_type || "Meeting type not listed"} ·{" "}
                         {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
+                      </p>
+                      <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">
+                        Connected decision: {publicAgendaTitle(card)}
                       </p>
                     </div>
                     <Link
