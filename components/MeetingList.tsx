@@ -2,6 +2,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, Search } from
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusPill } from "@/components/StatusPill";
+import Link from "next/link";
 import type { MeetingRow } from "@/lib/types";
 import {
   CIVIC_TIME_ZONE,
@@ -239,9 +240,9 @@ export function MeetingList({
   }
 
   return (
-    <div className="grid gap-6">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
-        <section className="quiet-card overflow-hidden">
+    <div className="grid gap-8">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+        <section className="hidden quiet-card overflow-hidden md:block">
           <div className="grid gap-4 border-b border-black/10 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
             <div>
               <p className="label-eyebrow text-civic">Month view</p>
@@ -251,7 +252,7 @@ export function MeetingList({
               </p>
             </div>
             <div className="flex flex-wrap gap-2 md:flex-nowrap">
-              <a
+              <Link
                 href={buildMeetingsHref({
                   jurisdiction,
                   search,
@@ -262,8 +263,8 @@ export function MeetingList({
               >
                 <ChevronLeft aria-hidden className="h-4 w-4" />
                 Previous
-              </a>
-              <a
+              </Link>
+              <Link
                 href={buildMeetingsHref({
                   jurisdiction,
                   search,
@@ -274,8 +275,8 @@ export function MeetingList({
                 className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
               >
                 Today
-              </a>
-              <a
+              </Link>
+              <Link
                 href={buildMeetingsHref({
                   jurisdiction,
                   search,
@@ -286,7 +287,7 @@ export function MeetingList({
               >
                 Next
                 <ChevronRight aria-hidden className="h-4 w-4" />
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -302,6 +303,8 @@ export function MeetingList({
               <div className="grid grid-cols-7">
                 {monthDays.map((day) => {
                   const dayMeetings = meetingsByDate.get(day) || [];
+                  const visibleDayMeetings = dayMeetings.slice(0, 3);
+                  const hiddenDayMeetings = dayMeetings.length - visibleDayMeetings.length;
                   const inMonth = day.startsWith(activeMonth);
                   const isToday = day === todayKey;
                   const isSelected = day === activeDate;
@@ -310,7 +313,7 @@ export function MeetingList({
                     <div
                       key={day}
                       className={cn(
-                        "min-h-[158px] border-b border-r border-black/10 p-2",
+                        "flex min-h-[176px] flex-col overflow-hidden border-b border-r border-black/10 p-2",
                         !inMonth && "bg-black/[0.025] text-black/40",
                         isToday && "bg-[#fff8df]",
                         isSelected && "shadow-[inset_0_0_0_2px_#2f65e8]"
@@ -336,18 +339,24 @@ export function MeetingList({
                           Today
                         </span>
                       ) : null}
-                      <div className="mt-2 grid gap-1.5">
-                        {dayMeetings.map((meeting) => (
+                      <div className="mt-2 grid flex-1 gap-1.5 overflow-hidden">
+                        {visibleDayMeetings.map((meeting) => (
                           <PendingLink
                             key={meeting.id}
                             href={meetingHref(meeting)}
-                            className="rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-[12px] font-bold leading-4 text-ink transition hover:border-civic/25 hover:bg-[#eef5ff] focus-visible:focus-ring"
+                            className="min-h-0 rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-[12px] font-bold leading-4 text-ink transition hover:border-civic/25 hover:bg-[#eef5ff] focus-visible:focus-ring"
+                            contentClassName="flex w-full flex-col items-start gap-0.5"
                             pendingLabel="Opening meeting"
                           >
-                            <span className="block text-[#12365f]">{meetingTimeLabel(meeting)}</span>
-                            <span className="line-clamp-2">{meeting.title}</span>
+                            <span className="text-[11px] font-black leading-4 text-[#12365f]">{meetingTimeLabel(meeting)}</span>
+                            <span className="line-clamp-1 leading-4">{meeting.title}</span>
                           </PendingLink>
                         ))}
+                        {hiddenDayMeetings > 0 ? (
+                          <div className="inline-flex min-h-7 items-center justify-center rounded-md border border-dashed border-black/15 bg-black/[0.03] px-2 text-[12px] font-bold text-black/60">
+                            +{hiddenDayMeetings} more
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   );
@@ -358,7 +367,7 @@ export function MeetingList({
         </section>
 
         <aside className="quiet-card overflow-hidden">
-          <div className="border-b border-black/10 p-5">
+          <div className="border-b border-black/10 p-4">
             <p className="label-eyebrow text-civic">Day view</p>
             <h2 className="mt-1 text-2xl font-black text-ink">
               {formatDateKey(activeDate, {
@@ -374,12 +383,12 @@ export function MeetingList({
           <div className="divide-y divide-black/10">
             {activeDateMeetings.length > 0 ? (
               activeDateMeetings.map((meeting) => (
-                <div key={meeting.id} className="p-4">
+                <div key={meeting.id} className="p-3.5">
                   <MeetingLine meeting={meeting} compact />
                 </div>
               ))
             ) : (
-              <div className="p-5">
+              <div className="p-4">
                 <p className="text-sm font-semibold leading-6 text-black/70">
                   No meetings are listed for this day with the current filters.
                 </p>
@@ -387,9 +396,10 @@ export function MeetingList({
             )}
           </div>
         </aside>
+
       </div>
 
-      <section className="quiet-card overflow-hidden">
+      <section className="quiet-card mt-1 overflow-hidden">
         <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="label-eyebrow text-civic">All matching meetings</p>

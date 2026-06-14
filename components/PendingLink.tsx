@@ -29,6 +29,7 @@ type PendingLinkProps = {
   className?: string;
   pendingLabel?: string;
   mode?: "inline" | "overlay";
+  contentClassName?: string;
   prefetch?: boolean;
 } & Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "children" | "className" | "onClick">;
 
@@ -38,6 +39,7 @@ export function PendingLink({
   className,
   pendingLabel,
   mode = "inline",
+  contentClassName,
   prefetch = true,
   ...rest
 }: PendingLinkProps) {
@@ -75,7 +77,7 @@ export function PendingLink({
     >
       {mode === "overlay" ? (
         <>
-          <span className={cn("inline-flex items-center gap-2 transition-opacity", pending && "opacity-0")}>
+          <span className={cn("inline-flex items-center gap-2 transition-opacity", pending && "opacity-0", contentClassName)}>
             {children}
           </span>
           {pending ? (
@@ -87,7 +89,7 @@ export function PendingLink({
         </>
       ) : (
         <>
-          <span className={cn("inline-flex items-center gap-2 transition-opacity", pending && "opacity-0")}>
+          <span className={cn("inline-flex items-center gap-2 transition-opacity", pending && "opacity-0", contentClassName)}>
             {children}
           </span>
           {pending ? (
