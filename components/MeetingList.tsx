@@ -166,7 +166,12 @@ function groupMeetingsByDate(meetings: MeetingRow[]) {
 
 function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compact?: boolean }) {
   return (
-    <div className={cn("grid gap-3", compact ? "grid-cols-[4.25rem_1fr]" : "sm:grid-cols-[7rem_1fr_auto] sm:items-center")}>
+    <div
+      className={cn(
+        "grid gap-3",
+        compact ? "sm:grid-cols-[4.25rem_1fr] sm:items-start" : "sm:grid-cols-[7rem_1fr_auto] sm:items-center"
+      )}
+    >
       <div className="flex items-center gap-1.5 text-sm font-black text-[#12365f]">
         <Clock aria-hidden className="h-3.5 w-3.5" />
         <span>{meetingTimeLabel(meeting)}</span>
@@ -174,7 +179,14 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
       <div className="min-w-0">
         <PendingLink
           href={meetingHref(meeting)}
-          className="line-clamp-2 text-sm font-black leading-5 text-ink transition hover:text-civic focus-visible:focus-ring"
+          className={cn(
+            "block w-full text-sm font-black leading-5 text-ink transition hover:text-civic focus-visible:focus-ring",
+            compact ? "line-clamp-3" : "line-clamp-2"
+          )}
+          contentClassName={cn(
+            compact ? "!flex !w-full !flex-col !items-start !gap-0.5" : "items-center",
+            "transition-opacity"
+          )}
           pendingLabel="Opening meeting"
         >
           {meeting.title}
@@ -313,7 +325,7 @@ export function MeetingList({
                     <div
                       key={day}
                       className={cn(
-                        "flex min-h-[176px] flex-col overflow-hidden border-b border-r border-black/10 p-2",
+                        "flex min-h-[100px] flex-col overflow-hidden border-b border-r border-black/10 p-1.5",
                         !inMonth && "bg-black/[0.025] text-black/40",
                         isToday && "bg-[#fff8df]",
                         isSelected && "shadow-[inset_0_0_0_2px_#2f65e8]"
@@ -339,21 +351,21 @@ export function MeetingList({
                           Today
                         </span>
                       ) : null}
-                      <div className="mt-2 grid flex-1 gap-1.5 overflow-hidden">
+                      <div className="mt-1.5 grid flex-1 gap-1 overflow-hidden">
                         {visibleDayMeetings.map((meeting) => (
                           <PendingLink
                             key={meeting.id}
                             href={meetingHref(meeting)}
-                            className="min-h-0 rounded-md border border-black/10 bg-white px-2 py-1.5 text-left text-[12px] font-bold leading-4 text-ink transition hover:border-civic/25 hover:bg-[#eef5ff] focus-visible:focus-ring"
+                            className="min-h-0 rounded-md border border-black/10 bg-white px-1.5 py-1 text-left text-[10px] font-bold leading-4 text-ink transition hover:border-civic/25 hover:bg-[#eef5ff] focus-visible:focus-ring"
                             contentClassName="flex w-full flex-col items-start gap-0.5"
                             pendingLabel="Opening meeting"
                           >
-                            <span className="text-[11px] font-black leading-4 text-[#12365f]">{meetingTimeLabel(meeting)}</span>
-                            <span className="line-clamp-1 leading-4">{meeting.title}</span>
+                            <span className="text-[10px] font-black leading-4 text-[#12365f]">{meetingTimeLabel(meeting)}</span>
+                            <span className="line-clamp-1 whitespace-normal text-[11px] leading-4">{meeting.title}</span>
                           </PendingLink>
                         ))}
                         {hiddenDayMeetings > 0 ? (
-                          <div className="inline-flex min-h-7 items-center justify-center rounded-md border border-dashed border-black/15 bg-black/[0.03] px-2 text-[12px] font-bold text-black/60">
+                          <div className="inline-flex min-h-6 items-center justify-center rounded-md border border-dashed border-black/15 bg-black/[0.03] px-1.5 text-[10px] font-bold text-black/60">
                             +{hiddenDayMeetings} more
                           </div>
                         ) : null}
