@@ -10,6 +10,17 @@ export default function AboutPage() {
           SimpleCity helps residents understand city meeting agendas without needing to decode
           government language or dig through packet PDFs.
         </p>
+        <br></br>
+        <p className="text-sm font-bold uppercase text-civic">Why we built SimpleCity</p>
+         <p className="mt-4 text-lg leading-8 text-black/80">
+          We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school students who wanted to understand what our local governments were discussing, but found meeting agendas difficult to read and often buried in long PDF packets.
+        </p>
+<p className="mt-4 text-lg leading-8 text-black/80">
+We built SimpleCity to make local decisions easier to understand while ensuring that official records remain easily accessible for transparency. 
+</p>
+<p className="mt-4 text-lg leading-8 text-black/80">
+Our goal is not to replace city records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed.
+        </p>
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-3">
