@@ -62,6 +62,13 @@ JSON schema:
 }
 
 Rules:
+- “agendaItem” is the public-facing card title, not a raw agenda title.
+- Write “agendaItem” as 6-12 plain-English words when possible.
+- Lead “agendaItem” with the concrete thing residents would recognize: a project, address, department budget, service, fee, tax, contract, plan, program, or rule change.
+- Prefer title patterns like “Vote on [budget/fee/project]”, “[service/work] contract”, “Rules for [topic]”, “Changes to [service/rules]”, “Update on [plan/program]”, or “[address/project] development”.
+- Remove agenda item numbers, resolution numbers, ordinance numbers, permit numbers, and file numbers from “agendaItem” unless the number is the only way to identify the item.
+- Avoid broad or legal phrases in “agendaItem” such as “adopt resolution approving”, “authorize execution”, “receive report”, “master plan project”, “multiple resolutions”, “staff report”, or “agreement” by itself.
+- Keep official names, addresses, fiscal years, money amounts, tax rates, percentages, dates, and public deadlines when they are central to understanding the item.
 - “whatIsHappening” must be 2-3 plain sentences.
 - “whyItMatters” must explain concrete impact.
 - “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or city taxpayers.

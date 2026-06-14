@@ -107,3 +107,62 @@ test("agenda titles get plain-English wording for common procedural phrases", ()
     "Approve minutes from February 19, 2026"
   );
 });
+
+test("agenda titles translate broad official item names into resident-facing headlines", () => {
+  assert.equal(
+    publicAgendaTitle(card({
+      agenda_item: "Adopt Resolution approving the Recommended Budget of the County of Santa Clara and Special Districts for FY 2026-2027 (Item 9)"
+    })),
+    "Santa Clara County 2026-27 budget vote"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Special Programs and Reserves adjustments (Item 10)" })),
+    "Special program and reserve fund changes"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Behavioral Health Services Department staffing changes (Item 28)" })),
+    "Staffing changes for behavioral health services"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Probation Department - FY 2026-2027 Budget" })),
+    "Probation 2026-27 budget"
+  );
+});
+
+test("agenda titles hide case numbers while keeping the concrete project", () => {
+  assert.equal(
+    publicAgendaTitle(card({
+      agenda_item: "616 S. B Street - New Eight\u2011Story Commercial/Residential Mixed\u2011Use Building (PA-2025-039)"
+    })),
+    "New 8-story mixed-use building at 616 S. B Street"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Juvenile Diversion Program Case Management Services - Agreement" })),
+    "Juvenile diversion case management contract"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Citywide Street Rehabilitation Package 6-B2 - Agreement" })),
+    "Citywide street repairs 6-B2 contract"
+  );
+  assert.equal(
+    publicAgendaTitle(card({
+      agenda_item: "Gilead Sciences Campus Expansion - multiple resolutions (EA2025-0001, RZ2025-0005, UP2025-0012, RS2025-0002) and parking agreement"
+    })),
+    "Gilead campus expansion approvals and parking agreement"
+  );
+});
+
+test("agenda titles simplify planning and policy phrases", () => {
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Storm Drain Master Plan - Adoption Recommendation" })),
+    "Recommend adopting the storm drain plan"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "Amendments to Accessory Dwelling Unit (ADU) Zoning (Chapter 17.78)" })),
+    "Rules for accessory dwelling units (ADUs)"
+  );
+  assert.equal(
+    publicAgendaTitle(card({ agenda_item: "5.2 Foster City Climate Action Plan Overview" })),
+    "Foster City climate action plan update"
+  );
+});

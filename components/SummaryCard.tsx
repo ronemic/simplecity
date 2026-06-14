@@ -13,9 +13,13 @@ import { cn } from "@/lib/utils/cn";
 function summaryPoints(text?: string | null) {
   const fallback = "Not listed in the source document.";
   const content = (text?.trim() || fallback).replace(/\s+/g, " ");
-  return content
+  const sentenceSafeContent = content
+    .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, "$1__SIMPLECITY_DOT__")
+    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|St|No|Inc|Co|Ltd|LLC)\.(?=\s+)/gi, "$1__SIMPLECITY_DOT__");
+
+  return sentenceSafeContent
     .split(/(?<=[.!?])\s+(?=[A-Z0-9"$“])/)
-    .map((item) => item.trim())
+    .map((item) => item.replace(/__SIMPLECITY_DOT__/g, ".").trim())
     .filter(Boolean)
     .slice(0, 3);
 }
@@ -144,6 +148,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
   const points = summaryPoints(card.what_is_happening);
+  const titlePreview = points[0] === "Not listed in the source document." ? null : points[0];
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
   const affectedResidents = compactList(card.who_it_affects);
@@ -175,9 +180,14 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
             <span>{cardJurisdictionLabel}</span>
           </div>
-          <h3 className="mt-1 line-clamp-2 text-xl font-black leading-snug text-ink">
+          <h3 className="mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2">
             {agendaTitle}
           </h3>
+          {titlePreview ? (
+            <p className="mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2">
+              {titlePreview}
+            </p>
+          ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
             <span
               className={cn(
