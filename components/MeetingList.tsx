@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, Search } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusPill } from "@/components/StatusPill";
@@ -21,7 +21,10 @@ type MeetingCalendarProps = {
   status?: string;
   month?: string;
   selectedDate?: string;
+  view?: MeetingView;
 };
+
+type MeetingView = "calendar" | "list";
 
 function jurisdictionLabel(meeting: MeetingRow) {
   if (meeting.jurisdiction_slug === "san-mateo-city") return "San Mateo";
@@ -128,13 +131,15 @@ function buildMeetingsHref({
   search,
   status,
   month,
-  date
+  date,
+  view
 }: {
   jurisdiction: string;
   search?: string;
   status?: string;
   month?: string;
   date?: string;
+  view?: MeetingView;
 }) {
   const params = new URLSearchParams();
   params.set("jurisdiction", jurisdiction);
@@ -142,6 +147,7 @@ function buildMeetingsHref({
   if (status) params.set("status", status);
   if (month) params.set("month", month);
   if (date) params.set("date", date);
+  if (view && view !== "calendar") params.set("view", view);
   return `/meetings?${params.toString()}`;
 }
 
@@ -162,6 +168,20 @@ function groupMeetingsByDate(meetings: MeetingRow[]) {
   }
 
   return groups;
+}
+
+function calendarMeetingTone(status?: string | null) {
+  const normalized = status?.toLowerCase() || "";
+
+  if (normalized.includes("cancel")) {
+    return "border-[#f0c8bb] bg-[#fff7f3] text-[#7d321f] hover:border-[#dc9f8d] hover:bg-[#fff1eb]";
+  }
+
+  if (normalized.includes("upcoming")) {
+    return "border-civic/20 bg-[#f3f7ff] text-[#12365f] hover:border-civic/35 hover:bg-[#eaf2ff]";
+  }
+
+  return "border-black/10 bg-white/90 text-ink hover:border-civic/25 hover:bg-[#f7fbff]";
 }
 
 function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compact?: boolean }) {
@@ -211,8 +231,10 @@ export function MeetingList({
   search = "",
   status = "",
   month,
-  selectedDate
+  selectedDate,
+  view = "calendar"
 }: MeetingCalendarProps) {
+  const activeView = view === "list" ? "list" : "calendar";
   const todayKey = dateKeyFromDate(new Date());
   const activeMonth = isValidMonthKey(month) ? month : todayKey.slice(0, 7);
   const activeDate =
@@ -232,213 +254,238 @@ export function MeetingList({
     month: "long",
     year: "numeric"
   });
-  const todayLabel = formatDateKey(todayKey, {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
-
-  if (meetings.length === 0) {
-    return (
-      <div className="quiet-card p-8 text-center">
-        <FileText aria-hidden className="mx-auto h-10 w-10 text-black/40" />
-        <h2 className="mt-3 text-xl font-bold text-ink">No meetings match those filters</h2>
-        <p className="mt-2 text-sm leading-6 text-black/70">
-          Try a broader search, a different status, or another jurisdiction.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="grid gap-8">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-        <section className="hidden quiet-card overflow-hidden md:block">
-          <div className="grid gap-4 border-b border-black/10 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
-            <div>
-              <p className="label-eyebrow text-civic">Month view</p>
-              <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
-              <p className="mt-1 text-sm font-semibold text-black/60">
-                Today is {todayLabel}. {monthMeetingCount} meetings shown this month.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-2 md:flex-nowrap">
-              <Link
-                href={buildMeetingsHref({
-                  jurisdiction,
-                  search,
-                  status,
-                  month: addMonths(activeMonth, -1)
-                })}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
-              >
-                <ChevronLeft aria-hidden className="h-4 w-4" />
-                Previous
-              </Link>
-              <Link
-                href={buildMeetingsHref({
-                  jurisdiction,
-                  search,
-                  status,
-                  month: todayKey.slice(0, 7),
-                  date: todayKey
-                })}
-                className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
-              >
-                Today
-              </Link>
-              <Link
-                href={buildMeetingsHref({
-                  jurisdiction,
-                  search,
-                  status,
-                  month: addMonths(activeMonth, 1)
-                })}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
-              >
-                Next
-                <ChevronRight aria-hidden className="h-4 w-4" />
-              </Link>
-            </div>
-          </div>
+    <div className="grid gap-6">
+      <div className="flex justify-end">
+        <div className="inline-flex rounded-lg border border-black/10 bg-white p-1 shadow-[0_1px_2px_rgba(23,23,23,0.04)]">
+          {(["calendar", "list"] as MeetingView[]).map((option) => {
+            const selected = activeView === option;
 
-          <div className="overflow-x-auto">
-            <div className="min-w-[720px]">
-              <div className="grid grid-cols-7 border-b border-black/10 bg-[#f8fafb]">
-                {WEEKDAYS.map((day) => (
-                  <div key={day} className="px-3 py-2 text-xs font-black uppercase text-black/55">
-                    {day}
-                  </div>
-                ))}
+            return (
+              <Link
+                key={option}
+                href={buildMeetingsHref({
+                  jurisdiction,
+                  search,
+                  status,
+                  month: activeMonth,
+                  date: activeDate,
+                  view: option
+                })}
+                aria-current={selected ? "page" : undefined}
+                className={cn(
+                  "inline-flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-black capitalize transition focus-visible:focus-ring",
+                  selected ? "bg-civic text-white shadow-sm" : "text-black/65 hover:bg-black/[0.04] hover:text-ink"
+                )}
+              >
+                {option === "calendar" ? (
+                  <CalendarDays aria-hidden className="h-4 w-4" />
+                ) : (
+                  <List aria-hidden className="h-4 w-4" />
+                )}
+                {option}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {meetings.length === 0 ? (
+        <div className="quiet-card p-8 text-center">
+          <FileText aria-hidden className="mx-auto h-10 w-10 text-black/40" />
+          <h2 className="mt-3 text-xl font-bold text-ink">No meetings match those filters</h2>
+          <p className="mt-2 text-sm leading-6 text-black/70">
+            Try a broader search, a different status, or another jurisdiction.
+          </p>
+        </div>
+      ) : activeView === "calendar" ? (
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+          <section className="hidden quiet-card overflow-hidden md:block">
+            <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
+              <div>
+                <p className="label-eyebrow text-civic">Month view</p>
+                <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
+                <p className="mt-1 text-sm font-semibold text-black/60">
+                  {monthMeetingCount} meetings shown this month.
+                </p>
               </div>
-              <div className="grid grid-cols-7">
-                {monthDays.map((day) => {
-                  const dayMeetings = meetingsByDate.get(day) || [];
-                  const visibleDayMeetings = dayMeetings.slice(0, 3);
-                  const hiddenDayMeetings = dayMeetings.length - visibleDayMeetings.length;
-                  const inMonth = day.startsWith(activeMonth);
-                  const isToday = day === todayKey;
-                  const isSelected = day === activeDate;
+              <div className="flex flex-wrap gap-2 md:flex-nowrap">
+                <Link
+                  href={buildMeetingsHref({
+                    jurisdiction,
+                    search,
+                    status,
+                    month: addMonths(activeMonth, -1),
+                    view: activeView
+                  })}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
+                >
+                  <ChevronLeft aria-hidden className="h-4 w-4" />
+                  Previous
+                </Link>
+                <Link
+                  href={buildMeetingsHref({
+                    jurisdiction,
+                    search,
+                    status,
+                    month: todayKey.slice(0, 7),
+                    date: todayKey,
+                    view: activeView
+                  })}
+                  className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
+                >
+                  Today
+                </Link>
+                <Link
+                  href={buildMeetingsHref({
+                    jurisdiction,
+                    search,
+                    status,
+                    month: addMonths(activeMonth, 1),
+                    view: activeView
+                  })}
+                  className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
+                >
+                  Next
+                  <ChevronRight aria-hidden className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
 
-                  return (
-                    <div
-                      key={day}
-                      className={cn(
-                        "flex min-h-[100px] flex-col overflow-hidden border-b border-r border-black/10 p-1.5",
-                        !inMonth && "bg-black/[0.025] text-black/40",
-                        isToday && "bg-[#fff8df]",
-                        isSelected && "shadow-[inset_0_0_0_2px_#2f65e8]"
-                      )}
-                    >
-                      <a
-                        href={buildMeetingsHref({
-                          jurisdiction,
-                          search,
-                          status,
-                          month: day.slice(0, 7),
-                          date: day
-                        })}
+            <div className="overflow-x-auto">
+              <div className="min-w-[720px]">
+                <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
+                  {WEEKDAYS.map((day) => (
+                    <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid auto-rows-[minmax(150px,auto)] grid-cols-7 bg-[#edf2f5]">
+                  {monthDays.map((day) => {
+                    const dayMeetings = meetingsByDate.get(day) || [];
+                    const inMonth = day.startsWith(activeMonth);
+                    const isSelected = day === activeDate;
+
+                    return (
+                      <div
+                        key={day}
                         className={cn(
-                          "inline-flex min-h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm font-black transition hover:bg-civic/10 focus-visible:focus-ring",
-                          isToday ? "bg-civic text-white hover:bg-civic" : "text-ink"
+                          "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2 transition",
+                          inMonth ? "hover:bg-[#f9fbfd]" : "bg-[#f7f8f9] text-black/35",
+                          isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
                         )}
                       >
-                        {Number(day.slice(-2))}
-                      </a>
-                      {isToday ? (
-                        <span className="ml-1 rounded bg-[#fff0bd] px-1.5 py-0.5 text-[11px] font-black uppercase text-[#7a5200]">
-                          Today
-                        </span>
-                      ) : null}
-                      <div className="mt-1.5 grid flex-1 gap-1 overflow-hidden">
-                        {visibleDayMeetings.map((meeting) => (
-                          <PendingLink
-                            key={meeting.id}
-                            href={meetingHref(meeting)}
-                            className="min-h-0 rounded-md border border-black/10 bg-white px-1.5 py-1 text-left text-[10px] font-bold leading-4 text-ink transition hover:border-civic/25 hover:bg-[#eef5ff] focus-visible:focus-ring"
-                            contentClassName="flex w-full flex-col items-start gap-0.5"
-                            pendingLabel="Opening meeting"
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={buildMeetingsHref({
+                              jurisdiction,
+                              search,
+                              status,
+                              month: day.slice(0, 7),
+                              date: day,
+                              view: activeView
+                            })}
+                            className={cn(
+                              "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition hover:bg-civic/10 focus-visible:focus-ring",
+                              isSelected ? "bg-civic text-white hover:bg-civic" : inMonth ? "text-ink" : "text-black/40"
+                            )}
                           >
-                            <span className="text-[10px] font-black leading-4 text-[#12365f]">{meetingTimeLabel(meeting)}</span>
-                            <span className="line-clamp-1 whitespace-normal text-[11px] leading-4">{meeting.title}</span>
-                          </PendingLink>
-                        ))}
-                        {hiddenDayMeetings > 0 ? (
-                          <div className="inline-flex min-h-6 items-center justify-center rounded-md border border-dashed border-black/15 bg-black/[0.03] px-1.5 text-[10px] font-bold text-black/60">
-                            +{hiddenDayMeetings} more
-                          </div>
-                        ) : null}
+                            {Number(day.slice(-2))}
+                          </a>
+                        </div>
+                        <div className="mt-2 grid flex-1 content-start gap-1.5">
+                          {dayMeetings.map((meeting) => (
+                            <PendingLink
+                              key={meeting.id}
+                              href={meetingHref(meeting)}
+                              className={cn(
+                                "block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
+                                calendarMeetingTone(meeting.status)
+                              )}
+                              contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
+                              pendingLabel="Opening meeting"
+                            >
+                              <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
+                                {meetingTimeLabel(meeting)}
+                              </span>
+                              <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
+                                {meeting.title}
+                              </span>
+                            </PendingLink>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
-        <aside className="quiet-card overflow-hidden">
-          <div className="border-b border-black/10 p-4">
-            <p className="label-eyebrow text-civic">Day view</p>
-            <h2 className="mt-1 text-2xl font-black text-ink">
-              {formatDateKey(activeDate, {
-                weekday: "long",
-                month: "short",
-                day: "numeric"
-              })}
-            </h2>
-            <p className="mt-1 text-sm font-semibold text-black/60">
-              {activeDate === todayKey ? "This is today." : `Today is ${formatDateKey(todayKey, { month: "short", day: "numeric" })}.`}
+          <aside className="quiet-card overflow-hidden">
+            <div className="border-b border-black/10 p-4">
+              <p className="label-eyebrow text-civic">Day view</p>
+              <h2 className="mt-1 text-2xl font-black text-ink">
+                {formatDateKey(activeDate, {
+                  weekday: "long",
+                  month: "short",
+                  day: "numeric"
+                })}
+              </h2>
+              <p className="mt-1 text-sm font-semibold text-black/60">
+                {activeDateMeetings.length === 1
+                  ? "1 meeting listed."
+                  : `${activeDateMeetings.length} meetings listed.`}
+              </p>
+            </div>
+            <div className="divide-y divide-black/10">
+              {activeDateMeetings.length > 0 ? (
+                activeDateMeetings.map((meeting) => (
+                  <div key={meeting.id} className="p-3.5">
+                    <MeetingLine meeting={meeting} compact />
+                  </div>
+                ))
+              ) : (
+                <div className="p-4">
+                  <p className="text-sm font-semibold leading-6 text-black/70">
+                    No meetings are listed for this day with the current filters.
+                  </p>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+      ) : (
+        <section className="quiet-card overflow-hidden">
+          <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="label-eyebrow text-civic">All matching meetings</p>
+              <h2 className="mt-1 text-2xl font-black text-ink">
+                {meetings.length === 1 ? "1 meeting" : `${meetings.length} meetings`}
+              </h2>
+            </div>
+            <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
+              <Search aria-hidden className="h-4 w-4" />
+              Search and status filters apply to this list.
             </p>
           </div>
           <div className="divide-y divide-black/10">
-            {activeDateMeetings.length > 0 ? (
-              activeDateMeetings.map((meeting) => (
-                <div key={meeting.id} className="p-3.5">
-                  <MeetingLine meeting={meeting} compact />
+            {sortedMeetings.map((meeting) => (
+              <article key={meeting.id} className="grid gap-4 p-5 transition hover:bg-black/[0.025] sm:p-6">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
+                  <StatusPill status={meeting.status} />
+                  <span className="inline-flex items-center gap-1.5">
+                    <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
+                    {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+                  </span>
                 </div>
-              ))
-            ) : (
-              <div className="p-4">
-                <p className="text-sm font-semibold leading-6 text-black/70">
-                  No meetings are listed for this day with the current filters.
-                </p>
-              </div>
-            )}
+                <MeetingLine meeting={meeting} />
+              </article>
+            ))}
           </div>
-        </aside>
-
-      </div>
-
-      <section className="quiet-card mt-1 overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="label-eyebrow text-civic">All matching meetings</p>
-            <h2 className="mt-1 text-2xl font-black text-ink">
-              {meetings.length === 1 ? "1 meeting" : `${meetings.length} meetings`}
-            </h2>
-          </div>
-          <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
-            <Search aria-hidden className="h-4 w-4" />
-            Search and status filters apply to the calendar and this full list.
-          </p>
-        </div>
-        <div className="divide-y divide-black/10">
-          {sortedMeetings.map((meeting) => (
-            <article key={meeting.id} className="grid gap-4 p-5 transition hover:bg-black/[0.025] sm:p-6">
-              <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
-                <StatusPill status={meeting.status} />
-                <span className="inline-flex items-center gap-1.5">
-                  <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-                  {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
-                </span>
-              </div>
-              <MeetingLine meeting={meeting} />
-            </article>
-          ))}
-        </div>
-      </section>
+        </section>
+      )}
     </div>
   );
 }

@@ -12,7 +12,14 @@ export const revalidate = 300;
 export default async function MeetingsPage({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; status?: string; jurisdiction?: string; month?: string; date?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    status?: string;
+    jurisdiction?: string;
+    month?: string;
+    date?: string;
+    view?: string;
+  }>;
 }) {
   const params = await searchParams;
   const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
@@ -20,6 +27,7 @@ export default async function MeetingsPage({
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = params.q || "";
   const status = params.status || "";
+  const view = params.view === "list" ? "list" : "calendar";
   const meetings = await getMeetings({ search, status, jurisdiction });
   const statusOptions = [
     { value: "", label: "All statuses" },
@@ -32,14 +40,15 @@ export default async function MeetingsPage({
     <div className="section-shell py-10">
       <div className="mb-6 max-w-3xl">
         <p className="label-eyebrow text-civic">Meetings</p>
-        <h1 className="page-title mt-2">{jurisdictionLabel} meeting calendar</h1>
+        <h1 className="page-title mt-2">{jurisdictionLabel} meetings</h1>
         <p className="page-copy mt-3 text-base">
-          See every scraped meeting by month and by day, with search and status filters.
+          See every scraped meeting by month, day, or list, with search and status filters.
         </p>
       </div>
 
       <form className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px_auto] sm:p-5">
         <input type="hidden" name="jurisdiction" value={publicJurisdiction} />
+        {view === "list" ? <input type="hidden" name="view" value="list" /> : null}
         {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
         {params.date ? <input type="hidden" name="date" value={params.date} /> : null}
         <input
@@ -65,6 +74,7 @@ export default async function MeetingsPage({
         status={status}
         month={params.month}
         selectedDate={params.date}
+        view={view}
       />
     </div>
   );
