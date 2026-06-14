@@ -1,8 +1,27 @@
 import { getPublicJurisdictionOptions } from "@/lib/config/jurisdictions";
 import { MetadataRoute } from "next";
+import { headers } from "next/headers";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  let appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!appUrl) {
+    try {
+      const headersList = await headers();
+      const host = headersList.get("host");
+      if (host) {
+        const proto = headersList.get("x-forwarded-proto") || "https";
+        appUrl = `${proto}://${host}`;
+      }
+    } catch {
+      // Fallback if headers() is called outside of request context (e.g. static build or tests)
+    }
+  }
+
+  // Final fallback
+  if (!appUrl) {
+    appUrl = "http://localhost:3000";
+  }
   const jurisdictions = getPublicJurisdictionOptions().map((opt) => opt.slug);
 
   const routes: MetadataRoute.Sitemap = [];
