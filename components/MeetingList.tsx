@@ -407,7 +407,7 @@ export function MeetingList({
 
   return (
     <div className="grid gap-6">
-      <div className="flex justify-end">
+      <div className="hidden md:flex justify-end">
         <div className="inline-flex rounded-lg border border-black/10 bg-white p-1 shadow-[0_1px_2px_rgba(23,23,23,0.04)]">
           {(["calendar", "list"] as MeetingView[]).map((option) => {
             const selected = activeView === option;
@@ -443,171 +443,183 @@ export function MeetingList({
             Try a broader search, a different status, or another jurisdiction.
           </p>
         </div>
-      ) : activeView === "calendar" ? (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
-          <section className="hidden quiet-card overflow-hidden md:block">
-            <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
-              <div>
-                <p className="label-eyebrow text-civic">Month view</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
+      ) : (
+        <>
+          <div
+            className={cn(
+              "grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start",
+              activeView !== "calendar" && "md:hidden"
+            )}
+          >
+            <section className="hidden quiet-card overflow-hidden md:block">
+              <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
+                <div>
+                  <p className="label-eyebrow text-civic">Month view</p>
+                  <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
+                  <p className="mt-1 text-sm font-semibold text-black/60">
+                    {monthMeetingCount} meetings shown this month.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 md:flex-nowrap">
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
+                  >
+                    <ChevronLeft aria-hidden className="h-4 w-4" />
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToday}
+                    className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
+                  >
+                    Next
+                    <ChevronRight aria-hidden className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <div className="min-w-[720px]">
+                  <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
+                    {WEEKDAYS.map((day) => (
+                      <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="grid auto-rows-[minmax(150px,auto)] grid-cols-7 bg-[#edf2f5]">
+                    {monthDays.map((day) => {
+                      const dayMeetings = meetingsByDate.get(day) || [];
+                      const inMonth = day.startsWith(activeMonth);
+                      const isSelected = day === activeDate;
+
+                      return (
+                        <div
+                          key={day}
+                          className={cn(
+                            "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2 transition",
+                            inMonth ? "hover:bg-[#f9fbfd]" : "bg-[#f7f8f9] text-black/35",
+                            isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
+                          )}
+                        >
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => handleDateClick(e, day)}
+                              className={cn(
+                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition hover:bg-civic/10 focus-visible:focus-ring",
+                                isSelected ? "bg-civic text-white hover:bg-civic" : inMonth ? "text-ink" : "text-black/40"
+                              )}
+                            >
+                              {Number(day.slice(-2))}
+                            </button>
+                          </div>
+                          <div className="mt-2 grid flex-1 content-start gap-1.5">
+                            {dayMeetings.map((meeting) => (
+                              <PendingLink
+                                key={meeting.id}
+                                href={meetingHref(meeting)}
+                                className={cn(
+                                  "block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
+                                  calendarMeetingTone(meeting.status)
+                                )}
+                                contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
+                                pendingLabel="Opening meeting"
+                              >
+                                <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
+                                  {meetingTimeLabel(meeting)}
+                                </span>
+                                <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
+                                  {meeting.title}
+                                </span>
+                              </PendingLink>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <aside className="quiet-card overflow-hidden">
+              <div className="border-b border-black/10 p-4">
+                <p className="label-eyebrow text-civic">Day view</p>
+                <h2 className="mt-1 text-2xl font-black text-ink">
+                  {formatDateKey(activeDate, {
+                    weekday: "long",
+                    month: "short",
+                    day: "numeric"
+                  })}
+                </h2>
                 <p className="mt-1 text-sm font-semibold text-black/60">
-                  {monthMeetingCount} meetings shown this month.
+                  {activeDateMeetings.length === 1
+                    ? "1 meeting listed."
+                    : `${activeDateMeetings.length} meetings listed.`}
                 </p>
               </div>
-              <div className="flex flex-wrap gap-2 md:flex-nowrap">
-                <button
-                  type="button"
-                  onClick={handlePrevMonth}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
-                >
-                  <ChevronLeft aria-hidden className="h-4 w-4" />
-                  Previous
-                </button>
-                <button
-                  type="button"
-                  onClick={handleToday}
-                  className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
-                >
-                  Today
-                </button>
-                <button
-                  type="button"
-                  onClick={handleNextMonth}
-                  className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
-                >
-                  Next
-                  <ChevronRight aria-hidden className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <div className="min-w-[720px]">
-                <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
-                  {WEEKDAYS.map((day) => (
-                    <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
-                      {day}
+              <div className="divide-y divide-black/10">
+                {activeDateMeetings.length > 0 ? (
+                  activeDateMeetings.map((meeting) => (
+                    <div key={meeting.id} className="p-3.5">
+                      <MeetingLine meeting={meeting} compact />
                     </div>
-                  ))}
-                </div>
-                <div className="grid auto-rows-[minmax(150px,auto)] grid-cols-7 bg-[#edf2f5]">
-                  {monthDays.map((day) => {
-                    const dayMeetings = meetingsByDate.get(day) || [];
-                    const inMonth = day.startsWith(activeMonth);
-                    const isSelected = day === activeDate;
-
-                    return (
-                      <div
-                        key={day}
-                        className={cn(
-                          "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2 transition",
-                          inMonth ? "hover:bg-[#f9fbfd]" : "bg-[#f7f8f9] text-black/35",
-                          isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
-                        )}
-                      >
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={(e) => handleDateClick(e, day)}
-                            className={cn(
-                              "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition hover:bg-civic/10 focus-visible:focus-ring",
-                              isSelected ? "bg-civic text-white hover:bg-civic" : inMonth ? "text-ink" : "text-black/40"
-                            )}
-                          >
-                            {Number(day.slice(-2))}
-                          </button>
-                        </div>
-                        <div className="mt-2 grid flex-1 content-start gap-1.5">
-                          {dayMeetings.map((meeting) => (
-                            <PendingLink
-                              key={meeting.id}
-                              href={meetingHref(meeting)}
-                              className={cn(
-                                "block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
-                                calendarMeetingTone(meeting.status)
-                              )}
-                              contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
-                              pendingLabel="Opening meeting"
-                            >
-                              <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
-                                {meetingTimeLabel(meeting)}
-                              </span>
-                              <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
-                                {meeting.title}
-                              </span>
-                            </PendingLink>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                  ))
+                ) : (
+                  <div className="p-4">
+                    <p className="text-sm font-semibold leading-6 text-black/70">
+                      No meetings are listed for this day with the current filters.
+                    </p>
+                  </div>
+                )}
               </div>
-            </div>
-          </section>
+            </aside>
+          </div>
 
-          <aside className="quiet-card overflow-hidden">
-            <div className="border-b border-black/10 p-4">
-              <p className="label-eyebrow text-civic">Day view</p>
-              <h2 className="mt-1 text-2xl font-black text-ink">
-                {formatDateKey(activeDate, {
-                  weekday: "long",
-                  month: "short",
-                  day: "numeric"
-                })}
-              </h2>
-              <p className="mt-1 text-sm font-semibold text-black/60">
-                {activeDateMeetings.length === 1
-                  ? "1 meeting listed."
-                  : `${activeDateMeetings.length} meetings listed.`}
+          <section
+            className={cn(
+              "quiet-card overflow-hidden",
+              activeView !== "list" && "md:hidden"
+            )}
+          >
+            <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="label-eyebrow text-civic">All matching meetings</p>
+                <h2 className="mt-1 text-2xl font-black text-ink">
+                  {meetings.length === 1 ? "1 meeting" : `${meetings.length} meetings`}
+                </h2>
+              </div>
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
+                <Search aria-hidden className="h-4 w-4" />
+                Search and status filters apply to this list.
               </p>
             </div>
             <div className="divide-y divide-black/10">
-              {activeDateMeetings.length > 0 ? (
-                activeDateMeetings.map((meeting) => (
-                  <div key={meeting.id} className="p-3.5">
-                    <MeetingLine meeting={meeting} compact />
+              {sortedMeetings.map((meeting) => (
+                <article key={meeting.id} className="grid gap-4 p-5 transition hover:bg-black/[0.025] sm:p-6">
+                  <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
+                    <StatusPill status={meeting.status} />
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
+                      {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+                    </span>
                   </div>
-                ))
-              ) : (
-                <div className="p-4">
-                  <p className="text-sm font-semibold leading-6 text-black/70">
-                    No meetings are listed for this day with the current filters.
-                  </p>
-                </div>
-              )}
+                  <MeetingLine meeting={meeting} />
+                </article>
+              ))}
             </div>
-          </aside>
-        </div>
-      ) : (
-        <section className="quiet-card overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="label-eyebrow text-civic">All matching meetings</p>
-              <h2 className="mt-1 text-2xl font-black text-ink">
-                {meetings.length === 1 ? "1 meeting" : `${meetings.length} meetings`}
-              </h2>
-            </div>
-            <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
-              <Search aria-hidden className="h-4 w-4" />
-              Search and status filters apply to this list.
-            </p>
-          </div>
-          <div className="divide-y divide-black/10">
-            {sortedMeetings.map((meeting) => (
-              <article key={meeting.id} className="grid gap-4 p-5 transition hover:bg-black/[0.025] sm:p-6">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
-                  <StatusPill status={meeting.status} />
-                  <span className="inline-flex items-center gap-1.5">
-                    <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-                    {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
-                  </span>
-                </div>
-                <MeetingLine meeting={meeting} />
-              </article>
-            ))}
-          </div>
-        </section>
+          </section>
+        </>
       )}
     </div>
   );
