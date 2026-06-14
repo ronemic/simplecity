@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { PendingLink } from "@/components/PendingLink";
@@ -234,18 +237,165 @@ export function MeetingList({
   selectedDate,
   view = "calendar"
 }: MeetingCalendarProps) {
-  const activeView = view === "list" ? "list" : "calendar";
   const todayKey = dateKeyFromDate(new Date());
-  const activeMonth = isValidMonthKey(month) ? month : todayKey.slice(0, 7);
-  const activeDate =
-    isValidDateKey(selectedDate) && selectedDate?.startsWith(activeMonth)
+
+  const [activeView, setActiveView] = useState<MeetingView>(view);
+  const [activeMonth, setActiveMonth] = useState<string>(() =>
+    isValidMonthKey(month) ? month : todayKey.slice(0, 7)
+  );
+  const [activeDate, setActiveDate] = useState<string>(() => {
+    const initialMonth = isValidMonthKey(month) ? month : todayKey.slice(0, 7);
+    return isValidDateKey(selectedDate) && selectedDate.startsWith(initialMonth)
       ? selectedDate
-      : todayKey.startsWith(activeMonth)
+      : todayKey.startsWith(initialMonth)
         ? todayKey
-        : `${activeMonth}-01`;
+        : `${initialMonth}-01`;
+  });
+
+  // Sync state if props change (e.g. from parent form submissions)
+  useEffect(() => {
+    setActiveView(view);
+  }, [view]);
+
+  useEffect(() => {
+    if (isValidMonthKey(month)) {
+      setActiveMonth(month);
+    }
+  }, [month]);
+
+  useEffect(() => {
+    if (isValidDateKey(selectedDate)) {
+      setActiveDate(selectedDate);
+    }
+  }, [selectedDate]);
+
+  // Sync form input helper
+  const syncFormInput = (name: string, value: string) => {
+    const input = document.querySelector(`input[data-form-sync="${name}"]`) as HTMLInputElement | null;
+    if (input) {
+      input.value = value;
+      if (name === "view") {
+        input.disabled = value === "calendar";
+      } else if (name === "month" || name === "date") {
+        input.disabled = !value;
+      }
+    }
+  };
+
+  const updateUrlParams = (params: { view?: string; month?: string; date?: string }) => {
+    const url = new URL(window.location.href);
+
+    if (params.view !== undefined) {
+      if (params.view === "calendar") {
+        url.searchParams.delete("view");
+      } else {
+        url.searchParams.set("view", params.view);
+      }
+      syncFormInput("view", params.view);
+    }
+
+    if (params.month !== undefined) {
+      if (!params.month) {
+        url.searchParams.delete("month");
+      } else {
+        url.searchParams.set("month", params.month);
+      }
+      syncFormInput("month", params.month);
+    }
+
+    if (params.date !== undefined) {
+      if (!params.date) {
+        url.searchParams.delete("date");
+      } else {
+        url.searchParams.set("date", params.date);
+      }
+      syncFormInput("date", params.date);
+    }
+
+    window.history.pushState(null, "", url.pathname + url.search);
+  };
+
+  // Listen to popstate event (browser Back/Forward buttons)
+  useEffect(() => {
+    function handlePopState() {
+      const params = new URLSearchParams(window.location.search);
+      const urlView = params.get("view") === "list" ? "list" : "calendar";
+      const urlMonth = params.get("month") || "";
+      const urlDate = params.get("date") || "";
+
+      setActiveView(urlView);
+      if (isValidMonthKey(urlMonth)) {
+        setActiveMonth(urlMonth);
+      } else {
+        setActiveMonth(todayKey.slice(0, 7));
+      }
+
+      if (isValidDateKey(urlDate)) {
+        setActiveDate(urlDate);
+      } else {
+        const fallbackMonth = isValidMonthKey(urlMonth) ? urlMonth : todayKey.slice(0, 7);
+        setActiveDate(todayKey.startsWith(fallbackMonth) ? todayKey : `${fallbackMonth}-01`);
+      }
+
+      // Sync form inputs
+      syncFormInput("view", urlView);
+      syncFormInput("month", urlMonth);
+      syncFormInput("date", urlDate);
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [todayKey]);
+
+  const handleViewChange = (newView: MeetingView) => {
+    setActiveView(newView);
+    updateUrlParams({ view: newView });
+  };
+
+  const handlePrevMonth = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const newMonth = addMonths(activeMonth, -1);
+    setActiveMonth(newMonth);
+    const newDate = todayKey.startsWith(newMonth) ? todayKey : `${newMonth}-01`;
+    setActiveDate(newDate);
+    updateUrlParams({ month: newMonth, date: newDate });
+  };
+
+  const handleNextMonth = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const newMonth = addMonths(activeMonth, 1);
+    setActiveMonth(newMonth);
+    const newDate = todayKey.startsWith(newMonth) ? todayKey : `${newMonth}-01`;
+    setActiveDate(newDate);
+    updateUrlParams({ month: newMonth, date: newDate });
+  };
+
+  const handleToday = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const newMonth = todayKey.slice(0, 7);
+    setActiveMonth(newMonth);
+    setActiveDate(todayKey);
+    updateUrlParams({ month: newMonth, date: todayKey });
+  };
+
+  const handleDateClick = (e: React.MouseEvent, day: string) => {
+    e.preventDefault();
+    const newMonth = day.slice(0, 7);
+    setActiveMonth(newMonth);
+    setActiveDate(day);
+    updateUrlParams({ month: newMonth, date: day });
+  };
+
   const monthDays = buildMonthDays(activeMonth);
   const meetingsByDate = groupMeetingsByDate(meetings);
-  const sortedMeetings = [...meetings].sort((left, right) => meetingSortTime(left) - meetingSortTime(right));
+  const sortedMeetings = [...meetings].sort((left, right) => {
+    const leftTime = meetingSortTime(left);
+    const rightTime = meetingSortTime(right);
+    if (leftTime === Number.POSITIVE_INFINITY && rightTime === Number.POSITIVE_INFINITY) return 0;
+    if (leftTime === Number.POSITIVE_INFINITY) return 1;
+    if (rightTime === Number.POSITIVE_INFINITY) return -1;
+    return rightTime - leftTime;
+  });
   const activeDateMeetings = meetingsByDate.get(activeDate) || [];
   const monthMeetingCount = monthDays
     .filter((day) => day.startsWith(activeMonth))
@@ -254,6 +404,7 @@ export function MeetingList({
     month: "long",
     year: "numeric"
   });
+
   return (
     <div className="grid gap-6">
       <div className="flex justify-end">
@@ -262,16 +413,10 @@ export function MeetingList({
             const selected = activeView === option;
 
             return (
-              <Link
+              <button
                 key={option}
-                href={buildMeetingsHref({
-                  jurisdiction,
-                  search,
-                  status,
-                  month: activeMonth,
-                  date: activeDate,
-                  view: option
-                })}
+                type="button"
+                onClick={() => handleViewChange(option)}
                 aria-current={selected ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-black capitalize transition focus-visible:focus-ring",
@@ -284,7 +429,7 @@ export function MeetingList({
                   <List aria-hidden className="h-4 w-4" />
                 )}
                 {option}
-              </Link>
+              </button>
             );
           })}
         </div>
@@ -310,45 +455,29 @@ export function MeetingList({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 md:flex-nowrap">
-                <Link
-                  href={buildMeetingsHref({
-                    jurisdiction,
-                    search,
-                    status,
-                    month: addMonths(activeMonth, -1),
-                    view: activeView
-                  })}
+                <button
+                  type="button"
+                  onClick={handlePrevMonth}
                   className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
                 >
                   <ChevronLeft aria-hidden className="h-4 w-4" />
                   Previous
-                </Link>
-                <Link
-                  href={buildMeetingsHref({
-                    jurisdiction,
-                    search,
-                    status,
-                    month: todayKey.slice(0, 7),
-                    date: todayKey,
-                    view: activeView
-                  })}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleToday}
                   className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
                 >
                   Today
-                </Link>
-                <Link
-                  href={buildMeetingsHref({
-                    jurisdiction,
-                    search,
-                    status,
-                    month: addMonths(activeMonth, 1),
-                    view: activeView
-                  })}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextMonth}
                   className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
                 >
                   Next
                   <ChevronRight aria-hidden className="h-4 w-4" />
-                </Link>
+                </button>
               </div>
             </div>
 
@@ -377,22 +506,16 @@ export function MeetingList({
                         )}
                       >
                         <div className="flex items-center gap-1">
-                          <a
-                            href={buildMeetingsHref({
-                              jurisdiction,
-                              search,
-                              status,
-                              month: day.slice(0, 7),
-                              date: day,
-                              view: activeView
-                            })}
+                          <button
+                            type="button"
+                            onClick={(e) => handleDateClick(e, day)}
                             className={cn(
                               "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition hover:bg-civic/10 focus-visible:focus-ring",
                               isSelected ? "bg-civic text-white hover:bg-civic" : inMonth ? "text-ink" : "text-black/40"
                             )}
                           >
                             {Number(day.slice(-2))}
-                          </a>
+                          </button>
                         </div>
                         <div className="mt-2 grid flex-1 content-start gap-1.5">
                           {dayMeetings.map((meeting) => (

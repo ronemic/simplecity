@@ -48,9 +48,9 @@ export default async function MeetingsPage({
 
       <form className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px_auto] sm:p-5">
         <input type="hidden" name="jurisdiction" value={publicJurisdiction} />
-        {view === "list" ? <input type="hidden" name="view" value="list" /> : null}
-        {params.month ? <input type="hidden" name="month" value={params.month} /> : null}
-        {params.date ? <input type="hidden" name="date" value={params.date} /> : null}
+        <input type="hidden" name="view" data-form-sync="view" defaultValue={view} disabled={view === "calendar"} />
+        <input type="hidden" name="month" data-form-sync="month" defaultValue={params.month || ""} disabled={!params.month} />
+        <input type="hidden" name="date" data-form-sync="date" defaultValue={params.date || ""} disabled={!params.date} />
         <input
           name="q"
           defaultValue={params.q || ""}
