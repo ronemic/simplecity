@@ -1,4 +1,5 @@
 import { AlertCircle, CalendarClock, Info } from "lucide-react";
+import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { AnnouncementRow } from "@/lib/types";
 
 const icons = {
@@ -9,9 +10,7 @@ const icons = {
 
 function jurisdictionLabel(slug?: string | null) {
   if (!slug) return "All";
-  if (slug === "san-mateo-city") return "San Mateo";
-  if (slug === "santa-clara-county") return "Santa Clara County";
-  return "Foster City";
+  return getJurisdictionDisplayLabel(slug);
 }
 
 export function AnnouncementBanner({ announcements }: { announcements?: AnnouncementRow[] | null }) {

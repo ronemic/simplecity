@@ -16,6 +16,7 @@ const jurisdictions = [
   { slug: "all", label: "All" },
   { slug: "foster-city", label: "Foster City" },
   { slug: "san-mateo", label: "San Mateo" },
+  { slug: "san-mateo-county", label: "San Mateo County" },
   { slug: "santa-clara-county", label: "Santa Clara County" }
 ];
 

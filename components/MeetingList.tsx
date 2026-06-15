@@ -5,6 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search 
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusPill } from "@/components/StatusPill";
+import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { MeetingRow } from "@/lib/types";
 import {
   CIVIC_TIME_ZONE,
@@ -12,6 +13,7 @@ import {
   hasDisplayableMeetingTime,
   parseMeetingDate
 } from "@/lib/utils/date";
+import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { cn } from "@/lib/utils/cn";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -27,9 +29,7 @@ type MeetingCalendarProps = {
 type MeetingView = "calendar" | "list";
 
 function jurisdictionLabel(meeting: MeetingRow) {
-  if (meeting.jurisdiction_slug === "san-mateo-city") return "San Mateo";
-  if (meeting.jurisdiction_slug === "santa-clara-county") return "Santa Clara County";
-  return meeting.jurisdiction_name || "Foster City";
+  return getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name);
 }
 
 function publicJurisdictionSlug(slug?: string | null) {
@@ -184,10 +184,10 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
           )}
           pendingLabel="Opening meeting"
         >
-          {meeting.title}
+          {displayMeetingTitle(meeting)}
         </PendingLink>
         <p className="mt-0.5 text-xs font-semibold leading-5 text-black/55">
-          {meeting.meeting_type || "Meeting type not listed"} · {jurisdictionLabel(meeting)}
+          {displayMeetingType(meeting)} · {jurisdictionLabel(meeting)}
         </p>
       </div>
       {!compact ? (
@@ -514,7 +514,7 @@ export function MeetingList({
                                   {meetingTimeLabel(meeting)}
                                 </span>
                                 <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
-                                  {meeting.title}
+                                  {displayMeetingTitle(meeting)}
                                 </span>
                               </PendingLink>
                             ))}

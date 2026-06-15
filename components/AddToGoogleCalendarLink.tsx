@@ -1,6 +1,7 @@
 import { CalendarPlus, ExternalLink } from "lucide-react";
 import type { MeetingRow } from "@/lib/types";
 import { buildGoogleCalendarUrl } from "@/lib/utils/calendar";
+import { displayMeetingText } from "@/lib/utils/meetingDisplay";
 import { cn } from "@/lib/utils/cn";
 
 type AddToGoogleCalendarLinkProps = {
@@ -28,7 +29,7 @@ export function AddToGoogleCalendarLink({
           : "action-secondary",
         className
       )}
-      aria-label={`Add ${meeting.title} to Google Calendar`}
+      aria-label={`Add ${displayMeetingText(meeting.title)} to Google Calendar`}
     >
       <CalendarPlus aria-hidden className="h-4 w-4" />
       {compact ? "Google Calendar" : "Add to Google Calendar"}

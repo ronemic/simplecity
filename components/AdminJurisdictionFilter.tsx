@@ -15,6 +15,7 @@ export function AdminJurisdictionFilter({
           {includeAll ? <option value="all">All</option> : null}
           <option value="foster-city">Foster City</option>
           <option value="san-mateo">San Mateo</option>
+          <option value="san-mateo-county">San Mateo County</option>
           <option value="santa-clara-county">Santa Clara County</option>
         </select>
       </label>

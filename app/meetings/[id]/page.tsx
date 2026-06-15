@@ -4,7 +4,8 @@ import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
 import { getMeetingDetail } from "@/lib/db/queries";
-import { normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
+import { getJurisdictionDisplayLabel, normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
+import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
 
 export const revalidate = 300;
@@ -21,12 +22,9 @@ export default async function MeetingDetailPage({
   const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction);
 
   if (!meeting) notFound();
-  const jurisdictionLabel =
-    meeting.jurisdiction_slug === "san-mateo-city"
-      ? "San Mateo"
-      : meeting.jurisdiction_slug === "santa-clara-county"
-        ? "Santa Clara County"
-        : meeting.jurisdiction_name || "Foster City";
+  const jurisdictionLabel = getJurisdictionDisplayLabel(
+    meeting.jurisdiction_slug || meeting.jurisdiction_name
+  );
 
   return (
     <div className="section-shell py-10">
@@ -40,8 +38,8 @@ export default async function MeetingDetailPage({
             {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
           </span>
         </div>
-        <h1 className="page-title mt-3">{meeting.title}</h1>
-        <p className="page-copy mt-3 text-base">{meeting.meeting_type || "Meeting type not listed"}</p>
+        <h1 className="page-title mt-3">{displayMeetingTitle(meeting)}</h1>
+        <p className="page-copy mt-3 text-base">{displayMeetingType(meeting)}</p>
         <AddToGoogleCalendarLink meeting={meeting} className="mt-5" />
       </div>
 

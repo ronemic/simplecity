@@ -5,8 +5,10 @@ import { useState } from "react";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
+import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
+import { displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 
@@ -114,21 +116,8 @@ function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInf
 }
 
 function jurisdictionLabel(card: SummaryCardRow) {
-  if (card.jurisdiction_slug === "san-mateo-city" || card.meetings?.jurisdiction_slug === "san-mateo-city") {
-    return "San Mateo";
-  }
-
-  if (
-    card.jurisdiction_slug === "santa-clara-county" ||
-    card.meetings?.jurisdiction_slug === "santa-clara-county"
-  ) {
-    return "Santa Clara County";
-  }
-
-  return (
-    card.jurisdiction_name ||
-    card.meetings?.jurisdiction_name ||
-    "Foster City"
+  return getJurisdictionDisplayLabel(
+    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name
   );
 }
 
@@ -176,7 +165,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
       <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
-            <span>{meeting?.meeting_type || "Meeting type not listed"}</span>
+            <span>{meeting ? displayMeetingType(meeting) : "Meeting type not listed"}</span>
             <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
             <span>{cardJurisdictionLabel}</span>
           </div>

@@ -19,6 +19,11 @@ test("sitemap lists only core pages and jurisdiction landing pages", async () =>
   assert.ok(urlStrings.includes("http://localhost:3000/meetings?jurisdiction=san-mateo"));
   assert.ok(urlStrings.includes("http://localhost:3000/categories?jurisdiction=san-mateo"));
 
+  assert.ok(urlStrings.includes("http://localhost:3000/?jurisdiction=san-mateo-county"));
+  assert.ok(urlStrings.includes("http://localhost:3000/decisions?jurisdiction=san-mateo-county"));
+  assert.ok(urlStrings.includes("http://localhost:3000/meetings?jurisdiction=san-mateo-county"));
+  assert.ok(urlStrings.includes("http://localhost:3000/categories?jurisdiction=san-mateo-county"));
+
   assert.ok(urlStrings.includes("http://localhost:3000/?jurisdiction=foster-city"));
   assert.ok(urlStrings.includes("http://localhost:3000/decisions?jurisdiction=foster-city"));
   assert.ok(urlStrings.includes("http://localhost:3000/meetings?jurisdiction=foster-city"));

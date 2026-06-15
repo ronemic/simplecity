@@ -1,5 +1,6 @@
 import type { MeetingRow } from "@/lib/types";
 import { CIVIC_TIME_ZONE, hasDisplayableMeetingTime, parseMeetingDate } from "@/lib/utils/date";
+import { displayMeetingText } from "@/lib/utils/meetingDisplay";
 
 const DEFAULT_MEETING_DURATION_MINUTES = 120;
 
@@ -28,7 +29,7 @@ export function buildGoogleCalendarUrl(
 
   const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
   const details = [
-    meeting.meeting_type ? `Meeting type: ${meeting.meeting_type}` : null,
+    meeting.meeting_type ? `Meeting type: ${displayMeetingText(meeting.meeting_type)}` : null,
     meeting.source_url ? `Official source: ${meeting.source_url}` : null
   ]
     .filter(Boolean)
@@ -36,7 +37,7 @@ export function buildGoogleCalendarUrl(
 
   const params = new URLSearchParams({
     action: "TEMPLATE",
-    text: meeting.title,
+    text: displayMeetingText(meeting.title),
     dates: `${toGoogleCalendarDate(start)}/${toGoogleCalendarDate(end)}`,
     ctz: CIVIC_TIME_ZONE
   });

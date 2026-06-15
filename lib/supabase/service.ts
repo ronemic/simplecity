@@ -7,6 +7,12 @@ export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
   const serviceRoleKey = getServiceRoleKey(slug);
 
   if (!serviceRoleKey) {
+    if (slug === "san-mateo-county") {
+      throw new Error(
+        "San Mateo County Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY, and SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY."
+      );
+    }
+
     if (slug === "santa-clara-county") {
       throw new Error(
         "Santa Clara County Supabase configuration is missing. Set NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY, and SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY."

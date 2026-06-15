@@ -17,6 +17,7 @@ import {
   isPublicInterestCard,
   publicAgendaTitle
 } from "@/lib/utils/civicPriority";
+import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
 
@@ -269,10 +270,10 @@ export default async function Home({
                     </div>
                     <div className="min-w-0">
                       <h3 className="line-clamp-2 text-base font-black leading-snug text-ink">
-                        {meeting.title}
+                        {displayMeetingTitle(meeting)}
                       </h3>
                       <p className="mt-1 text-sm font-semibold text-black/[0.58]">
-                        {meeting.meeting_type || "Meeting type not listed"} ·{" "}
+                        {displayMeetingType(meeting)} ·{" "}
                         {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
                       </p>
                       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">

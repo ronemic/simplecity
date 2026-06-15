@@ -16,12 +16,14 @@ import { getAuthenticatedAdmin, requireAdmin } from "@/lib/supabase/admin";
 import {
   getDefaultJurisdiction,
   getJurisdictionBySlug,
+  getJurisdictionDisplayLabel,
   getJurisdictionSlugFromRow,
   getServiceSupabaseClientForJurisdiction,
   normalizeJurisdictionSelection,
   requireValidJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { formatDisplayDate } from "@/lib/utils/date";
+import { displayMeetingText, displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 
 async function regenerateMeetingAction(formData: FormData) {
   "use server";
@@ -122,7 +124,7 @@ export default async function AdminMeetingsPage({
           <option value="">All meeting types</option>
           {meetingTypes.map((type) => (
             <option key={type || ""} value={type || ""}>
-              {type}
+              {displayMeetingText(type)}
             </option>
           ))}
         </select>
@@ -152,12 +154,9 @@ export default async function AdminMeetingsPage({
           const docs = documents.filter((doc) => doc.meeting_id === meeting.id);
           const meetingCards = cards.filter((card) => card.meeting_id === meeting.id);
           const categories = Array.from(new Set(meetingCards.flatMap((card) => card.category_tags || [])));
-          const jurisdictionLabel =
-            meeting.jurisdiction_slug === "san-mateo-city"
-              ? "San Mateo"
-              : meeting.jurisdiction_slug === "santa-clara-county"
-                ? "Santa Clara County"
-                : meeting.jurisdiction_name || "Foster City";
+          const jurisdictionLabel = getJurisdictionDisplayLabel(
+            meeting.jurisdiction_slug || meeting.jurisdiction_name
+          );
 
           return (
             <article key={meeting.id} className="quiet-card p-5">
@@ -175,8 +174,8 @@ export default async function AdminMeetingsPage({
                       <CategoryPill key={category} category={category} compact />
                     ))}
                   </div>
-                  <h2 className="mt-3 text-xl font-bold text-ink">{meeting.title}</h2>
-                  <p className="mt-1 text-sm text-black/70">{meeting.meeting_type || "Meeting type not listed"}</p>
+                  <h2 className="mt-3 text-xl font-bold text-ink">{displayMeetingTitle(meeting)}</h2>
+                  <p className="mt-1 text-sm text-black/70">{displayMeetingType(meeting)}</p>
                 </div>
                 <form action={regenerateMeetingAction}>
                   <input type="hidden" name="id" value={meeting.id} />

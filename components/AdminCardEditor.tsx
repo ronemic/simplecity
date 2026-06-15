@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { CATEGORIES } from "@/lib/constants";
+import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { SummaryCardRow } from "@/lib/types";
 
 function listFromCommaText(value: FormDataEntryValue | null) {
@@ -103,12 +104,9 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
   }
 
   const jurisdictionLabel =
-    card.jurisdiction_slug === "san-mateo-city" || card.meetings?.jurisdiction_slug === "san-mateo-city"
-      ? "San Mateo"
-      : card.jurisdiction_slug === "santa-clara-county" ||
-          card.meetings?.jurisdiction_slug === "santa-clara-county"
-        ? "Santa Clara County"
-        : card.jurisdiction_name || "Foster City";
+    getJurisdictionDisplayLabel(
+      card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name
+    );
 
   return (
     <article className="quiet-card p-5 sm:p-6">

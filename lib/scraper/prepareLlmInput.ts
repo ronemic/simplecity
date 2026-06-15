@@ -148,7 +148,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       extractionNotes.push(
         cancellationPdf
           ? "Cancellation PDF had no extractable text."
-          : "No cancellation document was available; used IQM2 row text."
+          : "No cancellation document was available; used source row text."
       );
     }
   } else {
@@ -197,7 +197,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
         loadText: () => cleanText(detailText),
         emptyNote: "Detail page had little or no usable agenda text.",
-        selectedNote: "Used IQM2 detail page text because no agenda document text was available."
+        selectedNote: "Used detail page text because no agenda document text was available."
       });
     }
 
@@ -208,7 +208,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         minimumCharacters: MIN_ROW_SOURCE_CHARS,
         loadText: () => cleanText(meeting.rowText),
         emptyNote: "Meeting row text had little or no usable agenda text.",
-        selectedNote: "Used IQM2 row text because no usable agenda document text was available."
+        selectedNote: "Used source row text because no usable agenda document text was available."
       });
     }
 

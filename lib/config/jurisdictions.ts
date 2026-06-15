@@ -2,13 +2,21 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const ALL_JURISDICTIONS_SLUG = "all" as const;
 
-export type JurisdictionSlug = "foster-city" | "san-mateo-city" | "santa-clara-county";
-export type PublicJurisdictionSlug = "foster-city" | "san-mateo" | "santa-clara-county";
+export type JurisdictionSlug =
+  | "foster-city"
+  | "san-mateo-city"
+  | "san-mateo-county"
+  | "santa-clara-county";
+export type PublicJurisdictionSlug =
+  | "foster-city"
+  | "san-mateo"
+  | "san-mateo-county"
+  | "santa-clara-county";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
 export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
   | typeof ALL_JURISDICTIONS_SLUG;
-export type CivicPlatform = "primegov" | "iqm2";
+export type CivicPlatform = "primegov" | "iqm2" | "legistar";
 
 export type JurisdictionConfig = {
   name: string;
@@ -17,6 +25,7 @@ export type JurisdictionConfig = {
   sourceUrl: string;
   primegovUrl?: string;
   iqm2Url?: string;
+  legistarUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
@@ -29,6 +38,9 @@ export type JurisdictionPublicOption = {
 
 const DEFAULT_FOSTER_CITY_PRIMEGOV_URL = "https://fostercity.primegov.com/public/portal";
 const DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL = "https://sanmateo.primegov.com/public/portal";
+const DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL =
+  process.env.SAN_MATEO_COUNTY_LEGISTAR_URL ||
+  "https://sanmateocounty.legistar.com/Calendar.aspx";
 const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
   "https://sccgov.iqm2.com/Citizens/Default.aspx?frame=no";
 
@@ -38,6 +50,7 @@ const serviceClients = new Map<JurisdictionSlug, SupabaseClient>();
 export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "foster-city",
   "san-mateo-city",
+  "san-mateo-county",
   "santa-clara-county"
 ];
 
@@ -53,6 +66,15 @@ export function toPublicJurisdictionSlug(
 ): PublicJurisdictionSelection {
   if (slug === "san-mateo-city") return "san-mateo";
   return slug;
+}
+
+export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
+  if (slug === ALL_JURISDICTIONS_SLUG || slug === "all") return "All";
+  const internalSlug = toInternalJurisdictionSlug(slug);
+  if (internalSlug === "san-mateo-city") return "San Mateo";
+  if (internalSlug === "san-mateo-county") return "San Mateo County";
+  if (internalSlug === "santa-clara-county") return "Santa Clara County";
+  return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
 }
 
 export function getJurisdictions(): JurisdictionConfig[] {
@@ -90,6 +112,16 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseUrl: process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL,
       supabaseAnonKey: process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY
+    },
+    {
+      name: "San Mateo County",
+      slug: "san-mateo-county",
+      platform: "legistar",
+      sourceUrl: DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL,
+      legistarUrl: DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL,
+      supabaseUrl: process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL,
+      supabaseAnonKey: process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey: process.env.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     },
     {
       name: "Santa Clara County",
@@ -135,6 +167,7 @@ export function requireValidJurisdictionSlug(
   if (
     slug === "foster-city" ||
     slug === "san-mateo-city" ||
+    slug === "san-mateo-county" ||
     slug === "santa-clara-county"
   ) {
     return slug;
@@ -166,6 +199,14 @@ export function getJurisdictionSlugFromRow(
 }
 
 function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" | "service") {
+  if (jurisdiction.slug === "san-mateo-county") {
+    if (scope === "service") {
+      return "San Mateo County Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY, and SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY.";
+    }
+
+    return "San Mateo County public Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL and NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY.";
+  }
+
   if (jurisdiction.slug === "santa-clara-county") {
     return "Santa Clara County Supabase configuration is missing. Set NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY, and SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY.";
   }

@@ -19,6 +19,7 @@ import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
 import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
 import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
+import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -162,6 +163,15 @@ export async function runSimpleCityPipeline(
             downloadDocuments: options.downloadDocuments ?? true,
             log
           })
+        : jurisdiction.platform === "legistar"
+          ? await scrapeLegistarMeetings({
+              ...options,
+              jurisdiction,
+              portalUrl: options.portalUrl || jurisdiction.legistarUrl || jurisdiction.sourceUrl,
+              documentOutputDir,
+              downloadDocuments: options.downloadDocuments ?? true,
+              log
+            })
         : await scrapePortal({
             ...options,
             portalUrl: options.portalUrl || jurisdiction.primegovUrl || jurisdiction.sourceUrl,

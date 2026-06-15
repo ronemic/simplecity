@@ -51,7 +51,12 @@ const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PU
 
 function logQueryError(context: string, error: unknown) {
   if (!error) return;
+  if (typeof error === "object" && error && "code" in error && (error as { code?: string }).code === "PGRST205") {
+    return;
+  }
+
   const message = error instanceof Error ? error.message : JSON.stringify(error);
+  if (message.includes("Could not find the table")) return;
   console.error(`[SimpleCity] ${context}: ${message}`);
 }
 
