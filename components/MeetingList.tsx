@@ -162,7 +162,7 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
   return (
     <div
       className={cn(
-        "grid gap-3",
+        "grid gap-2",
         compact ? "sm:grid-cols-[4.25rem_1fr] sm:items-start" : "sm:grid-cols-[7rem_1fr_auto] sm:items-center"
       )}
     >
@@ -174,8 +174,8 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
         <PendingLink
           href={meetingHref(meeting)}
           className={cn(
-            "block w-full text-sm font-black leading-5 text-ink transition hover:text-civic focus-visible:focus-ring",
-            compact ? "line-clamp-3" : "line-clamp-2"
+            "block w-full font-black text-ink transition hover:text-civic focus-visible:focus-ring",
+            compact ? "line-clamp-3 text-sm leading-5" : "line-clamp-2 text-lg leading-snug sm:text-[1.05rem]"
           )}
           contentClassName={cn(
             compact ? "!flex !w-full !flex-col !items-start !gap-0.5" : "items-center",
@@ -185,13 +185,12 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
         >
           {meeting.title}
         </PendingLink>
-        <p className="mt-1 text-xs font-semibold leading-5 text-black/55">
+        <p className="mt-0.5 text-xs font-semibold leading-5 text-black/55">
           {meeting.meeting_type || "Meeting type not listed"} · {jurisdictionLabel(meeting)}
         </p>
       </div>
       {!compact ? (
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <StatusPill status={meeting.status} />
           <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-9 px-3 py-2" />
         </div>
       ) : null}
@@ -557,7 +556,7 @@ export function MeetingList({
             </div>
             <div className="divide-y divide-black/10">
               {sortedMeetings.map((meeting) => (
-                <article key={meeting.id} className="grid gap-4 p-5 transition hover:bg-black/[0.025] sm:p-6">
+                <article key={meeting.id} className="grid gap-2 p-5 transition hover:bg-black/[0.025] sm:p-6">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
                     <StatusPill status={meeting.status} />
                     <span className="inline-flex items-center gap-1.5">
