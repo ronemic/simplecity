@@ -311,15 +311,36 @@ export function validateSimpleCitySummary(
         return null;
       }
 
+      const agendaItem = card.agendaItem.trim();
+      const whatIsHappening = card.whatIsHappening.trim();
+      const whyItMatters = card.whyItMatters.trim();
+      const categoryTags = card.categoryTags
+        .map((tag) => tag.trim())
+        .filter((tag) => allowedCategories.has(tag));
+
+      if (!agendaItem || !whatIsHappening || !whyItMatters) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem,
+          reason: "Card was missing required summary text."
+        });
+        return null;
+      }
+
+      if (categoryTags.length === 0) {
+        options.onIssue?.({
+          agendaItem,
+          reason: "Card did not include a supported category tag."
+        });
+        return null;
+      }
+
       return {
         ...card,
-        agendaItem: card.agendaItem.trim(),
-        whatIsHappening: card.whatIsHappening.trim(),
-        whyItMatters: card.whyItMatters.trim(),
+        agendaItem,
+        whatIsHappening,
+        whyItMatters,
         whoItAffects: card.whoItAffects.map((item) => item.trim()).filter(Boolean),
-        categoryTags: card.categoryTags
-          .map((tag) => tag.trim())
-          .filter((tag) => allowedCategories.has(tag)),
+        categoryTags,
         commentWindow: {
           ...commentWindow,
           closes: commentDeadline?.value || commentWindow.closes
@@ -330,15 +351,7 @@ export function validateSimpleCitySummary(
         confidence: capConfidence(card.confidence, maxConfidence)
       };
     })
-    .filter((card): card is NonNullable<typeof card> => Boolean(card))
-    .filter(
-      (card) =>
-        card.source &&
-        card.whatIsHappening &&
-        card.agendaItem &&
-        card.whyItMatters &&
-        card.categoryTags.length > 0
-    );
+    .filter((card): card is NonNullable<typeof card> => Boolean(card));
   const seenCards = new Set<string>();
   const dedupedCards = cards.filter((card) => {
     const key = cardDedupeKey(card);

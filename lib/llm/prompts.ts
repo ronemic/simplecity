@@ -84,6 +84,9 @@ Rules:
 - If the source only says receive report or presentation, mark status as “Information only.”
 - If the agenda or public-comment instructions say written comments must be submitted by a specific date or time, put that exact date/time in “commentWindow.closes”. If participation instructions exist but no deadline is listed, keep “commentWindow.closes” as “Not listed in the source document.” and explain the method in “howToAct”.
 - Always use the exact Source URL from the meeting metadata as each card’s “source” value.
+- Use “high” confidence only when the item is directly supported by complete agenda or packet text.
+- Use “medium” confidence when the source is partial, noisy, or truncated but the core agenda item is visible.
+- Use “low” confidence when the item comes from minimal row/detail text or the source is very short, but the core agenda item is still visible.
 - Do not include URLs, email addresses, phone numbers, deadlines, meeting times, ordinance numbers, resolution numbers, vote counts, contract amounts, or project quantities unless they appear in the provided text.
 - Do not invent facts.
 - If information is missing, write “Not listed in the source document.”
