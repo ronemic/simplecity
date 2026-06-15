@@ -15,6 +15,7 @@ import {
 import { cn } from "@/lib/utils/cn";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MEETING_VIEW_STORAGE_KEY = "simplecity.meeting-list-view";
 
 type MeetingCalendarProps = {
   meetings: MeetingRow[];
@@ -215,9 +216,27 @@ export function MeetingList({
     return isValidDateKey(selectedDate) && selectedDate.startsWith(initialMonth)
       ? selectedDate
       : todayKey.startsWith(initialMonth)
-        ? todayKey
+      ? todayKey
         : `${initialMonth}-01`;
   });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("view")) return;
+
+    try {
+      const storedView = window.localStorage.getItem(MEETING_VIEW_STORAGE_KEY);
+      if (storedView === "calendar" || storedView === "list") {
+        const frame = window.requestAnimationFrame(() => {
+          setActiveView(storedView);
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+      }
+    } catch {
+      // Ignore storage failures and fall back to the server-rendered default.
+    }
+  }, []);
 
   // Sync form input helper
   const syncFormInput = (name: string, value: string) => {
@@ -300,6 +319,12 @@ export function MeetingList({
   const handleViewChange = (newView: MeetingView) => {
     setActiveView(newView);
     updateUrlParams({ view: newView });
+
+    try {
+      window.localStorage.setItem(MEETING_VIEW_STORAGE_KEY, newView);
+    } catch {
+      // Ignore storage failures so the toggle still works normally.
+    }
   };
 
   const handlePrevMonth = (e: React.MouseEvent) => {
