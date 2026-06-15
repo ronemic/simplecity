@@ -29,6 +29,14 @@ export default async function MeetingsPage({
   const status = params.status || "";
   const view = params.view === "list" ? "list" : "calendar";
   const meetings = await getMeetings({ search, status, jurisdiction });
+  const meetingListKey = [
+    publicJurisdiction,
+    search,
+    status,
+    view,
+    params.month || "",
+    params.date || ""
+  ].join("|");
   const statusOptions = [
     { value: "", label: "All statuses" },
     { value: "Upcoming", label: "Upcoming" },
@@ -68,10 +76,8 @@ export default async function MeetingsPage({
       </form>
 
       <MeetingList
+        key={meetingListKey}
         meetings={meetings}
-        jurisdiction={publicJurisdiction}
-        search={search}
-        status={status}
         month={params.month}
         selectedDate={params.date}
         view={view}

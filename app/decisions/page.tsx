@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { SummaryCard } from "@/components/SummaryCard";
 import { getPublishedCards } from "@/lib/db/queries";
 import {

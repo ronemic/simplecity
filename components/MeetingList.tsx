@@ -5,7 +5,6 @@ import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search 
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusPill } from "@/components/StatusPill";
-import Link from "next/link";
 import type { MeetingRow } from "@/lib/types";
 import {
   CIVIC_TIME_ZONE,
@@ -19,9 +18,6 @@ const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 type MeetingCalendarProps = {
   meetings: MeetingRow[];
-  jurisdiction: string;
-  search?: string;
-  status?: string;
   month?: string;
   selectedDate?: string;
   view?: MeetingView;
@@ -129,31 +125,6 @@ function buildMonthDays(monthKey: string) {
   return Array.from({ length: 42 }, (_, index) => dateKeyFromUtcDate(addDays(firstGridDay, index)));
 }
 
-function buildMeetingsHref({
-  jurisdiction,
-  search,
-  status,
-  month,
-  date,
-  view
-}: {
-  jurisdiction: string;
-  search?: string;
-  status?: string;
-  month?: string;
-  date?: string;
-  view?: MeetingView;
-}) {
-  const params = new URLSearchParams();
-  params.set("jurisdiction", jurisdiction);
-  if (search) params.set("q", search);
-  if (status) params.set("status", status);
-  if (month) params.set("month", month);
-  if (date) params.set("date", date);
-  if (view && view !== "calendar") params.set("view", view);
-  return `/meetings?${params.toString()}`;
-}
-
 function meetingHref(meeting: MeetingRow) {
   return `/meetings/${meeting.id}?jurisdiction=${publicJurisdictionSlug(meeting.jurisdiction_slug)}`;
 }
@@ -230,9 +201,6 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
 
 export function MeetingList({
   meetings,
-  jurisdiction,
-  search = "",
-  status = "",
   month,
   selectedDate,
   view = "calendar"
@@ -251,23 +219,6 @@ export function MeetingList({
         ? todayKey
         : `${initialMonth}-01`;
   });
-
-  // Sync state if props change (e.g. from parent form submissions)
-  useEffect(() => {
-    setActiveView(view);
-  }, [view]);
-
-  useEffect(() => {
-    if (isValidMonthKey(month)) {
-      setActiveMonth(month);
-    }
-  }, [month]);
-
-  useEffect(() => {
-    if (isValidDateKey(selectedDate)) {
-      setActiveDate(selectedDate);
-    }
-  }, [selectedDate]);
 
   // Sync form input helper
   const syncFormInput = (name: string, value: string) => {
