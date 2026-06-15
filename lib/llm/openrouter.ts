@@ -47,9 +47,9 @@ function buildRegenerationGuidance(meeting: LlmReadyMeeting, result: SummaryRequ
 The previous response could not be fully used:
 ${issueSummary}
 
-Re-check the raw agenda text item by item. Include every non-routine, source-supported item with public impact, including consent-calendar items involving money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or city services.
+Re-check the raw agenda text item by item. Include every non-routine, source-supported item with public impact. Also include transparency routine items when the source gives enough detail for residents to verify the record or understand participation, such as consequential minutes approvals, grouped consent-calendar summaries, agenda changes, public-comment instructions, meaningful staff updates, decision-making appointments, listed closed-session topics, relevant proclamations, cancellations, continuances, special meeting notices, and named ceremonial adjournments.
 
-Keep the strict grounding rules: use only exact values visible in the provided text, write "Not listed in the source document." when a detail is missing, and use one of the official source URLs from the meeting metadata. If the source text is partial, noisy, row-only, or truncated, keep the card only when the core item is visible and set confidence to "medium" or "low". If there truly are no non-routine, source-supported items, return an empty cards array.`;
+Keep the strict grounding rules: use only exact values visible in the provided text, write "Not listed in the source document." when a detail is missing, and use one of the official source URLs from the meeting metadata. If the source text is partial, noisy, row-only, or truncated, keep the card only when the core item is visible and set confidence to "medium" or "low". If there truly are no non-routine or transparency-worthy source-supported items, return an empty cards array.`;
 }
 
 function isBetterSummaryResult(candidate: SummaryRequestResult, current: SummaryRequestResult) {
