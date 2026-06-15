@@ -165,6 +165,7 @@ export default async function Home({
               Search official summaries
             </p>
             <SearchAndFilters
+              action="/decisions"
               jurisdiction={publicJurisdiction}
               resultCount={filteredCards.length}
               search={search}

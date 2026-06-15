@@ -4,11 +4,13 @@ import Link from "next/link";
 export function SearchAndFilters({
   jurisdiction = "san-mateo",
   resultCount,
-  search = ""
+  search = "",
+  action = "/#search-results"
 }: {
   jurisdiction?: string;
   resultCount?: number;
   search?: string;
+  action?: string;
 }) {
   const hasSearch = search.trim().length > 0;
   const resultLabel = resultCount === 1 ? "1 result" : `${resultCount ?? 0} results`;
@@ -17,7 +19,7 @@ export function SearchAndFilters({
     <div className="w-full max-w-[740px]">
       <form
         className="flex w-full rounded-[10px] border border-white/20 bg-white/10 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur"
-        action="/#search-results"
+        action={action}
         role="search"
       >
         <label className="flex flex-1">

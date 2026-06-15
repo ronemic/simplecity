@@ -1,4 +1,5 @@
 import { SummaryCard } from "@/components/SummaryCard";
+import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { getPublishedCards } from "@/lib/db/queries";
 import {
   getJurisdictionLabel,
@@ -56,16 +57,7 @@ export default async function DecisionsPage({
         </p>
       </div>
 
-      <form className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:p-5">
-        <input type="hidden" name="jurisdiction" value={publicJurisdiction} />
-        <input
-          name="q"
-          defaultValue={params.q || ""}
-          placeholder="Search decisions..."
-          className="input-control"
-        />
-        <button className="action-primary">Filter</button>
-      </form>
+      <DecisionSearchForm jurisdiction={publicJurisdiction} search={params.q || ""} />
 
       <div className="grid gap-3">
         {prioritizedCards.map((card) => (
