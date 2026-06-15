@@ -2,7 +2,9 @@ import { unstable_cache } from "next/cache";
 import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
+  getJurisdictions,
   getJurisdictionSlugFromRow,
+  getPublicSupabaseClientForJurisdiction,
   getPublicSupabaseClientsForSelection,
   getServiceSupabaseClientsForSelection,
   type JurisdictionConfig,
@@ -396,6 +398,52 @@ const getCachedCategoryCards = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
+const getCachedPublicStats = unstable_cache(
+  async () => {
+    const jurisdictions = getJurisdictions();
+    const jurisdictionsSupported = jurisdictions.length;
+
+    const results = await Promise.all(
+      jurisdictions.map(async (jurisdiction) => {
+        let supabase;
+        try {
+          supabase = getPublicSupabaseClientForJurisdiction(jurisdiction.slug);
+        } catch (error) {
+          logQueryError(`Failed to create ${jurisdiction.name} public Supabase client`, error);
+          return {
+            agendaCards: 0,
+            meetings: 0
+          };
+        }
+
+        const [cards, meetings] = await Promise.all([
+          supabase
+            .from("summary_cards")
+            .select("id", { count: "exact", head: true })
+            .eq("is_published", true),
+          supabase.from("meetings").select("id", { count: "exact", head: true })
+        ]);
+
+        logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, cards.error);
+        logQueryError(`Failed to count ${jurisdiction.name} meetings`, meetings.error);
+
+        return {
+          agendaCards: cards.count || 0,
+          meetings: meetings.count || 0
+        };
+      })
+    );
+
+    return {
+      agendaCards: results.reduce((sum, result) => sum + result.agendaCards, 0),
+      meetings: results.reduce((sum, result) => sum + result.meetings, 0),
+      jurisdictionsSupported
+    };
+  },
+  ["public-stats"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
 export async function getPublishedCards(selection: JurisdictionSelection = getDefaultJurisdiction().slug) {
   return getCachedPublishedCards(selection);
 }
@@ -426,6 +474,10 @@ export async function getCategoryCards(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug
 ) {
   return getCachedCategoryCards(selection, category);
+}
+
+export async function getPublicStats() {
+  return getCachedPublicStats();
 }
 
 export async function getAdminCollections(
