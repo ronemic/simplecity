@@ -24,7 +24,7 @@ export default async function AboutPage() {
       icon: WalletCards,
       label: "Agenda cards",
       value: stats.agendaCards,
-      detail: "Published plain-English cards"
+      detail: "Agenda cards analyzed"
     },
     {
       icon: Layers3,
@@ -36,58 +36,66 @@ export default async function AboutPage() {
       icon: Landmark,
       label: "Jurisdictions",
       value: stats.jurisdictionsSupported,
-      detail: "Local governments supported"
+      detail: "Local jurisdictions supported"
+    },
+    {
+      icon: LinkIcon,
+      label: "Transparency",
+      valueText: "100%",
+      detail: "Source-linked"
     }
   ];
 
   return (
     <div className="section-shell py-10">
-      <div className="max-w-3xl">
-        <p className="label-eyebrow !text-civic">About SimpleCity</p>
-        <h1 className="page-title mt-2">Plain-English access to local decisions</h1>
-        <p className="page-copy mt-4">
-          SimpleCity helps residents understand city meeting agendas without needing to decode
-          government language or dig through packet PDFs.
-        </p>
-      </div>
+      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
+        <div className="max-w-3xl">
+          <p className="label-eyebrow !text-civic">About SimpleCity</p>
+          <h1 className="page-title mt-2">Plain-English access to local decisions</h1>
+          <p className="page-copy mt-4">
+            SimpleCity helps residents understand city meeting agendas without needing to decode
+            government language or dig through packet PDFs.
+          </p>
 
-      <section className="mt-10 max-w-3xl">
-        <p className="label-eyebrow !text-civic">Why we built SimpleCity</p>
-        <div className="mt-4 space-y-4">
-          <p className="page-copy">
-            We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school students
-            who wanted to understand what our local governments were discussing, but found meeting
-            agendas difficult to read and often buried in long PDF packets.
-          </p>
-          <p className="page-copy">
-            We built SimpleCity to make local decisions easier to understand while ensuring that
-            official records remain easily accessible for transparency.
-          </p>
-          <p className="page-copy">
-            Our goal is not to replace city records, but rather to help residents discover and
-            understand them, helping them stay informed about their community and take action when
-            needed.
-          </p>
-        </div>
-      </section>
-
-      <section className="mt-10">
-        <p className="label-eyebrow !text-civic">SimpleCity by the numbers</p>
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
-          {statItems.map((item) => (
-            <div key={item.label} className="quiet-card p-6">
-              <div className="flex items-center justify-between gap-4">
-                <item.icon aria-hidden className="h-7 w-7 text-civic" />
-                <p className="label-eyebrow text-black/50">{item.label}</p>
-              </div>
-              <p className="mt-6 text-4xl font-black leading-none text-ink">
-                {formatStat(item.value)}
+          <section className="mt-10">
+            <p className="label-eyebrow !text-civic">Why we built SimpleCity</p>
+            <div className="mt-4 space-y-4">
+              <p className="page-copy">
+                We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school
+                students who wanted to understand what our local governments were discussing, but
+                found meeting agendas difficult to read and often buried in long PDF packets.
               </p>
-              <p className="mt-2 text-sm font-semibold leading-6 text-black/65">{item.detail}</p>
+              <p className="page-copy">
+                We built SimpleCity to make local decisions easier to understand while ensuring that
+                official records remain easily accessible for transparency.
+              </p>
+              <p className="page-copy">
+                Our goal is not to replace city records, but rather to help residents discover and
+                understand them, helping them stay informed about their community and take action
+                when needed.
+              </p>
             </div>
-          ))}
+          </section>
         </div>
-      </section>
+
+        <section className="lg:pt-6">
+          <p className="label-eyebrow !text-civic">SimpleCity by the numbers</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+            {statItems.map((item) => (
+              <div key={item.label} className="quiet-card p-3 sm:p-4">
+                <div className="flex items-center justify-between gap-4">
+                  <item.icon aria-hidden className="h-5 w-5 text-civic" />
+                  <p className="label-eyebrow text-black/50">{item.label}</p>
+                </div>
+                <p className="mt-3 text-2xl font-black leading-none text-ink">
+                  {"valueText" in item ? item.valueText : formatStat(item.value)}
+                </p>
+                <p className="mt-1.5 text-sm font-semibold leading-5 text-black/65">{item.detail}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
 
       <section className="mt-10">
         <p className="label-eyebrow !text-civic">How SimpleCity works</p>
