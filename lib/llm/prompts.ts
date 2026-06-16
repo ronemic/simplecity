@@ -77,18 +77,8 @@ Rules:
 - If a fact is not clearly supported, omit it or write “Not listed in the source document.”
 - If the provided source text is short, noisy, scanned, or truncated, only summarize items that are visible in the provided text.
 - Preserve money amounts, tax rates, percentages, dates, times, item numbers, and decimals exactly as written in the source text. For example, keep “$0.0030” as “$0.0030”; do not rewrite it as “$0.” or “0030”.
-- Skip standalone roll call, pledge, generic call to order, routine adjournment, and boilerplate reports with no listed topic.
-- Include transparency routine cards when the source gives enough detail for residents to verify the record or understand participation. Keep these cards brief, mark status as “Information only” unless the agenda says there is a vote, and usually use “City Services” as the category.
-- Include approval of minutes when the minutes cover a consequential prior meeting, a controversial vote, or a correction/amendment. If the source only says generic minutes approval with no useful detail, skip it.
-- Include consent calendar items when they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or city services. If many consent items are listed only as a block, create one grouped “Consent calendar summary” card rather than many thin cards.
-- Include agenda approval or agenda changes when items are added, removed, reordered, continued, or pulled from consent.
-- Include public comment periods when the agenda gives concrete instructions, deadlines, time limits, remote participation options, or online submission details.
-- Include staff reports or informational updates when they name a real topic residents may care about, such as budget status, police/fire updates, housing progress, climate plan updates, road work, service levels, or emergency response.
-- Include appointments or committee nominations when the body has real decision power, such as planning, housing, transportation, budget, ethics, public safety, school, or youth boards.
-- Include closed session items only when the agenda lists a meaningful public topic, such as labor negotiations, litigation, property acquisition, or public employee appointment/dismissal. Do not speculate beyond the listed topic.
-- Include proclamations or recognitions only when tied to civic services, community programs, public health or safety, youth, major local events, or affected groups.
-- Include meeting cancellations, continuances, and special meeting notices because they affect public participation.
-- Include ceremonial adjournments only when the site needs a complete public-record card and the source gives a named subject; otherwise skip routine adjournment.
+- Skip routine items like call to order, roll call, pledge, adjournment, generic approval of minutes, and generic staff reports unless there is a meaningful action or public impact.
+- Consent calendar items can be summarized if they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or city services.
 - If the meeting is cancelled, return exactly one card explaining the cancellation.
 - If an item is a public hearing, mark status as “Upcoming vote” or “Under discussion” depending on source wording.
 - If the source only says receive report or presentation, mark status as “Information only.”
@@ -100,7 +90,7 @@ Rules:
 - Do not include URLs, email addresses, phone numbers, deadlines, meeting times, ordinance numbers, resolution numbers, vote counts, contract amounts, or project quantities unless they appear in the provided text.
 - Do not invent facts.
 - If information is missing, write “Not listed in the source document.”
-- If no non-routine or transparency-worthy source-supported agenda items are visible, return an empty cards array.`;
+- If no non-routine, source-supported agenda items are visible, return an empty cards array.`;
 
 export function buildSimpleCityUserPrompt(meeting: LlmReadyMeeting) {
   const dateTime =
