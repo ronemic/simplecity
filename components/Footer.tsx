@@ -7,8 +7,9 @@ export function Footer() {
         <div className="max-w-2xl space-y-3">
           <p className="font-semibold text-ink">SimpleCity</p>
           <p className="leading-6">
-            SimpleCity summarizes official public meeting documents to make them easier to understand. Always
-            review the original source before making formal decisions.
+            SimpleCity is an independent site compiled by private citizens, not an official City
+            website. It summarizes public meeting documents to make them easier to understand.
+            Always review the original source before making formal decisions.
           </p>
         </div>
 
