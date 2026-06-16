@@ -22,9 +22,12 @@ const jurisdictions = [
 
 const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";
 
-function normalizeJurisdiction(value: string | null | undefined) {
+function normalizeJurisdiction(value: string | null | undefined): string {
   if (value === "san-mateo-city") return "san-mateo";
-  return jurisdictions.some((jurisdiction) => jurisdiction.slug === value) ? value : "san-mateo";
+  if (jurisdictions.some((jurisdiction) => jurisdiction.slug === value)) {
+    return value || "san-mateo";
+  }
+  return "san-mateo";
 }
 
 export function HeaderNav() {
