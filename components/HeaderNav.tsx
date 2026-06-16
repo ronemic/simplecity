@@ -20,21 +20,41 @@ const jurisdictions = [
   { slug: "santa-clara-county", label: "Santa Clara County" }
 ];
 
+const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";
+
+function normalizeJurisdiction(value: string | null | undefined) {
+  if (value === "san-mateo-city") return "san-mateo";
+  return jurisdictions.some((jurisdiction) => jurisdiction.slug === value) ? value : "san-mateo";
+}
+
 export function HeaderNav() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
-  const requested =
-    searchParams.get("jurisdiction") === "san-mateo-city"
-      ? "san-mateo"
-      : searchParams.get("jurisdiction") || "san-mateo";
-  const selected = jurisdictions.some((jurisdiction) => jurisdiction.slug === requested)
-    ? requested
-    : "san-mateo";
+  const requested = normalizeJurisdiction(searchParams.get("jurisdiction"));
+  const selected = requested;
   const selectedJurisdiction =
     jurisdictions.find((jurisdiction) => jurisdiction.slug === selected) || jurisdictions[1];
+
+  useEffect(() => {
+    try {
+      const storedJurisdiction = window.localStorage.getItem(JURISDICTION_STORAGE_KEY);
+      const normalizedStoredJurisdiction = normalizeJurisdiction(storedJurisdiction);
+
+      if (!searchParams.has("jurisdiction")) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.set("jurisdiction", normalizedStoredJurisdiction);
+        router.replace(`${pathname}?${params.toString()}`);
+        return;
+      }
+
+      window.localStorage.setItem(JURISDICTION_STORAGE_KEY, selected);
+    } catch {
+      // Ignore storage failures and keep the URL-driven behavior.
+    }
+  }, [pathname, router, searchParams, selected]);
 
   useEffect(() => {
     if (!isJurisdictionMenuOpen) return;
@@ -71,6 +91,11 @@ export function HeaderNav() {
     const params = new URLSearchParams(searchParams.toString());
     params.set("jurisdiction", value);
     setIsJurisdictionMenuOpen(false);
+    try {
+      window.localStorage.setItem(JURISDICTION_STORAGE_KEY, value);
+    } catch {
+      // Ignore storage failures so the selector still works normally.
+    }
     router.push(`${pathname}?${params.toString()}`);
   }
 

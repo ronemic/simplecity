@@ -78,6 +78,10 @@ Rules:
 - If the provided source text is short, noisy, scanned, or truncated, only summarize items that are visible in the provided text.
 - Preserve money amounts, tax rates, percentages, dates, times, item numbers, and decimals exactly as written in the source text. For example, keep “$0.0030” as “$0.0030”; do not rewrite it as “$0.” or “0030”.
 - Skip routine items like call to order, roll call, pledge, adjournment, generic approval of minutes, and generic staff reports unless there is a meaningful action or public impact.
+- Include transparency routine cards when the source gives enough detail for residents to verify the record or understand participation, such as consequential minutes approvals, grouped Consent calendar summary cards, agenda changes, public-comment instructions, meaningful staff updates, decision-making appointments, listed closed-session topics, relevant proclamations, cancellations, continuances, special meeting notices, and named ceremonial adjournments.
+- Include closed session items only when the agenda lists a meaningful public topic, such as labor negotiations, litigation, property acquisition, or public employee appointment or dismissal.
+- Include meeting cancellations, continuances, and special meeting notices because they affect public participation.
+- Include public comment periods when the agenda gives concrete instructions, deadlines, time limits, remote participation options, or online submission details.
 - Consent calendar items can be summarized if they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or city services.
 - If the meeting is cancelled, return exactly one card explaining the cancellation.
 - If an item is a public hearing, mark status as “Upcoming vote” or “Under discussion” depending on source wording.
@@ -90,7 +94,7 @@ Rules:
 - Do not include URLs, email addresses, phone numbers, deadlines, meeting times, ordinance numbers, resolution numbers, vote counts, contract amounts, or project quantities unless they appear in the provided text.
 - Do not invent facts.
 - If information is missing, write “Not listed in the source document.”
-- If no non-routine, source-supported agenda items are visible, return an empty cards array.`;
+- If no non-routine or transparency-worthy source-supported agenda items are visible, return an empty cards array.`;
 
 export function buildSimpleCityUserPrompt(meeting: LlmReadyMeeting) {
   const dateTime =
