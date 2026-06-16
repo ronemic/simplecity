@@ -416,8 +416,8 @@ const getCachedPublicStats = unstable_cache(
         } catch (error) {
           logQueryError(`Failed to create ${jurisdiction.name} public Supabase client`, error);
           return {
-            agendaCards: 0,
-            meetings: 0
+            agendaItemsAnalyzed: 0,
+            meetingsAnalyzed: 0
           };
         }
 
@@ -425,23 +425,26 @@ const getCachedPublicStats = unstable_cache(
           supabase
             .from("summary_cards")
             .select("id", { count: "exact", head: true })
-            .eq("is_published", true),
-          supabase.from("meetings").select("id", { count: "exact", head: true })
+            .not("meeting_id", "is", null),
+          supabase
+            .from("meetings")
+            .select("id", { count: "exact", head: true })
+            .not("cards_generated_at", "is", null)
         ]);
 
-        logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, cards.error);
-        logQueryError(`Failed to count ${jurisdiction.name} meetings`, meetings.error);
+        logQueryError(`Failed to count ${jurisdiction.name} analyzed summary cards`, cards.error);
+        logQueryError(`Failed to count ${jurisdiction.name} analyzed meetings`, meetings.error);
 
         return {
-          agendaCards: cards.count || 0,
-          meetings: meetings.count || 0
+          agendaItemsAnalyzed: cards.count || 0,
+          meetingsAnalyzed: meetings.count || 0
         };
       })
     );
 
     return {
-      agendaCards: results.reduce((sum, result) => sum + result.agendaCards, 0),
-      meetings: results.reduce((sum, result) => sum + result.meetings, 0),
+      agendaItemsAnalyzed: results.reduce((sum, result) => sum + result.agendaItemsAnalyzed, 0),
+      meetingsAnalyzed: results.reduce((sum, result) => sum + result.meetingsAnalyzed, 0),
       jurisdictionsSupported
     };
   },

@@ -22,15 +22,15 @@ export default async function AboutPage() {
   const statItems = [
     {
       icon: WalletCards,
-      label: "Agenda cards",
-      value: stats.agendaCards,
-      detail: "Agenda cards analyzed"
+      label: "Agenda items",
+      value: stats.agendaItemsAnalyzed,
+      detail: "Agenda items analyzed"
     },
     {
       icon: Layers3,
-      label: "Meetings",
-      value: stats.meetings,
-      detail: "Official meetings indexed"
+      label: "Meetings analyzed",
+      value: stats.meetingsAnalyzed,
+      detail: "Official meetings analyzed"
     },
     {
       icon: Landmark,
