@@ -8,19 +8,20 @@ import {
 } from "@/lib/utils/civicPriority";
 import type { SummaryCardRow } from "@/lib/types";
 
-function card(input: Partial<SummaryCardRow>): SummaryCardRow {
+function card(input: Partial<SummaryCardRow> = {}): SummaryCardRow {
+  const { meetings: meetingInput, ...rest } = input;
   return {
-    id: input.id || "card",
+    id: rest.id || "card",
     meeting_id: "meeting",
     jurisdiction_name: "Santa Clara County",
     jurisdiction_slug: "santa-clara-county",
     platform: "iqm2",
-    agenda_item: input.agenda_item || "",
-    what_is_happening: input.what_is_happening || "",
-    why_it_matters: input.why_it_matters || "",
-    who_it_affects: input.who_it_affects || [],
-    category_tags: input.category_tags || [],
-    status: input.status || "Information only",
+    agenda_item: rest.agenda_item || "",
+    what_is_happening: rest.what_is_happening || "",
+    why_it_matters: rest.why_it_matters || "",
+    who_it_affects: rest.who_it_affects || [],
+    category_tags: rest.category_tags || [],
+    status: rest.status || "Information only",
     comment_window_opens: "Not listed in the source document.",
     comment_window_closes: "Not listed in the source document.",
     how_to_act_attend: "Attend the meeting.",
@@ -31,37 +32,41 @@ function card(input: Partial<SummaryCardRow>): SummaryCardRow {
     is_published: true,
     is_featured: false,
     admin_notes: null,
-    created_at: "2026-06-01T00:00:00.000Z",
-    updated_at: "2026-06-01T00:00:00.000Z",
-    meetings: {
-      id: "meeting",
-      external_id: "meeting",
-      jurisdiction_name: "Santa Clara County",
-      jurisdiction_slug: "santa-clara-county",
-      platform: "iqm2",
-      title: "Board of Supervisors",
-      meeting_type: "Board of Supervisors",
-      date_text: "June 18, 2026 1:30 PM",
-      meeting_datetime: "2026-06-18T20:30:00.000Z",
-      section: "Upcoming Meetings",
-      status: "Upcoming",
-      source_type: "Agenda",
-      source_url: "https://example.com",
-      row_text: "",
-      has_html_agenda: false,
-      has_pdf: true,
-      llm_input_text: null,
-      public_comments_input_text: null,
-      source_hash: null,
-      summarized_source_hash: null,
-      cards_generated_at: null,
-      extraction_notes: [],
-      raw: {},
-      scraped_at: null,
-      created_at: null,
-      updated_at: null
-    },
-    ...input
+    created_at: rest.created_at || "2026-06-01T00:00:00.000Z",
+    updated_at: rest.updated_at || "2026-06-01T00:00:00.000Z",
+    meetings:
+      meetingInput === null
+        ? null
+        : {
+          id: "meeting",
+          external_id: "meeting",
+          jurisdiction_name: "Santa Clara County",
+          jurisdiction_slug: "santa-clara-county",
+          platform: "iqm2",
+          title: "Board of Supervisors",
+          meeting_type: "Board of Supervisors",
+          date_text: "June 18, 2026 1:30 PM",
+          meeting_datetime: "2026-06-18T20:30:00.000Z",
+          section: "Upcoming Meetings",
+          status: "Upcoming",
+          source_type: "Agenda",
+          source_url: "https://example.com",
+          row_text: "",
+          has_html_agenda: false,
+          has_pdf: true,
+          llm_input_text: null,
+          public_comments_input_text: null,
+          source_hash: null,
+          summarized_source_hash: null,
+          cards_generated_at: null,
+          extraction_notes: [],
+          raw: {},
+          scraped_at: null,
+          created_at: null,
+          updated_at: null,
+          ...(meetingInput || {})
+        },
+    ...rest
   };
 }
 
@@ -95,6 +100,44 @@ test("public-interest ranking puts impactful items before routine recognitions a
   ]);
   assert.equal(isPublicInterestCard(budget), true);
   assert.equal(isPublicInterestCard(minutes), false);
+});
+
+test("future meetings sort ahead of past ones even when the past item scores higher", () => {
+  const now = Date.UTC(2026, 5, 15, 12, 0, 0);
+  const past = card({
+    id: "past",
+    agenda_item: "Transportation update",
+    category_tags: ["Transportation"],
+    status: "Upcoming vote",
+    created_at: "2025-01-01T00:00:00.000Z",
+    updated_at: "2025-01-01T00:00:00.000Z",
+    meetings: {
+      ...card().meetings!,
+      meeting_datetime: "2025-01-01T20:00:00.000Z",
+      date_text: "January 1, 2025 12:00 PM",
+      status: "Past"
+    }
+  });
+  const future = card({
+    id: "future",
+    agenda_item: "City services update",
+    category_tags: ["City Services"],
+    status: "Information only",
+    created_at: "2026-06-14T00:00:00.000Z",
+    updated_at: "2026-06-14T00:00:00.000Z",
+    meetings: {
+      ...card().meetings!,
+      meeting_datetime: "2026-06-16T20:00:00.000Z",
+      date_text: "June 16, 2026 12:00 PM",
+      status: "Upcoming"
+    }
+  });
+
+  assert.ok(publicInterestScore(past) > publicInterestScore(future));
+  assert.deepEqual([past, future].sort((left, right) => compareCardsByPublicInterest(left, right, now)).map((item) => item.id), [
+    "future",
+    "past"
+  ]);
 });
 
 test("agenda titles get plain-English wording for common procedural phrases", () => {

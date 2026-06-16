@@ -137,8 +137,8 @@ export default async function Home({
       ? `Results for "${search}"`
       : "Decisions that may affect daily life";
   const decisionSectionDescription = hasSearch
-    ? "Matching decisions from the currently selected jurisdiction, with everyday-impact items ranked first."
-    : "Ranked to put budgets, housing, safety, transportation, services, public hearings, contracts, and fees before ceremonial or internal process items.";
+    ? "Matching decisions from the currently selected jurisdiction, with newer, higher-impact items ranked first."
+    : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
 
   return (
     <div className="overflow-hidden">

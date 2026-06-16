@@ -39,6 +39,9 @@ const CANCELLATION_PATTERNS = [
 ];
 
 const DASH_SEPARATOR_PATTERN = /\s+[-\u2011\u2013\u2014]\s+/;
+const RECENCY_WINDOW_DAYS = 60;
+const RECENCY_MAX_BONUS = 24;
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 function compactText(values: Array<string | null | undefined>) {
   return values.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
@@ -221,6 +224,15 @@ function meetingTime(card: SummaryCardRow) {
   return Number.isNaN(time) ? 0 : time;
 }
 
+function recencyScore(card: SummaryCardRow, now = Date.now()) {
+  const time = meetingTime(card);
+  if (!time) return 0;
+
+  const ageInDays = Math.abs(now - time) / DAY_IN_MS;
+  const bonus = RECENCY_MAX_BONUS * (1 - ageInDays / RECENCY_WINDOW_DAYS);
+  return Math.max(0, bonus);
+}
+
 function hasCardCommentOptionInfo(card: SummaryCardRow) {
   return hasCommentOptionInfo({
     closes: card.comment_window_closes,
@@ -276,17 +288,21 @@ export function isPublicInterestCard(card: SummaryCardRow) {
   return publicInterestScore(card) >= 34 && !isRoutineOrCeremonialCard(card);
 }
 
-export function compareCardsByPublicInterest(left: SummaryCardRow, right: SummaryCardRow) {
-  const scoreDelta = publicInterestScore(right) - publicInterestScore(left);
-  if (scoreDelta !== 0) return scoreDelta;
-
+export function compareCardsByPublicInterest(left: SummaryCardRow, right: SummaryCardRow, now = Date.now()) {
   const leftTime = meetingTime(left);
   const rightTime = meetingTime(right);
-  const now = Date.now();
   const leftFuture = leftTime >= now;
   const rightFuture = rightTime >= now;
 
-  if (leftFuture !== rightFuture) return leftFuture ? -1 : 1;
+  if (leftFuture !== rightFuture) {
+    return Number(rightFuture) - Number(leftFuture);
+  }
+
+  const freshnessDelta = recencyScore(right, now) - recencyScore(left, now);
+  if (freshnessDelta !== 0) return freshnessDelta;
+
+  const scoreDelta = publicInterestScore(right) - publicInterestScore(left);
+  if (scoreDelta !== 0) return scoreDelta;
   if (leftFuture && rightFuture) return leftTime - rightTime;
   return rightTime - leftTime;
 }

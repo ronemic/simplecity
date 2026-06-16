@@ -53,7 +53,7 @@ export default async function DecisionsPage({
         <p className="label-eyebrow text-civic">Decisions</p>
         <h1 className="page-title mt-2">{jurisdictionLabel} decisions</h1>
         <p className="page-copy mt-3 text-base">
-          Read plain-language summaries of decisions being made by local government, ranked by community impact.
+          Read plain-language summaries of decisions being made by local government, ranked to show upcoming decisions first and then by recency and community impact.
         </p>
       </div>
 
