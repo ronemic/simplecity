@@ -5,6 +5,7 @@ on:
     - cron: "0 10 * * *"
     - cron: "30 10 * * *"
     - cron: "0 11 * * *"
+    - cron: "15 11 * * *"
   workflow_dispatch:
     inputs:
       jurisdiction:
@@ -15,6 +16,7 @@ on:
         options:
           - all
           - san-mateo-city
+          - san-mateo-county
           - foster-city
           - santa-clara-county
 
@@ -30,6 +32,9 @@ env:
   NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL }}
   NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY }}
   SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY }}
+  NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL }}
+  NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY }}
+  SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY }}
   NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL }}
   NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY }}
   SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY }}
@@ -70,6 +75,36 @@ jobs:
 
       - name: Run San Mateo pipeline
         run: npm run pipeline:san-mateo-city
+
+  san-mateo-county:
+    name: San Mateo County scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'san-mateo-county')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '15 11 * * *')
+    concurrency:
+      group: nightly-scraper-san-mateo-county
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Run San Mateo County pipeline
+        run: npm run pipeline:san-mateo-county
 
   foster-city:
     name: Foster City scraper
