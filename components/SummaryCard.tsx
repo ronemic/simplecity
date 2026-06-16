@@ -121,11 +121,6 @@ function jurisdictionLabel(card: SummaryCardRow) {
   );
 }
 
-function jurisdictionSlug(card: SummaryCardRow) {
-  const slug = card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
-  return slug === "san-mateo-city" ? "san-mateo" : slug;
-}
-
 function confidenceLabel(card: SummaryCardRow) {
   const confidence = String(card.confidence || "").trim().toLowerCase();
   if (!["high", "medium", "low"].includes(confidence)) return null;
@@ -153,7 +148,6 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
   const summaryConfidence = confidenceLabel(card);
   const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
-  const cardJurisdictionSlug = jurisdictionSlug(card);
   const primaryButtonClass =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12365f] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#0d2949] focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
   const noCommentLabel = "No comment option listed";
@@ -280,7 +274,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
             <span>{meetingDate}</span>
             {meeting?.id ? (
               <PendingLink
-                href={`/meetings/${meeting.id}?jurisdiction=${cardJurisdictionSlug}`}
+                href={`/meetings/${meeting.id}`}
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
                 pendingLabel="Opening meeting"
               >

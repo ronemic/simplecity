@@ -4,21 +4,27 @@ import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
 import { getMeetingDetail } from "@/lib/db/queries";
-import { getJurisdictionDisplayLabel, normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
+import {
+  JURISDICTION_PREFERENCE_COOKIE,
+  getJurisdictionDisplayLabel,
+  normalizeJurisdictionSelection
+} from "@/lib/config/jurisdictions";
+import { cookies } from "next/headers";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
 
 export const revalidate = 300;
 
 export default async function MeetingDetailPage({
-  params,
-  searchParams
+  params
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ jurisdiction?: string }>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
+  const { id } = await params;
+  const cookieStore = await cookies();
+  const jurisdiction = normalizeJurisdictionSelection(
+    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
   const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction);
 
   if (!meeting) notFound();

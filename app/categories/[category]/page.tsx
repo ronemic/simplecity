@@ -4,9 +4,10 @@ import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
 import { getCategoryCards } from "@/lib/db/queries";
+import { cookies } from "next/headers";
 import {
-  normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  JURISDICTION_PREFERENCE_COOKIE,
+  normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
 
 export const revalidate = 300;
@@ -20,14 +21,16 @@ export default async function CategoryDetailPage({
   searchParams
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ period?: string; jurisdiction?: string }>;
+  searchParams: Promise<{ period?: string }>;
 }) {
   const [{ category: slug }, query] = await Promise.all([params, searchParams]);
   const category = categoryFromSlug(slug);
   if (!category) notFound();
 
-  const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
-  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
+  const cookieStore = await cookies();
+  const jurisdiction = normalizeJurisdictionSelection(
+    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
   const definition = CATEGORY_DEFINITIONS[category];
   const cards = await getCategoryCards(category, jurisdiction);
   const filtered =
@@ -54,9 +57,9 @@ export default async function CategoryDetailPage({
 
       <div className="mb-6 flex flex-wrap gap-2">
         {[
-          { href: `/categories/${slug}?jurisdiction=${publicJurisdiction}`, label: "All" },
-          { href: `/categories/${slug}?jurisdiction=${publicJurisdiction}&period=upcoming`, label: "Upcoming" },
-          { href: `/categories/${slug}?jurisdiction=${publicJurisdiction}&period=past`, label: "Past" }
+          { href: `/categories/${slug}`, label: "All" },
+          { href: `/categories/${slug}?period=upcoming`, label: "Upcoming" },
+          { href: `/categories/${slug}?period=past`, label: "Past" }
         ].map((item) => (
           <PendingLink
             key={item.href}

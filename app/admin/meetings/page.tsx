@@ -64,7 +64,7 @@ async function regenerateMeetingAction(formData: FormData) {
 
   revalidatePath("/admin/meetings");
   revalidatePath("/admin/cards");
-  revalidatePublicContent([`/meetings/${id}?jurisdiction=${jurisdiction.slug}`]);
+  revalidatePublicContent([`/meetings/${id}`]);
 }
 
 export default async function AdminMeetingsPage({

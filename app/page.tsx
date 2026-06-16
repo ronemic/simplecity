@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays } from "lucide-react";
+import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
@@ -7,9 +8,9 @@ import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/const
 import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
 import {
   ALL_JURISDICTIONS_SLUG,
+  JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
-  normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
 import {
@@ -63,11 +64,6 @@ type MeetingPreviewCard = SummaryCardRow & {
   meetings: NonNullable<SummaryCardRow["meetings"]>;
 };
 
-function publicJurisdictionFromCard(card: SummaryCardRow) {
-  const slug = card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
-  return slug === "san-mateo-city" ? "san-mateo" : slug;
-}
-
 function getMeetingPreviewCards(cards: SummaryCardRow[]) {
   const seen = new Set<string>();
   const meetings: MeetingPreviewCard[] = [];
@@ -95,12 +91,14 @@ function pluralize(count: number, singular: string, plural: string) {
 export default async function Home({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; jurisdiction?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const params = await searchParams;
   const search = (params.q || "").trim();
-  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
-  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
+  const cookieStore = await cookies();
+  const jurisdiction = normalizeJurisdictionSelection(
+    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasSearch = search.length > 0;
   const [cards, announcements] = await Promise.all([
@@ -167,7 +165,6 @@ export default async function Home({
             </p>
             <SearchAndFilters
               action="/decisions"
-              jurisdiction={publicJurisdiction}
               resultCount={filteredCards.length}
               search={search}
             />
@@ -226,7 +223,7 @@ export default async function Home({
         </div>
         {!hasSearch && filteredCards.length > 4 ? (
           <Link
-            href={`/decisions?jurisdiction=${publicJurisdiction}`}
+            href="/decisions"
             className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
           >
             View all decisions
@@ -247,7 +244,7 @@ export default async function Home({
                 Upcoming meetings connected to the higher-impact cards shown first.
               </p>
               <Link
-                href={`/meetings?jurisdiction=${publicJurisdiction}`}
+                href="/meetings"
                 className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
               >
                 View all meetings
@@ -281,7 +278,7 @@ export default async function Home({
                       </p>
                     </div>
                     <Link
-                      href={`/meetings/${meeting.id}?jurisdiction=${publicJurisdictionFromCard(card)}`}
+                      href={`/meetings/${meeting.id}`}
                       className="inline-flex min-h-10 items-center justify-center rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-civic/30 hover:bg-civic/5 hover:text-civic focus-visible:focus-ring"
                     >
                       Meeting details
@@ -306,7 +303,7 @@ export default async function Home({
             return (
               <Link
                 key={category}
-                href={`/categories/${definition.slug}?jurisdiction=${publicJurisdiction}`}
+                href={`/categories/${definition.slug}`}
                 className="group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 rounded-lg border border-black/10 bg-white px-4 py-4 transition hover:border-civic/30 hover:bg-[#f4f8fb] focus-visible:focus-ring"
               >
                 <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] transition group-hover:bg-civic/10 group-hover:text-civic">

@@ -2,12 +2,10 @@ import { CalendarDays, Search } from "lucide-react";
 import Link from "next/link";
 
 export function SearchAndFilters({
-  jurisdiction = "san-mateo",
   resultCount,
   search = "",
   action = "/#search-results"
 }: {
-  jurisdiction?: string;
   resultCount?: number;
   search?: string;
   action?: string;
@@ -24,11 +22,6 @@ export function SearchAndFilters({
       >
         <label className="flex flex-1">
           <span className="sr-only">Search decisions, meetings, or topics</span>
-          <input
-            type="hidden"
-            name="jurisdiction"
-            value={jurisdiction}
-          />
           <input
             name="q"
             defaultValue={search}
@@ -61,13 +54,13 @@ export function SearchAndFilters({
 
       <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold sm:mt-4 sm:items-center">
         <Link
-          href={`/decisions?jurisdiction=${jurisdiction}`}
+          href="/decisions"
           className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/[0.16] px-4 py-2 text-[#e7f0fb] transition hover:border-white/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
         >
           See current decisions
         </Link>
         <Link
-          href={`/meetings?jurisdiction=${jurisdiction}`}
+          href="/meetings"
           className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[#b9d7ff] transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
         >
           <CalendarDays aria-hidden className="h-4 w-4" />

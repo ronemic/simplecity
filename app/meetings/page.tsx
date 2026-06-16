@@ -1,10 +1,11 @@
 import { ListboxSelect } from "@/components/ListboxSelect";
 import { MeetingList } from "@/components/MeetingList";
 import { getMeetings } from "@/lib/db/queries";
+import { cookies } from "next/headers";
 import {
+  JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
-  normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
 
 export const revalidate = 300;
@@ -15,22 +16,23 @@ export default async function MeetingsPage({
   searchParams: Promise<{
     q?: string;
     status?: string;
-    jurisdiction?: string;
     month?: string;
     date?: string;
     view?: string;
   }>;
 }) {
   const params = await searchParams;
-  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
-  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
+  const cookieStore = await cookies();
+  const jurisdiction = normalizeJurisdictionSelection(
+    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = params.q || "";
   const status = params.status || "";
   const view = params.view === "list" ? "list" : "calendar";
   const meetings = await getMeetings({ search, status, jurisdiction });
   const meetingListKey = [
-    publicJurisdiction,
+    jurisdiction,
     search,
     status,
     view,
@@ -55,7 +57,6 @@ export default async function MeetingsPage({
       </div>
 
       <form className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px_auto] sm:p-5">
-        <input type="hidden" name="jurisdiction" value={publicJurisdiction} />
         <input type="hidden" name="view" data-form-sync="view" defaultValue={view} disabled={view === "calendar"} />
         <input type="hidden" name="month" data-form-sync="month" defaultValue={params.month || ""} disabled={!params.month} />
         <input type="hidden" name="date" data-form-sync="date" defaultValue={params.date || ""} disabled={!params.date} />

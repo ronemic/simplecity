@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 export const ALL_JURISDICTIONS_SLUG = "all" as const;
+export const JURISDICTION_PREFERENCE_COOKIE = "simplecity.jurisdiction";
 
 export type JurisdictionSlug =
   | "foster-city"

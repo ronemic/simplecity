@@ -1,9 +1,16 @@
 import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { JURISDICTION_PREFERENCE_COOKIE, normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
 import { HeaderNav, HeaderNavFallback } from "@/components/HeaderNav";
 
-export function Header() {
+export async function Header() {
+  const cookieStore = await cookies();
+  const initialJurisdiction = normalizeJurisdictionSelection(
+    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
+
   return (
     <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f8fafb]/95 backdrop-blur-md">
       <div className="section-shell flex min-h-[70px] flex-col items-stretch justify-between gap-3 py-3 md:flex-row md:items-center">
@@ -22,7 +29,7 @@ export function Header() {
           <span>SimpleCity</span>
         </Link>
         <Suspense fallback={<HeaderNavFallback />}>
-          <HeaderNav />
+          <HeaderNav initialJurisdiction={initialJurisdiction} />
         </Suspense>
       </div>
     </header>

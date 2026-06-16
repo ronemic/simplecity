@@ -32,10 +32,6 @@ function jurisdictionLabel(meeting: MeetingRow) {
   return getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name);
 }
 
-function publicJurisdictionSlug(slug?: string | null) {
-  return slug === "san-mateo-city" ? "san-mateo" : slug || "foster-city";
-}
-
 function dateKeyFromDate(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: CIVIC_TIME_ZONE,
@@ -127,7 +123,7 @@ function buildMonthDays(monthKey: string) {
 }
 
 function meetingHref(meeting: MeetingRow) {
-  return `/meetings/${meeting.id}?jurisdiction=${publicJurisdictionSlug(meeting.jurisdiction_slug)}`;
+  return `/meetings/${meeting.id}`;
 }
 
 function groupMeetingsByDate(meetings: MeetingRow[]) {

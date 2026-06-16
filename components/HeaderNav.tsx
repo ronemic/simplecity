@@ -2,8 +2,9 @@
 
 import { Check, ChevronDown, MapPin } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { JURISDICTION_PREFERENCE_COOKIE } from "@/lib/config/jurisdictions";
 
 const nav = [
   { href: "/decisions", label: "Decisions" },
@@ -30,14 +31,17 @@ function normalizeJurisdiction(value: string | null | undefined): string {
   return "san-mateo";
 }
 
-export function HeaderNav() {
+function writeJurisdictionPreference(value: string) {
+  const encoded = encodeURIComponent(value);
+  document.cookie = `${JURISDICTION_PREFERENCE_COOKIE}=${encoded}; path=/; max-age=31536000; samesite=lax`;
+}
+
+export function HeaderNav({ initialJurisdiction = "san-mateo" }: { initialJurisdiction?: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
+  const [selected, setSelected] = useState(initialJurisdiction);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
-  const requested = normalizeJurisdiction(searchParams.get("jurisdiction"));
-  const selected = requested;
   const selectedJurisdiction =
     jurisdictions.find((jurisdiction) => jurisdiction.slug === selected) || jurisdictions[1];
 
@@ -45,19 +49,17 @@ export function HeaderNav() {
     try {
       const storedJurisdiction = window.localStorage.getItem(JURISDICTION_STORAGE_KEY);
       const normalizedStoredJurisdiction = normalizeJurisdiction(storedJurisdiction);
+      const current = normalizeJurisdiction(selected);
 
-      if (!searchParams.has("jurisdiction")) {
-        const params = new URLSearchParams(searchParams.toString());
-        params.set("jurisdiction", normalizedStoredJurisdiction);
-        router.replace(`${pathname}?${params.toString()}`);
-        return;
+      window.localStorage.setItem(JURISDICTION_STORAGE_KEY, normalizedStoredJurisdiction);
+      writeJurisdictionPreference(normalizedStoredJurisdiction);
+      if (normalizedStoredJurisdiction !== current) {
+        router.refresh();
       }
-
-      window.localStorage.setItem(JURISDICTION_STORAGE_KEY, selected);
     } catch {
-      // Ignore storage failures and keep the URL-driven behavior.
+      // Ignore storage failures and keep the default jurisdiction.
     }
-  }, [pathname, router, searchParams, selected]);
+  }, [router, selected]);
 
   useEffect(() => {
     if (!isJurisdictionMenuOpen) return;
@@ -84,22 +86,19 @@ export function HeaderNav() {
   }, [isJurisdictionMenuOpen]);
 
   function hrefWithJurisdiction(href: string) {
-    const [path, hash] = href.split("#");
-    const params = new URLSearchParams();
-    params.set("jurisdiction", selected);
-    return `${path || "/"}?${params.toString()}${hash ? `#${hash}` : ""}`;
+    return href;
   }
 
   function changeJurisdiction(value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("jurisdiction", value);
     setIsJurisdictionMenuOpen(false);
+    setSelected(value);
     try {
       window.localStorage.setItem(JURISDICTION_STORAGE_KEY, value);
+      writeJurisdictionPreference(value);
     } catch {
       // Ignore storage failures so the selector still works normally.
     }
-    router.push(`${pathname}?${params.toString()}`);
+    router.refresh();
   }
 
   return (
@@ -202,9 +201,7 @@ export function HeaderNavFallback() {
       {nav.map((item) => (
         <Link
           key={item.href}
-          href={`${item.href.split("#")[0] || "/"}?jurisdiction=san-mateo${
-            item.href.includes("#") ? `#${item.href.split("#")[1]}` : ""
-          }`}
+          href={item.href}
           className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring md:px-3.5"
         >
           {item.label}

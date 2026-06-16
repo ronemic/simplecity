@@ -1,10 +1,11 @@
 import { SummaryCard } from "@/components/SummaryCard";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { getPublishedCards } from "@/lib/db/queries";
+import { cookies } from "next/headers";
 import {
+  JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
-  normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import {
   compareCardsByPublicInterest
@@ -34,12 +35,13 @@ export default async function DecisionsPage({
 }: {
   searchParams: Promise<{
     q?: string;
-    jurisdiction?: string;
   }>;
 }) {
   const params = await searchParams;
-  const jurisdiction = normalizeJurisdictionSelection(params.jurisdiction);
-  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
+  const cookieStore = await cookies();
+  const jurisdiction = normalizeJurisdictionSelection(
+    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = (params.q || "").trim();
 
@@ -57,7 +59,7 @@ export default async function DecisionsPage({
         </p>
       </div>
 
-      <DecisionSearchForm jurisdiction={publicJurisdiction} search={params.q || ""} />
+      <DecisionSearchForm search={params.q || ""} />
 
       <div className="grid gap-3">
         {prioritizedCards.map((card) => (

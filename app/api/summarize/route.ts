@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     jurisdiction: resolvedJurisdiction,
     sourceHash
   });
-  revalidatePublicContent([`/meetings/${row.id}?jurisdiction=${resolvedJurisdiction.slug}`]);
+  revalidatePublicContent([`/meetings/${row.id}`]);
 
   return Response.json({ cardsGenerated: cards.length, summary: result.summary });
 }
