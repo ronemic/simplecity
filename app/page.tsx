@@ -123,7 +123,7 @@ export default async function Home({
   const introLabel =
     jurisdiction === "all" ? "Public meetings across jurisdictions" : `${jurisdictionLabel} public meetings`;
   const summaryItems = [
-    commentOptionCount > 0 ? pluralize(commentOptionCount, "decision lists a comment option", "decisions list comment options") : null,
+    commentOptionCount > 0 ? pluralize(commentOptionCount, "decision includes comment option", "decisions include comment options") : null,
     upcomingMeetingCount > 0 ? pluralize(upcomingMeetingCount, "upcoming meeting", "upcoming meetings") : null
   ].filter(Boolean);
   const summarySentence =
