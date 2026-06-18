@@ -5,6 +5,9 @@ import { cleanText, slugify } from "@/lib/utils/slug";
 export const DEFAULT_PORTAL_URL =
   process.env.SCRAPER_BASE_URL || "https://fostercity.primegov.com/public/portal";
 
+export const PORTAL_READY_SELECTOR =
+  'a[href*="/Public/CompiledDocument" i], a[href*="/Portal/Meeting" i]';
+
 export type ScrapePortalOptions = {
   portalUrl?: string;
   headful?: boolean;
@@ -43,16 +46,13 @@ export function dedupeMeetings(meetings: PrimeGovMeeting[]) {
 
 export async function waitForPortal(page: Page, portalUrl = DEFAULT_PORTAL_URL) {
   await page.goto(portalUrl, {
-    waitUntil: "networkidle",
+    waitUntil: "domcontentloaded",
     timeout: 60000
   });
 
-  await page.waitForTimeout(7000);
+  await page.waitForLoadState("load", { timeout: 15000 }).catch(() => undefined);
 
-  await page.waitForSelector(
-    'a[href*="/Public/CompiledDocument"], a[href*="/Portal/Meeting"]',
-    { timeout: 30000 }
-  );
+  await page.waitForSelector(PORTAL_READY_SELECTOR, { timeout: 60000 });
 }
 
 export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeeting[]> {
