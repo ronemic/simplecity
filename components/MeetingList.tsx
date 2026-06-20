@@ -213,7 +213,7 @@ export function MeetingList({
       ? selectedDate
       : todayKey.startsWith(initialMonth)
       ? todayKey
-        : `${initialMonth}-01`;
+        : "";
   });
 
   useEffect(() => {
@@ -299,7 +299,7 @@ export function MeetingList({
         setActiveDate(urlDate);
       } else {
         const fallbackMonth = isValidMonthKey(urlMonth) ? urlMonth : todayKey.slice(0, 7);
-        setActiveDate(todayKey.startsWith(fallbackMonth) ? todayKey : `${fallbackMonth}-01`);
+        setActiveDate(todayKey.startsWith(fallbackMonth) ? todayKey : "");
       }
 
       // Sync form inputs
@@ -327,7 +327,7 @@ export function MeetingList({
     e.preventDefault();
     const newMonth = addMonths(activeMonth, -1);
     setActiveMonth(newMonth);
-    const newDate = todayKey.startsWith(newMonth) ? todayKey : `${newMonth}-01`;
+    const newDate = todayKey.startsWith(newMonth) ? todayKey : "";
     setActiveDate(newDate);
     updateUrlParams({ month: newMonth, date: newDate });
   };
@@ -336,7 +336,7 @@ export function MeetingList({
     e.preventDefault();
     const newMonth = addMonths(activeMonth, 1);
     setActiveMonth(newMonth);
-    const newDate = todayKey.startsWith(newMonth) ? todayKey : `${newMonth}-01`;
+    const newDate = todayKey.startsWith(newMonth) ? todayKey : "";
     setActiveDate(newDate);
     updateUrlParams({ month: newMonth, date: newDate });
   };
@@ -499,6 +499,7 @@ export function MeetingList({
                               <PendingLink
                                 key={meeting.id}
                                 href={meetingHref(meeting)}
+                                mode="overlay"
                                 className={cn(
                                   "block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
                                   calendarMeetingTone(meeting.status)
@@ -527,11 +528,13 @@ export function MeetingList({
               <div className="border-b border-black/10 p-4">
                 <p className="label-eyebrow text-civic">Day view</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">
-                  {formatDateKey(activeDate, {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric"
-                  })}
+                  {activeDate
+                    ? formatDateKey(activeDate, {
+                        weekday: "long",
+                        month: "short",
+                        day: "numeric"
+                      })
+                    : "Select a day"}
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-black/60">
                   {activeDateMeetings.length === 1
