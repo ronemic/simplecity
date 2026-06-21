@@ -1,3 +1,7 @@
+-- Structure-only bootstrap for a new Supabase project.
+-- Run this entire file in the Supabase SQL Editor before importing CSV data.
+-- This script creates database objects only; it does not copy or modify row data.
+
 create extension if not exists pgcrypto;
 create extension if not exists pg_trgm;
 
@@ -124,6 +128,8 @@ create table if not exists public.admin_audit_log (
 
 create index if not exists meetings_meeting_datetime_idx on public.meetings(meeting_datetime);
 create index if not exists meetings_status_idx on public.meetings(status);
+create index if not exists meetings_source_hash_idx on public.meetings(source_hash);
+create index if not exists meetings_summarized_source_hash_idx on public.meetings(summarized_source_hash);
 create index if not exists meetings_jurisdiction_slug_idx on public.meetings(jurisdiction_slug);
 create index if not exists meetings_platform_idx on public.meetings(platform);
 create index if not exists meetings_status_datetime_idx
@@ -147,6 +153,7 @@ create unique index if not exists summary_cards_regeneration_idx
 on public.summary_cards(meeting_id, agenda_item, source_url);
 
 create index if not exists documents_meeting_id_idx on public.documents(meeting_id);
+create index if not exists documents_jurisdiction_slug_idx on public.documents(jurisdiction_slug);
 create unique index if not exists documents_source_url_idx on public.documents(source_url);
 
 create index if not exists announcements_is_published_idx on public.announcements(is_published);
