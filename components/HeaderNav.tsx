@@ -40,10 +40,11 @@ export function HeaderNav({ initialJurisdiction = "san-mateo" }: { initialJurisd
   const router = useRouter();
   const pathname = usePathname();
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
-  const [selected, setSelected] = useState(initialJurisdiction);
+  const [selected, setSelected] = useState(() => normalizeJurisdiction(initialJurisdiction));
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
   const selectedJurisdiction =
-    jurisdictions.find((jurisdiction) => jurisdiction.slug === selected) || jurisdictions[1];
+    jurisdictions.find((jurisdiction) => jurisdiction.slug === selected) ||
+    jurisdictions.find((jurisdiction) => jurisdiction.slug === "san-mateo")!;
 
   useEffect(() => {
     try {

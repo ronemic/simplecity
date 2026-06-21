@@ -2,7 +2,11 @@ import { Suspense } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { JURISDICTION_PREFERENCE_COOKIE, normalizeJurisdictionSelection } from "@/lib/config/jurisdictions";
+import {
+  JURISDICTION_PREFERENCE_COOKIE,
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
+} from "@/lib/config/jurisdictions";
 import { HeaderNav, HeaderNavFallback } from "@/components/HeaderNav";
 
 export async function Header() {
@@ -29,7 +33,7 @@ export async function Header() {
           <span>SimpleCity</span>
         </Link>
         <Suspense fallback={<HeaderNavFallback />}>
-          <HeaderNav initialJurisdiction={initialJurisdiction} />
+          <HeaderNav initialJurisdiction={toPublicJurisdictionSlug(initialJurisdiction)} />
         </Suspense>
       </div>
     </header>
