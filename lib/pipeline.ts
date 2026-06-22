@@ -28,6 +28,7 @@ export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   enrichDetails?: boolean;
   clickSeeMore?: boolean;
   limit?: number;
+  maxRuntimeMinutes?: number;
 };
 
 export type PipelineResult = {
@@ -76,21 +77,50 @@ function applyJurisdictionMetadata(meetings: PrimeGovMeeting[], jurisdiction: Ju
   }
 }
 
+function createDeadline(maxRuntimeMinutes?: number) {
+  if (!maxRuntimeMinutes || maxRuntimeMinutes <= 0) return null;
+
+  const deadlineAt = Date.now() + maxRuntimeMinutes * 60_000;
+  return {
+    exceeded() {
+      return Date.now() >= deadlineAt;
+    },
+    remainingMinutes() {
+      return Math.max(0, Math.ceil((deadlineAt - Date.now()) / 60_000));
+    }
+  };
+}
+
 export async function runSimpleCityPipeline(
   options: RunSimpleCityPipelineOptions = {}
 ): Promise<PipelineResult> {
   const jurisdiction = resolvePipelineJurisdiction(options.jurisdiction);
+  const deadline = createDeadline(options.maxRuntimeMinutes);
+  let deadlineRecorded = false;
   const logs: string[] = [];
+  const errors: string[] = [];
   const log = (message: string) => {
     const line = `${new Date().toISOString()} [${jurisdiction.slug}] ${message}`;
     logs.push(line);
     options.log?.(message);
   };
+  const deadlineExceeded = () => Boolean(deadline?.exceeded() || options.shouldStop?.());
+  const recordDeadline = (phase: string) => {
+    if (!deadlineExceeded()) return false;
+
+    if (!deadlineRecorded) {
+      const message = `Pipeline stopped early during ${phase} to leave time for CI cleanup and persistence.`;
+      errors.push(message);
+      log(message);
+      deadlineRecorded = true;
+    }
+
+    return true;
+  };
 
   const persist = options.persist ?? true;
   const shouldSummarize = options.summarize ?? true;
   let supabase = null as ReturnType<typeof getServiceSupabaseClientForJurisdiction> | null;
-  const errors: string[] = [];
 
   if (persist) {
     try {
@@ -150,6 +180,9 @@ export async function runSimpleCityPipeline(
 
   try {
     log(`Starting SimpleCity pipeline for ${jurisdiction.name}.`);
+    if (deadline) {
+      log(`Pipeline soft deadline is ${deadline.remainingMinutes()} minute(s) from start.`);
+    }
 
     const documentOutputDir =
       options.documentOutputDir || getJurisdictionDocumentsDir(jurisdiction.slug);
@@ -161,6 +194,7 @@ export async function runSimpleCityPipeline(
             portalUrl: options.portalUrl || jurisdiction.iqm2Url || jurisdiction.sourceUrl,
             documentOutputDir,
             downloadDocuments: options.downloadDocuments ?? true,
+            shouldStop: deadlineExceeded,
             log
           })
         : jurisdiction.platform === "legistar"
@@ -170,6 +204,7 @@ export async function runSimpleCityPipeline(
               portalUrl: options.portalUrl || jurisdiction.legistarUrl || jurisdiction.sourceUrl,
               documentOutputDir,
               downloadDocuments: options.downloadDocuments ?? true,
+              shouldStop: deadlineExceeded,
               log
             })
         : await scrapePortal({
@@ -178,6 +213,7 @@ export async function runSimpleCityPipeline(
             documentOutputDir,
             scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
             downloadDocuments: options.downloadDocuments ?? true,
+            shouldStop: deadlineExceeded,
             log
           });
     applyJurisdictionMetadata(scrapeResult.meetings, jurisdiction);
@@ -187,9 +223,11 @@ export async function runSimpleCityPipeline(
       .flatMap((meeting) => meeting.documents)
       .filter((doc) => Boolean(doc.localPath)).length;
 
-    log("Extracting PDF text.");
-    const pdfNotes = await extractPdfTextForMeetings(scrapeResult.meetings);
-    for (const note of pdfNotes) log(note);
+    if (!recordDeadline("PDF text extraction")) {
+      log("Extracting PDF text.");
+      const pdfNotes = await extractPdfTextForMeetings(scrapeResult.meetings);
+      for (const note of pdfNotes) log(note);
+    }
 
     log("Preparing LLM input.");
     const llmReadyMeetings = await prepareLlmInput(scrapeResult.meetings);
@@ -215,7 +253,7 @@ export async function runSimpleCityPipeline(
       log("Skipping Supabase persistence.");
     }
 
-    if (shouldSummarize) {
+    if (shouldSummarize && !recordDeadline("LLM summarization")) {
       if (!process.env.OPENROUTER_API_KEY) {
         errors.push("OPENROUTER_API_KEY is not configured; summaries were not generated.");
         log("OPENROUTER_API_KEY is not configured; skipping LLM summaries.");
@@ -237,6 +275,8 @@ export async function runSimpleCityPipeline(
             }));
 
         for (const item of summaryTargets) {
+          if (recordDeadline("LLM summarization")) break;
+
           if (!item.meeting.llmInputText) {
             log(`Skipping ${item.meeting.title}; no LLM input text.`);
             continue;

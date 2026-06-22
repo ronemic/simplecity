@@ -16,6 +16,7 @@ export type ScrapePortalOptions = {
   documentOutputDir?: string;
   allYears?: boolean;
   log?: (message: string) => void;
+  shouldStop?: () => boolean;
 };
 
 export function getMeetingTemplateId(url: string) {
@@ -269,6 +270,11 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
       log("Scraping HTML agenda text where available...");
 
       for (const meeting of meetings) {
+        if (options.shouldStop?.()) {
+          log("Stopping HTML agenda scraping early because the pipeline deadline is near.");
+          break;
+        }
+
         if (!meeting.hasHtmlAgenda) continue;
         meeting.htmlAgendaText = await scrapeHtmlAgendaText(context, meeting);
         if (meeting.htmlAgendaText) {
@@ -282,7 +288,8 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
       log("Downloading PDFs where available...");
       await downloadCompiledDocuments(context, meetings, {
         log,
-        outputDir: options.documentOutputDir
+        outputDir: options.documentOutputDir,
+        shouldStop: options.shouldStop
       });
     }
 

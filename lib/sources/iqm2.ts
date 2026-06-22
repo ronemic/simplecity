@@ -680,6 +680,11 @@ export async function scrapeIqm2Meetings(
     if (options.enrichDetails ?? true) {
       log("Enriching IQM2 meeting detail pages where available...");
       for (const meeting of meetings) {
+        if (options.shouldStop?.()) {
+          log("Stopping IQM2 detail enrichment early because the pipeline deadline is near.");
+          break;
+        }
+
         await enrichIqm2MeetingDetails(context, meeting, log);
       }
     }
@@ -689,7 +694,8 @@ export async function scrapeIqm2Meetings(
       log("Downloading IQM2 documents where available...");
       await downloadIqm2Documents(context, meetings, {
         log,
-        outputDir: options.documentOutputDir
+        outputDir: options.documentOutputDir,
+        shouldStop: options.shouldStop
       });
     }
 

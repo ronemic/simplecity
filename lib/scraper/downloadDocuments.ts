@@ -19,6 +19,7 @@ export function getJurisdictionDocumentsDir(jurisdictionSlug: string) {
 export type DownloadDocumentsOptions = {
   outputDir?: string;
   log?: (message: string) => void;
+  shouldStop?: () => boolean;
 };
 
 function decodeBasicHtmlEntities(text: string) {
@@ -113,6 +114,11 @@ export async function downloadCompiledDocuments(
     );
 
     for (const doc of compiledDocs) {
+      if (options.shouldStop?.()) {
+        log("Stopping document downloads early because the pipeline deadline is near.");
+        return { downloaded, failed };
+      }
+
       const filename = buildDownloadFilename(meeting, doc.type, doc.url);
       const filePath = path.join(docsDir, `${filename}.pdf`);
 
@@ -183,6 +189,11 @@ export async function downloadIqm2Documents(
     const iqm2Docs = meeting.documents.filter(isIqm2DownloadCandidate);
 
     for (const doc of iqm2Docs) {
+      if (options.shouldStop?.()) {
+        log("Stopping IQM2 document downloads early because the pipeline deadline is near.");
+        return { downloaded, failed };
+      }
+
       const baseFilename = iqm2DocumentFilename(meeting, doc.type, doc.url);
 
       try {

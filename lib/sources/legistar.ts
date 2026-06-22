@@ -331,7 +331,7 @@ function buildLegistarDocumentFilename(meeting: PrimeGovMeeting, docType: string
 async function downloadLegistarDocuments(
   context: BrowserContext,
   meetings: PrimeGovMeeting[],
-  options: { outputDir?: string; log?: (message: string) => void } = {}
+  options: { outputDir?: string; log?: (message: string) => void; shouldStop?: () => boolean } = {}
 ) {
   const docsDir = options.outputDir || path.join(process.cwd(), "scraped-primegov");
   const log = options.log || (() => undefined);
@@ -344,6 +344,11 @@ async function downloadLegistarDocuments(
     const docs = meeting.documents.filter((doc) => DOWNLOADABLE_DOCUMENT_TYPES.has(doc.type));
 
     for (const doc of docs) {
+      if (options.shouldStop?.()) {
+        log("Stopping Legistar document downloads early because the pipeline deadline is near.");
+        return { downloaded, failed };
+      }
+
       const filename = buildLegistarDocumentFilename(meeting, doc.type, doc.url);
 
       try {
@@ -1265,7 +1270,8 @@ export async function scrapeLegistarMeetings(
       log("Downloading Legistar documents where available...");
       await downloadLegistarDocuments(context, meetings, {
         log,
-        outputDir: options.documentOutputDir
+        outputDir: options.documentOutputDir,
+        shouldStop: options.shouldStop
       });
     }
 

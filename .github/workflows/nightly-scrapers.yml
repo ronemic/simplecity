@@ -145,7 +145,7 @@ jobs:
   santa-clara-county:
     name: Santa Clara County scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')) ||
@@ -170,7 +170,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Santa Clara County pipeline
-        run: npm run pipeline:santa-clara-county
+        run: npm run pipeline:santa-clara-county -- --max-runtime-minutes=110
 
   mountain-view:
     name: Mountain View scraper

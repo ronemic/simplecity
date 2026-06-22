@@ -34,6 +34,18 @@ function getLimit() {
   return Math.floor(limit);
 }
 
+function getMaxRuntimeMinutes() {
+  const raw = getArgValue("max-runtime-minutes");
+  if (!raw) return undefined;
+
+  const minutes = Number(raw);
+  if (!Number.isFinite(minutes) || minutes <= 0) {
+    throw new Error("--max-runtime-minutes must be a positive number.");
+  }
+
+  return minutes;
+}
+
 async function main() {
   const jurisdiction = getRequestedJurisdiction();
   const outputDir =
@@ -53,6 +65,7 @@ async function main() {
     limit: getLimit(),
     persist: !process.argv.includes("--no-persist"),
     summarize: !process.argv.includes("--no-summarize"),
+    maxRuntimeMinutes: getMaxRuntimeMinutes(),
     log: console.log
   };
 
