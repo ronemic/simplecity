@@ -72,7 +72,12 @@ export function PendingLink({
       prefetch={prefetch}
       onClick={handleClick}
       aria-busy={pending}
-      className={cn(className, mode === "overlay" && "relative overflow-hidden", pending && "pointer-events-none")}
+      className={cn(
+        className,
+        "relative",
+        mode === "overlay" && "overflow-hidden",
+        pending && "pointer-events-none"
+      )}
       {...rest}
     >
       {mode === "overlay" ? (
@@ -93,7 +98,7 @@ export function PendingLink({
             {children}
           </span>
           {pending ? (
-            <span className="inline-flex items-center gap-2 text-current">
+            <span className="absolute inset-0 flex items-center justify-center text-current">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
               <span className="sr-only">{pendingLabel || "Loading"}</span>
             </span>
