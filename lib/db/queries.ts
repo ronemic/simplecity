@@ -421,23 +421,33 @@ const getCachedPublicStats = unstable_cache(
           };
         }
 
-        const [cards, meetings] = await Promise.all([
+        const [cards, meetings, legacyMeetingsWithCards] = await Promise.all([
           supabase
             .from("summary_cards")
             .select("id", { count: "exact", head: true })
+            .eq("is_published", true)
             .not("meeting_id", "is", null),
           supabase
             .from("meetings")
             .select("id", { count: "exact", head: true })
-            .not("cards_generated_at", "is", null)
+            .not("cards_generated_at", "is", null),
+          supabase
+            .from("meetings")
+            .select("id,summary_cards!inner(id)", { count: "exact", head: true })
+            .is("cards_generated_at", null)
+            .eq("summary_cards.is_published", true)
         ]);
 
-        logQueryError(`Failed to count ${jurisdiction.name} analyzed summary cards`, cards.error);
+        logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, cards.error);
         logQueryError(`Failed to count ${jurisdiction.name} analyzed meetings`, meetings.error);
+        logQueryError(
+          `Failed to count ${jurisdiction.name} legacy meetings with published cards`,
+          legacyMeetingsWithCards.error
+        );
 
         return {
           agendaItemsAnalyzed: cards.count || 0,
-          meetingsAnalyzed: meetings.count || 0
+          meetingsAnalyzed: (meetings.count || 0) + (legacyMeetingsWithCards.count || 0)
         };
       })
     );
