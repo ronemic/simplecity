@@ -33,6 +33,12 @@ export function getRequiredPublicSupabaseEnv(slug?: JurisdictionSlug) {
       );
     }
 
+    if (slug === "mountain-view") {
+      throw new Error(
+        "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
+      );
+    }
+
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.");
   }
   return env as { url: string; anonKey: string };

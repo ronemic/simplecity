@@ -4,22 +4,27 @@ export type MeetingSection =
   | "Current And Upcoming Meetings"
   | "Archived Meetings"
   | "Upcoming Meetings"
+  | "All Meetings"
   | "Past Meetings"
   | "Unknown";
 
 export type DocumentType =
   | "HTML Agenda"
   | "Agenda"
+  | "Accessible Agenda"
   | "Agenda Packet"
   | "Packet"
   | "Public Comments"
   | "Minutes"
+  | "Accessible Minutes"
   | "Notice of Cancellation"
+  | "Media"
   | "Video"
   | "Audio"
   | "Captions"
   | "Meeting Details"
   | "Calendar"
+  | "Attachment"
   | "Document"
   | "Other";
 
@@ -61,9 +66,29 @@ export type PrimeGovMeeting = {
   documents: PrimeGovDocument[];
   htmlAgendaText?: string | null;
   detailText?: string | null;
+  items?: LegistarItem[];
   extractionNotes?: string[];
   llmInputText?: string;
   publicCommentsInputText?: string | null;
+};
+
+export type LegistarItem = {
+  externalId: string;
+  fileNumber: string | null;
+  agendaNumber: string | null;
+  itemType: string | null;
+  title: string | null;
+  action: string | null;
+  result: string | null;
+  sourceUrl: string;
+  rowText: string;
+  status?: string | null;
+  meetingBody?: string | null;
+  onAgenda?: string | null;
+  recommendedAction?: string | null;
+  legislationText?: string | null;
+  attachments?: PrimeGovDocument[];
+  extractionError?: string | null;
 };
 
 export type ScrapePortalResult = {

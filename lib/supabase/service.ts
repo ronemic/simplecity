@@ -1,12 +1,12 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import { getPublicSupabaseEnv, getRequiredPublicSupabaseEnv, getServiceRoleKey } from "./env";
+import { getPublicSupabaseEnv, getServiceRoleKey } from "./env";
 import type { JurisdictionSlug } from "@/lib/config/jurisdictions";
 
 export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
-  const { url } = getRequiredPublicSupabaseEnv(slug);
+  const env = getPublicSupabaseEnv(slug);
   const serviceRoleKey = getServiceRoleKey(slug);
 
-  if (!serviceRoleKey) {
+  if (!env.url || !env.anonKey || !serviceRoleKey) {
     if (slug === "san-mateo-county") {
       throw new Error(
         "San Mateo County Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY, and SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY."
@@ -19,10 +19,16 @@ export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
       );
     }
 
+    if (slug === "mountain-view") {
+      throw new Error(
+        "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
+      );
+    }
+
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY.");
   }
 
-  return createSupabaseClient(url, serviceRoleKey, {
+  return createSupabaseClient(env.url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false

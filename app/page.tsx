@@ -10,7 +10,8 @@ import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
 import {
@@ -91,13 +92,13 @@ function pluralize(count: number, singular: string, plural: string) {
 export default async function Home({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; jurisdiction?: string }>;
 }) {
   const params = await searchParams;
   const search = (params.q || "").trim();
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
-    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasSearch = search.length > 0;
@@ -164,7 +165,7 @@ export default async function Home({
               Search official summaries
             </p>
             <SearchAndFilters
-              action="/decisions"
+              action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
               resultCount={filteredCards.length}
               search={search}
             />

@@ -19,12 +19,13 @@ export default async function MeetingsPage({
     month?: string;
     date?: string;
     view?: string;
+    jurisdiction?: string;
   }>;
 }) {
   const params = await searchParams;
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
-    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = params.q || "";
@@ -60,6 +61,7 @@ export default async function MeetingsPage({
         <input type="hidden" name="view" data-form-sync="view" defaultValue={view} disabled={view === "calendar"} />
         <input type="hidden" name="month" data-form-sync="month" defaultValue={params.month || ""} disabled={!params.month} />
         <input type="hidden" name="date" data-form-sync="date" defaultValue={params.date || ""} disabled={!params.date} />
+        <input type="hidden" name="jurisdiction" defaultValue={params.jurisdiction || ""} disabled={!params.jurisdiction} />
         <input
           name="q"
           defaultValue={params.q || ""}

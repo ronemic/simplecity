@@ -7,7 +7,8 @@ import { getCategoryCards } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 
 export const revalidate = 300;
@@ -21,7 +22,7 @@ export default async function CategoryDetailPage({
   searchParams
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; jurisdiction?: string }>;
 }) {
   const [{ category: slug }, query] = await Promise.all([params, searchParams]);
   const category = categoryFromSlug(slug);
@@ -29,8 +30,11 @@ export default async function CategoryDetailPage({
 
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
-    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
+  const jurisdictionParam = query.jurisdiction
+    ? `jurisdiction=${encodeURIComponent(toPublicJurisdictionSlug(jurisdiction))}`
+    : "";
   const definition = CATEGORY_DEFINITIONS[category];
   const cards = await getCategoryCards(category, jurisdiction);
   const filtered =
@@ -57,9 +61,24 @@ export default async function CategoryDetailPage({
 
       <div className="mb-6 flex flex-wrap gap-2">
         {[
-          { href: `/categories/${slug}`, label: "All" },
-          { href: `/categories/${slug}?period=upcoming`, label: "Upcoming" },
-          { href: `/categories/${slug}?period=past`, label: "Past" }
+          {
+            href: `/categories/${slug}${jurisdictionParam ? `?${jurisdictionParam}` : ""}`,
+            label: "All"
+          },
+          {
+            href: `/categories/${slug}?${[
+              jurisdictionParam,
+              "period=upcoming"
+            ].filter(Boolean).join("&")}`,
+            label: "Upcoming"
+          },
+          {
+            href: `/categories/${slug}?${[
+              jurisdictionParam,
+              "period=past"
+            ].filter(Boolean).join("&")}`,
+            label: "Past"
+          }
         ].map((item) => (
           <PendingLink
             key={item.href}

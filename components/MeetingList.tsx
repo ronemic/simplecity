@@ -123,7 +123,12 @@ function buildMonthDays(monthKey: string) {
 }
 
 function meetingHref(meeting: MeetingRow) {
-  return `/meetings/${meeting.id}`;
+  const jurisdiction =
+    meeting.jurisdiction_slug === "san-mateo-city"
+      ? "san-mateo"
+      : meeting.jurisdiction_slug;
+
+  return `/meetings/${meeting.id}${jurisdiction ? `?jurisdiction=${jurisdiction}` : ""}`;
 }
 
 function groupMeetingsByDate(meetings: MeetingRow[]) {

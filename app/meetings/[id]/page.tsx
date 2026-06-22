@@ -16,14 +16,16 @@ import { formatDisplayDate } from "@/lib/utils/date";
 export const revalidate = 300;
 
 export default async function MeetingDetailPage({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ jurisdiction?: string }>;
 }) {
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
-    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction);
 

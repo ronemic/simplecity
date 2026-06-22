@@ -25,7 +25,9 @@ export function isMeetingCancelled(meeting: PrimeGovMeeting) {
   return (
     meeting.status === "Cancelled" ||
     meeting.title.toLowerCase().includes("cancelled") ||
+    meeting.title.toLowerCase().includes("canceled") ||
     meeting.rowText.toLowerCase().includes("cancelled") ||
+    meeting.rowText.toLowerCase().includes("canceled") ||
     meeting.documents.some((doc) => doc.type === "Notice of Cancellation")
   );
 }
@@ -35,6 +37,7 @@ function sourceUrlFallback(meeting: PrimeGovMeeting) {
     meeting.sourceUrl ||
     meeting.meetingDetailsUrl ||
     meeting.documents.find((doc) => doc.type === "Agenda")?.url ||
+    meeting.documents.find((doc) => doc.type === "Accessible Agenda")?.url ||
     meeting.documents.find((doc) => doc.type === "Agenda Packet")?.url ||
     meeting.documents.find((doc) => doc.type === "Packet")?.url ||
     meeting.documents[0]?.url ||
@@ -124,6 +127,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   const isCancelled = isMeetingCancelled(meeting);
   const htmlAgenda = findDoc(meeting, "HTML Agenda");
   const agendaPdf = findDoc(meeting, "Agenda");
+  const accessibleAgenda = findDoc(meeting, "Accessible Agenda");
   const packetPdf = findDoc(meeting, "Packet") || findDoc(meeting, "Agenda Packet");
   const publicCommentsPdf = findDoc(meeting, "Public Comments");
   const cancellationPdf = findDoc(meeting, "Notice of Cancellation");
@@ -175,6 +179,28 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       });
     }
 
+    if (accessibleAgenda?.localPath || accessibleAgenda?.extractedText) {
+      candidates.push({
+        sourceType: documentSourceType(accessibleAgenda, "Accessible Agenda"),
+        sourceUrl: accessibleAgenda.url,
+        minimumCharacters: MIN_HTML_AGENDA_CHARS,
+        loadText: () => extractTextForDocument(accessibleAgenda),
+        emptyNote: "Accessible agenda had little or no usable agenda text."
+      });
+    }
+
+    const mountainViewDetailText = meeting.detailText;
+    if (meeting.jurisdictionSlug === "mountain-view" && mountainViewDetailText) {
+      candidates.push({
+        sourceType: "Detail Page",
+        sourceUrl: meeting.meetingDetailsUrl || fallbackSourceUrl,
+        minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
+        loadText: () => cleanText(mountainViewDetailText),
+        emptyNote: "Detail page had little or no usable agenda text.",
+        selectedNote: "Used detail page text because no agenda document text was available."
+      });
+    }
+
     if (packetPdf?.localPath || packetPdf?.extractedText) {
       candidates.push({
         sourceType: documentSourceType(
@@ -189,7 +215,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       });
     }
 
-    const detailText = meeting.detailText;
+    const detailText = meeting.jurisdictionSlug === "mountain-view" ? null : meeting.detailText;
     if (detailText) {
       candidates.push({
         sourceType: "Detail Page",
@@ -221,7 +247,12 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     } else {
       selectedSourceType = htmlAgenda ? "HTML Agenda" : null;
       selectedSourceUrl =
-        htmlAgenda?.url || agendaPdf?.url || packetPdf?.url || cancellationPdf?.url || fallbackSourceUrl;
+        htmlAgenda?.url ||
+        agendaPdf?.url ||
+        accessibleAgenda?.url ||
+        packetPdf?.url ||
+        cancellationPdf?.url ||
+        fallbackSourceUrl;
       extractionNotes.push("No usable HTML agenda, agenda PDF, packet PDF, detail text, or row text was available.");
     }
   }

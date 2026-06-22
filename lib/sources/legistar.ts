@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
-import type { PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
+import type { LegistarItem, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 
@@ -10,36 +10,30 @@ const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx"
 
 const DOWNLOADABLE_DOCUMENT_TYPES = new Set([
   "Agenda",
+  "Accessible Agenda",
   "Agenda Packet",
   "Minutes",
+  "Accessible Minutes",
+  "Notice of Cancellation",
   "Document"
 ]);
 
 export type ScrapeLegistarOptions = ScrapePortalOptions & {
   jurisdiction: JurisdictionConfig;
   enrichDetails?: boolean;
+  enrichLegislation?: boolean;
   clickSeeMore?: boolean;
   limit?: number;
+  maxItemsPerMeeting?: number;
 };
 
-type LegistarDocument = PrimeGovDocument & {
-  type:
-    | "Agenda"
-    | "Agenda Packet"
-    | "Minutes"
-    | "Video"
-    | "Audio"
-    | "Captions"
-    | "Meeting Details"
-    | "Calendar"
-    | "Document"
-    | "Other";
-};
+type LegistarDocument = PrimeGovDocument;
 
 type LegistarMeeting = PrimeGovMeeting & {
   meetingDetailsUrl?: string | null;
   detailText?: string | null;
   documents: LegistarDocument[];
+  items?: LegistarItem[];
 };
 
 function dedupeDocuments(documents: LegistarDocument[]) {
@@ -47,7 +41,7 @@ function dedupeDocuments(documents: LegistarDocument[]) {
   const result: LegistarDocument[] = [];
 
   for (const doc of documents) {
-    const key = `${doc.type}|${doc.label}|${doc.url}`;
+    const key = `${doc.type}|${doc.url.toLowerCase()}`;
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(doc);
@@ -58,6 +52,148 @@ function dedupeDocuments(documents: LegistarDocument[]) {
 
 function countByStatus(meetings: PrimeGovMeeting[], status: string) {
   return meetings.filter((meeting) => meeting.status === status).length;
+}
+
+function getUrlIdentity(url: string | null | undefined) {
+  if (!url) return { id: null as string | null, guid: null as string | null };
+
+  try {
+    const parsed = new URL(url);
+    return {
+      id: parsed.searchParams.get("ID"),
+      guid: parsed.searchParams.get("GUID")
+    };
+  } catch {
+    return { id: null, guid: null };
+  }
+}
+
+function legistarMeetingMergeKey(meeting: LegistarMeeting) {
+  const { id, guid } = getUrlIdentity(meeting.meetingDetailsUrl);
+
+  if (id || guid) {
+    return [
+      meeting.jurisdictionSlug || "legistar",
+      "legistar",
+      id,
+      guid
+    ]
+      .filter(Boolean)
+      .join("-");
+  }
+
+  return [
+    meeting.jurisdictionSlug || "legistar",
+    meeting.bodyName || meeting.meetingType || meeting.title,
+    meeting.dateText || "",
+    meeting.timeText || ""
+  ]
+    .join("|")
+    .toLowerCase();
+}
+
+function hasCancellationSignal(meeting: LegistarMeeting) {
+  return (
+    /\b(cancelled|canceled)\b/i.test(`${meeting.title} ${meeting.rowText}`) ||
+    meeting.documents.some((doc) => doc.type === "Notice of Cancellation")
+  );
+}
+
+function mergeLegistarMeetings(meetings: LegistarMeeting[]) {
+  const byKey = new Map<string, LegistarMeeting>();
+
+  for (const meeting of meetings) {
+    const key = legistarMeetingMergeKey(meeting);
+    const existing = byKey.get(key);
+
+    if (!existing) {
+      byKey.set(key, meeting);
+      continue;
+    }
+
+    const upcoming =
+      existing.section === "Upcoming Meetings" ||
+      meeting.section === "Upcoming Meetings";
+    const cancelled = hasCancellationSignal(existing) || hasCancellationSignal(meeting);
+    const existingTitle = existing.title || "";
+    const meetingTitle = meeting.title || "";
+    const existingLocation = existing.location || "";
+    const meetingLocation = meeting.location || "";
+
+    byKey.set(key, {
+      ...existing,
+      section: upcoming ? "Upcoming Meetings" : existing.section,
+      status: cancelled ? "Cancelled" : upcoming ? "Upcoming" : "Past",
+      title: meetingTitle.length > existingTitle.length ? meeting.title : existing.title,
+      location:
+        meetingLocation.length > existingLocation.length ? meeting.location : existing.location,
+      sourceUrl: existing.sourceUrl || meeting.sourceUrl,
+      meetingDetailsUrl: existing.meetingDetailsUrl || meeting.meetingDetailsUrl,
+      documents: dedupeDocuments([...existing.documents, ...meeting.documents]),
+      items: [...(existing.items || []), ...(meeting.items || [])]
+    });
+  }
+
+  return [...byKey.values()];
+}
+
+function makeLegistarItemExternalId(sourceUrl: string, fallback: string) {
+  const { id, guid } = getUrlIdentity(sourceUrl);
+
+  if (id || guid) {
+    return ["legistar-item", id, guid].filter(Boolean).join("-");
+  }
+
+  return slugify(`legistar-item-${fallback || sourceUrl}`);
+}
+
+function formatLegistarItems(items: LegistarItem[] = []) {
+  if (items.length === 0) return "";
+
+  const lines = ["Meeting Items:"];
+  for (const item of items) {
+    lines.push(
+      [
+        item.agendaNumber ? `Agenda # ${item.agendaNumber}` : null,
+        item.fileNumber ? `File # ${item.fileNumber}` : null,
+        item.itemType,
+        item.title
+      ]
+        .filter(Boolean)
+        .join(" | ")
+    );
+
+    if (item.action) lines.push(`Action: ${item.action}`);
+    if (item.result) lines.push(`Result: ${item.result}`);
+    if (item.recommendedAction) lines.push(`Recommended Action: ${item.recommendedAction}`);
+    if (item.legislationText) lines.push(`Legislation Text: ${item.legislationText}`);
+    lines.push(`Source: ${item.sourceUrl}`);
+  }
+
+  return lines.join("\n");
+}
+
+async function mapLimit<T, R>(
+  values: T[],
+  limit: number,
+  mapper: (value: T, index: number) => Promise<R>
+) {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < values.length) {
+      const current = nextIndex;
+      nextIndex += 1;
+      results[current] = await mapper(values[current], current);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.max(1, Math.min(limit, values.length)) }, () => worker())
+  );
+
+  return results;
 }
 
 function applyJurisdictionMetadata(meetings: PrimeGovMeeting[], jurisdiction: JurisdictionConfig) {
@@ -75,7 +211,7 @@ function applyJurisdictionMetadata(meetings: PrimeGovMeeting[], jurisdiction: Ju
 }
 
 function shouldIgnoreLink(label = "", href = "") {
-  const text = label.toLowerCase();
+  const text = cleanText(label).toLowerCase();
   const url = href.toLowerCase();
 
   return (
@@ -89,25 +225,48 @@ function shouldIgnoreLink(label = "", href = "") {
     text.includes("back to") ||
     text.includes("share") ||
     text.includes("subscribe") ||
+    text.includes("export to icalendar") ||
+    text.includes("export to excel") ||
+    text.includes("export to pdf") ||
+    text.includes("export to word") ||
+    text.includes("city home") ||
+    text.includes("search files") ||
+    text.includes("skip to main content") ||
+    text.includes("prior council meeting documents") ||
+    text.includes("prior advisory body meeting documents") ||
+    text === "meetings" ||
+    text === "help" ||
+    text === "not available" ||
     text === "home" ||
+    url.includes("calendar.aspx?eid=") ||
+    url.includes("#") ||
     url.endsWith("#") ||
     url.startsWith("javascript:")
   );
 }
 
-function classifyLink(label = "", href = ""): LegistarDocument["type"] {
-  const text = label.toLowerCase();
+export function classifyLegistarLink(label = "", href = ""): LegistarDocument["type"] {
+  const text = cleanText(label).toLowerCase();
   const url = href.toLowerCase();
 
-  if (text.includes("meeting detail") || url.includes("meetingdetail.aspx")) return "Meeting Details";
+  if (
+    text.includes("meeting cancellation notice") ||
+    text.includes("cancellation notice")
+  ) {
+    return "Notice of Cancellation";
+  }
+
+  if (text.includes("accessible agenda")) return "Accessible Agenda";
   if (text.includes("agenda packet") || text.includes("packet")) return "Agenda Packet";
   if (text === "agenda" || text.includes("agenda")) return "Agenda";
+  if (text.includes("accessible minutes")) return "Accessible Minutes";
   if (text.includes("minutes")) return "Minutes";
-  if (text.includes("video")) return "Video";
+  if (text.includes("meeting detail") || url.includes("meetingdetail.aspx")) return "Meeting Details";
+  if (text.includes("media") || text.includes("video")) return "Media";
   if (text.includes("audio")) return "Audio";
   if (text.includes("caption")) return "Captions";
   if (text.includes("calendar") || text.includes("icalendar")) return "Calendar";
-  if (url.includes(".pdf") || url.includes("view.ashx") || url.includes("document")) return "Document";
+  if (url.includes("view.ashx") || url.includes(".pdf") || url.includes("document")) return "Document";
 
   return "Other";
 }
@@ -115,9 +274,12 @@ function classifyLink(label = "", href = ""): LegistarDocument["type"] {
 function acceptedDocumentType(type: string) {
   return [
     "Agenda",
+    "Accessible Agenda",
     "Agenda Packet",
     "Minutes",
-    "Video",
+    "Accessible Minutes",
+    "Notice of Cancellation",
+    "Media",
     "Audio",
     "Captions",
     "Meeting Details",
@@ -259,29 +421,133 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
   const page = await context.newPage();
 
   try {
-    await page.evaluate("globalThis.__name = (value) => value");
     await page.goto(detailUrl, {
       waitUntil: "networkidle",
       timeout: 60000
     });
+    await page.evaluate("globalThis.__name = (value) => value");
     await page.waitForTimeout(1500);
 
-    meeting.detailText = cleanText(await page.locator("body").innerText());
-    const links = await page.evaluate(() =>
-      Array.from(document.querySelectorAll("a[href]"))
+    const detail = await page.evaluate(() => {
+      function cleanTextInPage(value = "") {
+        return value.replace(/\s+/g, " ").trim();
+      }
+
+      function cleanMultiline(value = "") {
+        return value
+          .replace(/\r/g, "\n")
+          .replace(/[ \t]+/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function anchorLabel(anchor: HTMLAnchorElement) {
+        const image = anchor.querySelector("img");
+
+        return cleanTextInPage(
+          anchor.innerText ||
+            anchor.textContent ||
+            image?.getAttribute("alt") ||
+            image?.getAttribute("title") ||
+            anchor.getAttribute("title") ||
+            ""
+        );
+      }
+
+      function absoluteUrl(href: string | null) {
+        if (!href) return null;
+
+        try {
+          return new URL(href, window.location.href).toString();
+        } catch {
+          return null;
+        }
+      }
+
+      function normalizeHeader(value = "") {
+        return cleanTextInPage(value).toLowerCase().replace(/\s+/g, " ");
+      }
+
+      const links = Array.from(document.querySelectorAll("a[href]"))
         .map((anchor) => ({
-          label: (anchor.textContent || "").replace(/\s+/g, " ").trim(),
-          href: anchor.getAttribute("href")
+          label: anchorLabel(anchor as HTMLAnchorElement),
+          href: (anchor as HTMLAnchorElement).getAttribute("href")
         }))
-        .filter((link) => Boolean(link.href))
-    );
+        .filter((link) => Boolean(link.href));
+
+      const itemAnchors = Array.from(
+        document.querySelectorAll('a[href*="LegislationDetail.aspx"]')
+      ) as HTMLAnchorElement[];
+      const seenItemUrls = new Set<string>();
+      const items = [];
+
+      for (const itemAnchor of itemAnchors) {
+        const sourceUrl = absoluteUrl(itemAnchor.getAttribute("href"));
+        if (!sourceUrl || seenItemUrls.has(sourceUrl)) continue;
+        seenItemUrls.add(sourceUrl);
+
+        const row = itemAnchor.closest("tr");
+        if (!row) continue;
+
+        const table = row.closest("table");
+        const headerRow = table
+          ? Array.from(table.querySelectorAll("tr")).find((candidate) => {
+              const text = cleanTextInPage((candidate as HTMLElement).innerText || "").toLowerCase();
+              return text.includes("file") && text.includes("title");
+            })
+          : null;
+
+        const headers = headerRow
+          ? Array.from(headerRow.querySelectorAll("th,td")).map((cell) =>
+              normalizeHeader((cell as HTMLElement).innerText || cell.textContent || "")
+            )
+          : [];
+        const cells = Array.from(row.querySelectorAll(":scope > td")) as HTMLTableCellElement[];
+        const cellTexts = cells.map((cell) =>
+          cleanTextInPage(cell.innerText || cell.textContent || "")
+        );
+
+        function valueForHeader(candidates: string[]) {
+          for (const candidate of candidates) {
+            const index = headers.findIndex(
+              (header) => header === candidate || header.includes(candidate)
+            );
+
+            if (index >= 0 && cellTexts[index]) {
+              return cellTexts[index];
+            }
+          }
+
+          return null;
+        }
+
+        items.push({
+          fileNumber:
+            cleanTextInPage(itemAnchor.innerText || itemAnchor.textContent || "") ||
+            valueForHeader(["file #", "file"]),
+          agendaNumber: valueForHeader(["agenda #", "agenda"]),
+          itemType: valueForHeader(["type"]),
+          title: valueForHeader(["title"]),
+          action: valueForHeader(["action"]),
+          result: valueForHeader(["result", "action details"]),
+          sourceUrl,
+          rowText: cleanTextInPage((row as HTMLElement).innerText || "")
+        });
+      }
+
+      return {
+        bodyText: cleanMultiline(document.body.innerText || ""),
+        links,
+        items
+      };
+    });
 
     const detailDocs: LegistarDocument[] = [];
 
-    for (const link of links) {
+    for (const link of detail.links) {
       const url = new URL(link.href || "", page.url()).toString();
       if (shouldIgnoreLink(link.label, url)) continue;
-      const type = classifyLink(link.label, url);
+      const type = classifyLegistarLink(link.label, url);
       if (!acceptedDocumentType(type)) continue;
 
       detailDocs.push({
@@ -294,12 +560,22 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
       });
     }
 
+    const items = detail.items.map((item) => ({
+      ...item,
+      externalId: makeLegistarItemExternalId(
+        item.sourceUrl,
+        [item.fileNumber, item.agendaNumber, item.title].filter(Boolean).join("-")
+      )
+    }));
+
+    meeting.items = items;
+    meeting.detailText = cleanText([detail.bodyText, formatLegistarItems(items)].filter(Boolean).join("\n\n"));
     meeting.documents = dedupeDocuments([...meeting.documents, ...detailDocs]);
     meeting.hasPdf = meeting.documents.some((doc) =>
-      ["Agenda", "Agenda Packet", "Document", "Minutes"].includes(doc.type)
+      ["Agenda", "Accessible Agenda", "Agenda Packet", "Document", "Minutes", "Accessible Minutes"].includes(doc.type)
     );
 
-    log(`Enriched Legistar detail page for ${meeting.title}.`);
+    log(`Enriched Legistar detail page for ${meeting.title}; captured ${items.length} meeting items.`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown Legistar detail page error";
     meeting.extractionNotes = [
@@ -312,13 +588,161 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
   }
 }
 
+async function enrichLegislationItem(context: BrowserContext, item: LegistarItem): Promise<LegistarItem> {
+  const page = await context.newPage();
+
+  try {
+    await page.goto(item.sourceUrl, {
+      waitUntil: "networkidle",
+      timeout: 60000
+    });
+    await page.evaluate("globalThis.__name = (value) => value");
+    await page.waitForTimeout(1000);
+
+    const detail = await page.evaluate(() => {
+      function cleanTextInPage(value = "") {
+        return value.replace(/\s+/g, " ").trim();
+      }
+
+      function cleanMultiline(value = "") {
+        return value
+          .replace(/\r/g, "\n")
+          .replace(/[ \t]+/g, " ")
+          .replace(/\n{3,}/g, "\n\n")
+          .trim();
+      }
+
+      function htmlToText(html = "") {
+        return cleanMultiline(
+          html
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+            .replace(/<br\s*\/?>/gi, "\n")
+            .replace(/<\/(p|div|li|tr|td|th|h1|h2|h3|h4|h5|h6)>/gi, "\n")
+            .replace(/<[^>]+>/g, " ")
+            .replace(/&nbsp;/gi, " ")
+            .replace(/&amp;/gi, "&")
+            .replace(/&lt;/gi, "<")
+            .replace(/&gt;/gi, ">")
+            .replace(/&quot;/gi, '"')
+            .replace(/&#39;/gi, "'")
+        );
+      }
+
+      function absoluteUrl(href: string | null) {
+        if (!href) return null;
+
+        try {
+          return new URL(href, window.location.href).toString();
+        } catch {
+          return null;
+        }
+      }
+
+      function extractBlock(bodyText: string, label: string, stopLabels: string[]) {
+        const lower = bodyText.toLowerCase();
+        const start = lower.lastIndexOf(label.toLowerCase());
+        if (start < 0) return null;
+
+        const contentStart = start + label.length;
+        let end = bodyText.length;
+
+        for (const stopLabel of stopLabels) {
+          const stopIndex = lower.indexOf(stopLabel.toLowerCase(), contentStart);
+          if (stopIndex >= 0 && stopIndex < end) end = stopIndex;
+        }
+
+        return cleanMultiline(bodyText.slice(contentStart, end)) || null;
+      }
+
+      const visibleText = cleanMultiline(document.body.innerText || "");
+      const bodyText = cleanMultiline(
+        `${visibleText}\n\n${htmlToText(document.documentElement.innerHTML || "")}`
+      );
+      const fileNumber = bodyText.match(/File #:\s*([^\s]+)/i)?.[1] || null;
+      const itemType = bodyText.match(/Type:\s*(.+?)\s+Status:/i)?.[1]?.trim() || null;
+      const status =
+        bodyText.match(/Status:\s*(.+?)\s+Meeting Body:/i)?.[1]?.trim() ||
+        bodyText.match(/Status:\s*(.+?)\s+On agenda:/i)?.[1]?.trim() ||
+        null;
+      const meetingBody = bodyText.match(/Meeting Body:\s*(.+?)\s+On agenda:/i)?.[1]?.trim() || null;
+      const onAgenda = bodyText.match(/On agenda:\s*([^\n]+)/i)?.[1]?.trim() || null;
+      const title = extractBlock(bodyText, "Title:", ["Attachments:", "History", "Text"]);
+      const recommendedAction = extractBlock(bodyText, "Recommended Action", [
+        "Legislation Text",
+        "Legislation Details"
+      ]);
+      const legislationText = extractBlock(bodyText, "Legislation Text", ["Legislation Details"]);
+      const attachments = Array.from(document.querySelectorAll("a[href]"))
+        .map((anchor) => {
+          const element = anchor as HTMLAnchorElement;
+          const image = element.querySelector("img");
+          const label = cleanTextInPage(
+            element.innerText ||
+              element.textContent ||
+              image?.getAttribute("alt") ||
+              image?.getAttribute("title") ||
+              ""
+          );
+          const url = absoluteUrl(element.getAttribute("href"));
+
+          return {
+            type: "Attachment" as const,
+            label,
+            url
+          };
+        })
+        .filter(
+          (attachment): attachment is { type: "Attachment"; label: string; url: string } =>
+            Boolean(
+              attachment.url &&
+                attachment.label &&
+                attachment.url.toLowerCase().includes("view.ashx")
+            )
+        );
+
+      return {
+        fileNumber,
+        itemType,
+        status,
+        meetingBody,
+        onAgenda,
+        title,
+        recommendedAction,
+        legislationText,
+        attachments
+      };
+    });
+
+    return {
+      ...item,
+      fileNumber: detail.fileNumber || item.fileNumber,
+      itemType: detail.itemType || item.itemType,
+      title: item.title || detail.title,
+      status: detail.status,
+      meetingBody: detail.meetingBody,
+      onAgenda: detail.onAgenda,
+      recommendedAction: detail.recommendedAction,
+      legislationText: detail.legislationText,
+      attachments: detail.attachments
+    };
+  } catch (error) {
+    return {
+      ...item,
+      extractionError: error instanceof Error ? error.message : String(error)
+    };
+  } finally {
+    await page.close();
+  }
+}
+
 async function extractVisibleLegistarMeetings(
   page: Page,
   jurisdiction: JurisdictionConfig
 ): Promise<LegistarMeeting[]> {
   await page.evaluate("globalThis.__name = (value) => value");
 
-  return (await page.evaluate(
+  const rawMeetings = (await page.evaluate(
     ({ jurisdiction }) => {
       function cleanTextInPage(text = "") {
         return text.replace(/\s+/g, " ").trim();
@@ -339,6 +763,24 @@ async function extractVisibleLegistarMeetings(
         }
       }
 
+      function anchorLabel(anchor: HTMLAnchorElement) {
+        const image = anchor.querySelector("img");
+
+        return cleanTextInPage(
+          anchor.innerText ||
+            anchor.textContent ||
+            image?.getAttribute("alt") ||
+            image?.getAttribute("title") ||
+            anchor.getAttribute("title") ||
+            ""
+        );
+      }
+
+      function getDirectCells(row: HTMLTableRowElement) {
+        const direct = Array.from(row.querySelectorAll(":scope > td")) as HTMLTableCellElement[];
+        return direct.length > 0 ? direct : Array.from(row.cells);
+      }
+
       function extractDateTime(rowText: string) {
         const match =
           rowText.match(
@@ -357,24 +799,33 @@ async function extractVisibleLegistarMeetings(
       }
 
       function classifyLink(label = "", href = "") {
-        const text = label.toLowerCase();
+        const text = cleanTextInPage(label).toLowerCase();
         const url = href.toLowerCase();
 
-        if (text.includes("meeting detail") || url.includes("meetingdetail.aspx")) return "Meeting Details";
+        if (
+          text.includes("meeting cancellation notice") ||
+          text.includes("cancellation notice")
+        ) {
+          return "Notice of Cancellation";
+        }
+
+        if (text.includes("accessible agenda")) return "Accessible Agenda";
         if (text.includes("agenda packet") || text.includes("packet")) return "Agenda Packet";
         if (text === "agenda" || text.includes("agenda")) return "Agenda";
+        if (text.includes("accessible minutes")) return "Accessible Minutes";
         if (text.includes("minutes")) return "Minutes";
-        if (text.includes("video")) return "Video";
+        if (text.includes("meeting detail") || url.includes("meetingdetail.aspx")) return "Meeting Details";
+        if (text.includes("media") || text.includes("video")) return "Media";
         if (text.includes("audio")) return "Audio";
         if (text.includes("caption")) return "Captions";
         if (text.includes("calendar") || text.includes("icalendar")) return "Calendar";
-        if (url.includes(".pdf") || url.includes("view.ashx") || url.includes("document")) return "Document";
+        if (url.includes("view.ashx") || url.includes(".pdf") || url.includes("document")) return "Document";
 
         return "Other";
       }
 
       function shouldIgnoreLink(label = "", href = "") {
-        const text = label.toLowerCase();
+        const text = cleanTextInPage(label).toLowerCase();
         const url = href.toLowerCase();
 
         return (
@@ -388,7 +839,21 @@ async function extractVisibleLegistarMeetings(
           text.includes("subscribe") ||
           text.includes("full calendar") ||
           text.includes("back to") ||
+          text.includes("export to icalendar") ||
+          text.includes("export to excel") ||
+          text.includes("export to pdf") ||
+          text.includes("export to word") ||
+          text.includes("city home") ||
+          text.includes("search files") ||
+          text.includes("skip to main content") ||
+          text.includes("prior council meeting documents") ||
+          text.includes("prior advisory body meeting documents") ||
+          text === "meetings" ||
+          text === "help" ||
+          text === "not available" ||
           text === "home" ||
+          url.includes("calendar.aspx?eid=") ||
+          url.includes("#") ||
           url.endsWith("#") ||
           url.startsWith("javascript:")
         );
@@ -397,9 +862,12 @@ async function extractVisibleLegistarMeetings(
       function acceptedDocumentType(type: string) {
         return [
           "Agenda",
+          "Accessible Agenda",
           "Agenda Packet",
           "Minutes",
-          "Video",
+          "Accessible Minutes",
+          "Notice of Cancellation",
+          "Media",
           "Audio",
           "Captions",
           "Meeting Details",
@@ -408,25 +876,32 @@ async function extractVisibleLegistarMeetings(
         ].includes(type);
       }
 
-      function isMeetingCancelled(title = "", rowText = "") {
-        return /cancelled/i.test(title) || /cancelled/i.test(rowText);
+      function isMeetingCancelled(title = "", rowText = "", documents: Array<{ type: string }> = []) {
+        return (
+          /\b(cancelled|canceled)\b/i.test(`${title} ${rowText}`) ||
+          documents.some((doc) => doc.type === "Notice of Cancellation")
+        );
       }
 
       function findHeadingY(exactText: string) {
-        const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6"));
-        const match = headings.find((el) => {
+        const headings = Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6, div, span, td"));
+        const matches = headings.filter((el) => {
           const text = cleanTextInPage(((el as HTMLElement).innerText || el.textContent || ""));
           return text.toLowerCase() === exactText.toLowerCase();
         });
 
-        return match ? yPos(match) : null;
+        matches.sort((left, right) => left.children.length - right.children.length);
+        return matches[0] ? yPos(matches[0]) : null;
       }
 
-      function sectionForY(elementY: number, upcomingY: number | null, pastY: number | null) {
-        if (upcomingY !== null && pastY !== null && elementY > upcomingY && elementY < pastY) {
+      function sectionForY(elementY: number, upcomingY: number | null, pastY: number | null, allY: number | null) {
+        const archiveY = allY ?? pastY;
+
+        if (upcomingY !== null && archiveY !== null && elementY > upcomingY && elementY < archiveY) {
           return "Upcoming Meetings";
         }
 
+        if (allY !== null && elementY > allY) return "All Meetings";
         if (pastY !== null && elementY > pastY) return "Past Meetings";
         if (upcomingY !== null && elementY > upcomingY) return "Upcoming Meetings";
         return "Unknown";
@@ -436,6 +911,11 @@ async function extractVisibleLegistarMeetings(
         elementY: number;
         rowText: string;
         meetingDetailsUrl: string | null;
+        bodyName: string | null;
+        title: string | null;
+        location: string | null;
+        dateText: string | null;
+        timeText: string | null;
         documents: Array<{ type: string; label: string; url: string }>;
       };
 
@@ -450,6 +930,11 @@ async function extractVisibleLegistarMeetings(
             elementY: yPos(container),
             rowText,
             meetingDetailsUrl: null,
+            bodyName: null,
+            title: null,
+            location: null,
+            dateText,
+            timeText: null,
             documents: []
           });
         }
@@ -457,18 +942,52 @@ async function extractVisibleLegistarMeetings(
         return rowMap.get(key) || null;
       }
 
+      function applyTableCellMetadata(entry: RowEntry, row: HTMLTableRowElement) {
+        const cells = getDirectCells(row);
+        if (cells.length === 0) return;
+
+        const cellTexts = cells.map((cell) => cleanTextInPage(cell.innerText || cell.textContent || ""));
+        const detailsIndex = cells.findIndex((cell) =>
+          Boolean(cell.querySelector('a[href*="MeetingDetail.aspx"]'))
+        );
+        const dateIndex = cellTexts.findIndex((text) => /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(text));
+        const timeIndex = cellTexts.findIndex((text) => /^\d{1,2}:\d{2}\s*(AM|PM)$/i.test(text));
+        const locationCell = detailsIndex > 0 ? cells[detailsIndex - 1] : null;
+        const fullLocationText = locationCell
+          ? cleanTextInPage(locationCell.innerText || locationCell.textContent || "")
+          : "";
+        const descriptionElement = locationCell?.querySelector("em,i") || null;
+        const description = descriptionElement
+          ? cleanTextInPage(
+              (descriptionElement as HTMLElement).innerText ||
+                descriptionElement.textContent ||
+                ""
+            )
+          : "";
+        const location = description
+          ? cleanTextInPage(fullLocationText.replace(description, ""))
+          : fullLocationText;
+
+        entry.bodyName = entry.bodyName || cellTexts[0] || null;
+        entry.title = description || entry.title || entry.bodyName;
+        entry.location = location || entry.location;
+        entry.dateText = dateIndex >= 0 ? cellTexts[dateIndex] : entry.dateText;
+        entry.timeText = timeIndex >= 0 ? cellTexts[timeIndex] : entry.timeText;
+      }
+
       const upcomingY =
         findHeadingY("Upcoming Meetings") ||
         findHeadingY("Current Meetings") ||
         findHeadingY("Current And Upcoming Meetings");
       const pastY = findHeadingY("Past Meetings") || findHeadingY("Archived Meetings");
+      const allY = findHeadingY("All Meetings");
 
       const rowMap = new Map<string, RowEntry>();
       const floatingLinks: Array<{ elementY: number; type: string; label: string; url: string }> =
         [];
 
       for (const anchor of Array.from(document.querySelectorAll("a[href]"))) {
-        const label = cleanTextInPage((anchor as HTMLElement).innerText || anchor.textContent || "");
+        const label = anchorLabel(anchor as HTMLAnchorElement);
         const url = absoluteUrl(anchor.getAttribute("href"));
         if (!url || shouldIgnoreLink(label, url)) continue;
 
@@ -496,6 +1015,9 @@ async function extractVisibleLegistarMeetings(
         if (type === "Meeting Details") {
           entry.meetingDetailsUrl = url;
         }
+
+        const row = anchor.closest("tr") as HTMLTableRowElement | null;
+        if (row) applyTableCellMetadata(entry, row);
 
         entry.documents.push({
           type,
@@ -539,14 +1061,22 @@ async function extractVisibleLegistarMeetings(
       const seenMeetingKeys = new Set<string>();
 
       for (const entry of rowEntries) {
-        const { dateText, timeText, dateTimeText } = extractDateTime(entry.rowText);
-        const section = sectionForY(entry.elementY, upcomingY, pastY);
+        if (!entry.meetingDetailsUrl) continue;
+
+        const { dateText: extractedDateText, timeText: extractedTimeText, dateTimeText } = extractDateTime(entry.rowText);
+        const dateText = entry.dateText || extractedDateText;
+        const timeText = entry.timeText || extractedTimeText;
+        const section = sectionForY(entry.elementY, upcomingY, pastY, allY);
         const rowPrefix = dateTimeText ? entry.rowText.split(dateTimeText)[0] : entry.rowText;
         const derivedBodyName = cleanTextInPage(
           rowPrefix
             .replace(/\bMeeting details\b/gi, " ")
             .replace(/\bAgenda\b/gi, " ")
+            .replace(/\bAccessible Agenda\b/gi, " ")
+            .replace(/\bAgenda Packet\b/gi, " ")
+            .replace(/\bAccessible Minutes\b/gi, " ")
             .replace(/\bVideo\b/gi, " ")
+            .replace(/\bMedia\b/gi, " ")
             .replace(/\bMinutes\b/gi, " ")
             .replace(/\bDocument\b/gi, " ")
             .replace(/\s+/g, " ")
@@ -561,23 +1091,26 @@ async function extractVisibleLegistarMeetings(
 
         title = title
           .replace(
-            /\b(Agenda Packet|Agenda|Minutes|Video|Audio|Captions?|Meeting Details|Calendar|Document)\b/gi,
+            /\b(Notice of Cancellation|Meeting Cancellation Notice|Cancellation Notice|Accessible Agenda|Agenda Packet|Agenda|Accessible Minutes|Minutes|Media|Video|Audio|Captions?|Meeting Details|Calendar|Document)\b/gi,
             " "
           )
-          .replace(/Cancelled/gi, " ")
+          .replace(/Cancelled|Canceled/gi, " ")
           .replace(/\|/g, " ")
           .replace(/\s+/g, " ")
           .trim();
 
+        title = entry.title || title;
         if (!title || title.length > 500) continue;
 
         const bodyName =
+          entry.bodyName ||
           derivedBodyName ||
           (title.includes(" - ") ? title.split(" - ")[0].trim() : title);
         const seenDocKeys = new Set<string>();
         const documents = (entry.documents as Array<{ type: string; label: string; url: string }>).filter(
           (doc: { type: string; label: string; url: string }) => {
-            const key = `${doc.type}|${doc.label}|${doc.url}`;
+            if (doc.type === "Meeting Details" || doc.type === "Calendar" || doc.type === "Other") return false;
+            const key = `${doc.type}|${doc.url.toLowerCase()}`;
             if (seenDocKeys.has(key)) return false;
             seenDocKeys.add(key);
             return true;
@@ -588,6 +1121,9 @@ async function extractVisibleLegistarMeetings(
           entry.meetingDetailsUrl ||
           documents.find((doc: { type: string; label: string; url: string }) => doc.type === "Agenda")
             ?.url ||
+          documents.find(
+            (doc: { type: string; label: string; url: string }) => doc.type === "Accessible Agenda"
+          )?.url ||
           documents.find(
             (doc: { type: string; label: string; url: string }) => doc.type === "Agenda Packet"
           )?.url ||
@@ -615,18 +1151,18 @@ async function extractVisibleLegistarMeetings(
           meetingType: bodyName || title || "Meeting type not listed",
           dateText,
           timeText,
-          location: null,
+          location: entry.location || null,
           rowText: entry.rowText,
-          status: isMeetingCancelled(title, entry.rowText)
+          status: isMeetingCancelled(title, entry.rowText, documents)
             ? "Cancelled"
-            : section === "Past Meetings"
+            : section === "Past Meetings" || section === "All Meetings"
               ? "Past"
               : "Upcoming",
           sourceUrl,
           meetingDetailsUrl: entry.meetingDetailsUrl,
-          hasHtmlAgenda: false,
+          hasHtmlAgenda: documents.some((doc: { type: string }) => doc.type === "Accessible Agenda"),
           hasPdf: documents.some((doc: { type: string }) =>
-            ["Agenda", "Agenda Packet", "Document", "Minutes"].includes(doc.type)
+            ["Agenda", "Accessible Agenda", "Agenda Packet", "Document", "Minutes", "Accessible Minutes"].includes(doc.type)
           ),
           documents
         });
@@ -642,7 +1178,10 @@ async function extractVisibleLegistarMeetings(
         platform: jurisdiction.platform
       }
     }
+
   )) as LegistarMeeting[];
+
+  return mergeLegistarMeetings(rawMeetings);
 }
 
 export async function scrapeLegistarMeetings(
@@ -689,9 +1228,37 @@ export async function scrapeLegistarMeetings(
 
     if (options.enrichDetails ?? true) {
       log("Enriching Legistar meeting detail pages where available...");
-      for (const meeting of meetings as LegistarMeeting[]) {
+      meetings = await mapLimit(meetings as LegistarMeeting[], 4, async (meeting) => {
         await scrapeLegistarDetails(context, meeting, log);
-      }
+        return meeting;
+      });
+    }
+
+    if (options.enrichLegislation) {
+      log("Enriching Legistar legislation detail pages where available...");
+      meetings = await mapLimit(meetings as LegistarMeeting[], 2, async (meeting) => {
+        const items = meeting.items || [];
+        const limit = options.maxItemsPerMeeting ?? 100;
+        const limitedItems = items.slice(0, limit);
+        const enrichedItems = await mapLimit(limitedItems, 3, (item) =>
+          enrichLegislationItem(context, item)
+        );
+
+        meeting.items = [...enrichedItems, ...items.slice(limit)];
+        if (enrichedItems.length > 0) {
+          meeting.detailText = cleanText(
+            [
+              meeting.detailText,
+              "Enriched Legislation Details:",
+              formatLegistarItems(enrichedItems)
+            ]
+              .filter(Boolean)
+              .join("\n\n")
+          );
+        }
+
+        return meeting;
+      });
     }
 
     if (options.downloadDocuments) {

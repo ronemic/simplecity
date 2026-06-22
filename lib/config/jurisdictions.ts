@@ -7,12 +7,14 @@ export type JurisdictionSlug =
   | "foster-city"
   | "san-mateo-city"
   | "san-mateo-county"
-  | "santa-clara-county";
+  | "santa-clara-county"
+  | "mountain-view";
 export type PublicJurisdictionSlug =
   | "foster-city"
   | "san-mateo"
   | "san-mateo-county"
-  | "santa-clara-county";
+  | "santa-clara-county"
+  | "mountain-view";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
 export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
@@ -44,6 +46,9 @@ const DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL =
   "https://sanmateocounty.legistar.com/Calendar.aspx";
 const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
   "https://sccgov.iqm2.com/Citizens/Default.aspx?frame=no";
+const DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL =
+  process.env.MOUNTAIN_VIEW_LEGISTAR_URL ||
+  "https://mountainview.legistar.com/Calendar.aspx";
 
 const publicClients = new Map<JurisdictionSlug, SupabaseClient>();
 const serviceClients = new Map<JurisdictionSlug, SupabaseClient>();
@@ -52,7 +57,8 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "foster-city",
   "san-mateo-city",
   "san-mateo-county",
-  "santa-clara-county"
+  "santa-clara-county",
+  "mountain-view"
 ];
 
 export function toInternalJurisdictionSlug(
@@ -75,6 +81,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "san-mateo-city") return "San Mateo";
   if (internalSlug === "san-mateo-county") return "San Mateo County";
   if (internalSlug === "santa-clara-county") return "Santa Clara County";
+  if (internalSlug === "mountain-view") return "Mountain View";
   return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
 }
 
@@ -135,6 +142,16 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseUrl: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
       supabaseAnonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+    },
+    {
+      name: "Mountain View",
+      slug: "mountain-view",
+      platform: "legistar",
+      sourceUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
+      legistarUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
+      supabaseUrl: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL,
+      supabaseAnonKey: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey: process.env.MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY
     }
   ];
 }
@@ -169,7 +186,8 @@ export function requireValidJurisdictionSlug(
     slug === "foster-city" ||
     slug === "san-mateo-city" ||
     slug === "san-mateo-county" ||
-    slug === "santa-clara-county"
+    slug === "santa-clara-county" ||
+    slug === "mountain-view"
   ) {
     return slug;
   }
@@ -212,6 +230,12 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
     return "Santa Clara County Supabase configuration is missing. Set NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL, NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY, and SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY.";
   }
 
+  if (jurisdiction.slug === "mountain-view") {
+    return scope === "service"
+      ? "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
+      : "Mountain View public Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL and NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY.";
+  }
+
   if (jurisdiction.slug === "san-mateo-city") {
     if (scope === "service") {
       return "San Mateo Supabase configuration is missing. Set NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL, NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY, and SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY.";
@@ -250,13 +274,17 @@ function requirePublicConfig(jurisdiction: JurisdictionConfig) {
 }
 
 function requireServiceConfig(jurisdiction: JurisdictionConfig) {
-  const publicConfig = requirePublicConfig(jurisdiction);
-  if (!jurisdiction.supabaseServiceRoleKey) {
+  if (
+    !jurisdiction.supabaseUrl ||
+    !jurisdiction.supabaseAnonKey ||
+    !jurisdiction.supabaseServiceRoleKey
+  ) {
     throw new Error(missingConfigMessage(jurisdiction, "service"));
   }
 
   return {
-    ...publicConfig,
+    url: jurisdiction.supabaseUrl,
+    anonKey: jurisdiction.supabaseAnonKey,
     serviceRoleKey: jurisdiction.supabaseServiceRoleKey
   };
 }
@@ -294,17 +322,33 @@ export function getServiceSupabaseClientForJurisdiction(slug: string | null | un
 }
 
 export function getAllPublicSupabaseClients() {
-  return getJurisdictions().map((jurisdiction) => ({
-    jurisdiction,
-    supabase: getPublicSupabaseClientForJurisdiction(jurisdiction.slug)
-  }));
+  return getJurisdictions().flatMap((jurisdiction) => {
+    try {
+      return [
+        {
+          jurisdiction,
+          supabase: getPublicSupabaseClientForJurisdiction(jurisdiction.slug)
+        }
+      ];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export function getAllServiceSupabaseClients() {
-  return getJurisdictions().map((jurisdiction) => ({
-    jurisdiction,
-    supabase: getServiceSupabaseClientForJurisdiction(jurisdiction.slug)
-  }));
+  return getJurisdictions().flatMap((jurisdiction) => {
+    try {
+      return [
+        {
+          jurisdiction,
+          supabase: getServiceSupabaseClientForJurisdiction(jurisdiction.slug)
+        }
+      ];
+    } catch {
+      return [];
+    }
+  });
 }
 
 export function getPublicSupabaseClientsForSelection(selection: JurisdictionSelection) {

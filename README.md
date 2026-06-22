@@ -1,6 +1,6 @@
 # SimpleCity
 
-SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and OpenRouter summarization pipeline for Foster City, San Mateo, San Mateo County, and Santa Clara County.
+SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and OpenRouter summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, and Mountain View.
 
 ## Setup
 
@@ -17,7 +17,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    cp .env.example .env.local
    ```
 
-3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, and Santa Clara County each use their own Supabase project:
+3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, Santa Clara County, and Mountain View each use their own Supabase project:
 
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=
@@ -32,7 +32,11 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL=
    NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY=
    SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL=
+   NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY=
+   MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY=
    SAN_MATEO_COUNTY_LEGISTAR_URL=https://sanmateocounty.legistar.com/Calendar.aspx
+   MOUNTAIN_VIEW_LEGISTAR_URL=https://mountainview.legistar.com/Calendar.aspx
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -41,7 +45,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
 
 4. Apply Supabase migrations from `supabase/migrations`.
 
-   For a brand-new San Mateo County database, you can also run `supabase/bootstrap_county.sql` once in the Supabase SQL editor to create the full schema in one shot.
+   For a brand-new separate jurisdiction database, including Mountain View, you can also run `supabase/bootstrap_county.sql` once in the Supabase SQL editor to create the full schema in one shot.
 
 5. Run the app:
 
@@ -64,6 +68,10 @@ npm run pipeline:san-mateo-city
 npm run pipeline:san-mateo-county
 npm run scrape:santa-clara-county
 npm run pipeline:santa-clara-county
+npm run scrape:mountain-view
+npm run scrape:mountain-view:download
+npm run scrape:mountain-view:items
+npm run pipeline:mountain-view
 npm run pipeline:all
 ```
 
@@ -73,18 +81,19 @@ Deployments run `npm run playwright:install` automatically before `next build` a
 
 ## Scheduled Scrapers
 
-If Render Cron Jobs are available, run the production scraper outside the web request lifecycle. Create two Cron Job services from this repo, copy the same environment variables used by the web service, and use these settings:
+The production scrapers run from the `Nightly scrapers` GitHub Actions workflow. GitHub cron schedules use UTC:
 
-| Job | Schedule | Build command | Command |
+| Job | Schedule | Pacific time during daylight saving | Command |
 | --- | --- | --- | --- |
-| San Mateo scraper | `0 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:san-mateo-city` |
-| San Mateo County scraper | `0 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:san-mateo-county` |
-| Foster City scraper | `30 10 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:foster-city` |
-| Santa Clara County scraper | `0 11 * * *` | `npm install && npm run playwright:install` | `npm run pipeline:santa-clara-county` |
+| San Mateo scraper | `0 10 * * *` | 3:00 AM PDT | `npm run pipeline:san-mateo-city` |
+| Foster City scraper | `30 10 * * *` | 3:30 AM PDT | `npm run pipeline:foster-city` |
+| Santa Clara County scraper | `0 11 * * *` | 4:00 AM PDT | `npm run pipeline:santa-clara-county` |
+| San Mateo County scraper | `15 11 * * *` | 4:15 AM PDT | `npm run pipeline:san-mateo-county` |
+| Mountain View scraper | `20 12 * * *` | 5:20 AM PDT | `npm run pipeline:mountain-view` |
 
-Render schedules use UTC, so these examples run at 3:00 AM, 3:30 AM, and 4:00 AM Pacific during daylight saving time. Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
+Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
 
-If Render Cron Jobs are not available, keep the Supabase `nightly-scraper` Edge Function and create Supabase cron jobs that call it with one jurisdiction at a time:
+If you stop using GitHub Actions, the older Supabase `nightly-scraper` Edge Function can still be scheduled with Supabase cron jobs that call it one jurisdiction at a time:
 
 ```sql
 select cron.schedule(

@@ -7,8 +7,9 @@ import {
   type CategoryName
 } from "@/lib/constants";
 
-function categoryHref(category: CategoryName | null, search: string) {
+function categoryHref(category: CategoryName | null, search: string, jurisdiction?: string) {
   const params = new URLSearchParams();
+  if (jurisdiction) params.set("jurisdiction", jurisdiction);
   if (search) params.set("q", search);
   if (category) params.set("category", CATEGORY_DEFINITIONS[category].slug);
   const query = params.toString();
@@ -17,17 +18,19 @@ function categoryHref(category: CategoryName | null, search: string) {
 
 export function DecisionCategorySelector({
   selectedCategory,
-  search
+  search,
+  jurisdiction
 }: {
   selectedCategory?: CategoryName;
   search: string;
+  jurisdiction?: string;
 }) {
   return (
     <nav aria-label="Filter decisions by category" className="border-b border-black/10 py-5">
       <p className="mb-3 text-sm font-bold text-ink">Filter by topic</p>
       <div className="flex gap-2.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
         <PendingLink
-          href={categoryHref(null, search)}
+          href={categoryHref(null, search, jurisdiction)}
           aria-current={!selectedCategory ? "true" : undefined}
           pendingLabel="Showing all categories"
           className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold shadow-sm transition focus-visible:focus-ring ${
@@ -43,7 +46,7 @@ export function DecisionCategorySelector({
           <CategoryPill
             key={category}
             category={category}
-            href={categoryHref(category, search)}
+            href={categoryHref(category, search, jurisdiction)}
             large
             selected={selectedCategory === category}
           />
