@@ -57,8 +57,8 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "foster-city",
   "san-mateo-city",
   "san-mateo-county",
-  "santa-clara-county",
-  "mountain-view"
+  "mountain-view",
+  "santa-clara-county"
 ];
 
 export function toInternalJurisdictionSlug(
@@ -132,6 +132,16 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseServiceRoleKey: process.env.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     },
     {
+      name: "Mountain View",
+      slug: "mountain-view",
+      platform: "legistar",
+      sourceUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
+      legistarUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
+      supabaseUrl: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL,
+      supabaseAnonKey: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey: process.env.MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY
+    },
+    {
       name: "Santa Clara County",
       slug: "santa-clara-county",
       platform: "iqm2",
@@ -142,16 +152,6 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseUrl: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
       supabaseAnonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
-    },
-    {
-      name: "Mountain View",
-      slug: "mountain-view",
-      platform: "legistar",
-      sourceUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
-      legistarUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
-      supabaseUrl: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL,
-      supabaseAnonKey: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: process.env.MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY
     }
   ];
 }

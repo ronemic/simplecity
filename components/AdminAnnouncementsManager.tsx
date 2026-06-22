@@ -118,8 +118,8 @@ function AnnouncementEditor({
             <option value="foster-city">Foster City</option>
             <option value="san-mateo">San Mateo</option>
             <option value="san-mateo-county">San Mateo County</option>
-            <option value="santa-clara-county">Santa Clara County</option>
             <option value="mountain-view">Mountain View</option>
+            <option value="santa-clara-county">Santa Clara County</option>
           </select>
         </label>
         <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">
