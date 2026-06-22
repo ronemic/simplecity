@@ -3,6 +3,7 @@
 import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { PendingLink } from "@/components/PendingLink";
+import { HighlightedText } from "@/components/HighlightedText";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
@@ -11,6 +12,7 @@ import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
+import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 
 function summaryPoints(text?: string | null) {
   const fallback = "Not listed in the source document.";
@@ -127,20 +129,30 @@ function confidenceLabel(card: SummaryCardRow) {
   return `Summary confidence: ${confidence}`;
 }
 
-export function SummaryCard({ card }: { card: SummaryCardRow }) {
+export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlight?: string }) {
   const [open, setOpen] = useState(false);
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
   const points = summaryPoints(card.what_is_happening);
-  const titlePreview = points[0] === "Not listed in the source document." ? null : points[0];
+  const defaultTitlePreview = points[0] === "Not listed in the source document." ? null : points[0];
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
   const affectedResidents = compactList(card.who_it_affects);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
+  const normalizedHighlight = highlight?.trim().toLowerCase() || "";
   const topicLabel = categoryTags[0] || "Topic not listed";
   const primaryCategory = getPrimaryCategory(card);
   const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
+  const titleContainsHighlight = normalizedHighlight
+    ? agendaTitle.toLowerCase().includes(normalizedHighlight)
+    : false;
+  const matchingPreview = !titleContainsHighlight && highlight
+    ? [card.what_is_happening, card.why_it_matters, meeting?.title]
+      .map((text) => getHighlightExcerpt(text, highlight))
+      .find(Boolean)
+    : null;
+  const titlePreview = matchingPreview || defaultTitlePreview;
   const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
@@ -159,16 +171,21 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
       <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
-            <span>{meeting ? displayMeetingType(meeting) : "Meeting type not listed"}</span>
+            <span>
+              <HighlightedText
+                text={meeting ? displayMeetingType(meeting) : "Meeting type not listed"}
+                query={highlight}
+              />
+            </span>
             <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
-            <span>{cardJurisdictionLabel}</span>
+            <span><HighlightedText text={cardJurisdictionLabel} query={highlight} /></span>
           </div>
           <h3 className="mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2">
-            {agendaTitle}
+            <HighlightedText text={agendaTitle} query={highlight} />
           </h3>
           {titlePreview ? (
             <p className="mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2">
-              {titlePreview}
+              <HighlightedText text={titlePreview} query={highlight} />
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
@@ -179,7 +196,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
               )}
             >
               {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
-              {status.label}
+              <HighlightedText text={status.label} query={highlight} />
             </span>
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
@@ -192,7 +209,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
               >
                 <TopicIcon className="h-3.5 w-3.5" />
               </span>
-              {topicLabel}
+              <HighlightedText text={topicLabel} query={highlight} />
             </span>
             {!hasCommentOption ? (
               <span className="inline-flex items-center gap-1.5 text-black/[0.5]">
@@ -228,7 +245,7 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
                 {points.map((point) => (
                   <li key={point} className="flex gap-2">
                     <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-civic" />
-                    <span>{point}</span>
+                    <span><HighlightedText text={point} query={highlight} /></span>
                   </li>
                 ))}
               </ul>
@@ -236,18 +253,23 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
 
             <section>
               <p className="text-xs font-black uppercase text-black/[0.55]">Why it matters</p>
-              <p className="mt-2">{card.why_it_matters || "Not listed in the source document."}</p>
+              <p className="mt-2">
+                <HighlightedText
+                  text={card.why_it_matters || "Not listed in the source document."}
+                  query={highlight}
+                />
+              </p>
               <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">Who is affected</p>
               {affectedTags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {affectedTags.map((resident) => (
                     <span key={resident} className="rounded-md border border-black/10 bg-white px-2.5 py-1 text-xs text-black/70">
-                      {resident}
+                      <HighlightedText text={resident} query={highlight} />
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="mt-2">{affectedResidents}</p>
+                <p className="mt-2"><HighlightedText text={affectedResidents} query={highlight} /></p>
               )}
             </section>
 
@@ -256,15 +278,24 @@ export function SummaryCard({ card }: { card: SummaryCardRow }) {
               <div className="mt-2 grid gap-3">
                 <p>
                   <span className="font-bold text-ink">Attend: </span>
-                  {card.how_to_act_attend || "Not listed in the source document."}
+                  <HighlightedText
+                    text={card.how_to_act_attend || "Not listed in the source document."}
+                    query={highlight}
+                  />
                 </p>
                 <p>
                   <span className="font-bold text-ink">Email: </span>
-                  {card.how_to_act_email || "Not listed in the source document."}
+                  <HighlightedText
+                    text={card.how_to_act_email || "Not listed in the source document."}
+                    query={highlight}
+                  />
                 </p>
                 <p>
                   <span className="font-bold text-ink">Submit comment: </span>
-                  {card.how_to_act_submit_comment || "Not listed in the source document."}
+                  <HighlightedText
+                    text={card.how_to_act_submit_comment || "Not listed in the source document."}
+                    query={highlight}
+                  />
                 </p>
               </div>
             </section>

@@ -169,6 +169,17 @@ p {
   padding-left: 3rem;
 }
 
+.input-control--search {
+  appearance: none;
+  padding-left: 3rem;
+  padding-right: 3rem;
+}
+
+.input-control--search::-webkit-search-cancel-button,
+.input-control--search::-webkit-search-decoration {
+  appearance: none;
+}
+
 .input-control--hero-search {
   height: 40px;
   min-height: 40px;

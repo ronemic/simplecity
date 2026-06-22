@@ -1,5 +1,6 @@
-import { SummaryCard } from "@/components/SummaryCard";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
+import { DecisionCategorySelector } from "@/components/DecisionCategorySelector";
+import { SummaryCard } from "@/components/SummaryCard";
 import { getPublishedCards } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
@@ -10,31 +11,16 @@ import {
 import {
   compareCardsByPublicInterest
 } from "@/lib/utils/civicPriority";
-import type { SummaryCardRow } from "@/lib/types";
+import { categoryFromSlug, matchesDecisionFilters } from "@/lib/utils/decisionFilters";
 
 export const revalidate = 300;
-
-function matchesSearch(card: SummaryCardRow, search: string) {
-  if (!search) return true;
-  const haystack = [
-    card.agenda_item,
-    card.what_is_happening,
-    card.why_it_matters,
-    card.meetings?.title,
-    ...(card.category_tags || [])
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(search.toLowerCase());
-}
 
 export default async function DecisionsPage({
   searchParams
 }: {
   searchParams: Promise<{
     q?: string;
+    category?: string;
   }>;
 }) {
   const params = await searchParams;
@@ -44,9 +30,12 @@ export default async function DecisionsPage({
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = (params.q || "").trim();
+  const selectedCategory = categoryFromSlug(params.category);
 
   const cards = await getPublishedCards(jurisdiction);
-  const filteredCards = cards.filter((card) => matchesSearch(card, search));
+  const filteredCards = cards.filter((card) =>
+    matchesDecisionFilters(card, search, selectedCategory)
+  );
   const prioritizedCards = [...filteredCards].sort(compareCardsByPublicInterest);
 
   return (
@@ -59,20 +48,21 @@ export default async function DecisionsPage({
         </p>
       </div>
 
-      <DecisionSearchForm search={params.q || ""} />
+      <DecisionSearchForm key={search} search={params.q || ""} />
+      <DecisionCategorySelector selectedCategory={selectedCategory} search={search} />
 
-      <div className="grid gap-3">
+      <div className="mt-6 grid gap-3" aria-live="polite">
         {prioritizedCards.map((card) => (
-          <SummaryCard key={card.id} card={card} />
+          <SummaryCard key={card.id} card={card} highlight={search} />
         ))}
         {filteredCards.length === 0 ? (
           <div className="quiet-card p-8 text-center">
             <h3 className="text-lg font-semibold text-ink">
-              {search ? "No matching decisions" : "No decisions yet"}
+              {search || selectedCategory ? "No matching decisions" : "No decisions yet"}
             </h3>
             <p className="mt-2 text-sm leading-6 text-black/70">
-              {search
-                ? "Try searching for a different topic, department, or keyword."
+              {search || selectedCategory
+                ? "Try changing the search or category filter."
                 : `Official ${jurisdictionLabel} agenda cards will appear here once meetings are scraped.`}
             </p>
           </div>

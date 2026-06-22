@@ -1,23 +1,69 @@
+"use client";
+
+import { Search, X } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
+
 export function DecisionSearchForm({
   search = "",
-  action,
-  buttonLabel = "Filter",
   placeholder = "Search decisions..."
 }: {
   search?: string;
-  action?: string;
-  buttonLabel?: string;
   placeholder?: string;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [value, setValue] = useState(search);
+
+  useEffect(() => {
+    const query = value.trim();
+    if (query === search.trim()) return;
+
+    function updateResults() {
+      const params = new URLSearchParams(searchParams.toString());
+      if (query) params.set("q", query);
+      else params.delete("q");
+      const nextQuery = params.toString();
+      router.replace(`${pathname}${nextQuery ? `?${nextQuery}` : ""}`, { scroll: false });
+    }
+
+    if (!query) {
+      updateResults();
+      return;
+    }
+
+    const timer = window.setTimeout(updateResults, 300);
+    return () => window.clearTimeout(timer);
+  }, [pathname, router, search, searchParams, value]);
+
   return (
-    <form className="quiet-card grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:p-5" action={action} role="search">
+    <div className="quiet-card p-4 sm:p-5" role="search">
+      <div className="relative">
+        <Search
+          aria-hidden
+          className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black/45"
+        />
       <input
-        name="q"
-        defaultValue={search}
+        type="search"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
         placeholder={placeholder}
-        className="input-control"
+        aria-label="Search decisions"
+        autoComplete="off"
+        className="input-control input-control--search"
       />
-      <button className="action-primary">{buttonLabel}</button>
-    </form>
+        {value ? (
+          <button
+            type="button"
+            onClick={() => setValue("")}
+            aria-label="Clear search"
+            className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-black/50 transition hover:bg-black/[0.05] hover:text-ink focus-visible:focus-ring"
+          >
+            <X aria-hidden className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+    </div>
   );
 }
