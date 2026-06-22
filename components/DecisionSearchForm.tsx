@@ -17,6 +17,15 @@ export function DecisionSearchForm({
   const [value, setValue] = useState(search);
 
   useEffect(() => {
+    function syncFromHistory() {
+      setValue(new URL(window.location.href).searchParams.get("q") || "");
+    }
+
+    window.addEventListener("popstate", syncFromHistory);
+    return () => window.removeEventListener("popstate", syncFromHistory);
+  }, []);
+
+  useEffect(() => {
     const query = value.trim();
     if (query === search.trim()) return;
 
