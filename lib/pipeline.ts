@@ -284,18 +284,12 @@ export async function runSimpleCityPipeline(
 
           try {
             if (persistSummaries && supabase && item.id && item.existingCardCount > 0) {
-              if (item.summarizedSourceHash === item.sourceHash) {
-                log(`Skipping ${item.meeting.title}; source unchanged and cards already exist.`);
-                continue;
-              }
+              log(`Skipping ${item.meeting.title}; append-only mode keeps ${item.existingCardCount} existing cards.`);
+              continue;
             }
 
             const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
             if (persistSummaries && supabase && item.id) {
-              if (item.existingCardCount > 0 && summary.cards.length === 0) {
-                log(`Clearing existing cards for ${item.meeting.title}; regenerated summary returned no source-grounded cards.`);
-              }
-
               const inserted = await replaceSummaryCardsForMeeting(
                 supabase,
                 item.id,
@@ -315,39 +309,6 @@ export async function runSimpleCityPipeline(
             const message = error instanceof Error ? error.message : "Unknown LLM error";
             errors.push(`${item.meeting.title}: ${message}`);
             log(`LLM failed for ${item.meeting.title}: ${message}`);
-
-            if (
-              persistSummaries &&
-              supabase &&
-              item.id &&
-              item.existingCardCount > 0 &&
-              item.sourceHash &&
-              item.summarizedSourceHash !== item.sourceHash
-            ) {
-              await replaceSummaryCardsForMeeting(
-                supabase,
-                item.id,
-                {
-                  meetingSummary: {
-                    title: item.meeting.title,
-                    date: item.meeting.dateText || "",
-                    status: item.meeting.status,
-                    oneSentenceSummary: ""
-                  },
-                  cards: []
-                },
-                {
-                  error: message,
-                  failedAt: new Date().toISOString()
-                },
-                {
-                  allowEmptyReplacement: true,
-                  jurisdiction,
-                  sourceHash: item.sourceHash
-                }
-              );
-              log(`Cleared stale cards for ${item.meeting.title} because the source changed and regeneration failed.`);
-            }
           }
         }
       }
