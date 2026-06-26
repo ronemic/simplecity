@@ -11,6 +11,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
 import {
+  appendSummaryCardsForMeeting,
   replaceSummaryCardsForMeeting,
   upsertMeetings
 } from "@/lib/db/upsertMeetings";
@@ -283,24 +284,41 @@ export async function runSimpleCityPipeline(
           }
 
           try {
-            if (persistSummaries && supabase && item.id && item.existingCardCount > 0) {
-              log(`Skipping ${item.meeting.title}; append-only mode keeps ${item.existingCardCount} existing cards.`);
+            const shouldAppendToExisting =
+              Boolean(persistSummaries && supabase && item.id && item.existingCardCount > 0);
+
+            if (shouldAppendToExisting && item.summarizedSourceHash === item.sourceHash) {
+              log(`Skipping ${item.meeting.title}; source unchanged and cards already exist.`);
               continue;
             }
 
             const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
             if (persistSummaries && supabase && item.id) {
-              const inserted = await replaceSummaryCardsForMeeting(
-                supabase,
-                item.id,
-                summary,
-                raw,
-                {
-                  allowEmptyReplacement: true,
-                  jurisdiction,
-                  sourceHash: item.sourceHash
-                }
-              );
+              const inserted = shouldAppendToExisting
+                ? await appendSummaryCardsForMeeting(
+                    supabase,
+                    item.id,
+                    summary,
+                    raw,
+                    {
+                      jurisdiction,
+                      sourceHash: item.sourceHash
+                    }
+                  )
+                : await replaceSummaryCardsForMeeting(
+                    supabase,
+                    item.id,
+                    summary,
+                    raw,
+                    {
+                      allowEmptyReplacement: true,
+                      jurisdiction,
+                      sourceHash: item.sourceHash
+                    }
+                  );
+              if (shouldAppendToExisting) {
+                log(`Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; appended ${inserted.length} new cards.`);
+              }
               cardsGenerated += inserted.length;
             } else {
               cardsGenerated += summary.cards.length;

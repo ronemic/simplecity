@@ -301,6 +301,81 @@ export async function replaceSummaryCardsForMeeting(
   return data || [];
 }
 
+export async function appendSummaryCardsForMeeting(
+  supabase: SupabaseClient,
+  meetingId: string,
+  summary: SimpleCitySummary,
+  rawLlmJson: unknown,
+  options: {
+    sourceHash?: string | null;
+    jurisdiction?: JurisdictionConfig | null;
+  } = {}
+) {
+  const { data: existingCards, error: existingError } = await supabase
+    .from("summary_cards")
+    .select("agenda_item,source_url")
+    .eq("meeting_id", meetingId);
+
+  if (existingError) throw new Error(`Failed to read existing cards: ${existingError.message}`);
+
+  const existingExactKeys = new Set<string>();
+  const existingAgendaKeys = new Set<string>();
+
+  for (const card of existingCards || []) {
+    existingExactKeys.add(exactCardKey(card.agenda_item, card.source_url));
+    existingAgendaKeys.add(normalizeCardKey(card.agenda_item));
+  }
+
+  const newCards = summary.cards.filter((card) => {
+    const exactKey = exactCardKey(card.agendaItem, card.source);
+    const agendaKey = normalizeCardKey(card.agendaItem);
+    return !existingExactKeys.has(exactKey) && !existingAgendaKeys.has(agendaKey);
+  });
+
+  if (newCards.length === 0) {
+    await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+    return [];
+  }
+
+  const rows = newCards.map((card) =>
+    sanitizeForDatabase({
+      ...(options.jurisdiction
+        ? {
+            jurisdiction_name: options.jurisdiction.name,
+            jurisdiction_slug: options.jurisdiction.slug,
+            platform: options.jurisdiction.platform
+          }
+        : {}),
+      meeting_id: meetingId,
+      agenda_item: card.agendaItem,
+      what_is_happening: card.whatIsHappening,
+      why_it_matters: card.whyItMatters,
+      who_it_affects: card.whoItAffects,
+      category_tags: card.categoryTags,
+      status: card.status,
+      comment_window_opens: card.commentWindow.opens,
+      comment_window_closes: card.commentWindow.closes,
+      how_to_act_attend: card.howToAct.attend,
+      how_to_act_email: card.howToAct.email,
+      how_to_act_submit_comment: card.howToAct.submitComment,
+      source_url: card.source,
+      confidence: card.confidence,
+      is_published: true,
+      is_featured: false,
+      admin_notes: null,
+      raw_llm_json: rawLlmJson
+    })
+  );
+
+  const { data, error } = await supabase.from("summary_cards").insert(rows).select("id");
+
+  if (error) throw new Error(`Failed to append summary cards: ${error.message}`);
+
+  await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+
+  return data || [];
+}
+
 export async function writeAuditLog(
   supabase: SupabaseClient,
   input: {
