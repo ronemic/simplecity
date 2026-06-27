@@ -44,6 +44,10 @@ function writeLocalePreference(value: Locale) {
   document.cookie = `${LOCALE_COOKIE}=${encoded}; path=/; max-age=31536000; samesite=lax`;
 }
 
+function jurisdictionLabel(jurisdiction: (typeof jurisdictions)[number], locale: Locale) {
+  return jurisdiction.slug === "all" ? t(locale, "all") : jurisdiction.label;
+}
+
 export function HeaderNav({
   initialJurisdiction = "san-mateo",
   locale = "en"
@@ -181,7 +185,7 @@ export function HeaderNav({
         >
           <span className="flex min-w-0 items-center gap-2">
             <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
-            <span className="truncate">{selectedJurisdiction.label}</span>
+            <span className="truncate">{jurisdictionLabel(selectedJurisdiction, selectedLocale)}</span>
           </span>
           <ChevronDown
             aria-hidden="true"
@@ -213,7 +217,7 @@ export function HeaderNav({
                       aria-hidden="true"
                       className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
                     />
-                    <span className="truncate">{jurisdiction.label}</span>
+                    <span className="truncate">{jurisdictionLabel(jurisdiction, selectedLocale)}</span>
                   </button>
                 );
               })}

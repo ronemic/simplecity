@@ -198,7 +198,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     about: "Acerca de",
     addToGoogleCalendar: "Agregar a Google Calendar",
     adminAnnouncement: "Anuncio del administrador",
-    all: "Todo",
+    all: "Todos",
     allMatchingMeetings: "Todas las reuniones coincidentes",
     allStatuses: "Todos los estados",
     allTopics: "Todos los temas",
