@@ -1,7 +1,8 @@
 import { STATUS_TONES } from "@/lib/constants";
 import { cn } from "@/lib/utils/cn";
+import { type Locale, statusLabel } from "@/lib/i18n";
 
-export function StatusPill({ status }: { status?: string | null }) {
+export function StatusPill({ status, locale = "en" }: { status?: string | null; locale?: Locale }) {
   const label = status || "Unknown";
 
   return (
@@ -11,7 +12,7 @@ export function StatusPill({ status }: { status?: string | null }) {
         STATUS_TONES[label] || "border-black/20 bg-black/5 text-black/70"
       )}
     >
-      {label}
+      {statusLabel(locale, label)}
     </span>
   );
 }

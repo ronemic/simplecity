@@ -1,5 +1,5 @@
 const MISSING_VALUE_PATTERN =
-  /not listed|not applicable|not provided|n\/a|^na$|^none$|^null$|^tbd$|to be determined|^closed$|comments?\s+(?:are\s+)?(?:closed|not accepted|unavailable)|no comments?\s+(?:accepted|allowed)/i;
+  /not listed|not applicable|not provided|n\/a|^na$|^none$|^null$|^tbd$|to be determined|^closed$|comments?\s+(?:are\s+)?(?:closed|not accepted|unavailable)|no comments?\s+(?:accepted|allowed)|no indicado|no aplica|no aplicable|no proporcionado|no se indica|sin comentarios?/i;
 
 const DEADLINE_SIGNAL_PATTERN =
   /\b(by|before|deadline|due|no later than|until|through|prior to)\b/i;

@@ -1234,6 +1234,11 @@ export async function scrapeLegistarMeetings(
     if (options.enrichDetails ?? true) {
       log("Enriching Legistar meeting detail pages where available...");
       meetings = await mapLimit(meetings as LegistarMeeting[], 4, async (meeting) => {
+        if (options.shouldStop?.()) {
+          log("Stopping Legistar meeting detail enrichment early because the pipeline deadline is near.");
+          return meeting;
+        }
+
         await scrapeLegistarDetails(context, meeting, log);
         return meeting;
       });
@@ -1242,6 +1247,11 @@ export async function scrapeLegistarMeetings(
     if (options.enrichLegislation) {
       log("Enriching Legistar legislation detail pages where available...");
       meetings = await mapLimit(meetings as LegistarMeeting[], 2, async (meeting) => {
+        if (options.shouldStop?.()) {
+          log("Stopping Legistar legislation detail enrichment early because the pipeline deadline is near.");
+          return meeting;
+        }
+
         const items = meeting.items || [];
         const limit = options.maxItemsPerMeeting ?? 100;
         const limitedItems = items.slice(0, limit);

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
-import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
+import { CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
 import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -22,6 +22,8 @@ import {
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
+import { categoryShortLabel, t } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
 
 export const revalidate = 300;
 
@@ -50,16 +52,6 @@ function hasCardCommentOptionInfo(card: SummaryCardRow) {
     ]
   });
 }
-
-const TOPIC_LABELS: Partial<Record<CategoryName, string>> = {
-  Transportation: "Transportation",
-  "Public Safety": "Public Safety",
-  "Parks & Environment": "Parks & Environment",
-  "Budget & Taxes": "Budget",
-  "Business & Development": "Business",
-  "Schools & Youth": "Schools",
-  "City Services": "Public Services"
-};
 
 type MeetingPreviewCard = SummaryCardRow & {
   meetings: NonNullable<SummaryCardRow["meetings"]>;
@@ -95,6 +87,7 @@ export default async function Home({
   searchParams: Promise<{ q?: string; jurisdiction?: string }>;
 }) {
   const params = await searchParams;
+  const locale = await getRequestLocale();
   const search = (params.q || "").trim();
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
@@ -103,7 +96,7 @@ export default async function Home({
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasSearch = search.length > 0;
   const [cards, announcements] = await Promise.all([
-    getPublishedCards(jurisdiction),
+    getPublishedCards(jurisdiction, locale),
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG)
   ]);
   const filteredCards = cards.filter((card) => matchesSearch(card, search));
@@ -122,22 +115,46 @@ export default async function Home({
     publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards
   );
   const introLabel =
-    jurisdiction === "all" ? "Public meetings across jurisdictions" : `${jurisdictionLabel} public meetings`;
+    jurisdiction === "all"
+      ? locale === "es"
+        ? "Reuniones públicas de varias jurisdicciones"
+        : "Public meetings across jurisdictions"
+      : locale === "es"
+        ? `Reuniones públicas de ${jurisdictionLabel}`
+        : `${jurisdictionLabel} public meetings`;
   const summaryItems = [
-    commentOptionCount > 0 ? pluralize(commentOptionCount, "decision includes comment option", "decisions include comment options") : null,
-    upcomingMeetingCount > 0 ? pluralize(upcomingMeetingCount, "upcoming meeting", "upcoming meetings") : null
+    commentOptionCount > 0
+      ? locale === "es"
+        ? pluralize(commentOptionCount, "decisión incluye opción para comentar", "decisiones incluyen opciones para comentar")
+        : pluralize(commentOptionCount, "decision includes comment option", "decisions include comment options")
+      : null,
+    upcomingMeetingCount > 0
+      ? locale === "es"
+        ? pluralize(upcomingMeetingCount, "reunión próxima", "reuniones próximas")
+        : pluralize(upcomingMeetingCount, "upcoming meeting", "upcoming meetings")
+      : null
   ].filter(Boolean);
   const summarySentence =
     summaryItems.length > 0
       ? summaryItems.join(" · ")
-      : `${pluralize(filteredCards.length, "published decision", "published decisions")} available`;
+      : locale === "es"
+        ? `${pluralize(filteredCards.length, "decisión publicada", "decisiones publicadas")} disponibles`
+        : `${pluralize(filteredCards.length, "published decision", "published decisions")} available`;
   const decisionSectionTitle =
     hasSearch
-      ? `Results for "${search}"`
-      : "Decisions that may affect daily life";
+      ? locale === "es"
+        ? `Resultados para "${search}"`
+        : `Results for "${search}"`
+      : locale === "es"
+        ? "Decisiones que pueden afectar la vida diaria"
+        : "Decisions that may affect daily life";
   const decisionSectionDescription = hasSearch
-    ? "Matching decisions from the currently selected jurisdiction, with newer, higher-impact items ranked first."
-    : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
+    ? locale === "es"
+      ? "Decisiones coincidentes de la jurisdicción seleccionada, con elementos más recientes y de mayor impacto primero."
+      : "Matching decisions from the currently selected jurisdiction, with newer, higher-impact items ranked first."
+    : locale === "es"
+      ? "Ordenado para mostrar primero decisiones próximas, luego elementos recientes de alto impacto como presupuestos, vivienda, seguridad, transporte, servicios, audiencias públicas, contratos y tarifas antes que elementos ceremoniales o de proceso interno."
+      : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
 
   return (
     <div className="overflow-hidden">
@@ -152,22 +169,27 @@ export default async function Home({
               {introLabel}
             </p>
             <h1 className="mt-4 text-balance text-[36px] font-black leading-[1.02] text-[#fffaf0] sm:text-[52px] lg:text-[56px]">
-              See what your local government is deciding.
+              {locale === "es"
+                ? "Mira qué está decidiendo tu gobierno local."
+                : "See what your local government is deciding."}
             </h1>
             <p className="mt-4 max-w-2xl text-balance text-base font-medium leading-7 text-[#d9e2ec] sm:mt-5 sm:text-xl sm:leading-8">
-              Read plain-language summaries, check upcoming meetings and votes, and find ways to share your input.
+              {locale === "es"
+                ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
+                : "Read plain-language summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
             <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>
           </div>
 
           <div className="rounded-[12px] border border-white/15 bg-[#0c1726]/70 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur sm:p-5 lg:justify-self-stretch">
             <p className="mb-3 text-xs font-black uppercase text-[#9fc4f4]">
-              Search official summaries
+              {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
             </p>
             <SearchAndFilters
               action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
               resultCount={filteredCards.length}
               search={search}
+              locale={locale}
             />
           </div>
         </div>
@@ -175,7 +197,7 @@ export default async function Home({
 
       {announcements.length > 0 ? (
         <section className="section-shell py-6 sm:py-8">
-          <AnnouncementBanner announcements={announcements} />
+          <AnnouncementBanner announcements={announcements} locale={locale} />
         </section>
       ) : null}
 
@@ -189,7 +211,7 @@ export default async function Home({
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">
               <p className="label-eyebrow text-civic">
-                {hasSearch ? "Search results" : "Top public decisions"}
+                {hasSearch ? t(locale, "searchResults") : t(locale, "topPublicDecisions")}
               </p>
               <h2 className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
                 {decisionSectionTitle}
@@ -198,7 +220,13 @@ export default async function Home({
             </div>
             {hasSearch ? (
               <p className="rounded-md border border-civic/20 bg-white px-3 py-2 text-sm font-bold text-civic shadow-sm">
-                {filteredCards.length === 1 ? "1 matching decision" : `${filteredCards.length} matching decisions`}
+                {filteredCards.length === 1
+                  ? locale === "es"
+                    ? "1 decisión coincidente"
+                    : "1 matching decision"
+                  : locale === "es"
+                    ? `${filteredCards.length} decisiones coincidentes`
+                    : `${filteredCards.length} matching decisions`}
               </p>
             ) : (
               <p className="max-w-sm text-sm font-semibold leading-6 text-black/60 sm:text-right">
@@ -209,15 +237,19 @@ export default async function Home({
         </div>
         <div className="grid gap-3">
           {visibleCards.map((card) => (
-            <SummaryCard key={card.id} card={card} />
+            <SummaryCard key={card.id} card={card} locale={locale} />
           ))}
           {filteredCards.length === 0 ? (
             <div className="quiet-card p-8 text-center">
-              <h3 className="text-lg font-semibold text-ink">{hasSearch ? "No matching decisions" : "No cards yet"}</h3>
+              <h3 className="text-lg font-semibold text-ink">
+                {hasSearch ? t(locale, "noMatchingDecisions") : t(locale, "noCardsYet")}
+              </h3>
               <p className="mt-2 text-sm leading-6 text-black/70">
                 {hasSearch
-                  ? "Try searching for a topic, department, meeting title, or everyday impact."
-                  : `Once the scraper and summarizer run, official ${jurisdictionLabel} agenda cards will appear here.`}
+                  ? t(locale, "trySearching")
+                  : locale === "es"
+                    ? `Cuando se ejecuten el recopilador y el resumidor, aparecerán aquí tarjetas oficiales de agenda de ${jurisdictionLabel}.`
+                    : `Once the scraper and summarizer run, official ${jurisdictionLabel} agenda cards will appear here.`}
               </p>
             </div>
           ) : null}
@@ -227,7 +259,7 @@ export default async function Home({
             href="/decisions"
             className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
           >
-            View all decisions
+            {t(locale, "viewAllDecisions")}
             <ArrowRight aria-hidden className="h-4 w-4" />
           </Link>
         ) : null}
@@ -237,18 +269,20 @@ export default async function Home({
         <section className="section-shell pb-8 pt-2">
           <div className="grid gap-5 border-y border-black/10 py-7 lg:grid-cols-[0.72fr_1fr] lg:items-start">
             <div>
-              <p className="label-eyebrow text-civic">Upcoming meetings</p>
+              <p className="label-eyebrow text-civic">{t(locale, "upcomingMeetings")}</p>
               <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">
-                Meetings tied to the top decisions
+                {locale === "es" ? "Reuniones relacionadas con las decisiones principales" : "Meetings tied to the top decisions"}
               </h2>
               <p className="mt-3 max-w-md text-base leading-7 text-black/[0.68]">
-                Upcoming meetings connected to the higher-impact cards shown first.
+                {locale === "es"
+                  ? "Próximas reuniones conectadas con las tarjetas de mayor impacto que se muestran primero."
+                  : "Upcoming meetings connected to the higher-impact cards shown first."}
               </p>
               <Link
                 href="/meetings"
                 className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
               >
-                View all meetings
+                {t(locale, "viewAllMeetings")}
                 <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
             </div>
@@ -275,14 +309,14 @@ export default async function Home({
                         {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
                       </p>
                       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">
-                        Connected decision: {publicAgendaTitle(card)}
+                        {t(locale, "connectedDecision")}: {publicAgendaTitle(card)}
                       </p>
                     </div>
                     <Link
                       href={`/meetings/${meeting.id}`}
                       className="inline-flex min-h-10 items-center justify-center rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-civic/30 hover:bg-civic/5 hover:text-civic focus-visible:focus-ring"
                     >
-                      Meeting details
+                      {t(locale, "meetingDetails")}
                     </Link>
                   </article>
                 );
@@ -294,8 +328,8 @@ export default async function Home({
 
       <section className="section-shell pb-16 pt-8">
         <div className="mb-5 max-w-2xl">
-          <p className="label-eyebrow text-civic">Browse by topic</p>
-          <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">Find decisions by everyday impact</h2>
+          <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>
+          <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">{t(locale, "everydayImpactTitle")}</h2>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {CATEGORIES.map((category) => {
@@ -311,7 +345,7 @@ export default async function Home({
                   <Icon aria-hidden className="h-5 w-5" />
                 </span>
                 <span className="text-base font-black leading-5 text-ink">
-                  {TOPIC_LABELS[category] || category}
+                  {categoryShortLabel(locale, category)}
                 </span>
               </Link>
             );

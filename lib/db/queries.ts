@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
@@ -11,7 +12,19 @@ import {
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { PUBLIC_CACHE_REVALIDATE_SECONDS, PUBLIC_CONTENT_CACHE_TAG } from "@/lib/db/publicCache";
-import type { AnnouncementRow, DocumentRow, MeetingRow, SummaryCardRow } from "@/lib/types";
+import {
+  meetingTranslationFingerprint,
+  summaryCardTranslationFingerprint
+} from "@/lib/db/translationFingerprint";
+import type {
+  AnnouncementRow,
+  DocumentRow,
+  MeetingRow,
+  MeetingTranslationRow,
+  SummaryCardRow,
+  SummaryCardTranslationRow
+} from "@/lib/types";
+import type { Locale } from "@/lib/i18n";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,meeting_datetime,status";
@@ -202,8 +215,119 @@ function dedupeAnnouncements(rows: AnnouncementRow[]) {
   return deduped;
 }
 
+async function applyMeetingTranslations(
+  supabase: { from: SupabaseClient["from"] },
+  rows: MeetingRow[],
+  locale: Locale
+) {
+  if (locale === "en" || rows.length === 0) return rows;
+
+  const ids = rows.map((row) => row.id);
+  const { data, error } = await supabase
+    .from("meeting_translations")
+    .select("meeting_id,locale,title,meeting_type,source_fingerprint,translation_status")
+    .eq("locale", locale)
+    .in("translation_status", ["machine", "reviewed"])
+    .in("meeting_id", ids);
+
+  if (error) {
+    logQueryError("Failed to load meeting translations", error);
+    return rows;
+  }
+
+  const translations = new Map(
+    ((data || []) as unknown as MeetingTranslationRow[]).map((row) => [row.meeting_id, row])
+  );
+
+  return rows.map((row) => {
+    const translation = translations.get(row.id);
+    if (!translation) return row;
+    if (translation.source_fingerprint !== meetingTranslationFingerprint(row)) return row;
+
+    return {
+      ...row,
+      title: translation.title || row.title,
+      meeting_type: translation.meeting_type || row.meeting_type
+    };
+  });
+}
+
+async function applyCardTranslations(
+  supabase: { from: SupabaseClient["from"] },
+  rows: SummaryCardRow[],
+  locale: Locale
+) {
+  if (locale === "en" || rows.length === 0) return rows;
+
+  const cardIds = rows.map((row) => row.id);
+  const meetingRows = rows
+    .map((row) => row.meetings)
+    .filter((meeting): meeting is MeetingRow => Boolean(meeting?.id));
+  const { data, error } = await supabase
+    .from("summary_card_translations")
+    .select(
+      [
+        "summary_card_id",
+        "locale",
+        "agenda_item",
+        "what_is_happening",
+        "why_it_matters",
+        "who_it_affects",
+        "status",
+        "comment_window_opens",
+        "comment_window_closes",
+        "how_to_act_attend",
+        "how_to_act_email",
+        "how_to_act_submit_comment",
+        "source_fingerprint",
+        "translation_status"
+      ].join(",")
+    )
+    .eq("locale", locale)
+    .in("translation_status", ["machine", "reviewed"])
+    .in("summary_card_id", cardIds);
+
+  if (error) {
+    logQueryError("Failed to load summary card translations", error);
+    return rows;
+  }
+
+  const translatedMeetings = await applyMeetingTranslations(supabase, meetingRows, locale);
+  const meetingById = new Map(translatedMeetings.map((meeting) => [meeting.id, meeting]));
+  const translations = new Map(
+    ((data || []) as unknown as SummaryCardTranslationRow[]).map((row) => [
+      row.summary_card_id,
+      row
+    ])
+  );
+
+  return rows.map((row) => {
+    const translation = translations.get(row.id);
+    const translatedMeeting = row.meetings?.id ? meetingById.get(row.meetings.id) : null;
+    const baseRow = translatedMeeting ? { ...row, meetings: translatedMeeting } : row;
+
+    if (!translation) return baseRow;
+    if (translation.source_fingerprint !== summaryCardTranslationFingerprint(row)) return baseRow;
+
+    return {
+      ...baseRow,
+      agenda_item: translation.agenda_item || row.agenda_item,
+      what_is_happening: translation.what_is_happening || row.what_is_happening,
+      why_it_matters: translation.why_it_matters || row.why_it_matters,
+      who_it_affects: translation.who_it_affects || row.who_it_affects,
+      status: translation.status || row.status,
+      comment_window_opens: translation.comment_window_opens || row.comment_window_opens,
+      comment_window_closes: translation.comment_window_closes || row.comment_window_closes,
+      how_to_act_attend: translation.how_to_act_attend || row.how_to_act_attend,
+      how_to_act_email: translation.how_to_act_email || row.how_to_act_email,
+      how_to_act_submit_comment:
+        translation.how_to_act_submit_comment || row.how_to_act_submit_comment
+    };
+  });
+}
+
 const getCachedPublishedCards = unstable_cache(
-  async (selection: JurisdictionSelection) => {
+  async (selection: JurisdictionSelection, locale: Locale) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as SummaryCardRow[];
 
@@ -221,9 +345,10 @@ const getCachedPublishedCards = unstable_cache(
           return [] as SummaryCardRow[];
         }
 
-        return ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+        const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
           withCardJurisdictionFallback(row, jurisdiction)
         );
+        return applyCardTranslations(supabase, rows, locale);
       })
     );
 
@@ -263,7 +388,7 @@ async function getCachedActiveAnnouncements(selection: JurisdictionSelection) {
 }
 
 const getCachedMeetings = unstable_cache(
-  async (selection: JurisdictionSelection, search: string, status: string) => {
+  async (selection: JurisdictionSelection, search: string, status: string, locale: Locale) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as MeetingRow[];
 
@@ -297,9 +422,10 @@ const getCachedMeetings = unstable_cache(
           return [] as MeetingRow[];
         }
 
-        return ((data || []) as unknown as MeetingRow[]).map((row) =>
+        const rows = ((data || []) as unknown as MeetingRow[]).map((row) =>
           withMeetingJurisdictionFallback(row, jurisdiction)
         );
+        return applyMeetingTranslations(supabase, rows, locale);
       })
     );
 
@@ -310,7 +436,7 @@ const getCachedMeetings = unstable_cache(
 );
 
 const getCachedMeetingDetail = unstable_cache(
-  async (selection: JurisdictionSelection, id: string) => {
+  async (selection: JurisdictionSelection, id: string, locale: Locale) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) {
       return {
@@ -345,13 +471,20 @@ const getCachedMeetingDetail = unstable_cache(
         logQueryError(`Failed to load ${jurisdiction.name} cards for meeting ${id}`, cardsError);
         logQueryError(`Failed to load ${jurisdiction.name} documents for meeting ${id}`, documentsError);
 
-        return {
-          meeting: meeting
+        const meetingRow = meeting
             ? withMeetingJurisdictionFallback(meeting as unknown as MeetingRow, jurisdiction)
-            : null,
-          cards: ((cards || []) as unknown as SummaryCardRow[]).map((row) =>
+            : null;
+        const translatedMeetings = meetingRow
+          ? await applyMeetingTranslations(supabase, [meetingRow], locale)
+          : [];
+        const cardRows = ((cards || []) as unknown as SummaryCardRow[]).map((row) =>
             withCardJurisdictionFallback(row, jurisdiction)
-          ),
+          );
+        const translatedCards = await applyCardTranslations(supabase, cardRows, locale);
+
+        return {
+          meeting: translatedMeetings[0] || meetingRow,
+          cards: translatedCards,
           documents: ((documents || []) as unknown as DocumentRow[]).map((row) =>
             withDocumentJurisdictionFallback(row, jurisdiction)
           )
@@ -372,7 +505,7 @@ const getCachedMeetingDetail = unstable_cache(
 );
 
 const getCachedCategoryCards = unstable_cache(
-  async (selection: JurisdictionSelection, category: string) => {
+  async (selection: JurisdictionSelection, category: string, locale: Locale) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as SummaryCardRow[];
 
@@ -391,9 +524,10 @@ const getCachedCategoryCards = unstable_cache(
           return [] as SummaryCardRow[];
         }
 
-        return ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+        const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
           withCardJurisdictionFallback(row, jurisdiction)
         );
+        return applyCardTranslations(supabase, rows, locale);
       })
     );
 
@@ -462,8 +596,11 @@ const getCachedPublicStats = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
-export async function getPublishedCards(selection: JurisdictionSelection = getDefaultJurisdiction().slug) {
-  return getCachedPublishedCards(selection);
+export async function getPublishedCards(
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
+) {
+  return getCachedPublishedCards(selection, locale);
 }
 
 export async function getActiveAnnouncements(selection: JurisdictionSelection = getDefaultJurisdiction().slug) {
@@ -471,27 +608,30 @@ export async function getActiveAnnouncements(selection: JurisdictionSelection = 
 }
 
 export async function getMeetings(
-  filters: { search?: string; status?: string; jurisdiction?: JurisdictionSelection } = {}
+  filters: { search?: string; status?: string; jurisdiction?: JurisdictionSelection; locale?: Locale } = {}
 ) {
   return getCachedMeetings(
     filters.jurisdiction || getDefaultJurisdiction().slug,
     normalizeSearch(filters.search),
-    normalizeSearch(filters.status)
+    normalizeSearch(filters.status),
+    filters.locale || "en"
   );
 }
 
 export async function getMeetingDetail(
   id: string,
-  selection: JurisdictionSelection = getDefaultJurisdiction().slug
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
 ) {
-  return getCachedMeetingDetail(selection, id);
+  return getCachedMeetingDetail(selection, id, locale);
 }
 
 export async function getCategoryCards(
   category: string,
-  selection: JurisdictionSelection = getDefaultJurisdiction().slug
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
 ) {
-  return getCachedCategoryCards(selection, category);
+  return getCachedCategoryCards(selection, category, locale);
 }
 
 export async function getPublicStats() {

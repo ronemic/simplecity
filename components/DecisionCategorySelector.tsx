@@ -6,6 +6,7 @@ import {
   CATEGORY_DEFINITIONS,
   type CategoryName
 } from "@/lib/constants";
+import { type Locale, t } from "@/lib/i18n";
 
 function categoryHref(category: CategoryName | null, search: string, jurisdiction?: string) {
   const params = new URLSearchParams();
@@ -19,20 +20,22 @@ function categoryHref(category: CategoryName | null, search: string, jurisdictio
 export function DecisionCategorySelector({
   selectedCategory,
   search,
-  jurisdiction
+  jurisdiction,
+  locale = "en"
 }: {
   selectedCategory?: CategoryName;
   search: string;
   jurisdiction?: string;
+  locale?: Locale;
 }) {
   return (
-    <nav aria-label="Filter decisions by category" className="border-b border-black/10 py-5">
-      <p className="mb-3 text-sm font-bold text-ink">Filter by topic</p>
+    <nav aria-label={t(locale, "filterByTopic")} className="border-b border-black/10 py-5">
+      <p className="mb-3 text-sm font-bold text-ink">{t(locale, "filterByTopic")}</p>
       <div className="flex gap-2.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
         <PendingLink
           href={categoryHref(null, search, jurisdiction)}
           aria-current={!selectedCategory ? "true" : undefined}
-          pendingLabel="Showing all categories"
+          pendingLabel={locale === "es" ? "Mostrando todas las categorías" : "Showing all categories"}
           className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold shadow-sm transition focus-visible:focus-ring ${
             !selectedCategory
               ? "border-civic/35 bg-civic/10 text-civic hover:bg-civic/15"
@@ -40,7 +43,7 @@ export function DecisionCategorySelector({
           }`}
         >
           <Layers3 aria-hidden className="h-4 w-4 shrink-0" />
-          <span>All topics</span>
+          <span>{t(locale, "allTopics")}</span>
         </PendingLink>
         {CATEGORIES.map((category) => (
           <CategoryPill
@@ -49,6 +52,7 @@ export function DecisionCategorySelector({
             href={categoryHref(category, search, jurisdiction)}
             large
             selected={selectedCategory === category}
+            locale={locale}
           />
         ))}
       </div>

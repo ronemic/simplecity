@@ -13,9 +13,10 @@ import { displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 import { getHighlightExcerpt } from "@/lib/utils/highlightText";
+import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
 
-function summaryPoints(text?: string | null) {
-  const fallback = "Not listed in the source document.";
+function summaryPoints(text: string | null | undefined, locale: Locale) {
+  const fallback = t(locale, "notListedInSource");
   const content = (text?.trim() || fallback).replace(/\s+/g, " ");
   const sentenceSafeContent = content
     .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, "$1__SIMPLECITY_DOT__")
@@ -28,8 +29,8 @@ function summaryPoints(text?: string | null) {
     .slice(0, 3);
 }
 
-function compactList(items?: string[] | null) {
-  if (!items || items.length === 0) return "Not listed";
+function compactList(items: string[] | null | undefined, locale: Locale) {
+  if (!items || items.length === 0) return t(locale, "notListed");
   return items.slice(0, 3).join(", ");
 }
 
@@ -58,10 +59,15 @@ function getPrimaryCategory(card: SummaryCardRow) {
   return category as CategoryName | undefined;
 }
 
-function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInfo | null, hasCommentOption: boolean) {
+function statusSummary(
+  card: SummaryCardRow,
+  commentDeadline: CommentDeadlineInfo | null,
+  hasCommentOption: boolean,
+  locale: Locale
+) {
   if (commentDeadline) {
     return {
-      label: `Comment deadline ${formatCompactDisplayDate(commentDeadline.value)}`,
+      label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value)}`,
       className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
       icon: Clock
     };
@@ -69,7 +75,7 @@ function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInf
 
   if (hasCommentOption) {
     return {
-      label: "Comment option listed",
+      label: t(locale, "commentOptionListed"),
       className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]",
       icon: MessageSquare
     };
@@ -83,7 +89,7 @@ function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInf
 
   if (status === "Cancelled" || status === "Canceled" || card.meetings?.status === "Cancelled") {
     return {
-      label: "Meeting canceled",
+      label: t(locale, "meetingCanceled"),
       className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]",
       icon: null
     };
@@ -93,10 +99,14 @@ function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInf
     return {
       label:
         compactMeetingDate === "Date not listed"
-          ? "Vote upcoming"
+          ? t(locale, "voteUpcoming")
           : status === "Upcoming vote"
-            ? `Vote scheduled ${compactMeetingDate}`
-            : `Meeting ${compactMeetingDate}`,
+            ? locale === "es"
+              ? `Votación programada ${compactMeetingDate}`
+              : `Vote scheduled ${compactMeetingDate}`
+            : locale === "es"
+              ? `Reunión ${compactMeetingDate}`
+              : `Meeting ${compactMeetingDate}`,
       className: "border-[#f0c75e] bg-[#fff9e9] text-[#a54f00]",
       icon: null
     };
@@ -104,14 +114,14 @@ function statusSummary(card: SummaryCardRow, commentDeadline: CommentDeadlineInf
 
   if (status === "Information only") {
     return {
-      label: "Info only",
+      label: statusLabel(locale, "Info only"),
       className: "border-[#92dfaa] bg-[#effbf3] text-[#16743b]",
       icon: null
     };
   }
 
   return {
-    label: status,
+    label: statusLabel(locale, status),
     className: "border-black/15 bg-black/[0.035] text-black/[0.65]",
     icon: null
   };
@@ -135,25 +145,41 @@ function meetingHref(card: SummaryCardRow) {
   return `/meetings/${meeting.id}${jurisdiction ? `?jurisdiction=${jurisdiction}` : ""}`;
 }
 
-function confidenceLabel(card: SummaryCardRow) {
+function confidenceLabel(card: SummaryCardRow, locale: Locale) {
   const confidence = String(card.confidence || "").trim().toLowerCase();
   if (!["high", "medium", "low"].includes(confidence)) return null;
-  return `Summary confidence: ${confidence}`;
+  const localizedConfidence =
+    locale === "es"
+      ? confidence === "high"
+        ? "alta"
+        : confidence === "medium"
+          ? "media"
+          : "baja"
+      : confidence;
+  return `${t(locale, "summaryConfidence")}: ${localizedConfidence}`;
 }
 
-export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlight?: string }) {
+export function SummaryCard({
+  card,
+  highlight,
+  locale = "en"
+}: {
+  card: SummaryCardRow;
+  highlight?: string;
+  locale?: Locale;
+}) {
   const [open, setOpen] = useState(false);
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
-  const points = summaryPoints(card.what_is_happening);
-  const defaultTitlePreview = points[0] === "Not listed in the source document." ? null : points[0];
+  const points = summaryPoints(card.what_is_happening, locale);
+  const defaultTitlePreview = points[0] === t(locale, "notListedInSource") ? null : points[0];
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
-  const affectedResidents = compactList(card.who_it_affects);
+  const affectedResidents = compactList(card.who_it_affects, locale);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
   const normalizedHighlight = highlight?.trim().toLowerCase() || "";
-  const topicLabel = categoryTags[0] || "Topic not listed";
+  const topicLabel = categoryTags[0] ? categoryLabel(locale, categoryTags[0]) : t(locale, "topicNotListed");
   const primaryCategory = getPrimaryCategory(card);
   const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
   const titleContainsHighlight = normalizedHighlight
@@ -168,14 +194,14 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
   const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
-  const status = statusSummary(card, commentDeadline, hasCommentOption);
-  const summaryConfidence = confidenceLabel(card);
+  const status = statusSummary(card, commentDeadline, hasCommentOption, locale);
+  const summaryConfidence = confidenceLabel(card, locale);
   const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
   const primaryButtonClass =
     "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12365f] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#0d2949] focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
-  const noCommentLabel = "No comment option listed";
+  const noCommentLabel = t(locale, "noCommentOptionListed");
 
   return (
     <article
@@ -186,7 +212,7 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
             <span>
               <HighlightedText
-                text={meeting ? displayMeetingType(meeting) : "Meeting type not listed"}
+                text={meeting ? displayMeetingType(meeting) : t(locale, "meetingTypeNotListed")}
                 query={highlight}
               />
             </span>
@@ -240,7 +266,7 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
             className={primaryButtonClass}
             aria-expanded={open}
           >
-            {open ? "Hide summary" : "Read summary"}
+            {open ? t(locale, "hideSummary") : t(locale, "readSummary")}
             <ChevronDown
               aria-hidden
               className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
@@ -253,7 +279,7 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
         <div className="border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6">
           <div className="grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]">
             <section>
-              <p className="text-xs font-black uppercase text-civic">What&apos;s happening</p>
+              <p className="text-xs font-black uppercase text-civic">{t(locale, "whatIsHappening")}</p>
               <ul className="mt-2 space-y-2">
                 {points.map((point) => (
                   <li key={point} className="flex gap-2">
@@ -265,14 +291,14 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
             </section>
 
             <section>
-              <p className="text-xs font-black uppercase text-black/[0.55]">Why it matters</p>
+              <p className="text-xs font-black uppercase text-black/[0.55]">{t(locale, "whyItMatters")}</p>
               <p className="mt-2">
                 <HighlightedText
-                  text={card.why_it_matters || "Not listed in the source document."}
+                  text={card.why_it_matters || t(locale, "notListedInSource")}
                   query={highlight}
                 />
               </p>
-              <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">Who is affected</p>
+              <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">{t(locale, "whoIsAffected")}</p>
               {affectedTags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {affectedTags.map((resident) => (
@@ -287,26 +313,26 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
             </section>
 
             <section>
-              <p className="text-xs font-black uppercase text-[#8e452e]">How to act</p>
+              <p className="text-xs font-black uppercase text-[#8e452e]">{t(locale, "howToAct")}</p>
               <div className="mt-2 grid gap-3">
                 <p>
-                  <span className="font-bold text-ink">Attend: </span>
+                  <span className="font-bold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
                   <HighlightedText
-                    text={card.how_to_act_attend || "Not listed in the source document."}
+                    text={card.how_to_act_attend || t(locale, "notListedInSource")}
                     query={highlight}
                   />
                 </p>
                 <p>
                   <span className="font-bold text-ink">Email: </span>
                   <HighlightedText
-                    text={card.how_to_act_email || "Not listed in the source document."}
+                    text={card.how_to_act_email || t(locale, "notListedInSource")}
                     query={highlight}
                   />
                 </p>
                 <p>
-                  <span className="font-bold text-ink">Submit comment: </span>
+                  <span className="font-bold text-ink">{t(locale, "submitComment")}: </span>
                   <HighlightedText
-                    text={card.how_to_act_submit_comment || "Not listed in the source document."}
+                    text={card.how_to_act_submit_comment || t(locale, "notListedInSource")}
                     query={highlight}
                   />
                 </p>
@@ -320,9 +346,9 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
               <PendingLink
                 href={meetingPageHref}
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
-                pendingLabel="Opening meeting"
+                pendingLabel={t(locale, "openingMeeting")}
               >
-                Meeting page
+                {t(locale, "meetingPage")}
               </PendingLink>
             ) : null}
             {card.source_url ? (
@@ -332,7 +358,7 @@ export function SummaryCard({ card, highlight }: { card: SummaryCardRow; highlig
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
               >
-                Source
+                {t(locale, "source")}
                 <ExternalLink aria-hidden className="h-4 w-4" />
               </a>
             ) : null}

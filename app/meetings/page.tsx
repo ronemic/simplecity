@@ -7,6 +7,8 @@ import {
   getJurisdictionLabel,
   normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
+import { statusLabel, t } from "@/lib/i18n";
+import { getRequestLocale } from "@/lib/i18n/server";
 
 export const revalidate = 300;
 
@@ -23,6 +25,7 @@ export default async function MeetingsPage({
   }>;
 }) {
   const params = await searchParams;
+  const locale = await getRequestLocale();
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
@@ -31,7 +34,7 @@ export default async function MeetingsPage({
   const search = params.q || "";
   const status = params.status || "";
   const view = params.view === "list" ? "list" : "calendar";
-  const meetings = await getMeetings({ search, status, jurisdiction });
+  const meetings = await getMeetings({ search, status, jurisdiction, locale });
   const meetingListKey = [
     jurisdiction,
     search,
@@ -41,19 +44,21 @@ export default async function MeetingsPage({
     params.date || ""
   ].join("|");
   const statusOptions = [
-    { value: "", label: "All statuses" },
-    { value: "Upcoming", label: "Upcoming" },
-    { value: "Past", label: "Past" },
-    { value: "Cancelled", label: "Cancelled" }
+    { value: "", label: t(locale, "allStatuses") },
+    { value: "Upcoming", label: statusLabel(locale, "Upcoming") },
+    { value: "Past", label: statusLabel(locale, "Past") },
+    { value: "Cancelled", label: statusLabel(locale, "Cancelled") }
   ];
 
   return (
     <div className="section-shell py-10">
       <div className="mb-6 max-w-3xl">
-        <p className="label-eyebrow text-civic">Meetings</p>
-        <h1 className="page-title mt-2">{jurisdictionLabel} meetings</h1>
+        <p className="label-eyebrow text-civic">{t(locale, "meetings")}</p>
+        <h1 className="page-title mt-2">
+          {locale === "es" ? `Reuniones de ${jurisdictionLabel}` : `${jurisdictionLabel} meetings`}
+        </h1>
         <p className="page-copy mt-3 text-base">
-          See every scraped meeting by month, day, or list, with search and status filters.
+          {t(locale, "meetingsDescription")}
         </p>
       </div>
 
@@ -65,17 +70,17 @@ export default async function MeetingsPage({
         <input
           name="q"
           defaultValue={params.q || ""}
-          placeholder="Search meetings..."
+          placeholder={t(locale, "searchMeetings")}
           className="input-control"
         />
         <ListboxSelect
           key={status}
           name="status"
-          label="Status"
+          label={t(locale, "status")}
           value={status}
           options={statusOptions}
         />
-        <button className="action-primary">Filter</button>
+        <button className="action-primary">{t(locale, "filter")}</button>
       </form>
 
       <MeetingList
@@ -84,6 +89,7 @@ export default async function MeetingsPage({
         month={params.month}
         selectedDate={params.date}
         view={view}
+        locale={locale}
       />
     </div>
   );

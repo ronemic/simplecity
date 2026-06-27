@@ -1,6 +1,7 @@
 import { AlertCircle, CalendarClock, Info } from "lucide-react";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { AnnouncementRow } from "@/lib/types";
+import { type Locale, t } from "@/lib/i18n";
 
 const icons = {
   info: Info,
@@ -13,7 +14,13 @@ function jurisdictionLabel(slug?: string | null) {
   return getJurisdictionDisplayLabel(slug);
 }
 
-export function AnnouncementBanner({ announcements }: { announcements?: AnnouncementRow[] | null }) {
+export function AnnouncementBanner({
+  announcements,
+  locale = "en"
+}: {
+  announcements?: AnnouncementRow[] | null;
+  locale?: Locale;
+}) {
   if (!announcements || announcements.length === 0) return null;
 
   return (
@@ -32,7 +39,7 @@ export function AnnouncementBanner({ announcements }: { announcements?: Announce
               </span>
               <div className="min-w-0">
                 <p className="label-eyebrow text-black/[0.65]">
-                  Admin announcement · {jurisdictionLabel(announcement.jurisdiction_slug)}
+                  {t(locale, "adminAnnouncement")} · {jurisdictionLabel(announcement.jurisdiction_slug)}
                 </p>
                 <h2 className="mt-1 text-xl font-black leading-snug text-ink">{announcement.title}</h2>
                 <p className="mt-2 text-sm leading-6 text-black/75">{announcement.body}</p>

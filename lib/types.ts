@@ -167,6 +167,29 @@ export type SummaryCardRow = {
   meetings?: MeetingRow | null;
 };
 
+export type SummaryCardTranslationRow = {
+  id: string;
+  summary_card_id: string;
+  locale: string;
+  agenda_item: string | null;
+  what_is_happening: string | null;
+  why_it_matters: string | null;
+  who_it_affects: string[] | null;
+  status: string | null;
+  comment_window_opens: string | null;
+  comment_window_closes: string | null;
+  how_to_act_attend: string | null;
+  how_to_act_email: string | null;
+  how_to_act_submit_comment: string | null;
+  source_fingerprint: string | null;
+  translation_status: string | null;
+  raw_llm_json: unknown;
+  translated_at: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type MeetingRow = {
   id: string;
   external_id: string | null;
@@ -194,6 +217,21 @@ export type MeetingRow = {
   extraction_notes: unknown;
   raw: unknown;
   scraped_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type MeetingTranslationRow = {
+  id: string;
+  meeting_id: string;
+  locale: string;
+  title: string | null;
+  meeting_type: string | null;
+  source_fingerprint: string | null;
+  translation_status: string | null;
+  raw_llm_json: unknown;
+  translated_at: string | null;
+  reviewed_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 };

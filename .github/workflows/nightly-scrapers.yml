@@ -200,4 +200,4 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Mountain View pipeline
-        run: npm run pipeline:mountain-view
+        run: npm run pipeline:mountain-view -- --max-runtime-minutes=50

@@ -15,8 +15,8 @@ import {
 } from "@/lib/utils/date";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { cn } from "@/lib/utils/cn";
+import { type Locale, t } from "@/lib/i18n";
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MEETING_VIEW_STORAGE_KEY = "simplecity.meeting-list-view";
 
 type MeetingCalendarProps = {
@@ -24,6 +24,7 @@ type MeetingCalendarProps = {
   month?: string;
   selectedDate?: string;
   view?: MeetingView;
+  locale?: Locale;
 };
 
 type MeetingView = "calendar" | "list";
@@ -90,13 +91,13 @@ function meetingDateKey(meeting: MeetingRow) {
   return start ? dateKeyFromDate(start) : null;
 }
 
-function meetingTimeLabel(meeting: MeetingRow) {
+function meetingTimeLabel(meeting: MeetingRow, locale: Locale) {
   const start = meetingStart(meeting);
   if (!start || !hasDisplayableMeetingTime(meeting.date_text, start.toISOString(), meeting.time_text)) {
-    return "Time not listed";
+    return t(locale, "timeNotListed");
   }
 
-  return new Intl.DateTimeFormat("en-US", {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
     timeZone: CIVIC_TIME_ZONE,
     hour: "numeric",
     minute: "2-digit"
@@ -107,11 +108,20 @@ function meetingSortTime(meeting: MeetingRow) {
   return meetingStart(meeting)?.getTime() || Number.POSITIVE_INFINITY;
 }
 
-function formatDateKey(key: string, options: Intl.DateTimeFormatOptions) {
-  return new Intl.DateTimeFormat("en-US", {
+function formatDateKey(key: string, options: Intl.DateTimeFormatOptions, locale: Locale) {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
     timeZone: CIVIC_TIME_ZONE,
     ...options
   }).format(utcDateFromKey(key));
+}
+
+function weekdays(locale: Locale) {
+  const formatter = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+    weekday: "short",
+    timeZone: CIVIC_TIME_ZONE
+  });
+  const firstSunday = new Date(Date.UTC(2024, 0, 7, 12));
+  return Array.from({ length: 7 }, (_, index) => formatter.format(addDays(firstSunday, index)));
 }
 
 function buildMonthDays(monthKey: string) {
@@ -160,7 +170,15 @@ function calendarMeetingTone(status?: string | null) {
   return "border-black/10 bg-white/90 text-ink hover:border-civic/25 hover:bg-[#f7fbff]";
 }
 
-function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compact?: boolean }) {
+function MeetingLine({
+  meeting,
+  compact = false,
+  locale
+}: {
+  meeting: MeetingRow;
+  compact?: boolean;
+  locale: Locale;
+}) {
   return (
     <div
       className={cn(
@@ -170,7 +188,7 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
     >
       <div className="flex items-center gap-1.5 text-sm font-black text-[#12365f]">
         <Clock aria-hidden className="h-3.5 w-3.5" />
-        <span>{meetingTimeLabel(meeting)}</span>
+        <span>{meetingTimeLabel(meeting, locale)}</span>
       </div>
       <div className="min-w-0">
         <PendingLink
@@ -183,7 +201,7 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
             compact ? "!flex !w-full !flex-col !items-start !gap-0.5" : "items-center",
             "transition-opacity"
           )}
-          pendingLabel="Opening meeting"
+          pendingLabel={t(locale, "openingMeeting")}
         >
           {displayMeetingTitle(meeting)}
         </PendingLink>
@@ -193,7 +211,7 @@ function MeetingLine({ meeting, compact = false }: { meeting: MeetingRow; compac
       </div>
       {!compact ? (
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-9 px-3 py-2" />
+          <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-9 px-3 py-2" locale={locale} />
         </div>
       ) : null}
     </div>
@@ -204,7 +222,8 @@ export function MeetingList({
   meetings,
   month,
   selectedDate,
-  view = "calendar"
+  view = "calendar",
+  locale = "en"
 }: MeetingCalendarProps) {
   const todayKey = dateKeyFromDate(new Date());
 
@@ -379,7 +398,8 @@ export function MeetingList({
   const activeMonthLabel = formatDateKey(`${activeMonth}-01`, {
     month: "long",
     year: "numeric"
-  });
+  }, locale);
+  const weekdayLabels = weekdays(locale);
 
   return (
     <div className="grid gap-6">
@@ -404,7 +424,7 @@ export function MeetingList({
                 ) : (
                   <List aria-hidden className="h-4 w-4" />
                 )}
-                {option}
+                {t(locale, option)}
               </button>
             );
           })}
@@ -414,9 +434,9 @@ export function MeetingList({
       {meetings.length === 0 ? (
         <div className="quiet-card p-8 text-center">
           <FileText aria-hidden className="mx-auto h-10 w-10 text-black/40" />
-          <h2 className="mt-3 text-xl font-bold text-ink">No meetings match those filters</h2>
+          <h2 className="mt-3 text-xl font-bold text-ink">{t(locale, "noMatchingMeetings")}</h2>
           <p className="mt-2 text-sm leading-6 text-black/70">
-            Try a broader search, a different status, or another jurisdiction.
+            {t(locale, "tryBroaderMeetingSearch")}
           </p>
         </div>
       ) : (
@@ -430,10 +450,12 @@ export function MeetingList({
             <section className="hidden quiet-card overflow-hidden md:block">
               <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
                 <div>
-                  <p className="label-eyebrow text-civic">Month view</p>
+                  <p className="label-eyebrow text-civic">{t(locale, "monthView")}</p>
                   <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
                   <p className="mt-1 text-sm font-semibold text-black/60">
-                    {monthMeetingCount} meetings shown this month.
+                    {locale === "es"
+                      ? `${monthMeetingCount} reuniones mostradas este mes.`
+                      : `${monthMeetingCount} meetings shown this month.`}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2 md:flex-nowrap">
@@ -443,21 +465,21 @@ export function MeetingList({
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
                   >
                     <ChevronLeft aria-hidden className="h-4 w-4" />
-                    Previous
+                    {t(locale, "previous")}
                   </button>
                   <button
                     type="button"
                     onClick={handleToday}
                     className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
                   >
-                    Today
+                    {t(locale, "today")}
                   </button>
                   <button
                     type="button"
                     onClick={handleNextMonth}
                     className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
                   >
-                    Next
+                    {t(locale, "next")}
                     <ChevronRight aria-hidden className="h-4 w-4" />
                   </button>
                 </div>
@@ -466,7 +488,7 @@ export function MeetingList({
               <div className="overflow-x-auto">
                 <div className="min-w-[720px]">
                   <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
-                    {WEEKDAYS.map((day) => (
+                    {weekdayLabels.map((day) => (
                       <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
                         {day}
                       </div>
@@ -510,10 +532,10 @@ export function MeetingList({
                                   calendarMeetingTone(meeting.status)
                                 )}
                                 contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
-                                pendingLabel="Opening meeting"
+                                pendingLabel={t(locale, "openingMeeting")}
                               >
                                 <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
-                                  {meetingTimeLabel(meeting)}
+                                  {meetingTimeLabel(meeting, locale)}
                                 </span>
                                 <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
                                   {displayMeetingTitle(meeting)}
@@ -531,33 +553,37 @@ export function MeetingList({
 
             <aside className="quiet-card overflow-hidden">
               <div className="border-b border-black/10 p-4">
-                <p className="label-eyebrow text-civic">Day view</p>
+                <p className="label-eyebrow text-civic">{t(locale, "dayView")}</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">
                   {activeDate
                     ? formatDateKey(activeDate, {
                         weekday: "long",
                         month: "short",
                         day: "numeric"
-                      })
-                    : "Select a day"}
+                      }, locale)
+                    : t(locale, "selectADay")}
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-black/60">
                   {activeDateMeetings.length === 1
-                    ? "1 meeting listed."
-                    : `${activeDateMeetings.length} meetings listed.`}
+                    ? locale === "es"
+                      ? "1 reunión indicada."
+                      : "1 meeting listed."
+                    : locale === "es"
+                      ? `${activeDateMeetings.length} reuniones indicadas.`
+                      : `${activeDateMeetings.length} meetings listed.`}
                 </p>
               </div>
               <div className="divide-y divide-black/10">
                 {activeDateMeetings.length > 0 ? (
                   activeDateMeetings.map((meeting) => (
                     <div key={meeting.id} className="p-3.5">
-                      <MeetingLine meeting={meeting} compact />
+                      <MeetingLine meeting={meeting} compact locale={locale} />
                     </div>
                   ))
                 ) : (
                   <div className="p-4">
                     <p className="text-sm font-semibold leading-6 text-black/70">
-                      No meetings are listed for this day with the current filters.
+                      {t(locale, "noMeetingsForDay")}
                     </p>
                   </div>
                 )}
@@ -573,27 +599,35 @@ export function MeetingList({
           >
             <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="label-eyebrow text-civic">All matching meetings</p>
+                <p className="label-eyebrow text-civic">{t(locale, "allMatchingMeetings")}</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">
-                  {meetings.length === 1 ? "1 meeting" : `${meetings.length} meetings`}
+                  {meetings.length === 1
+                    ? locale === "es"
+                      ? "1 reunión"
+                      : "1 meeting"
+                    : locale === "es"
+                      ? `${meetings.length} reuniones`
+                      : `${meetings.length} meetings`}
                 </h2>
               </div>
               <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
                 <Search aria-hidden className="h-4 w-4" />
-                Search and status filters apply to this list.
+                {locale === "es"
+                  ? "La búsqueda y los filtros de estado se aplican a esta lista."
+                  : "Search and status filters apply to this list."}
               </p>
             </div>
             <div className="divide-y divide-black/10">
               {sortedMeetings.map((meeting) => (
                 <article key={meeting.id} className="grid gap-2 p-5 transition hover:bg-black/[0.025] sm:p-6">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
-                    <StatusPill status={meeting.status} />
+                    <StatusPill status={meeting.status} locale={locale} />
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
                       {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
                     </span>
                   </div>
-                  <MeetingLine meeting={meeting} />
+                  <MeetingLine meeting={meeting} locale={locale} />
                 </article>
               ))}
             </div>

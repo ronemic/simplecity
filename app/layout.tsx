@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { getRequestLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
   title: "SimpleCity",
@@ -12,13 +13,15 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getRequestLocale();
+
   return (
-    <html lang="en" data-scroll-behavior="smooth">
+    <html lang={locale} data-scroll-behavior="smooth">
       <body className="font-sans antialiased">
         <Script
           src={`https://www.googletagmanager.com/gtag/js?id=G-SQRVDWEMHW`}
@@ -34,7 +37,7 @@ export default function RootLayout({
         </Script>
         <Header />
         <main>{children}</main>
-        <Footer />
+        <Footer locale={locale} />
       </body>
     </html>
   );

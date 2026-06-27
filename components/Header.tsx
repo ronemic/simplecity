@@ -7,10 +7,11 @@ import {
   normalizeJurisdictionSelection,
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
+import { getRequestLocale } from "@/lib/i18n/server";
 import { HeaderNav, HeaderNavFallback } from "@/components/HeaderNav";
 
 export async function Header() {
-  const cookieStore = await cookies();
+  const [cookieStore, locale] = await Promise.all([cookies(), getRequestLocale()]);
   const initialJurisdiction = normalizeJurisdictionSelection(
     cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
@@ -33,7 +34,7 @@ export async function Header() {
           <span>SimpleCity</span>
         </Link>
         <Suspense fallback={<HeaderNavFallback />}>
-          <HeaderNav initialJurisdiction={toPublicJurisdictionSlug(initialJurisdiction)} />
+          <HeaderNav initialJurisdiction={toPublicJurisdictionSlug(initialJurisdiction)} locale={locale} />
         </Suspense>
       </div>
     </header>

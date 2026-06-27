@@ -3,13 +3,16 @@
 import { Search, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { type Locale, t } from "@/lib/i18n";
 
 export function DecisionSearchForm({
   search = "",
-  placeholder = "Search decisions..."
+  placeholder,
+  locale = "en"
 }: {
   search?: string;
   placeholder?: string;
+  locale?: Locale;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -57,8 +60,8 @@ export function DecisionSearchForm({
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder={placeholder}
-        aria-label="Search decisions"
+        placeholder={placeholder || `${t(locale, "searchDecisions")}...`}
+        aria-label={t(locale, "searchDecisions")}
         autoComplete="off"
         className="input-control input-control--search"
       />
@@ -66,7 +69,7 @@ export function DecisionSearchForm({
           <button
             type="button"
             onClick={() => setValue("")}
-            aria-label="Clear search"
+            aria-label={t(locale, "clearSearch")}
             className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-black/50 transition hover:bg-black/[0.05] hover:text-ink focus-visible:focus-ring"
           >
             <X aria-hidden className="h-4 w-4" />

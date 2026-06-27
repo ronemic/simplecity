@@ -37,6 +37,7 @@
     "summarize:san-mateo-city": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=san-mateo-city",
     "summarize:santa-clara-county": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=santa-clara-county",
     "summarize:mountain-view": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=mountain-view",
+    "translations:backfill": "node --import tsx/esm scripts/backfill-translations.ts",
     "pipeline": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts",
     "pipeline:foster-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=foster-city",
     "pipeline:san-mateo-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=san-mateo-city",
