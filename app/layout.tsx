@@ -1,16 +1,32 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
+  applicationName: "SimpleCity",
   title: "SimpleCity",
   description: "Local decisions, translated into plain-English civic action cards.",
+  manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/favicon.svg"
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" }
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }]
+  },
+  appleWebApp: {
+    capable: true,
+    title: "SimpleCity",
+    statusBarStyle: "default"
   }
+};
+
+export const viewport: Viewport = {
+  themeColor: "#2457a6"
 };
 
 export default async function RootLayout({
@@ -38,6 +54,7 @@ export default async function RootLayout({
         <Header />
         <main>{children}</main>
         <Footer locale={locale} />
+        <ServiceWorkerRegistration />
       </body>
     </html>
   );
