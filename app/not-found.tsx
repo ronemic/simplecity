@@ -11,8 +11,8 @@ export default async function NotFound() {
         <h1 className="text-2xl font-bold text-ink">{t(locale, "pageNotFound")}</h1>
         <p className="mt-2 text-sm leading-6 text-black/75">
           {locale === "es"
-            ? "Es posible que la reunión o categoría aún no exista, o que todavía no se haya cargado desde PrimeGov."
-            : "The meeting or category may not exist yet, or it may not have been loaded from PrimeGov."}
+            ? "Es posible que esta página no exista, haya cambiado de ubicación o ya no esté disponible."
+            : "This page may not exist, may have moved, or may no longer be available."}
         </p>
         <Link
           href="/"
