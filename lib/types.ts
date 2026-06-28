@@ -130,6 +130,23 @@ export type SimpleCityCard = {
   confidence: "high" | "medium" | "low";
 };
 
+export type SimpleCityCardTranslation = {
+  agendaItem: string;
+  whatIsHappening: string;
+  whyItMatters: string;
+  whoItAffects: string[];
+  status: string;
+  commentWindow: {
+    opens: string;
+    closes: string;
+  };
+  howToAct: {
+    attend: string;
+    email: string;
+    submitComment: string;
+  };
+};
+
 export type SimpleCitySummary = {
   meetingSummary: {
     title: string;
@@ -138,6 +155,15 @@ export type SimpleCitySummary = {
     oneSentenceSummary: string;
   };
   cards: SimpleCityCard[];
+  translations?: {
+    es?: {
+      meeting?: {
+        title: string;
+        meetingType: string;
+      };
+      cards: Array<SimpleCityCardTranslation | null>;
+    };
+  };
 };
 
 export type SummaryCardRow = {

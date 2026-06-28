@@ -58,7 +58,33 @@ JSON schema:
       "source": "string",
       "confidence": "high | medium | low"
     }
-  ]
+  ],
+  "translations": {
+    "es": {
+      "meeting": {
+        "title": "Spanish translation of the meeting metadata title",
+        "meetingType": "Spanish translation of the meeting metadata meeting type"
+      },
+      "cards": [
+        {
+          "agendaItem": "Spanish translation of cards[0].agendaItem",
+          "whatIsHappening": "Spanish translation of cards[0].whatIsHappening",
+          "whyItMatters": "Spanish translation of cards[0].whyItMatters",
+          "whoItAffects": ["Spanish translations of cards[0].whoItAffects"],
+          "status": "exact same English status enum as cards[0].status",
+          "commentWindow": {
+            "opens": "Spanish translation of cards[0].commentWindow.opens",
+            "closes": "Spanish translation of cards[0].commentWindow.closes"
+          },
+          "howToAct": {
+            "attend": "Spanish translation of cards[0].howToAct.attend",
+            "email": "Spanish translation of cards[0].howToAct.email",
+            "submitComment": "Spanish translation of cards[0].howToAct.submitComment"
+          }
+        }
+      ]
+    }
+  }
 }
 
 Rules:
@@ -94,7 +120,14 @@ Rules:
 - Do not include URLs, email addresses, phone numbers, deadlines, meeting times, ordinance numbers, resolution numbers, vote counts, contract amounts, or project quantities unless they appear in the provided text.
 - Do not invent facts.
 - If information is missing, write “Not listed in the source document.”
-- If no non-routine or transparency-worthy source-supported agenda items are visible, return an empty cards array.`;
+- If no non-routine or transparency-worthy source-supported agenda items are visible, return an empty cards array.
+- Always include translations.es.
+- translations.es.cards must have the same number of items as cards, in the exact same order.
+- Translate only public-facing text into Spanish. Preserve URLs, emails, phone numbers, dollar amounts, dates, times, item numbers, ordinance numbers, resolution numbers, vote counts, contract amounts, and project quantities exactly as written.
+- In translations.es.cards[*].status, keep the exact same English enum value as the matching cards[*].status. Do not translate status.
+- If an English field says “Not listed in the source document.”, translate that field as “No indicado en el documento fuente.”
+- If cards is empty, return translations.es.cards as an empty array.
+- Do not add facts in Spanish that are not present in the English card.`;
 
 export function buildSimpleCityUserPrompt(meeting: LlmReadyMeeting) {
   const dateTime =

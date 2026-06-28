@@ -98,6 +98,52 @@ test("dedupes cards for the same agenda item and source", () => {
   assert.equal(result.cards.length, 1);
 });
 
+test("keeps Spanish card translations aligned with validated cards", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard()],
+      translations: {
+        es: {
+          meeting: {
+            title: "Reunión del Concejo",
+            meetingType: "Concejo Municipal"
+          },
+          cards: [
+            {
+              agendaItem: "Aprobación de contrato",
+              whatIsHappening: "El concejo considerará un contrato de $100 para mantenimiento de parques.",
+              whyItMatters: "El contrato afecta el mantenimiento de parques.",
+              whoItAffects: ["usuarios de parques"],
+              status: "Votación próxima",
+              commentWindow: {
+                opens: "No indicado en el documento fuente.",
+                closes: "No indicado en el documento fuente."
+              },
+              howToAct: {
+                attend: "Asiste a la reunión a las 7:00 PM.",
+                email: "No indicado en el documento fuente.",
+                submitComment: "No indicado en el documento fuente."
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.translations?.es?.meeting?.title, "Reunión del Concejo");
+  assert.equal(result.translations?.es?.cards.length, 1);
+  assert.equal(result.translations?.es?.cards[0]?.agendaItem, "Aprobación de contrato");
+  assert.equal(result.translations?.es?.cards[0]?.status, "Upcoming vote");
+});
+
 test("drops cards with ungrounded contact details", () => {
   const result = validateSimpleCitySummary(
     {

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
 import { CATEGORIES } from "@/lib/constants";
-import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
+import type { LlmReadyMeeting, SimpleCityCardTranslation, SimpleCitySummary } from "@/lib/types";
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 
 const allowedCategories = new Set<string>(CATEGORIES);
@@ -63,6 +63,34 @@ const CardSchema = z.object({
   confidence: z.enum(["high", "medium", "low"]).default("medium")
 });
 
+const CardTranslationSchema = z.object({
+  agendaItem: z.string().default(""),
+  whatIsHappening: z.string().default(""),
+  whyItMatters: z.string().default(""),
+  whoItAffects: z.array(z.string()).default([]),
+  status: z.string().default(""),
+  commentWindow: z
+    .object({
+      opens: z.string().default("No indicado en el documento fuente."),
+      closes: z.string().default("No indicado en el documento fuente.")
+    })
+    .default({
+      opens: "No indicado en el documento fuente.",
+      closes: "No indicado en el documento fuente."
+    }),
+  howToAct: z
+    .object({
+      attend: z.string().default("No indicado en el documento fuente."),
+      email: z.string().default("No indicado en el documento fuente."),
+      submitComment: z.string().default("No indicado en el documento fuente.")
+    })
+    .default({
+      attend: "No indicado en el documento fuente.",
+      email: "No indicado en el documento fuente.",
+      submitComment: "No indicado en el documento fuente."
+    })
+});
+
 const SummarySchema = z.object({
   meetingSummary: z.object({
     title: z.string().default(""),
@@ -70,7 +98,22 @@ const SummarySchema = z.object({
     status: z.string().default(""),
     oneSentenceSummary: z.string().default("")
   }),
-  cards: z.array(CardSchema).default([])
+  cards: z.array(CardSchema).default([]),
+  translations: z
+    .object({
+      es: z
+        .object({
+          meeting: z
+            .object({
+              title: z.string().default(""),
+              meetingType: z.string().default("")
+            })
+            .optional(),
+          cards: z.array(CardTranslationSchema.nullable()).default([])
+        })
+        .optional()
+    })
+    .optional()
 });
 
 export type SummaryValidationIssue = {
@@ -179,6 +222,36 @@ function cardDedupeKey(card: SimpleCitySummary["cards"][number]) {
   return `${normalizeEvidenceText(card.agendaItem)}|${normalizeUrl(card.source)}`;
 }
 
+function cleanCardTranslation(
+  translation: z.infer<typeof CardTranslationSchema> | null | undefined,
+  sourceStatus: string
+): SimpleCityCardTranslation | null {
+  if (!translation) return null;
+
+  const agendaItem = translation.agendaItem.trim();
+  const whatIsHappening = translation.whatIsHappening.trim();
+  const whyItMatters = translation.whyItMatters.trim();
+
+  if (!agendaItem || !whatIsHappening || !whyItMatters) return null;
+
+  return {
+    agendaItem,
+    whatIsHappening,
+    whyItMatters,
+    whoItAffects: translation.whoItAffects.map((item) => item.trim()).filter(Boolean),
+    status: sourceStatus,
+    commentWindow: {
+      opens: translation.commentWindow.opens.trim(),
+      closes: translation.commentWindow.closes.trim()
+    },
+    howToAct: {
+      attend: translation.howToAct.attend.trim(),
+      email: translation.howToAct.email.trim(),
+      submitComment: translation.howToAct.submitComment.trim()
+    }
+  };
+}
+
 function buildMeetingSourceText(meeting: LlmReadyMeeting) {
   return [
     meeting.title,
@@ -263,8 +336,11 @@ export function validateSimpleCitySummary(
   const sourceText = options.sourceText || "";
   const maxConfidence = options.maxConfidence || "high";
 
+  const spanishMeeting = parsed.translations?.es?.meeting;
+  const spanishCardTranslations = parsed.translations?.es?.cards || [];
+
   const cards = parsed.cards
-    .map((card) => {
+    .map((card, index) => {
       const howToAct = {
         attend: card.howToAct.attend.trim(),
         email: card.howToAct.email.trim(),
@@ -335,29 +411,32 @@ export function validateSimpleCitySummary(
       }
 
       return {
-        ...card,
-        agendaItem,
-        whatIsHappening,
-        whyItMatters,
-        whoItAffects: card.whoItAffects.map((item) => item.trim()).filter(Boolean),
-        categoryTags,
-        commentWindow: {
-          ...commentWindow,
-          closes: commentDeadline?.value || commentWindow.closes
+        card: {
+          ...card,
+          agendaItem,
+          whatIsHappening,
+          whyItMatters,
+          whoItAffects: card.whoItAffects.map((item) => item.trim()).filter(Boolean),
+          categoryTags,
+          commentWindow: {
+            ...commentWindow,
+            closes: commentDeadline?.value || commentWindow.closes
+          },
+          howToAct,
+          source,
+          status,
+          confidence: capConfidence(card.confidence, maxConfidence)
         },
-        howToAct,
-        source,
-        status,
-        confidence: capConfidence(card.confidence, maxConfidence)
+        spanishTranslation: cleanCardTranslation(spanishCardTranslations[index], status)
       };
     })
     .filter((card): card is NonNullable<typeof card> => Boolean(card));
   const seenCards = new Set<string>();
   const dedupedCards = cards.filter((card) => {
-    const key = cardDedupeKey(card);
+    const key = cardDedupeKey(card.card);
     if (seenCards.has(key)) {
       options.onIssue?.({
-        agendaItem: card.agendaItem,
+        agendaItem: card.card.agendaItem,
         reason: "Duplicate card for the same agenda item and source was dropped."
       });
       return false;
@@ -369,7 +448,20 @@ export function validateSimpleCitySummary(
 
   return {
     meetingSummary: parsed.meetingSummary,
-    cards: dedupedCards
+    cards: dedupedCards.map((entry) => entry.card),
+    translations: parsed.translations?.es
+      ? {
+          es: {
+            meeting: spanishMeeting
+              ? {
+                  title: spanishMeeting.title.trim(),
+                  meetingType: spanishMeeting.meetingType.trim()
+                }
+              : undefined,
+            cards: dedupedCards.map((entry) => entry.spanishTranslation)
+          }
+        }
+      : undefined
   };
 }
 

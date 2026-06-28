@@ -1,7 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
+import type { LlmReadyMeeting, SimpleCityCard, SimpleCitySummary } from "@/lib/types";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
+import {
+  meetingTranslationFingerprint,
+  summaryCardTranslationFingerprint
+} from "@/lib/db/translationFingerprint";
 import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 
@@ -18,6 +22,17 @@ type PreservedCardAdminState = {
   is_published: boolean | null;
   is_featured: boolean | null;
   admin_notes: string | null;
+};
+
+type InsertedCardIdentity = {
+  id: string;
+  agenda_item: string | null;
+  source_url: string | null;
+};
+
+type CardWithSummaryIndex = {
+  card: SimpleCityCard;
+  summaryIndex: number;
 };
 
 function sanitizeDatabaseString(value: string) {
@@ -51,6 +66,61 @@ function exactCardKey(agendaItem?: string | null, sourceUrl?: string | null) {
   return `${normalizeCardKey(agendaItem)}|${normalizeCardKey(sourceUrl)}`;
 }
 
+function summaryCardFingerprintInput(card: SimpleCityCard) {
+  return {
+    agenda_item: card.agendaItem,
+    what_is_happening: card.whatIsHappening,
+    why_it_matters: card.whyItMatters,
+    who_it_affects: card.whoItAffects,
+    status: card.status,
+    comment_window_opens: card.commentWindow.opens,
+    comment_window_closes: card.commentWindow.closes,
+    how_to_act_attend: card.howToAct.attend,
+    how_to_act_email: card.howToAct.email,
+    how_to_act_submit_comment: card.howToAct.submitComment
+  };
+}
+
+function cardInsertRow(
+  meetingId: string,
+  card: SimpleCityCard,
+  rawLlmJson: unknown,
+  options: {
+    jurisdiction?: JurisdictionConfig | null;
+    isPublished: boolean;
+    isFeatured: boolean;
+    adminNotes: string | null;
+  }
+) {
+  return sanitizeForDatabase({
+    ...(options.jurisdiction
+      ? {
+          jurisdiction_name: options.jurisdiction.name,
+          jurisdiction_slug: options.jurisdiction.slug,
+          platform: options.jurisdiction.platform
+        }
+      : {}),
+    meeting_id: meetingId,
+    agenda_item: card.agendaItem,
+    what_is_happening: card.whatIsHappening,
+    why_it_matters: card.whyItMatters,
+    who_it_affects: card.whoItAffects,
+    category_tags: card.categoryTags,
+    status: card.status,
+    comment_window_opens: card.commentWindow.opens,
+    comment_window_closes: card.commentWindow.closes,
+    how_to_act_attend: card.howToAct.attend,
+    how_to_act_email: card.howToAct.email,
+    how_to_act_submit_comment: card.howToAct.submitComment,
+    source_url: card.source,
+    confidence: card.confidence,
+    is_published: options.isPublished,
+    is_featured: options.isFeatured,
+    admin_notes: options.adminNotes,
+    raw_llm_json: rawLlmJson
+  });
+}
+
 function meetingDateTimeText(meeting: LlmReadyMeeting) {
   const dateText = meeting.dateText || "";
   const timeText = meeting.timeText || "";
@@ -77,6 +147,93 @@ async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string)
 
   if (error) throw new Error(`Failed to count existing cards: ${error.message}`);
   return count || 0;
+}
+
+async function writeSpanishMeetingTranslation(
+  supabase: SupabaseClient,
+  meetingId: string,
+  summary: SimpleCitySummary,
+  rawLlmJson: unknown
+) {
+  const translation = summary.translations?.es?.meeting;
+  if (!translation?.title && !translation?.meetingType) return;
+
+  const { data: meeting, error: meetingError } = await supabase
+    .from("meetings")
+    .select("title,meeting_type")
+    .eq("id", meetingId)
+    .single();
+
+  if (meetingError) {
+    throw new Error(`Failed to load meeting for translation: ${meetingError.message}`);
+  }
+
+  const now = new Date().toISOString();
+  const { error } = await supabase.from("meeting_translations").upsert(
+    sanitizeForDatabase({
+      meeting_id: meetingId,
+      locale: "es",
+      title: translation.title || meeting.title,
+      meeting_type: translation.meetingType || meeting.meeting_type,
+      source_fingerprint: meetingTranslationFingerprint(meeting),
+      translation_status: "machine",
+      raw_llm_json: rawLlmJson,
+      translated_at: now
+    }),
+    { onConflict: "meeting_id,locale" }
+  );
+
+  if (error) throw new Error(`Failed to write meeting translation: ${error.message}`);
+}
+
+async function writeSpanishCardTranslations(
+  supabase: SupabaseClient,
+  insertedCards: InsertedCardIdentity[],
+  cards: CardWithSummaryIndex[],
+  summary: SimpleCitySummary,
+  rawLlmJson: unknown
+) {
+  const translations = summary.translations?.es?.cards;
+  if (!translations?.length || insertedCards.length === 0) return;
+
+  const insertedByKey = new Map(
+    insertedCards.map((card) => [exactCardKey(card.agenda_item, card.source_url), card])
+  );
+  const now = new Date().toISOString();
+  const rows = cards
+    .map(({ card, summaryIndex }) => {
+      const translation = translations[summaryIndex];
+      const inserted = insertedByKey.get(exactCardKey(card.agendaItem, card.source));
+      if (!translation || !inserted?.id) return null;
+
+      return sanitizeForDatabase({
+        summary_card_id: inserted.id,
+        locale: "es",
+        agenda_item: translation.agendaItem,
+        what_is_happening: translation.whatIsHappening,
+        why_it_matters: translation.whyItMatters,
+        who_it_affects: translation.whoItAffects,
+        status: card.status,
+        comment_window_opens: translation.commentWindow.opens,
+        comment_window_closes: translation.commentWindow.closes,
+        how_to_act_attend: translation.howToAct.attend,
+        how_to_act_email: translation.howToAct.email,
+        how_to_act_submit_comment: translation.howToAct.submitComment,
+        source_fingerprint: summaryCardTranslationFingerprint(summaryCardFingerprintInput(card)),
+        translation_status: "machine",
+        raw_llm_json: rawLlmJson,
+        translated_at: now
+      });
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+  if (rows.length === 0) return;
+
+  const { error } = await supabase
+    .from("summary_card_translations")
+    .upsert(rows, { onConflict: "summary_card_id,locale" });
+
+  if (error) throw new Error(`Failed to write summary card translations: ${error.message}`);
 }
 
 export async function markMeetingSummarized(
@@ -244,6 +401,7 @@ export async function replaceSummaryCardsForMeeting(
 
     if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
+    await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
     await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
     return [];
@@ -256,45 +414,37 @@ export async function replaceSummaryCardsForMeeting(
 
   if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
-  const rows = summary.cards.map((card) => {
+  const cardsToInsert = summary.cards.map((card, summaryIndex) => ({ card, summaryIndex }));
+  const rows = cardsToInsert.map(({ card }) => {
     const preserved =
       preservedByExactKey.get(exactCardKey(card.agendaItem, card.source)) ||
       preservedByAgendaKey.get(normalizeCardKey(card.agendaItem));
 
-    return sanitizeForDatabase({
-      ...(options.jurisdiction
-        ? {
-            jurisdiction_name: options.jurisdiction.name,
-            jurisdiction_slug: options.jurisdiction.slug,
-            platform: options.jurisdiction.platform
-          }
-        : {}),
-      meeting_id: meetingId,
-      agenda_item: card.agendaItem,
-      what_is_happening: card.whatIsHappening,
-      why_it_matters: card.whyItMatters,
-      who_it_affects: card.whoItAffects,
-      category_tags: card.categoryTags,
-      status: card.status,
-      comment_window_opens: card.commentWindow.opens,
-      comment_window_closes: card.commentWindow.closes,
-      how_to_act_attend: card.howToAct.attend,
-      how_to_act_email: card.howToAct.email,
-      how_to_act_submit_comment: card.howToAct.submitComment,
-      source_url: card.source,
-      confidence: card.confidence,
-      is_published:
+    return cardInsertRow(meetingId, card, rawLlmJson, {
+      jurisdiction: options.jurisdiction,
+      isPublished:
         typeof preserved?.is_published === "boolean" ? preserved.is_published : true,
-      is_featured:
+      isFeatured:
         typeof preserved?.is_featured === "boolean" ? preserved.is_featured : false,
-      admin_notes: preserved?.admin_notes || null,
-      raw_llm_json: rawLlmJson
+      adminNotes: preserved?.admin_notes || null
     });
   });
 
-  const { data, error } = await supabase.from("summary_cards").insert(rows).select("id");
+  const { data, error } = await supabase
+    .from("summary_cards")
+    .insert(rows)
+    .select("id,agenda_item,source_url");
 
   if (error) throw new Error(`Failed to insert summary cards: ${error.message}`);
+
+  await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
+  await writeSpanishCardTranslations(
+    supabase,
+    ((data || []) as unknown as InsertedCardIdentity[]),
+    cardsToInsert,
+    summary,
+    rawLlmJson
+  );
 
   await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
@@ -326,50 +476,44 @@ export async function appendSummaryCardsForMeeting(
     existingAgendaKeys.add(normalizeCardKey(card.agenda_item));
   }
 
-  const newCards = summary.cards.filter((card) => {
-    const exactKey = exactCardKey(card.agendaItem, card.source);
-    const agendaKey = normalizeCardKey(card.agendaItem);
-    return !existingExactKeys.has(exactKey) && !existingAgendaKeys.has(agendaKey);
-  });
+  const newCards = summary.cards
+    .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(({ card }) => {
+      const exactKey = exactCardKey(card.agendaItem, card.source);
+      const agendaKey = normalizeCardKey(card.agendaItem);
+      return !existingExactKeys.has(exactKey) && !existingAgendaKeys.has(agendaKey);
+    });
 
   if (newCards.length === 0) {
+    await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
     await markMeetingSummarized(supabase, meetingId, options.sourceHash);
     return [];
   }
 
-  const rows = newCards.map((card) =>
-    sanitizeForDatabase({
-      ...(options.jurisdiction
-        ? {
-            jurisdiction_name: options.jurisdiction.name,
-            jurisdiction_slug: options.jurisdiction.slug,
-            platform: options.jurisdiction.platform
-          }
-        : {}),
-      meeting_id: meetingId,
-      agenda_item: card.agendaItem,
-      what_is_happening: card.whatIsHappening,
-      why_it_matters: card.whyItMatters,
-      who_it_affects: card.whoItAffects,
-      category_tags: card.categoryTags,
-      status: card.status,
-      comment_window_opens: card.commentWindow.opens,
-      comment_window_closes: card.commentWindow.closes,
-      how_to_act_attend: card.howToAct.attend,
-      how_to_act_email: card.howToAct.email,
-      how_to_act_submit_comment: card.howToAct.submitComment,
-      source_url: card.source,
-      confidence: card.confidence,
-      is_published: true,
-      is_featured: false,
-      admin_notes: null,
-      raw_llm_json: rawLlmJson
+  const rows = newCards.map(({ card }) =>
+    cardInsertRow(meetingId, card, rawLlmJson, {
+      jurisdiction: options.jurisdiction,
+      isPublished: true,
+      isFeatured: false,
+      adminNotes: null
     })
   );
 
-  const { data, error } = await supabase.from("summary_cards").insert(rows).select("id");
+  const { data, error } = await supabase
+    .from("summary_cards")
+    .insert(rows)
+    .select("id,agenda_item,source_url");
 
   if (error) throw new Error(`Failed to append summary cards: ${error.message}`);
+
+  await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
+  await writeSpanishCardTranslations(
+    supabase,
+    ((data || []) as unknown as InsertedCardIdentity[]),
+    newCards,
+    summary,
+    rawLlmJson
+  );
 
   await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
