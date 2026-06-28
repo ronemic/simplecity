@@ -4,6 +4,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { getPublishedCards } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
+  ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
   normalizeJurisdictionSelection
@@ -16,6 +17,26 @@ import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const revalidate = 300;
+
+function decisionsTitle(locale: "en" | "es", jurisdiction: string, jurisdictionLabel: string) {
+  if (jurisdiction === ALL_JURISDICTIONS_SLUG) {
+    return locale === "es" ? "Todas las decisiones" : "All decisions";
+  }
+
+  return locale === "es" ? `Decisiones de ${jurisdictionLabel}` : `${jurisdictionLabel} decisions`;
+}
+
+function noCardsDescription(locale: "en" | "es", jurisdiction: string, jurisdictionLabel: string) {
+  if (jurisdiction === ALL_JURISDICTIONS_SLUG) {
+    return locale === "es"
+      ? "Las tarjetas oficiales de agenda aparecerán aquí cuando se recopilen las reuniones."
+      : "Official agenda cards will appear here once meetings are scraped.";
+  }
+
+  return locale === "es"
+    ? `Las tarjetas oficiales de agenda de ${jurisdictionLabel} aparecerán aquí cuando se recopilen las reuniones.`
+    : `Official ${jurisdictionLabel} agenda cards will appear here once meetings are scraped.`;
+}
 
 export default async function DecisionsPage({
   searchParams
@@ -46,7 +67,7 @@ export default async function DecisionsPage({
       <div className="mb-6 max-w-3xl">
         <p className="label-eyebrow text-civic">{t(locale, "decisions")}</p>
         <h1 className="page-title mt-2">
-          {locale === "es" ? `Decisiones de ${jurisdictionLabel}` : `${jurisdictionLabel} decisions`}
+          {decisionsTitle(locale, jurisdiction, jurisdictionLabel)}
         </h1>
         <p className="page-copy mt-3 text-base">
           {t(locale, "decisionsDescription")}
@@ -68,9 +89,7 @@ export default async function DecisionsPage({
             <p className="mt-2 text-sm leading-6 text-black/70">
               {search || selectedCategory
                 ? t(locale, "tryChangingFilters")
-                : locale === "es"
-                  ? `Las tarjetas oficiales de agenda de ${jurisdictionLabel} aparecerán aquí cuando se recopilen las reuniones.`
-                  : `Official ${jurisdictionLabel} agenda cards will appear here once meetings are scraped.`}
+                : noCardsDescription(locale, jurisdiction, jurisdictionLabel)}
             </p>
           </div>
         ) : null}

@@ -3,6 +3,7 @@ import { MeetingList } from "@/components/MeetingList";
 import { getMeetings } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
+  ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
   normalizeJurisdictionSelection
@@ -11,6 +12,14 @@ import { statusLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const revalidate = 300;
+
+function meetingsTitle(locale: "en" | "es", jurisdiction: string, jurisdictionLabel: string) {
+  if (jurisdiction === ALL_JURISDICTIONS_SLUG) {
+    return locale === "es" ? "Reuniones de todas las jurisdicciones" : "All meetings";
+  }
+
+  return locale === "es" ? `Reuniones de ${jurisdictionLabel}` : `${jurisdictionLabel} meetings`;
+}
 
 export default async function MeetingsPage({
   searchParams
@@ -55,7 +64,7 @@ export default async function MeetingsPage({
       <div className="mb-6 max-w-3xl">
         <p className="label-eyebrow text-civic">{t(locale, "meetings")}</p>
         <h1 className="page-title mt-2">
-          {locale === "es" ? `Reuniones de ${jurisdictionLabel}` : `${jurisdictionLabel} meetings`}
+          {meetingsTitle(locale, jurisdiction, jurisdictionLabel)}
         </h1>
         <p className="page-copy mt-3 text-base">
           {t(locale, "meetingsDescription")}
