@@ -44,13 +44,14 @@ export default async function DecisionsPage({
   searchParams: Promise<{
     q?: string;
     category?: string;
+    jurisdiction?: string;
   }>;
 }) {
   const params = await searchParams;
   const locale = await getRequestLocale();
   const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
-    cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = (params.q || "").trim();
@@ -75,7 +76,12 @@ export default async function DecisionsPage({
       </div>
 
       <DecisionSearchForm search={params.q || ""} locale={locale} />
-      <DecisionCategorySelector selectedCategory={selectedCategory} search={search} locale={locale} />
+      <DecisionCategorySelector
+        selectedCategory={selectedCategory}
+        search={search}
+        jurisdiction={params.jurisdiction}
+        locale={locale}
+      />
 
       <div className="mt-6 grid gap-3" aria-live="polite">
         {prioritizedCards.map((card) => (

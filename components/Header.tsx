@@ -34,7 +34,11 @@ export async function Header() {
           <span>SimpleCity</span>
         </Link>
         <Suspense fallback={<HeaderNavFallback />}>
-          <HeaderNav initialJurisdiction={toPublicJurisdictionSlug(initialJurisdiction)} locale={locale} />
+          <HeaderNav
+            key={`${toPublicJurisdictionSlug(initialJurisdiction)}-${locale}`}
+            initialJurisdiction={toPublicJurisdictionSlug(initialJurisdiction)}
+            locale={locale}
+          />
         </Suspense>
       </div>
     </header>

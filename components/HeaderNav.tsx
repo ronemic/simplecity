@@ -1,9 +1,9 @@
 "use client";
 
-import { Check, ChevronDown, Languages, MapPin } from "lucide-react";
+import { Check, ChevronDown, Languages, Loader2, MapPin } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { JURISDICTION_PREFERENCE_COOKIE } from "@/lib/config/jurisdictions";
 import { LANGUAGE_OPTIONS, LOCALE_COOKIE, type Locale, t } from "@/lib/i18n";
 
@@ -61,10 +61,13 @@ export function HeaderNav({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [selected, setSelected] = useState(() => normalizeJurisdiction(initialJurisdiction));
   const [selectedLocale, setSelectedLocale] = useState<Locale>(locale);
+  const [isPending, startTransition] = useTransition();
+  const [pendingSelector, setPendingSelector] = useState<"jurisdiction" | "language" | null>(null);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
   const languageMenuRef = useRef<HTMLDivElement>(null);
   const selectedJurisdiction =
@@ -72,31 +75,8 @@ export function HeaderNav({
     jurisdictions.find((jurisdiction) => jurisdiction.slug === "san-mateo")!;
   const selectedLanguage =
     LANGUAGE_OPTIONS.find((option) => option.locale === selectedLocale) || LANGUAGE_OPTIONS[0];
-
-  useEffect(() => {
-    try {
-      const storedJurisdiction = window.localStorage.getItem(JURISDICTION_STORAGE_KEY);
-      const normalizedStoredJurisdiction = normalizeJurisdiction(storedJurisdiction);
-      const current = normalizeJurisdiction(selected);
-
-      window.localStorage.setItem(JURISDICTION_STORAGE_KEY, normalizedStoredJurisdiction);
-      writeJurisdictionPreference(normalizedStoredJurisdiction);
-      if (normalizedStoredJurisdiction !== current) {
-        router.refresh();
-      }
-    } catch {
-      // Ignore storage failures and keep the default jurisdiction.
-    }
-  }, [router, selected]);
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LOCALE_STORAGE_KEY, selectedLocale);
-      writeLocalePreference(selectedLocale);
-    } catch {
-      // Ignore storage failures and keep the server-selected locale.
-    }
-  }, [selectedLocale]);
+  const isJurisdictionPending = isPending && pendingSelector === "jurisdiction";
+  const isLanguagePending = isPending && pendingSelector === "language";
 
   useEffect(() => {
     if (!isJurisdictionMenuOpen) return;
@@ -150,28 +130,41 @@ export function HeaderNav({
     return href;
   }
 
+  function hrefWithSelection(key: "jurisdiction" | "lang", value: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(key, value);
+    const query = params.toString();
+    return `${pathname}${query ? `?${query}` : ""}`;
+  }
+
   function changeJurisdiction(value: string) {
     setIsJurisdictionMenuOpen(false);
     setSelected(value);
+    setPendingSelector("jurisdiction");
     try {
       window.localStorage.setItem(JURISDICTION_STORAGE_KEY, value);
       writeJurisdictionPreference(value);
     } catch {
       // Ignore storage failures so the selector still works normally.
     }
-    router.refresh();
+    startTransition(() => {
+      router.push(hrefWithSelection("jurisdiction", value), { scroll: false });
+    });
   }
 
   function changeLanguage(value: Locale) {
     setIsLanguageMenuOpen(false);
     setSelectedLocale(value);
+    setPendingSelector("language");
     try {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, value);
       writeLocalePreference(value);
     } catch {
       // Ignore storage failures so the selector still works normally.
     }
-    router.refresh();
+    startTransition(() => {
+      router.push(hrefWithSelection("lang", value), { scroll: false });
+    });
   }
 
   return (
@@ -184,6 +177,7 @@ export function HeaderNav({
           type="button"
           aria-haspopup="listbox"
           aria-expanded={isJurisdictionMenuOpen}
+          aria-busy={isJurisdictionPending}
           className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:focus-ring"
           onClick={() => setIsJurisdictionMenuOpen((isOpen) => !isOpen)}
         >
@@ -191,12 +185,16 @@ export function HeaderNav({
             <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
             <span className="truncate">{jurisdictionLabel(selectedJurisdiction, selectedLocale)}</span>
           </span>
-          <ChevronDown
-            aria-hidden="true"
-            className={`h-4 w-4 shrink-0 text-black/60 transition ${
-              isJurisdictionMenuOpen ? "rotate-180" : ""
-            }`}
-          />
+          {isJurisdictionPending ? (
+            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
+          ) : (
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 shrink-0 text-black/60 transition ${
+                isJurisdictionMenuOpen ? "rotate-180" : ""
+              }`}
+            />
+          )}
         </button>
         {isJurisdictionMenuOpen ? (
           <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)]">
@@ -234,6 +232,7 @@ export function HeaderNav({
           type="button"
           aria-haspopup="listbox"
           aria-expanded={isLanguageMenuOpen}
+          aria-busy={isLanguagePending}
           className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:focus-ring"
           onClick={() => setIsLanguageMenuOpen((isOpen) => !isOpen)}
         >
@@ -241,12 +240,16 @@ export function HeaderNav({
             <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
             <span className="truncate">{selectedLanguage.label}</span>
           </span>
-          <ChevronDown
-            aria-hidden="true"
-            className={`h-4 w-4 shrink-0 text-black/60 transition ${
-              isLanguageMenuOpen ? "rotate-180" : ""
-            }`}
-          />
+          {isLanguagePending ? (
+            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
+          ) : (
+            <ChevronDown
+              aria-hidden="true"
+              className={`h-4 w-4 shrink-0 text-black/60 transition ${
+                isLanguageMenuOpen ? "rotate-180" : ""
+              }`}
+            />
+          )}
         </button>
         {isLanguageMenuOpen ? (
           <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)]">
