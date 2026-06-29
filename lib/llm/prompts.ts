@@ -16,7 +16,7 @@ Do not rely on general knowledge or assumptions.
 
 You must transform raw agenda text into structured civic action cards.
 
-Allowed categories:
+Allowed topics:
 Housing
 Transportation
 Public Safety
@@ -98,7 +98,7 @@ Rules:
 - “whatIsHappening” must be 2-3 plain sentences.
 - “whyItMatters” must explain concrete impact.
 - “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or city taxpayers.
-- “categoryTags” must only use allowed categories.
+- “categoryTags” must only use allowed topics.
 - Every factual claim must be directly supported by the provided meeting metadata, raw agenda text, or optional public-comment text.
 - If a fact is not clearly supported, omit it or write “Not listed in the source document.”
 - If the provided source text is short, noisy, scanned, or truncated, only summarize items that are visible in the provided text.

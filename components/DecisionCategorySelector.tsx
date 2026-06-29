@@ -35,7 +35,7 @@ export function DecisionCategorySelector({
         <PendingLink
           href={categoryHref(null, search, jurisdiction)}
           aria-current={!selectedCategory ? "true" : undefined}
-          pendingLabel={locale === "es" ? "Mostrando todas las categorías" : "Showing all categories"}
+          pendingLabel={locale === "es" ? "Mostrando todos los temas" : "Showing all topics"}
           className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold shadow-sm transition focus-visible:focus-ring ${
             !selectedCategory
               ? "border-civic/35 bg-civic/10 text-civic hover:bg-civic/15"

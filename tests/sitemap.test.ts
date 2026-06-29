@@ -11,9 +11,9 @@ test("sitemap lists only core pages", async () => {
   assert.ok(urlStrings.includes("http://localhost:3000/about"));
   assert.ok(urlStrings.includes("http://localhost:3000/decisions"));
   assert.ok(urlStrings.includes("http://localhost:3000/meetings"));
-  assert.ok(urlStrings.includes("http://localhost:3000/categories"));
+  assert.ok(urlStrings.includes("http://localhost:3000/topics"));
 
-  // 3. Verify individual meeting/category links are NOT included
+  // 3. Verify individual meeting/topic links are NOT included
   assert.equal(urlStrings.some(url => url.includes("/meetings/")), false);
-  assert.equal(urlStrings.some(url => url.includes("/categories/")), false);
+  assert.equal(urlStrings.some(url => url.includes("/topics/")), false);
 });

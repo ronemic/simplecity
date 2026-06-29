@@ -160,7 +160,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             <input name="source_url" defaultValue={card.source_url || ""} className="input-control" />
           </label>
           <fieldset className="md:col-span-2">
-            <legend className="text-xs font-bold uppercase text-black/70">Categories</legend>
+            <legend className="text-xs font-bold uppercase text-black/70">Topics</legend>
             <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.02] p-2">
               {CATEGORIES.map((category) => (
                 <label

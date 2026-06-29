@@ -22,7 +22,6 @@ type TranslationKey =
   | "allTopics"
   | "browseByTopic"
   | "calendar"
-  | "categories"
   | "clearSearch"
   | "commentDeadline"
   | "commentOptionListed"
@@ -84,6 +83,7 @@ type TranslationKey =
   | "summaryConfidence"
   | "timeNotListed"
   | "today"
+  | "topics"
   | "topicNotListed"
   | "topPublicDecisions"
   | "tryAgain"
@@ -113,7 +113,6 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     allTopics: "All topics",
     browseByTopic: "Browse by topic",
     calendar: "Calendar",
-    categories: "Categories",
     clearSearch: "Clear search",
     commentDeadline: "Comment deadline",
     commentOptionListed: "Comment option listed",
@@ -142,7 +141,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     meetingsDescription: "See every scraped meeting by month, day, or list, with search and status filters.",
     monthView: "Month view",
     next: "Next",
-    noCardsInCategory: "No cards in this category yet",
+    noCardsInCategory: "No cards in this topic yet",
     noCardsInCategoryDescription: "Cards will appear here once official agenda items are scraped and summarized.",
     noCardsYet: "No cards yet",
     noDecisionsYet: "No decisions yet",
@@ -176,11 +175,12 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     summaryConfidence: "Summary confidence",
     timeNotListed: "Time not listed",
     today: "Today",
+    topics: "Topics",
     topicNotListed: "Topic not listed",
     topPublicDecisions: "Top public decisions",
     tryAgain: "Try again",
     tryBroaderMeetingSearch: "Try a broader search, a different status, or another jurisdiction.",
-    tryChangingFilters: "Try changing the search or category filter.",
+    tryChangingFilters: "Try changing the search or topic filter.",
     trySearching: "Try searching for a topic, department, meeting title, or everyday impact.",
     upcoming: "Upcoming",
     upcomingMeetings: "Upcoming meetings",
@@ -204,7 +204,6 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     allTopics: "Todos los temas",
     browseByTopic: "Explorar por tema",
     calendar: "Calendario",
-    categories: "Categorías",
     clearSearch: "Borrar búsqueda",
     commentDeadline: "Fecha límite para comentar",
     commentOptionListed: "Opción para comentar indicada",
@@ -233,7 +232,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     meetingsDescription: "Consulta cada reunión recopilada por mes, día o lista, con búsqueda y filtros de estado.",
     monthView: "Vista mensual",
     next: "Siguiente",
-    noCardsInCategory: "Aún no hay tarjetas en esta categoría",
+    noCardsInCategory: "Aún no hay tarjetas en este tema",
     noCardsInCategoryDescription: "Las tarjetas aparecerán aquí cuando se recopilen y resuman los puntos oficiales de la agenda.",
     noCardsYet: "Aún no hay tarjetas",
     noDecisionsYet: "Aún no hay decisiones",
@@ -267,11 +266,12 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     summaryConfidence: "Confianza del resumen",
     timeNotListed: "Hora no indicada",
     today: "Hoy",
+    topics: "Temas",
     topicNotListed: "Tema no indicado",
     topPublicDecisions: "Decisiones públicas principales",
     tryAgain: "Intentar de nuevo",
     tryBroaderMeetingSearch: "Prueba una búsqueda más amplia, otro estado u otra jurisdicción.",
-    tryChangingFilters: "Prueba cambiar la búsqueda o el filtro de categoría.",
+    tryChangingFilters: "Prueba cambiar la búsqueda o el filtro de tema.",
     trySearching: "Prueba buscar un tema, departamento, título de reunión o impacto cotidiano.",
     upcoming: "Próximas",
     upcomingMeetings: "Próximas reuniones",

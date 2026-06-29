@@ -338,7 +338,7 @@ export default async function Home({
             return (
               <Link
                 key={category}
-                href={`/categories/${definition.slug}`}
+                href={`/topics/${definition.slug}`}
                 className="group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 rounded-lg border border-black/10 bg-white px-4 py-4 transition hover:border-civic/30 hover:bg-[#f4f8fb] focus-visible:focus-ring"
               >
                 <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] transition group-hover:bg-civic/10 group-hover:text-civic">

@@ -1,4 +1,4 @@
-export default function CategoryDetailLoading() {
+export default function TopicDetailLoading() {
   return (
     <div className="section-shell py-10">
       <div className="max-w-3xl space-y-4">

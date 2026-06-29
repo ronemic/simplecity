@@ -133,7 +133,7 @@ export default async function AdminMeetingsPage({
           defaultValue={params.category || ""}
           className="input-control"
         >
-          <option value="">All categories</option>
+          <option value="">All topics</option>
           {CATEGORIES.map((category) => (
             <option key={category} value={category}>
               {category}
