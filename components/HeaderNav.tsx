@@ -48,6 +48,10 @@ function jurisdictionLabel(jurisdiction: (typeof jurisdictions)[number], locale:
   return jurisdiction.slug === "all" ? t(locale, "all") : jurisdiction.label;
 }
 
+function isActiveNavItem(pathname: string, href: string) {
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function HeaderNav({
   initialJurisdiction = "san-mateo",
   locale = "en"
@@ -276,16 +280,16 @@ export function HeaderNav({
         ) : null}
       </div>
       {nav.map((item) => {
-        const isActive = pathname === item.href;
+        const isActive = isActiveNavItem(pathname, item.href);
 
         return (
           <Link
             key={item.href}
             href={hrefWithJurisdiction(item.href)}
             aria-current={isActive ? "page" : undefined}
-            className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center transition focus-visible:focus-ring md:px-3.5 ${
+            className={`relative inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center transition focus-visible:focus-ring md:px-3.5 ${
               isActive
-                ? "bg-[#e8eef3] text-[#102134]"
+                ? "font-black text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
                 : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
             }`}
           >
