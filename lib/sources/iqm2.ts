@@ -113,7 +113,14 @@ export function classifyIqm2Link(label = "", href = ""): Iqm2Document["type"] {
   if (text.includes("agenda packet")) return "Agenda Packet";
   if (text === "agenda" || text.includes("agenda")) return "Agenda";
   if (text.includes("minutes")) return "Minutes";
-  if (text.includes("video")) return "Video";
+  if (
+    text.includes("video") ||
+    url.includes("video") ||
+    url.includes("mediaplayer") ||
+    url.includes("granicus.com") ||
+    url.includes("swagit.com") ||
+    url.includes("mode=granicus")
+  ) return "Video";
   if (text.includes("audio")) return "Audio";
   if (text.includes("caption")) return "Captions";
   if (url.includes("detail_meeting.aspx")) return "Meeting Details";
@@ -134,7 +141,13 @@ export function shouldIgnoreIqm2Link(label = "", href = "") {
     text.includes("export to calendar") ||
     text.includes("login") ||
     text === "home" ||
+    text === "help" ||
+    url.startsWith("mailto:") ||
+    url.includes("support@granicus.com") ||
+    url.includes("/citizens/media.aspx") ||
     url.endsWith("#") ||
+    url === "javascript:void(0)" ||
+    url === "javascript:void(0);" ||
     url.includes("rss")
   );
 }
@@ -186,10 +199,27 @@ async function extractVisibleIqm2Meetings(
         if (!href) return null;
 
         try {
-          return new URL(href, window.location.href).toString();
+          const url = new URL(href, window.location.href);
+          if (!["http:", "https:"].includes(url.protocol)) return null;
+          return url.toString();
         } catch {
           return null;
         }
+      }
+
+      function urlFromOnclick(onclick: string | null) {
+        if (!onclick) return null;
+
+        const match =
+          onclick.match(/OpenWindow\(\s*['"]([^'"]+)['"]/i) ||
+          onclick.match(/window\.open\(\s*['"]([^'"]+)['"]/i);
+
+        return absoluteUrl(match?.[1] || null);
+      }
+
+      function elementUrl(anchor: HTMLAnchorElement) {
+        return urlFromOnclick(anchor.getAttribute("onclick")) ||
+          absoluteUrl(anchor.getAttribute("href"));
       }
 
       function classifyLink(label = "", href = "") {
@@ -199,7 +229,14 @@ async function extractVisibleIqm2Meetings(
         if (text.includes("agenda packet")) return "Agenda Packet";
         if (text === "agenda" || text.includes("agenda")) return "Agenda";
         if (text.includes("minutes")) return "Minutes";
-        if (text.includes("video")) return "Video";
+        if (
+          text.includes("video") ||
+          url.includes("video") ||
+          url.includes("mediaplayer") ||
+          url.includes("granicus.com") ||
+          url.includes("swagit.com") ||
+          url.includes("mode=granicus")
+        ) return "Video";
         if (text.includes("audio")) return "Audio";
         if (text.includes("caption")) return "Captions";
         if (url.includes("detail_meeting.aspx")) return "Meeting Details";
@@ -368,7 +405,7 @@ async function extractVisibleIqm2Meetings(
 
       for (const anchor of Array.from(document.querySelectorAll("a[href]"))) {
         const label = cleanTextInPage((anchor as HTMLElement).innerText || anchor.textContent || "");
-        const url = absoluteUrl(anchor.getAttribute("href"));
+        const url = elementUrl(anchor as HTMLAnchorElement);
         if (!url || shouldIgnoreLink(label, url)) continue;
 
         const type = classifyLink(label, url);
@@ -529,16 +566,33 @@ async function extractLinksFromDetailPage(page: Page) {
       if (!href) return null;
 
       try {
-        return new URL(href, window.location.href).toString();
+        const url = new URL(href, window.location.href);
+        if (!["http:", "https:"].includes(url.protocol)) return null;
+        return url.toString();
       } catch {
         return null;
       }
     }
 
+    function urlFromOnclick(onclick: string | null) {
+      if (!onclick) return null;
+
+      const match =
+        onclick.match(/OpenWindow\(\s*['"]([^'"]+)['"]/i) ||
+        onclick.match(/window\.open\(\s*['"]([^'"]+)['"]/i);
+
+      return absoluteUrl(match?.[1] || null);
+    }
+
+    function elementUrl(anchor: HTMLAnchorElement) {
+      return urlFromOnclick(anchor.getAttribute("onclick")) ||
+        absoluteUrl(anchor.getAttribute("href"));
+    }
+
     return Array.from(document.querySelectorAll("a[href]"))
       .map((anchor) => ({
         label: cleanTextInPage((anchor as HTMLElement).innerText || anchor.textContent || ""),
-        url: absoluteUrl(anchor.getAttribute("href"))
+        url: elementUrl(anchor as HTMLAnchorElement)
       }))
       .filter((link): link is { label: string; url: string } => Boolean(link.url));
   });

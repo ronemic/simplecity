@@ -245,6 +245,19 @@ function shouldIgnoreLink(label = "", href = "") {
   );
 }
 
+function isLegistarViewUrl(url: string) {
+  try {
+    return new URL(url).pathname.toLowerCase().includes("/view.ashx");
+  } catch {
+    return false;
+  }
+}
+
+function shouldDownloadLegistarDocument(doc: LegistarDocument) {
+  if (DOWNLOADABLE_DOCUMENT_TYPES.has(doc.type)) return true;
+  return doc.type === "Media" && isLegistarViewUrl(doc.url);
+}
+
 export function classifyLegistarLink(label = "", href = ""): LegistarDocument["type"] {
   const text = cleanText(label).toLowerCase();
   const url = href.toLowerCase();
@@ -262,7 +275,15 @@ export function classifyLegistarLink(label = "", href = ""): LegistarDocument["t
   if (text.includes("accessible minutes")) return "Accessible Minutes";
   if (text.includes("minutes")) return "Minutes";
   if (text.includes("meeting detail") || url.includes("meetingdetail.aspx")) return "Meeting Details";
-  if (text.includes("media") || text.includes("video")) return "Media";
+  if (
+    text.includes("media") ||
+    text.includes("video") ||
+    url.includes("video.aspx") ||
+    url.includes("mediaplayer") ||
+    url.includes("granicus.com") ||
+    url.includes("swagit.com") ||
+    url.includes("mode=granicus")
+  ) return "Media";
   if (text.includes("audio")) return "Audio";
   if (text.includes("caption")) return "Captions";
   if (text.includes("calendar") || text.includes("icalendar")) return "Calendar";
@@ -341,7 +362,7 @@ async function downloadLegistarDocuments(
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const docs = meeting.documents.filter((doc) => DOWNLOADABLE_DOCUMENT_TYPES.has(doc.type));
+    const docs = meeting.documents.filter(shouldDownloadLegistarDocument);
 
     for (const doc of docs) {
       if (options.shouldStop?.()) {
@@ -463,10 +484,27 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
         if (!href) return null;
 
         try {
-          return new URL(href, window.location.href).toString();
+          const url = new URL(href, window.location.href);
+          if (!["http:", "https:"].includes(url.protocol)) return null;
+          return url.toString();
         } catch {
           return null;
         }
+      }
+
+      function urlFromOnclick(onclick: string | null) {
+        if (!onclick) return null;
+
+        const match =
+          onclick.match(/window\.open\(\s*['"]([^'"]+)['"]/i) ||
+          onclick.match(/OpenWindow\(\s*['"]([^'"]+)['"]/i);
+
+        return absoluteUrl(match?.[1] || null);
+      }
+
+      function elementUrl(anchor: HTMLAnchorElement) {
+        return urlFromOnclick(anchor.getAttribute("onclick")) ||
+          absoluteUrl(anchor.getAttribute("href"));
       }
 
       function normalizeHeader(value = "") {
@@ -476,9 +514,9 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
       const links = Array.from(document.querySelectorAll("a[href]"))
         .map((anchor) => ({
           label: anchorLabel(anchor as HTMLAnchorElement),
-          href: (anchor as HTMLAnchorElement).getAttribute("href")
+          href: elementUrl(anchor as HTMLAnchorElement)
         }))
-        .filter((link) => Boolean(link.href));
+        .filter((link): link is { label: string; href: string } => Boolean(link.href));
 
       const itemAnchors = Array.from(
         document.querySelectorAll('a[href*="LegislationDetail.aspx"]')
@@ -487,7 +525,7 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
       const items = [];
 
       for (const itemAnchor of itemAnchors) {
-        const sourceUrl = absoluteUrl(itemAnchor.getAttribute("href"));
+        const sourceUrl = elementUrl(itemAnchor);
         if (!sourceUrl || seenItemUrls.has(sourceUrl)) continue;
         seenItemUrls.add(sourceUrl);
 
@@ -550,7 +588,7 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
     const detailDocs: LegistarDocument[] = [];
 
     for (const link of detail.links) {
-      const url = new URL(link.href || "", page.url()).toString();
+      const url = link.href;
       if (shouldIgnoreLink(link.label, url)) continue;
       const type = classifyLegistarLink(link.label, url);
       if (!acceptedDocumentType(type)) continue;
@@ -638,7 +676,9 @@ async function enrichLegislationItem(context: BrowserContext, item: LegistarItem
         if (!href) return null;
 
         try {
-          return new URL(href, window.location.href).toString();
+          const url = new URL(href, window.location.href);
+          if (!["http:", "https:"].includes(url.protocol)) return null;
+          return url.toString();
         } catch {
           return null;
         }
@@ -762,10 +802,27 @@ async function extractVisibleLegistarMeetings(
         if (!href) return null;
 
         try {
-          return new URL(href, window.location.href).toString();
+          const url = new URL(href, window.location.href);
+          if (!["http:", "https:"].includes(url.protocol)) return null;
+          return url.toString();
         } catch {
           return null;
         }
+      }
+
+      function urlFromOnclick(onclick: string | null) {
+        if (!onclick) return null;
+
+        const match =
+          onclick.match(/window\.open\(\s*['"]([^'"]+)['"]/i) ||
+          onclick.match(/OpenWindow\(\s*['"]([^'"]+)['"]/i);
+
+        return absoluteUrl(match?.[1] || null);
+      }
+
+      function elementUrl(anchor: HTMLAnchorElement) {
+        return urlFromOnclick(anchor.getAttribute("onclick")) ||
+          absoluteUrl(anchor.getAttribute("href"));
       }
 
       function anchorLabel(anchor: HTMLAnchorElement) {
@@ -820,7 +877,15 @@ async function extractVisibleLegistarMeetings(
         if (text.includes("accessible minutes")) return "Accessible Minutes";
         if (text.includes("minutes")) return "Minutes";
         if (text.includes("meeting detail") || url.includes("meetingdetail.aspx")) return "Meeting Details";
-        if (text.includes("media") || text.includes("video")) return "Media";
+        if (
+          text.includes("media") ||
+          text.includes("video") ||
+          url.includes("video.aspx") ||
+          url.includes("mediaplayer") ||
+          url.includes("granicus.com") ||
+          url.includes("swagit.com") ||
+          url.includes("mode=granicus")
+        ) return "Media";
         if (text.includes("audio")) return "Audio";
         if (text.includes("caption")) return "Captions";
         if (text.includes("calendar") || text.includes("icalendar")) return "Calendar";
@@ -993,7 +1058,7 @@ async function extractVisibleLegistarMeetings(
 
       for (const anchor of Array.from(document.querySelectorAll("a[href]"))) {
         const label = anchorLabel(anchor as HTMLAnchorElement);
-        const url = absoluteUrl(anchor.getAttribute("href"));
+        const url = elementUrl(anchor as HTMLAnchorElement);
         if (!url || shouldIgnoreLink(label, url)) continue;
 
         const type = classifyLink(label, url);

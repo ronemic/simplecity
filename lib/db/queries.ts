@@ -25,6 +25,7 @@ import type {
   SummaryCardTranslationRow
 } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
+import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,meeting_datetime,status";
@@ -624,6 +625,35 @@ export async function getMeetingDetail(
   locale: Locale = "en"
 ) {
   return getCachedMeetingDetail(selection, id, locale);
+}
+
+export async function getMeetingRawVideoDocuments(
+  id: string,
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug
+) {
+  const clients = getSafePublicClients(selection);
+  if (clients.length === 0) return [] as DocumentRow[];
+
+  const results = await Promise.all(
+    clients.map(async ({ jurisdiction, supabase }) => {
+      const { data, error } = await supabase
+        .from("meetings")
+        .select("raw")
+        .eq("id", id)
+        .maybeSingle();
+
+      logQueryError(`Failed to load ${jurisdiction.name} raw meeting video documents for ${id}`, error);
+      const raw = data && typeof data === "object" && "raw" in data
+        ? (data as { raw?: unknown }).raw
+        : null;
+
+      return getMeetingVideoDocuments([], raw).map((row) =>
+        withDocumentJurisdictionFallback(row, jurisdiction)
+      );
+    })
+  );
+
+  return getMeetingVideoDocuments(results.flat());
 }
 
 export async function getCategoryCards(

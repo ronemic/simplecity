@@ -1,21 +1,30 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ExternalLink, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, FileText } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
+import { MeetingVideoEmbed } from "@/components/MeetingVideoEmbed";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
-import { getMeetingDetail } from "@/lib/db/queries";
+import { getMeetingDetail, getMeetingRawVideoDocuments, getMeetings } from "@/lib/db/queries";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionDisplayLabel,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { cookies } from "next/headers";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
+import { getAdjacentMeetings } from "@/lib/utils/meetingNavigation";
+import { getEmbeddableVideoDocuments } from "@/lib/utils/videoEmbed";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const revalidate = 300;
+
+function meetingHref(meetingId: string, jurisdiction: string) {
+  return `/meetings/${meetingId}?jurisdiction=${encodeURIComponent(jurisdiction)}`;
+}
 
 export default async function MeetingDetailPage({
   params,
@@ -30,9 +39,19 @@ export default async function MeetingDetailPage({
   const jurisdiction = normalizeJurisdictionSelection(
     query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
-  const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction, locale);
+  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
+  const [{ meeting, cards, documents }, meetings] = await Promise.all([
+    getMeetingDetail(id, jurisdiction, locale),
+    getMeetings({ jurisdiction, locale })
+  ]);
 
   if (!meeting) notFound();
+  const rawVideoDocuments =
+    getEmbeddableVideoDocuments(documents).length > 0
+      ? []
+      : await getMeetingRawVideoDocuments(id, jurisdiction);
+  const videoDocuments = rawVideoDocuments.length > 0 ? [...documents, ...rawVideoDocuments] : documents;
+  const { newerMeeting, olderMeeting } = getAdjacentMeetings(meetings, meeting.id);
   const jurisdictionLabel = getJurisdictionDisplayLabel(
     meeting.jurisdiction_slug || meeting.jurisdiction_name
   );
@@ -54,8 +73,69 @@ export default async function MeetingDetailPage({
         <AddToGoogleCalendarLink meeting={meeting} className="mt-5" locale={locale} />
       </div>
 
+      <nav
+        aria-label={locale === "es" ? "Navegación entre reuniones" : "Meeting navigation"}
+        className="mb-8 grid gap-3 sm:grid-cols-2"
+      >
+        {olderMeeting ? (
+          <Link
+            href={meetingHref(olderMeeting.id, publicJurisdiction)}
+            className="quiet-card group flex min-h-24 items-center gap-3 p-4 transition hover:-translate-y-0.5 hover:border-civic/25 hover:shadow-soft focus-visible:focus-ring"
+          >
+            <ChevronLeft aria-hidden className="h-5 w-5 shrink-0 text-civic transition group-hover:-translate-x-0.5" />
+            <span className="min-w-0">
+              <span className="label-eyebrow block text-black/55">
+                {locale === "es" ? "Reunión anterior" : "Previous meeting"}
+              </span>
+              <span className="mt-1 line-clamp-2 block text-sm font-black leading-5 text-ink">
+                {displayMeetingTitle(olderMeeting)}
+              </span>
+              <span className="mt-1 block text-xs font-semibold text-black/55">
+                {formatDisplayDate(olderMeeting.date_text, olderMeeting.meeting_datetime, olderMeeting.time_text)}
+              </span>
+            </span>
+          </Link>
+        ) : (
+          <div className="quiet-card flex min-h-24 items-center gap-3 p-4 opacity-55">
+            <ChevronLeft aria-hidden className="h-5 w-5 shrink-0 text-black/35" />
+            <span className="text-sm font-semibold text-black/55">
+              {locale === "es" ? "No hay reunión anterior" : "No previous meeting"}
+            </span>
+          </div>
+        )}
+
+        {newerMeeting ? (
+          <Link
+            href={meetingHref(newerMeeting.id, publicJurisdiction)}
+            className="quiet-card group flex min-h-24 items-center justify-between gap-3 p-4 text-right transition hover:-translate-y-0.5 hover:border-civic/25 hover:shadow-soft focus-visible:focus-ring"
+          >
+            <span className="min-w-0">
+              <span className="label-eyebrow block text-black/55">
+                {locale === "es" ? "Siguiente reunión" : "Next meeting"}
+              </span>
+              <span className="mt-1 line-clamp-2 block text-sm font-black leading-5 text-ink">
+                {displayMeetingTitle(newerMeeting)}
+              </span>
+              <span className="mt-1 block text-xs font-semibold text-black/55">
+                {formatDisplayDate(newerMeeting.date_text, newerMeeting.meeting_datetime, newerMeeting.time_text)}
+              </span>
+            </span>
+            <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-civic transition group-hover:translate-x-0.5" />
+          </Link>
+        ) : (
+          <div className="quiet-card flex min-h-24 items-center justify-end gap-3 p-4 text-right opacity-55">
+            <span className="text-sm font-semibold text-black/55">
+              {locale === "es" ? "No hay siguiente reunión" : "No next meeting"}
+            </span>
+            <ChevronRight aria-hidden className="h-5 w-5 shrink-0 text-black/35" />
+          </div>
+        )}
+      </nav>
+
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <section className="space-y-4">
+          <MeetingVideoEmbed documents={videoDocuments} locale={locale} />
+
           <div>
             <p className="label-eyebrow text-civic">{t(locale, "summaryCards")}</p>
             <h2 className="section-title mt-1">

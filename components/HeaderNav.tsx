@@ -134,7 +134,12 @@ export function HeaderNav({
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value);
     const query = params.toString();
-    return `${pathname}${query ? `?${query}` : ""}`;
+    const nextPathname =
+      key === "jurisdiction" && /^\/meetings\/[^/]+/.test(pathname)
+        ? "/meetings"
+        : pathname;
+
+    return `${nextPathname}${query ? `?${query}` : ""}`;
   }
 
   function changeJurisdiction(value: string) {

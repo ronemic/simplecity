@@ -72,6 +72,23 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
         const text = label.toLowerCase();
         const url = href.toLowerCase();
 
+        if (
+          text.includes("video") ||
+          text.includes("media") ||
+          text.includes("watch") ||
+          text.includes("recording") ||
+          url.includes("video") ||
+          url.includes("media") ||
+          url.includes("swagit.com") ||
+          url.includes("granicus.com") ||
+          url.includes("watch") ||
+          url.includes("recording") ||
+          url.includes("mediaplayer") ||
+          url.includes("mode=granicus")
+        ) {
+          return "Video";
+        }
+
         if (text.includes("html agenda") || url.includes("/portal/meeting")) {
           return "HTML Agenda";
         }
@@ -83,6 +100,73 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
         if (text.includes("agenda")) return "Agenda";
 
         return "Other";
+      }
+
+      function isMeetingLink(link) {
+        const text = link.label.toLowerCase();
+        const url = link.url.toLowerCase();
+
+        return (
+          url.includes("/public/compileddocument") ||
+          url.includes("/portal/meeting") ||
+          text.includes("video") ||
+          text.includes("media") ||
+          text.includes("watch") ||
+          text.includes("recording") ||
+          url.includes("video") ||
+          url.includes("media") ||
+          url.includes("swagit.com") ||
+          url.includes("granicus.com") ||
+          url.includes("watch") ||
+          url.includes("recording") ||
+          url.includes("mediaplayer") ||
+          url.includes("mode=granicus")
+        );
+      }
+
+      function absoluteUrl(value = "") {
+        if (!value) return "";
+
+        try {
+          const url = new URL(value, window.location.href);
+          return /^https?:$/i.test(url.protocol) ? url.href : "";
+        } catch {
+          return "";
+        }
+      }
+
+      function urlFromOnclick(onclick = "") {
+        const match = onclick.match(/https?:\/\/[^'")\s]+|\/[A-Za-z0-9_./?=&:%-]+/);
+        return match ? absoluteUrl(match[0]) : "";
+      }
+
+      function elementUrl(element) {
+        const attrs = [
+          "href",
+          "data-url",
+          "data-href",
+          "data-link",
+          "data-target",
+          "data-video-url",
+          "data-src"
+        ];
+
+        for (const attr of attrs) {
+          const url = absoluteUrl(element.getAttribute(attr) || "");
+          if (url) return url;
+        }
+
+        return urlFromOnclick(element.getAttribute("onclick") || "");
+      }
+
+      function elementLabel(element) {
+        return cleanTextInPage(
+          element.innerText ||
+            element.textContent ||
+            element.getAttribute("aria-label") ||
+            element.getAttribute("title") ||
+            ""
+        );
       }
 
       function deriveMeetingType(title = "") {
@@ -111,6 +195,8 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
 
       for (const table of tables) {
         const tableY = yPos(table);
+        const tableText = cleanTextInPage(table.innerText || table.textContent || "");
+        const tableTextLower = tableText.toLowerCase();
         let section = "Unknown";
 
         if (
@@ -122,6 +208,12 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
           section = "Current And Upcoming Meetings";
         } else if (archivedHeadingY !== null && tableY > archivedHeadingY) {
           section = "Archived Meetings";
+        } else if (
+          tableTextLower.includes("meeting title") &&
+          tableTextLower.includes("date/time") &&
+          tableTextLower.includes("video")
+        ) {
+          section = "Archived Meetings";
         }
 
         const rows = Array.from(table.querySelectorAll("tbody tr, tr"));
@@ -130,16 +222,16 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
           const rowText = cleanTextInPage(row.innerText || "");
           if (!rowText) continue;
 
-          const links = Array.from(row.querySelectorAll("a[href]"))
-            .map((a) => ({
-              label: cleanTextInPage(a.innerText || a.textContent || ""),
-              url: a.href
+          const links = Array.from(
+            row.querySelectorAll(
+              "a[href], button, [role='button'], [onclick], [data-url], [data-href], [data-link], [data-target], [data-video-url], [data-src]"
+            )
+          )
+            .map((element) => ({
+              label: elementLabel(element),
+              url: elementUrl(element)
             }))
-            .filter(
-              (link) =>
-                link.url.includes("/Public/CompiledDocument") ||
-                link.url.includes("/Portal/Meeting")
-            );
+            .filter((link) => isMeetingLink(link));
 
           if (links.length === 0) continue;
 
@@ -175,6 +267,7 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
               label: link.label,
               url: link.url
             }))
+            .filter((doc) => doc.url)
             .filter((doc) => {
               const key = doc.type + "|" + doc.label + "|" + doc.url;
               if (seenDocs.has(key)) return false;
@@ -243,6 +336,11 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
   try {
     log("Opening PrimeGov portal...");
     await waitForPortal(page, portalUrl);
+    await page.waitForFunction(
+      () => document.querySelectorAll("table tbody tr, table tr").length > 3,
+      { timeout: 5000 }
+    ).catch(() => undefined);
+    await page.waitForTimeout(1500);
 
     log("Scraping current and upcoming meetings...");
     const visibleMeetings = await extractVisibleMeetings(page);
