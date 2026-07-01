@@ -76,21 +76,64 @@ function openRouterResponse(summary: SimpleCitySummary) {
   );
 }
 
+function captureLlmEnv() {
+  return {
+    openRouterApiKey: process.env.OPENROUTER_API_KEY,
+    openRouterModel: process.env.OPENROUTER_MODEL,
+    openRouterMinIntervalMs: process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS,
+    openRouterMaxAttempts: process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS,
+    openRouterRetryBaseMs: process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS,
+    openRouterRateLimitRetryBaseMs: process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS,
+    cerebrasApiKey: process.env.CEREBRAS_API_KEY,
+    cerebrasModel: process.env.CEREBRAS_MODEL,
+    cerebrasMinIntervalMs: process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS
+  };
+}
+
+function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
+  const restore = (name: string, value: string | undefined) => {
+    if (value === undefined) {
+      delete process.env[name];
+    } else {
+      process.env[name] = value;
+    }
+  };
+
+  restore("OPENROUTER_API_KEY", env.openRouterApiKey);
+  restore("OPENROUTER_MODEL", env.openRouterModel);
+  restore("OPENROUTER_MIN_REQUEST_INTERVAL_MS", env.openRouterMinIntervalMs);
+  restore("OPENROUTER_SUMMARY_MAX_ATTEMPTS", env.openRouterMaxAttempts);
+  restore("OPENROUTER_SUMMARY_RETRY_BASE_MS", env.openRouterRetryBaseMs);
+  restore("OPENROUTER_RATE_LIMIT_RETRY_BASE_MS", env.openRouterRateLimitRetryBaseMs);
+  restore("CEREBRAS_API_KEY", env.cerebrasApiKey);
+  restore("CEREBRAS_MODEL", env.cerebrasModel);
+  restore("CEREBRAS_MIN_REQUEST_INTERVAL_MS", env.cerebrasMinIntervalMs);
+}
+
+function setLlmTestEnv() {
+  process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+  process.env.OPENROUTER_MODEL = "test-openrouter-model";
+  process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS = "0";
+  process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "3";
+  process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS = "0";
+  process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS = "0";
+  delete process.env.CEREBRAS_API_KEY;
+  delete process.env.CEREBRAS_MODEL;
+  process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS = "0";
+}
+
 test("regenerates when validation drops source-unsupported cards", async (t) => {
   const originalFetch = globalThis.fetch;
-  const originalApiKey = process.env.OPENROUTER_API_KEY;
-  const originalModel = process.env.OPENROUTER_MODEL;
+  const originalEnv = captureLlmEnv();
   let calls = 0;
   let secondPrompt = "";
 
   t.after(() => {
     globalThis.fetch = originalFetch;
-    process.env.OPENROUTER_API_KEY = originalApiKey;
-    process.env.OPENROUTER_MODEL = originalModel;
+    restoreLlmEnv(originalEnv);
   });
 
-  process.env.OPENROUTER_API_KEY = "test-key";
-  process.env.OPENROUTER_MODEL = "test-model";
+  setLlmTestEnv();
   globalThis.fetch = (async (_url, init) => {
     calls += 1;
     const body = JSON.parse(String(init?.body || "{}")) as {
@@ -127,18 +170,15 @@ test("regenerates when validation drops source-unsupported cards", async (t) => 
 
 test("regenerates an empty summary when agenda source text is usable", async (t) => {
   const originalFetch = globalThis.fetch;
-  const originalApiKey = process.env.OPENROUTER_API_KEY;
-  const originalModel = process.env.OPENROUTER_MODEL;
+  const originalEnv = captureLlmEnv();
   let calls = 0;
 
   t.after(() => {
     globalThis.fetch = originalFetch;
-    process.env.OPENROUTER_API_KEY = originalApiKey;
-    process.env.OPENROUTER_MODEL = originalModel;
+    restoreLlmEnv(originalEnv);
   });
 
-  process.env.OPENROUTER_API_KEY = "test-key";
-  process.env.OPENROUTER_MODEL = "test-model";
+  setLlmTestEnv();
   globalThis.fetch = (async () => {
     calls += 1;
 
@@ -157,5 +197,86 @@ test("regenerates an empty summary when agenda source text is usable", async (t)
   const result = await generateSummaryForMeeting(meeting());
 
   assert.equal(calls, 2);
+  assert.equal(result.summary.cards.length, 1);
+});
+
+test("falls back to Cerebras when OpenRouter is rate-limited", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const urls: string[] = [];
+  const models: string[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
+  process.env.CEREBRAS_MODEL = "gpt-oss-120b";
+
+  globalThis.fetch = (async (url, init) => {
+    urls.push(String(url));
+    const body = JSON.parse(String(init?.body || "{}")) as { model?: string };
+    models.push(body.model || "");
+
+    if (String(url).includes("openrouter.ai")) {
+      return new Response("temporarily rate-limited upstream", { status: 429 });
+    }
+
+    return openRouterResponse({
+      meetingSummary,
+      cards: [card()]
+    });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting());
+
+  assert.deepEqual(urls, [
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://api.cerebras.ai/v1/chat/completions"
+  ]);
+  assert.deepEqual(models, ["test-openrouter-model", "gpt-oss-120b"]);
+  assert.equal(result.summary.cards.length, 1);
+});
+
+test("backs off and retries when all configured providers are rate-limited", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let calls = 0;
+  const sleepDelays: number[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "2";
+  globalThis.fetch = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      return new Response("slow down", {
+        status: 429,
+        headers: {
+          "Retry-After": "2"
+        }
+      });
+    }
+
+    return openRouterResponse({
+      meetingSummary,
+      cards: [card()]
+    });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting(), {
+    sleep: async (ms) => {
+      sleepDelays.push(ms);
+    }
+  });
+
+  assert.equal(calls, 2);
+  assert.deepEqual(sleepDelays, [2000]);
   assert.equal(result.summary.cards.length, 1);
 });

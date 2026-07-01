@@ -1,6 +1,6 @@
 # SimpleCity
 
-SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and OpenRouter summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco.
+SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and an OpenRouter/Cerebras summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco.
 
 ## Setup
 
@@ -17,7 +17,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    cp .env.example .env.local
    ```
 
-3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco each use their own Supabase project:
+3. Fill in Supabase and LLM provider values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco each use their own Supabase project:
 
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=
@@ -43,9 +43,13 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    SAN_FRANCISCO_LEGISTAR_URL=https://sfgov.legistar.com/Calendar.aspx
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
+   CEREBRAS_API_KEY=
+   CEREBRAS_MODEL=gpt-oss-120b
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ADMIN_PASSWORD=choose-a-long-random-password
    ```
+
+   OpenRouter is tried first when configured. If it is rate-limited or unavailable and `CEREBRAS_API_KEY` is set, the summarizer falls back to Cerebras direct API.
 
 4. Apply Supabase migrations from `supabase/migrations`.
 

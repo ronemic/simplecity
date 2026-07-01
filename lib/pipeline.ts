@@ -9,7 +9,11 @@ import {
   type JurisdictionSelection,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
-import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
+import {
+  generateSummaryForMeeting,
+  hasSummaryProviderConfig,
+  isLlmRateLimitError
+} from "@/lib/llm/openrouter";
 import {
   appendSummaryCardsForMeeting,
   replaceSummaryCardsForMeeting,
@@ -90,6 +94,14 @@ function createDeadline(maxRuntimeMinutes?: number) {
       return Math.max(0, Math.ceil((deadlineAt - Date.now()) / 60_000));
     }
   };
+}
+
+function getMaxConsecutiveRateLimitFailures() {
+  const raw = process.env.OPENROUTER_MAX_CONSECUTIVE_RATE_LIMITS;
+  if (!raw) return 2;
+
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2;
 }
 
 export async function runSimpleCityPipeline(
@@ -255,9 +267,9 @@ export async function runSimpleCityPipeline(
     }
 
     if (shouldSummarize && !recordDeadline("LLM summarization")) {
-      if (!process.env.OPENROUTER_API_KEY) {
-        errors.push("OPENROUTER_API_KEY is not configured; summaries were not generated.");
-        log("OPENROUTER_API_KEY is not configured; skipping LLM summaries.");
+      if (!hasSummaryProviderConfig()) {
+        errors.push("No LLM provider API key is configured; summaries were not generated.");
+        log("Configure OPENROUTER_API_KEY or CEREBRAS_API_KEY to generate LLM summaries.");
       } else if (persist && !persistSummaries) {
         const message =
           "Skipping LLM summaries because database persistence failed; generated cards would not appear on the frontend.";
@@ -274,6 +286,8 @@ export async function runSimpleCityPipeline(
               summarizedSourceHash: null,
               existingCardCount: 0
             }));
+        let consecutiveRateLimitFailures = 0;
+        const maxConsecutiveRateLimitFailures = getMaxConsecutiveRateLimitFailures();
 
         for (const item of summaryTargets) {
           if (recordDeadline("LLM summarization")) break;
@@ -323,10 +337,24 @@ export async function runSimpleCityPipeline(
             } else {
               cardsGenerated += summary.cards.length;
             }
+            consecutiveRateLimitFailures = 0;
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown LLM error";
             errors.push(`${item.meeting.title}: ${message}`);
             log(`LLM failed for ${item.meeting.title}: ${message}`);
+
+            if (isLlmRateLimitError(error)) {
+              consecutiveRateLimitFailures += 1;
+              if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
+                const stopMessage =
+                  "Stopping LLM summaries after repeated provider rate-limit responses; retry later or configure another provider with available quota.";
+                errors.push(stopMessage);
+                log(stopMessage);
+                break;
+              }
+            } else {
+              consecutiveRateLimitFailures = 0;
+            }
           }
         }
       }
