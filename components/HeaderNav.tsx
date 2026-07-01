@@ -20,7 +20,8 @@ const jurisdictions = [
   { slug: "san-mateo", label: "San Mateo" },
   { slug: "san-mateo-county", label: "San Mateo County" },
   { slug: "mountain-view", label: "Mountain View" },
-  { slug: "santa-clara-county", label: "Santa Clara County" }
+  { slug: "santa-clara-county", label: "Santa Clara County" },
+  { slug: "san-francisco", label: "San Francisco" }
 ];
 
 const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";

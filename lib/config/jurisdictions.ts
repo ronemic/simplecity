@@ -8,13 +8,15 @@ export type JurisdictionSlug =
   | "san-mateo-city"
   | "san-mateo-county"
   | "santa-clara-county"
-  | "mountain-view";
+  | "mountain-view"
+  | "san-francisco";
 export type PublicJurisdictionSlug =
   | "foster-city"
   | "san-mateo"
   | "san-mateo-county"
   | "santa-clara-county"
-  | "mountain-view";
+  | "mountain-view"
+  | "san-francisco";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
 export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
@@ -23,8 +25,10 @@ export type CivicPlatform = "primegov" | "iqm2" | "legistar";
 
 export type JurisdictionConfig = {
   name: string;
+  officialName: string;
   slug: JurisdictionSlug;
   platform: CivicPlatform;
+  timezone: string;
   sourceUrl: string;
   primegovUrl?: string;
   iqm2Url?: string;
@@ -49,6 +53,15 @@ const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
 const DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL =
   process.env.MOUNTAIN_VIEW_LEGISTAR_URL ||
   "https://mountainview.legistar.com/Calendar.aspx";
+const DEFAULT_SAN_FRANCISCO_LEGISTAR_URL =
+  process.env.SAN_FRANCISCO_LEGISTAR_URL ||
+  "https://sfgov.legistar.com/Calendar.aspx";
+export const SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE = [
+  "San Francisco Supabase configuration is missing. Set",
+  "NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,",
+  "NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_ANON_KEY, and",
+  "SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY."
+].join("\n");
 
 const publicClients = new Map<JurisdictionSlug, SupabaseClient>();
 const serviceClients = new Map<JurisdictionSlug, SupabaseClient>();
@@ -58,7 +71,8 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "san-mateo-city",
   "san-mateo-county",
   "mountain-view",
-  "santa-clara-county"
+  "santa-clara-county",
+  "san-francisco"
 ];
 
 export function toInternalJurisdictionSlug(
@@ -82,6 +96,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "san-mateo-county") return "San Mateo County";
   if (internalSlug === "santa-clara-county") return "Santa Clara County";
   if (internalSlug === "mountain-view") return "Mountain View";
+  if (internalSlug === "san-francisco") return "San Francisco";
   return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
 }
 
@@ -89,8 +104,10 @@ export function getJurisdictions(): JurisdictionConfig[] {
   return [
     {
       name: "Foster City",
+      officialName: "City of Foster City",
       slug: "foster-city",
       platform: "primegov",
+      timezone: "America/Los_Angeles",
       sourceUrl:
         process.env.FOSTER_CITY_PRIMEGOV_URL ||
         process.env.SCRAPER_BASE_URL ||
@@ -111,8 +128,10 @@ export function getJurisdictions(): JurisdictionConfig[] {
     },
     {
       name: "San Mateo",
+      officialName: "City of San Mateo",
       slug: "san-mateo-city",
       platform: "primegov",
+      timezone: "America/Los_Angeles",
       sourceUrl:
         process.env.SAN_MATEO_CITY_PRIMEGOV_URL || DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL,
       primegovUrl:
@@ -123,8 +142,10 @@ export function getJurisdictions(): JurisdictionConfig[] {
     },
     {
       name: "San Mateo County",
+      officialName: "County of San Mateo",
       slug: "san-mateo-county",
       platform: "legistar",
+      timezone: "America/Los_Angeles",
       sourceUrl: DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL,
       legistarUrl: DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL,
       supabaseUrl: process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL,
@@ -133,8 +154,10 @@ export function getJurisdictions(): JurisdictionConfig[] {
     },
     {
       name: "Mountain View",
+      officialName: "City of Mountain View",
       slug: "mountain-view",
       platform: "legistar",
+      timezone: "America/Los_Angeles",
       sourceUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
       legistarUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
       supabaseUrl: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL,
@@ -143,8 +166,10 @@ export function getJurisdictions(): JurisdictionConfig[] {
     },
     {
       name: "Santa Clara County",
+      officialName: "County of Santa Clara",
       slug: "santa-clara-county",
       platform: "iqm2",
+      timezone: "America/Los_Angeles",
       sourceUrl:
         process.env.SANTA_CLARA_COUNTY_IQM2_URL || DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL,
       iqm2Url:
@@ -152,6 +177,18 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseUrl: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
       supabaseAnonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey: process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+    },
+    {
+      name: "San Francisco",
+      officialName: "City and County of San Francisco",
+      slug: "san-francisco",
+      platform: "legistar",
+      timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_SAN_FRANCISCO_LEGISTAR_URL,
+      legistarUrl: DEFAULT_SAN_FRANCISCO_LEGISTAR_URL,
+      supabaseUrl: process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,
+      supabaseAnonKey: process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey: process.env.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY
     }
   ];
 }
@@ -187,7 +224,8 @@ export function requireValidJurisdictionSlug(
     slug === "san-mateo-city" ||
     slug === "san-mateo-county" ||
     slug === "santa-clara-county" ||
-    slug === "mountain-view"
+    slug === "mountain-view" ||
+    slug === "san-francisco"
   ) {
     return slug;
   }
@@ -234,6 +272,10 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
     return scope === "service"
       ? "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
       : "Mountain View public Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL and NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY.";
+  }
+
+  if (jurisdiction.slug === "san-francisco") {
+    return SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 
   if (jurisdiction.slug === "san-mateo-city") {

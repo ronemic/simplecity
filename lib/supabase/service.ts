@@ -1,6 +1,9 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getPublicSupabaseEnv, getServiceRoleKey } from "./env";
-import type { JurisdictionSlug } from "@/lib/config/jurisdictions";
+import {
+  SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
+  type JurisdictionSlug
+} from "@/lib/config/jurisdictions";
 
 export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
   const env = getPublicSupabaseEnv(slug);
@@ -23,6 +26,10 @@ export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
       throw new Error(
         "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
       );
+    }
+
+    if (slug === "san-francisco") {
+      throw new Error(SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE);
     }
 
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY.");

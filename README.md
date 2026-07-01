@@ -1,6 +1,6 @@
 # SimpleCity
 
-SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and OpenRouter summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, and Mountain View.
+SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and OpenRouter summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco.
 
 ## Setup
 
@@ -17,7 +17,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    cp .env.example .env.local
    ```
 
-3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, Santa Clara County, and Mountain View each use their own Supabase project:
+3. Fill in Supabase and OpenRouter values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco each use their own Supabase project:
 
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=
@@ -35,8 +35,12 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL=
    NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY=
    MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL=
+   NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_ANON_KEY=
+   SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY=
    SAN_MATEO_COUNTY_LEGISTAR_URL=https://sanmateocounty.legistar.com/Calendar.aspx
    MOUNTAIN_VIEW_LEGISTAR_URL=https://mountainview.legistar.com/Calendar.aspx
+   SAN_FRANCISCO_LEGISTAR_URL=https://sfgov.legistar.com/Calendar.aspx
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    NEXT_PUBLIC_APP_URL=http://localhost:3000
@@ -45,7 +49,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
 
 4. Apply Supabase migrations from `supabase/migrations`.
 
-   For a brand-new separate jurisdiction database, including Mountain View, you can also run `supabase/bootstrap_county.sql` once in the Supabase SQL editor to create the full schema in one shot.
+   For a brand-new separate jurisdiction database, including Mountain View and San Francisco, you can also run `supabase/bootstrap_county.sql` once in the Supabase SQL editor to create the full schema in one shot.
 
 5. Run the app:
 
@@ -72,6 +76,10 @@ npm run scrape:mountain-view
 npm run scrape:mountain-view:download
 npm run scrape:mountain-view:items
 npm run pipeline:mountain-view
+npm run scrape:san-francisco
+npm run scrape:san-francisco:download
+npm run scrape:san-francisco:items
+npm run pipeline:san-francisco
 npm run pipeline:all
 ```
 
@@ -90,6 +98,7 @@ The production scrapers run from the `Nightly scrapers` GitHub Actions workflow.
 | Santa Clara County scraper | `0 11 * * *` | 4:00 AM PDT | `npm run pipeline:santa-clara-county` |
 | San Mateo County scraper | `15 11 * * *` | 4:15 AM PDT | `npm run pipeline:san-mateo-county` |
 | Mountain View scraper | `20 12 * * *` | 5:20 AM PDT | `npm run pipeline:mountain-view` |
+| San Francisco scraper | `40 12 * * *` | 5:40 AM PDT | `npm run pipeline:san-francisco` |
 
 Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
 

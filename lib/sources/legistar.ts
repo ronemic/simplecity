@@ -5,6 +5,7 @@ import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { LegistarItem, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { parseMeetingDate } from "@/lib/utils/date";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
 
@@ -135,6 +136,28 @@ function mergeLegistarMeetings(meetings: LegistarMeeting[]) {
   }
 
   return [...byKey.values()];
+}
+
+function inferLegistarMeetingStatus(meeting: LegistarMeeting): LegistarMeeting {
+  if (meeting.status === "Cancelled" || hasCancellationSignal(meeting)) {
+    return {
+      ...meeting,
+      status: "Cancelled"
+    };
+  }
+
+  if (meeting.section !== "Unknown") return meeting;
+
+  const dateTimeText = [meeting.dateText, meeting.timeText].filter(Boolean).join(" ");
+  const meetingIso = parseMeetingDate(dateTimeText);
+  if (!meetingIso) return meeting;
+
+  const isPast = new Date(meetingIso).getTime() < Date.now();
+  return {
+    ...meeting,
+    section: isPast ? "Past Meetings" : "Upcoming Meetings",
+    status: isPast ? "Past" : "Upcoming"
+  };
 }
 
 function makeLegistarItemExternalId(sourceUrl: string, fallback: string) {
@@ -285,7 +308,7 @@ export function classifyLegistarLink(label = "", href = ""): LegistarDocument["t
     url.includes("mode=granicus")
   ) return "Media";
   if (text.includes("audio")) return "Audio";
-  if (text.includes("caption")) return "Captions";
+  if (text.includes("caption") || text.includes("transcript")) return "Captions";
   if (text.includes("calendar") || text.includes("icalendar")) return "Calendar";
   if (url.includes("view.ashx") || url.includes(".pdf") || url.includes("document")) return "Document";
 
@@ -887,7 +910,7 @@ async function extractVisibleLegistarMeetings(
           url.includes("mode=granicus")
         ) return "Media";
         if (text.includes("audio")) return "Audio";
-        if (text.includes("caption")) return "Captions";
+        if (text.includes("caption") || text.includes("transcript")) return "Captions";
         if (text.includes("calendar") || text.includes("icalendar")) return "Calendar";
         if (url.includes("view.ashx") || url.includes(".pdf") || url.includes("document")) return "Document";
 
@@ -1251,7 +1274,7 @@ async function extractVisibleLegistarMeetings(
 
   )) as LegistarMeeting[];
 
-  return mergeLegistarMeetings(rawMeetings);
+  return mergeLegistarMeetings(rawMeetings).map(inferLegistarMeetingStatus);
 }
 
 export async function scrapeLegistarMeetings(

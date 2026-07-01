@@ -32,3 +32,13 @@ test("classifies Mountain View Legistar document labels by visible text first", 
     "Document"
   );
 });
+
+test("classifies San Francisco Legistar transcript links from the calendar table", () => {
+  assert.equal(
+    classifyLegistarLink(
+      "Transcript",
+      "https://sfgov.legistar.com/Transcript.aspx?ID=1&GUID=abc"
+    ),
+    "Captions"
+  );
+});
