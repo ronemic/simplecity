@@ -257,7 +257,13 @@ async function extractVisibleIqm2Meetings(
           text.includes("export to calendar") ||
           text.includes("login") ||
           text === "home" ||
+          text === "help" ||
+          url.startsWith("mailto:") ||
+          url.includes("support@granicus.com") ||
+          url.includes("/citizens/media.aspx") ||
           url.endsWith("#") ||
+          url === "javascript:void(0)" ||
+          url === "javascript:void(0);" ||
           url.includes("rss")
         );
       }
@@ -584,15 +590,15 @@ async function extractLinksFromDetailPage(page: Page) {
       return absoluteUrl(match?.[1] || null);
     }
 
-    function elementUrl(anchor: HTMLAnchorElement) {
-      return urlFromOnclick(anchor.getAttribute("onclick")) ||
-        absoluteUrl(anchor.getAttribute("href"));
+    function elementUrl(element: Element) {
+      return urlFromOnclick(element.getAttribute("onclick")) ||
+        absoluteUrl(element.getAttribute("href"));
     }
 
-    return Array.from(document.querySelectorAll("a[href]"))
-      .map((anchor) => ({
-        label: cleanTextInPage((anchor as HTMLElement).innerText || anchor.textContent || ""),
-        url: elementUrl(anchor as HTMLAnchorElement)
+    return Array.from(document.querySelectorAll("a[href], [onclick]"))
+      .map((element) => ({
+        label: cleanTextInPage((element as HTMLElement).innerText || element.textContent || ""),
+        url: elementUrl(element)
       }))
       .filter((link): link is { label: string; url: string } => Boolean(link.url));
   });

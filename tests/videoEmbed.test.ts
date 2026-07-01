@@ -98,6 +98,44 @@ test("finds video links in a meeting raw document payload", () => {
   assert.equal(videos[0]?.source_url, "https://city.example/watch/meeting-1");
 });
 
+test("ignores generic IQM2 media center and inert video links", () => {
+  const documents = [
+    document({
+      id: "iqm2-media-center",
+      type: "Video",
+      label: "Videos",
+      source_url: "https://sccgov.iqm2.com/Citizens/Media.aspx"
+    }),
+    document({
+      id: "iqm2-void-link",
+      type: "Video",
+      label: "Video",
+      source_url: "javascript:void(0);"
+    }),
+    document({
+      id: "iqm2-recording",
+      type: "Video",
+      label: "Video",
+      source_url: "https://sccgov.iqm2.com/Citizens/SplitView.aspx?Mode=Video&MediaID=28330"
+    })
+  ];
+
+  assert.deepEqual(getMeetingVideoDocuments(documents).map((item) => item.id), ["iqm2-recording"]);
+  assert.deepEqual(getEmbeddableVideoDocuments(documents).map((item) => item.document.id), [
+    "iqm2-recording"
+  ]);
+
+  assert.equal(
+    getMeetingVideoDocuments([], {
+      documents: [
+        { type: "Video", label: "Videos", url: "https://sccgov.iqm2.com/Citizens/Media.aspx" },
+        { type: "Video", label: "Video", url: "javascript:void(0);" }
+      ]
+    }).length,
+    0
+  );
+});
+
 test("only returns video documents with iframe-ready embed URLs", () => {
   const videos = getEmbeddableVideoDocuments([
     document({

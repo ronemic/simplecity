@@ -118,6 +118,28 @@ function urlsFromText(value: string | null | undefined) {
   return matches.map((match) => match.replace(/[.,;:]+$/, ""));
 }
 
+function hasVideoUrlInText(value: string) {
+  return (
+    value.includes("granicus.com/player/clip") ||
+    value.includes("granicus.com/mediaplayer") ||
+    value.includes("swagit.com/videos") ||
+    value.includes("youtube.com/watch")
+  );
+}
+
+function isIgnorableVideoSourceUrl(value: string | null | undefined) {
+  const sourceUrl = String(value || "").trim().toLowerCase();
+  if (!sourceUrl) return false;
+  if (sourceUrl.startsWith("javascript:")) return true;
+
+  const url = asUrl(value);
+  if (!url) return false;
+
+  const host = url.hostname.toLowerCase();
+  const path = url.pathname.toLowerCase().replace(/\/+$/, "");
+  return host.includes("iqm2.com") && path.endsWith("/citizens/media.aspx") && !url.search;
+}
+
 function videoUrlCandidates(document: Pick<DocumentRow, "source_url" | "extracted_text">) {
   return [document.source_url, ...urlsFromText(document.extracted_text)].filter(
     (url): url is string => Boolean(url)
@@ -131,6 +153,11 @@ export function isVideoDocument(
   const label = String(document.label || "").trim().toLowerCase();
   const sourceUrl = String(document.source_url || "").trim().toLowerCase();
   const extractedText = String(document.extracted_text || "").trim().toLowerCase();
+  const extractedTextHasVideoUrl = hasVideoUrlInText(extractedText);
+
+  if (isIgnorableVideoSourceUrl(document.source_url) && !extractedTextHasVideoUrl) {
+    return false;
+  }
 
   return (
     VIDEO_DOCUMENT_TYPES.has(type) ||
@@ -142,10 +169,7 @@ export function isVideoDocument(
     sourceUrl.includes("mediaplayer") ||
     sourceUrl.includes("mode=video") ||
     sourceUrl.includes("mode=granicus") ||
-    extractedText.includes("granicus.com/player/clip") ||
-    extractedText.includes("granicus.com/mediaplayer") ||
-    extractedText.includes("swagit.com/videos") ||
-    extractedText.includes("youtube.com/watch")
+    extractedTextHasVideoUrl
   );
 }
 
