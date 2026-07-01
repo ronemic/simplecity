@@ -13,6 +13,15 @@ import {
   hasDisplayableMeetingTime,
   parseMeetingDate
 } from "@/lib/utils/date";
+import {
+  addMonths,
+  buildMonthDays,
+  dateKeyFromDate,
+  firstDateInMonth,
+  formatDateKey,
+  isValidMonthKey,
+  weekdays
+} from "@/lib/utils/calendarGrid";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { cn } from "@/lib/utils/cn";
 import { type Locale, t } from "@/lib/i18n";
@@ -31,51 +40,6 @@ type MeetingView = "calendar" | "list";
 
 function jurisdictionLabel(meeting: MeetingRow) {
   return getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name);
-}
-
-function dateKeyFromDate(date: Date) {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: CIVIC_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit"
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-
-  return `${values.year}-${values.month}-${values.day}`;
-}
-
-function utcDateFromKey(key: string) {
-  const [year, month, day] = key.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day, 12));
-}
-
-function dateKeyFromUtcDate(date: Date) {
-  return [
-    date.getUTCFullYear(),
-    String(date.getUTCMonth() + 1).padStart(2, "0"),
-    String(date.getUTCDate()).padStart(2, "0")
-  ].join("-");
-}
-
-function addDays(date: Date, days: number) {
-  const copy = new Date(date);
-  copy.setUTCDate(copy.getUTCDate() + days);
-  return copy;
-}
-
-function addMonths(monthKey: string, delta: number) {
-  const [year, month] = monthKey.split("-").map(Number);
-  const date = new Date(Date.UTC(year, month - 1 + delta, 1, 12));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-function isValidMonthKey(value?: string | null): value is string {
-  return Boolean(value && /^\d{4}-\d{2}$/.test(value));
-}
-
-function isValidDateKey(value?: string | null): value is string {
-  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
 }
 
 function meetingStart(meeting: MeetingRow) {
@@ -106,30 +70,6 @@ function meetingTimeLabel(meeting: MeetingRow, locale: Locale) {
 
 function meetingSortTime(meeting: MeetingRow) {
   return meetingStart(meeting)?.getTime() || Number.POSITIVE_INFINITY;
-}
-
-function formatDateKey(key: string, options: Intl.DateTimeFormatOptions, locale: Locale) {
-  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
-    timeZone: CIVIC_TIME_ZONE,
-    ...options
-  }).format(utcDateFromKey(key));
-}
-
-function weekdays(locale: Locale) {
-  const formatter = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
-    weekday: "short",
-    timeZone: CIVIC_TIME_ZONE
-  });
-  const firstSunday = new Date(Date.UTC(2024, 0, 7, 12));
-  return Array.from({ length: 7 }, (_, index) => formatter.format(addDays(firstSunday, index)));
-}
-
-function buildMonthDays(monthKey: string) {
-  const [year, month] = monthKey.split("-").map(Number);
-  const firstOfMonth = new Date(Date.UTC(year, month - 1, 1, 12));
-  const firstGridDay = addDays(firstOfMonth, -firstOfMonth.getUTCDay());
-
-  return Array.from({ length: 42 }, (_, index) => dateKeyFromUtcDate(addDays(firstGridDay, index)));
 }
 
 function meetingHref(meeting: MeetingRow) {
@@ -233,11 +173,7 @@ export function MeetingList({
   );
   const [activeDate, setActiveDate] = useState<string>(() => {
     const initialMonth = isValidMonthKey(month) ? month : todayKey.slice(0, 7);
-    return isValidDateKey(selectedDate) && selectedDate.startsWith(initialMonth)
-      ? selectedDate
-      : todayKey.startsWith(initialMonth)
-      ? todayKey
-        : "";
+    return firstDateInMonth(initialMonth, selectedDate, todayKey);
   });
 
   useEffect(() => {
@@ -319,12 +255,8 @@ export function MeetingList({
         setActiveMonth(todayKey.slice(0, 7));
       }
 
-      if (isValidDateKey(urlDate)) {
-        setActiveDate(urlDate);
-      } else {
-        const fallbackMonth = isValidMonthKey(urlMonth) ? urlMonth : todayKey.slice(0, 7);
-        setActiveDate(todayKey.startsWith(fallbackMonth) ? todayKey : "");
-      }
+      const fallbackMonth = isValidMonthKey(urlMonth) ? urlMonth : todayKey.slice(0, 7);
+      setActiveDate(firstDateInMonth(fallbackMonth, urlDate, todayKey));
 
       // Sync form inputs
       syncFormInput("view", urlView);
@@ -351,7 +283,7 @@ export function MeetingList({
     e.preventDefault();
     const newMonth = addMonths(activeMonth, -1);
     setActiveMonth(newMonth);
-    const newDate = todayKey.startsWith(newMonth) ? todayKey : "";
+    const newDate = firstDateInMonth(newMonth, activeDate, todayKey);
     setActiveDate(newDate);
     updateUrlParams({ month: newMonth, date: newDate });
   };
@@ -360,7 +292,7 @@ export function MeetingList({
     e.preventDefault();
     const newMonth = addMonths(activeMonth, 1);
     setActiveMonth(newMonth);
-    const newDate = todayKey.startsWith(newMonth) ? todayKey : "";
+    const newDate = firstDateInMonth(newMonth, activeDate, todayKey);
     setActiveDate(newDate);
     updateUrlParams({ month: newMonth, date: newDate });
   };
@@ -375,6 +307,7 @@ export function MeetingList({
 
   const handleDateClick = (e: React.MouseEvent, day: string) => {
     e.preventDefault();
+    if (!day.startsWith(activeMonth)) return;
     const newMonth = day.slice(0, 7);
     setActiveMonth(newMonth);
     setActiveDate(day);
@@ -496,16 +429,17 @@ export function MeetingList({
                   </div>
                   <div className="grid auto-rows-[minmax(150px,auto)] grid-cols-7 bg-[#edf2f5]">
                     {monthDays.map((day) => {
-                      const dayMeetings = meetingsByDate.get(day) || [];
                       const inMonth = day.startsWith(activeMonth);
-                      const isSelected = day === activeDate;
+                      const dayMeetings = inMonth ? meetingsByDate.get(day) || [] : [];
+                      const isSelected = inMonth && day === activeDate;
+                      const isToday = inMonth && day === todayKey;
 
                       return (
                         <div
                           key={day}
                           className={cn(
                             "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2 transition",
-                            inMonth ? "hover:bg-[#f9fbfd]" : "bg-[#f7f8f9] text-black/35",
+                            inMonth ? "hover:bg-[#f9fbfd]" : "bg-[#eef1f4] text-black/25",
                             isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
                           )}
                         >
@@ -513,9 +447,16 @@ export function MeetingList({
                             <button
                               type="button"
                               onClick={(e) => handleDateClick(e, day)}
+                              disabled={!inMonth}
+                              aria-current={isToday ? "date" : undefined}
+                              aria-pressed={isSelected}
                               className={cn(
                                 "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition hover:bg-civic/10 focus-visible:focus-ring",
-                                isSelected ? "bg-civic text-white hover:bg-civic" : inMonth ? "text-ink" : "text-black/40"
+                                isSelected || isToday
+                                  ? "bg-civic text-white hover:bg-civic"
+                                  : inMonth
+                                    ? "text-ink"
+                                    : "cursor-default text-black/25 hover:bg-transparent"
                               )}
                             >
                               {Number(day.slice(-2))}
