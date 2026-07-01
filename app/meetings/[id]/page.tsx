@@ -70,57 +70,54 @@ export default async function MeetingDetailPage({
         </div>
         <h1 className="page-title mt-3">{displayMeetingTitle(meeting)}</h1>
         <p className="page-copy mt-3 text-base">{displayMeetingType(meeting)}</p>
-        <AddToGoogleCalendarLink meeting={meeting} className="mt-5" locale={locale} />
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <AddToGoogleCalendarLink meeting={meeting} locale={locale} />
+          <nav
+            aria-label={locale === "es" ? "Navegación entre reuniones" : "Meeting navigation"}
+            className="flex flex-wrap items-center gap-2"
+          >
+            {olderMeeting ? (
+              <Link
+                href={meetingHref(olderMeeting.id, publicJurisdiction)}
+                aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting)}`}
+                title={displayMeetingTitle(olderMeeting)}
+                className="group inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition hover:border-civic/25 hover:bg-black/[0.035] focus-visible:focus-ring"
+              >
+                <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-ink" />
+                <span>{locale === "es" ? "Anterior" : "Previous"}</span>
+              </Link>
+            ) : (
+              <div
+                aria-disabled="true"
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/35 shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
+              >
+                <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
+                <span>{locale === "es" ? "Anterior" : "Previous"}</span>
+              </div>
+            )}
+
+            {newerMeeting ? (
+              <Link
+                href={meetingHref(newerMeeting.id, publicJurisdiction)}
+                aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting)}`}
+                title={displayMeetingTitle(newerMeeting)}
+                className="group inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition hover:border-civic/25 hover:bg-black/[0.035] focus-visible:focus-ring"
+              >
+                <span>{locale === "es" ? "Siguiente" : "Next"}</span>
+                <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-ink" />
+              </Link>
+            ) : (
+              <div
+                aria-disabled="true"
+                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/35 shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
+              >
+                <span>{locale === "es" ? "Siguiente" : "Next"}</span>
+                <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
+              </div>
+            )}
+          </nav>
+        </div>
       </div>
-
-      <nav
-        aria-label={locale === "es" ? "Navegación entre reuniones" : "Meeting navigation"}
-        className="mb-8 flex flex-wrap justify-end gap-3"
-      >
-        {olderMeeting ? (
-          <Link
-            href={meetingHref(olderMeeting.id, publicJurisdiction)}
-            aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting)}`}
-            title={displayMeetingTitle(olderMeeting)}
-            className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/15 bg-white px-4 py-2 text-base font-semibold text-ink shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition hover:border-civic/25 hover:bg-black/[0.035] focus-visible:focus-ring"
-          >
-            <ChevronLeft aria-hidden className="h-4.5 w-4.5 shrink-0 text-ink" />
-            <span>{locale === "es" ? "Anterior" : "Previous"}</span>
-          </Link>
-        ) : (
-          <div
-            aria-disabled="true"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-4 py-2 text-base font-semibold text-black/35 shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
-          >
-            <ChevronLeft aria-hidden className="h-4.5 w-4.5 shrink-0 text-black/25" />
-            <span>
-              {locale === "es" ? "Anterior" : "Previous"}
-            </span>
-          </div>
-        )}
-
-        {newerMeeting ? (
-          <Link
-            href={meetingHref(newerMeeting.id, publicJurisdiction)}
-            aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting)}`}
-            title={displayMeetingTitle(newerMeeting)}
-            className="group inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/15 bg-white px-4 py-2 text-base font-semibold text-ink shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition hover:border-civic/25 hover:bg-black/[0.035] focus-visible:focus-ring"
-          >
-            <span>{locale === "es" ? "Siguiente" : "Next"}</span>
-            <ChevronRight aria-hidden className="h-4.5 w-4.5 shrink-0 text-ink" />
-          </Link>
-        ) : (
-          <div
-            aria-disabled="true"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-black/10 bg-white px-4 py-2 text-base font-semibold text-black/35 shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
-          >
-            <span>
-              {locale === "es" ? "Siguiente" : "Next"}
-            </span>
-            <ChevronRight aria-hidden className="h-4.5 w-4.5 shrink-0 text-black/25" />
-          </div>
-        )}
-      </nav>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
         <section className="space-y-4">
