@@ -52,7 +52,7 @@ export default async function CategoryDetailPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-8 max-w-3xl">
-        <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-civic/10 text-civic shadow-sm">
+        <span className="icon-tile-lg">
           <Icon aria-hidden className="h-6 w-6" />
         </span>
         <h1 className="page-title mt-4">{categoryLabel(locale, category)}</h1>
@@ -66,27 +66,31 @@ export default async function CategoryDetailPage({
         {[
           {
             href: `/topics/${slug}${jurisdictionParam ? `?${jurisdictionParam}` : ""}`,
-            label: t(locale, "all")
+            label: t(locale, "all"),
+            selected: !query.period
           },
           {
             href: `/topics/${slug}?${[
               jurisdictionParam,
               "period=upcoming"
             ].filter(Boolean).join("&")}`,
-            label: t(locale, "upcoming")
+            label: t(locale, "upcoming"),
+            selected: query.period === "upcoming"
           },
           {
             href: `/topics/${slug}?${[
               jurisdictionParam,
               "period=past"
             ].filter(Boolean).join("&")}`,
-            label: t(locale, "past")
+            label: t(locale, "past"),
+            selected: query.period === "past"
           }
         ].map((item) => (
           <PendingLink
             key={item.href}
             href={item.href}
-            className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-black/15 bg-white px-4 py-2 text-sm font-semibold text-black/75 shadow-sm transition hover:bg-black/[0.03] focus-visible:focus-ring whitespace-nowrap"
+            aria-current={item.selected ? "true" : undefined}
+            className={`chip chip-lg ${item.selected ? "chip-selected" : ""}`}
             pendingLabel={`${t(locale, "loading")} ${item.label.toLowerCase()}`}
           >
             {item.label}

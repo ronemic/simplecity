@@ -219,7 +219,7 @@ export default async function Home({
               <p className="mt-2 text-base leading-7 text-black/[0.68]">{decisionSectionDescription}</p>
             </div>
             {hasSearch ? (
-              <p className="rounded-md border border-civic/20 bg-white px-3 py-2 text-sm font-bold text-civic shadow-sm">
+              <p className="count-badge">
                 {filteredCards.length === 1
                   ? locale === "es"
                     ? "1 decisión coincidente"
@@ -257,7 +257,7 @@ export default async function Home({
         {!hasSearch && filteredCards.length > 4 ? (
           <Link
             href="/decisions"
-            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
+            className="action-link mt-4 font-black underline-offset-4 hover:underline"
           >
             {t(locale, "viewAllDecisions")}
             <ArrowRight aria-hidden className="h-4 w-4" />
@@ -280,7 +280,7 @@ export default async function Home({
               </p>
               <Link
                 href="/meetings"
-                className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-black text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
+                className="action-link mt-4 font-black underline-offset-4 hover:underline"
               >
                 {t(locale, "viewAllMeetings")}
                 <ArrowRight aria-hidden className="h-4 w-4" />
@@ -314,7 +314,7 @@ export default async function Home({
                     </div>
                     <Link
                       href={`/meetings/${meeting.id}`}
-                      className="inline-flex min-h-10 items-center justify-center rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:border-civic/30 hover:bg-civic/5 hover:text-civic focus-visible:focus-ring"
+                      className="action-secondary-sm"
                     >
                       {t(locale, "meetingDetails")}
                     </Link>
@@ -339,9 +339,9 @@ export default async function Home({
               <Link
                 key={category}
                 href={`/topics/${definition.slug}`}
-                className="group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 rounded-lg border border-black/10 bg-white px-4 py-4 transition hover:border-civic/30 hover:bg-[#f4f8fb] focus-visible:focus-ring"
+                className="quiet-card interactive-card group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 px-4 py-4 focus-visible:focus-ring"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] transition group-hover:bg-civic/10 group-hover:text-civic">
+                <span className="icon-tile transition group-hover:bg-civic/10 group-hover:text-civic">
                   <Icon aria-hidden className="h-5 w-5" />
                 </span>
                 <span className="text-base font-black leading-5 text-ink">

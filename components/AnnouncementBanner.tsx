@@ -31,10 +31,10 @@ export function AnnouncementBanner({
         return (
           <aside
             key={announcement.id}
-            className="overflow-hidden rounded-[10px] border border-black/10 bg-white shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
+            className="quiet-card overflow-hidden"
           >
             <div className="grid gap-4 p-4 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-start sm:p-5">
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f]">
+              <span className="icon-tile-sm">
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <div className="min-w-0">

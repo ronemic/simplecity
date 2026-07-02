@@ -20,13 +20,13 @@ export function CategoryPill({
 }) {
   const definition = CATEGORY_DEFINITIONS[category as CategoryName];
   const className = cn(
-    "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-black/15 bg-white font-semibold text-black/75 shadow-sm transition hover:bg-black/[0.03] focus-visible:focus-ring",
+    "chip",
     compact
-      ? "px-2.5 py-1 text-xs"
+      ? "chip-compact"
       : large
-        ? "min-h-9 px-3.5 py-1.5 text-sm"
-        : "px-3 py-1 text-xs",
-    selected && "border-civic/35 bg-civic/10 text-civic hover:bg-civic/15"
+        ? "chip-lg"
+        : "",
+    selected && "chip-selected"
   );
 
   const content = (

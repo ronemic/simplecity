@@ -171,7 +171,7 @@ export function MeetingVideoEmbed({
               href={primaryVideo.document.source_url}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex min-h-8 items-center gap-1.5 rounded-md border border-civic/20 bg-[#eef5ff] px-2.5 py-1 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
+              className="action-civic-xs"
             >
               {locale === "es" ? "Grabación completa" : "Full recording"}
               <ExternalLink aria-hidden className="h-3.5 w-3.5" />
@@ -202,7 +202,7 @@ export function MeetingVideoEmbed({
                           target="_blank"
                           rel="noreferrer"
                           title={videoLabel(document, locale)}
-                          className="inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/65 transition hover:border-civic/25 hover:bg-[#f7fbff] hover:text-civic focus-visible:focus-ring"
+                          className="action-row-sm"
                         >
                           <span className="truncate">{clipLinkLabel(document, index, locale)}</span>
                           <ExternalLink aria-hidden className="h-3.5 w-3.5 shrink-0" />
@@ -225,7 +225,7 @@ export function MeetingVideoEmbed({
                           target="_blank"
                           rel="noreferrer"
                           title={videoLabel(document, locale)}
-                          className="inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/65 transition hover:border-civic/25 hover:bg-[#f7fbff] hover:text-civic focus-visible:focus-ring"
+                          className="action-row-sm"
                         >
                           <span className="truncate">{audioLinkLabel(document, index, locale)}</span>
                           <ExternalLink aria-hidden className="h-3.5 w-3.5 shrink-0" />

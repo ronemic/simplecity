@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { JURISDICTION_PREFERENCE_COOKIE } from "@/lib/config/jurisdictions";
 import { LANGUAGE_OPTIONS, LOCALE_COOKIE, type Locale, t } from "@/lib/i18n";
+import { cn } from "@/lib/utils/cn";
 
 const nav = [
   { href: "/decisions", labelKey: "decisions" },
@@ -43,6 +44,11 @@ function writeJurisdictionPreference(value: string) {
 function writeLocalePreference(value: Locale) {
   const encoded = encodeURIComponent(value);
   document.cookie = `${LOCALE_COOKIE}=${encoded}; path=/; max-age=31536000; samesite=lax`;
+}
+
+function announceLocalePreference(value: Locale) {
+  document.documentElement.lang = value;
+  window.dispatchEvent(new CustomEvent("simplecity:localechange", { detail: { locale: value } }));
 }
 
 function jurisdictionLabel(jurisdiction: (typeof jurisdictions)[number], locale: Locale) {
@@ -165,8 +171,9 @@ export function HeaderNav({
     try {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, value);
       writeLocalePreference(value);
+      announceLocalePreference(value);
     } catch {
-      // Ignore storage failures so the selector still works normally.
+      announceLocalePreference(value);
     }
     startTransition(() => {
       router.push(hrefWithSelection("lang", value), { scroll: false });
@@ -184,7 +191,7 @@ export function HeaderNav({
           aria-haspopup="listbox"
           aria-expanded={isJurisdictionMenuOpen}
           aria-busy={isJurisdictionPending}
-          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:focus-ring"
+          className="menu-trigger"
           onClick={() => setIsJurisdictionMenuOpen((isOpen) => !isOpen)}
         >
           <span className="flex min-w-0 items-center gap-2">
@@ -203,7 +210,7 @@ export function HeaderNav({
           )}
         </button>
         {isJurisdictionMenuOpen ? (
-          <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)]">
+          <div className="menu-popover">
             <div role="listbox" aria-label="Jurisdiction" className="max-h-64 overflow-auto">
               {jurisdictions.map((jurisdiction) => {
                 const isSelected = jurisdiction.slug === selected;
@@ -214,11 +221,7 @@ export function HeaderNav({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={`grid min-h-10 w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm font-bold transition ${
-                      isSelected
-                        ? "bg-[#12365f] text-white"
-                        : "text-ink hover:bg-[#eef4f8] focus-visible:bg-[#eef4f8]"
-                    }`}
+                    className={cn("menu-option", isSelected && "menu-option-selected")}
                     onClick={() => changeJurisdiction(jurisdiction.slug)}
                   >
                     <Check
@@ -239,7 +242,7 @@ export function HeaderNav({
           aria-haspopup="listbox"
           aria-expanded={isLanguageMenuOpen}
           aria-busy={isLanguagePending}
-          className="flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:focus-ring"
+          className="menu-trigger"
           onClick={() => setIsLanguageMenuOpen((isOpen) => !isOpen)}
         >
           <span className="flex min-w-0 items-center gap-2">
@@ -258,7 +261,7 @@ export function HeaderNav({
           )}
         </button>
         {isLanguageMenuOpen ? (
-          <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)]">
+          <div className="menu-popover">
             <div role="listbox" aria-label={t(selectedLocale, "language")} className="max-h-64 overflow-auto">
               {LANGUAGE_OPTIONS.map((option) => {
                 const isSelected = option.locale === selectedLocale;
@@ -269,11 +272,7 @@ export function HeaderNav({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={`grid min-h-10 w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm font-bold transition ${
-                      isSelected
-                        ? "bg-[#12365f] text-white"
-                        : "text-ink hover:bg-[#eef4f8] focus-visible:bg-[#eef4f8]"
-                    }`}
+                    className={cn("menu-option", isSelected && "menu-option-selected")}
                     onClick={() => changeLanguage(option.locale)}
                   >
                     <Check
@@ -316,7 +315,7 @@ export function HeaderNavFallback() {
       aria-label="Primary navigation"
       className="grid w-full grid-cols-4 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
     >
-      <label className="col-span-4 flex min-h-11 items-center gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 shadow-sm md:col-span-1 md:mr-2 md:w-48">
+      <label className="menu-trigger col-span-4 md:col-span-1 md:mr-2 md:w-48">
         <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
@@ -330,7 +329,7 @@ export function HeaderNavFallback() {
           ))}
         </select>
       </label>
-      <label className="col-span-4 flex min-h-11 items-center gap-2 rounded-lg border border-black/15 bg-white/[0.85] px-3 py-2 shadow-sm md:col-span-1 md:mr-2 md:w-36">
+      <label className="menu-trigger col-span-4 md:col-span-1 md:mr-2 md:w-36">
         <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Language</span>
         <select

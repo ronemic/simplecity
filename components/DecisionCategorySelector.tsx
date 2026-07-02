@@ -36,11 +36,7 @@ export function DecisionCategorySelector({
           href={categoryHref(null, search, jurisdiction)}
           aria-current={!selectedCategory ? "true" : undefined}
           pendingLabel={locale === "es" ? "Mostrando todos los temas" : "Showing all topics"}
-          className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-sm font-semibold shadow-sm transition focus-visible:focus-ring ${
-            !selectedCategory
-              ? "border-civic/35 bg-civic/10 text-civic hover:bg-civic/15"
-              : "border-black/15 bg-white text-black/75 hover:bg-black/[0.03]"
-          }`}
+          className={`chip chip-lg ${!selectedCategory ? "chip-selected" : ""}`}
         >
           <Layers3 aria-hidden className="h-4 w-4 shrink-0" />
           <span>{t(locale, "allTopics")}</span>

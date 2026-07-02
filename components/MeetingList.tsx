@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
+import { HighlightedText } from "@/components/HighlightedText";
 import { PendingLink } from "@/components/PendingLink";
 import { StatusPill } from "@/components/StatusPill";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
@@ -32,6 +33,7 @@ type MeetingCalendarProps = {
   meetings: MeetingRow[];
   month?: string;
   selectedDate?: string;
+  search?: string;
   view?: MeetingView;
   locale?: Locale;
 };
@@ -113,12 +115,17 @@ function calendarMeetingTone(status?: string | null) {
 function MeetingLine({
   meeting,
   compact = false,
+  highlight,
   locale
 }: {
   meeting: MeetingRow;
   compact?: boolean;
+  highlight?: string;
   locale: Locale;
 }) {
+  const meetingType = displayMeetingType(meeting);
+  const meetingJurisdiction = jurisdictionLabel(meeting);
+
   return (
     <div
       className={cn(
@@ -143,10 +150,12 @@ function MeetingLine({
           )}
           pendingLabel={t(locale, "openingMeeting")}
         >
-          {displayMeetingTitle(meeting)}
+          <HighlightedText text={displayMeetingTitle(meeting)} query={highlight} />
         </PendingLink>
         <p className="mt-0.5 text-xs font-semibold leading-5 text-black/55">
-          {displayMeetingType(meeting)} · {jurisdictionLabel(meeting)}
+          <HighlightedText text={meetingType} query={highlight} />
+          {" · "}
+          <HighlightedText text={meetingJurisdiction} query={highlight} />
         </p>
       </div>
       {!compact ? (
@@ -162,9 +171,11 @@ export function MeetingList({
   meetings,
   month,
   selectedDate,
+  search = "",
   view = "calendar",
   locale = "en"
 }: MeetingCalendarProps) {
+  const highlight = search.trim();
   const todayKey = dateKeyFromDate(new Date());
 
   const [activeView, setActiveView] = useState<MeetingView>(view);
@@ -337,7 +348,7 @@ export function MeetingList({
   return (
     <div className="grid gap-6">
       <div className="hidden md:flex justify-end">
-        <div className="inline-flex rounded-lg border border-black/10 bg-white p-1 shadow-[0_1px_2px_rgba(23,23,23,0.04)]">
+        <div className="segmented-control">
           {(["calendar", "list"] as MeetingView[]).map((option) => {
             const selected = activeView === option;
 
@@ -348,8 +359,8 @@ export function MeetingList({
                 onClick={() => handleViewChange(option)}
                 aria-current={selected ? "page" : undefined}
                 className={cn(
-                  "inline-flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-black capitalize transition focus-visible:focus-ring",
-                  selected ? "bg-civic text-white shadow-sm" : "text-black/65 hover:bg-black/[0.04] hover:text-ink"
+                  "segmented-button",
+                  selected && "segmented-button-selected"
                 )}
               >
                 {option === "calendar" ? (
@@ -395,7 +406,7 @@ export function MeetingList({
                   <button
                     type="button"
                     onClick={handlePrevMonth}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
+                    className="action-secondary-sm"
                   >
                     <ChevronLeft aria-hidden className="h-4 w-4" />
                     {t(locale, "previous")}
@@ -403,14 +414,14 @@ export function MeetingList({
                   <button
                     type="button"
                     onClick={handleToday}
-                    className="inline-flex min-h-10 items-center rounded-md border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic transition hover:bg-[#e0edff] focus-visible:focus-ring"
+                    className="action-civic-sm"
                   >
                     {t(locale, "today")}
                   </button>
                   <button
                     type="button"
                     onClick={handleNextMonth}
-                    className="inline-flex min-h-10 items-center gap-1.5 rounded-md border border-black/15 px-3 py-2 text-sm font-bold text-ink transition hover:bg-black/[0.035] focus-visible:focus-ring"
+                    className="action-secondary-sm"
                   >
                     {t(locale, "next")}
                     <ChevronRight aria-hidden className="h-4 w-4" />
@@ -479,7 +490,7 @@ export function MeetingList({
                                   {meetingTimeLabel(meeting, locale)}
                                 </span>
                                 <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
-                                  {displayMeetingTitle(meeting)}
+                                  <HighlightedText text={displayMeetingTitle(meeting)} query={highlight} />
                                 </span>
                               </PendingLink>
                             ))}
@@ -518,7 +529,7 @@ export function MeetingList({
                 {activeDateMeetings.length > 0 ? (
                   activeDateMeetings.map((meeting) => (
                     <div key={meeting.id} className="p-3.5">
-                      <MeetingLine meeting={meeting} compact locale={locale} />
+                      <MeetingLine meeting={meeting} compact highlight={highlight} locale={locale} />
                     </div>
                   ))
                 ) : (
@@ -562,13 +573,16 @@ export function MeetingList({
               {sortedMeetings.map((meeting) => (
                 <article key={meeting.id} className="grid gap-2 p-5 transition hover:bg-black/[0.025] sm:p-6">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
-                    <StatusPill status={meeting.status} locale={locale} />
+                    <StatusPill status={meeting.status} locale={locale} highlight={highlight} />
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-                      {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+                      <HighlightedText
+                        text={formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+                        query={highlight}
+                      />
                     </span>
                   </div>
-                  <MeetingLine meeting={meeting} locale={locale} />
+                  <MeetingLine meeting={meeting} highlight={highlight} locale={locale} />
                 </article>
               ))}
             </div>

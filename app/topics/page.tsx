@@ -27,9 +27,9 @@ export default async function TopicsPage() {
             <Link
               key={category}
               href={`/topics/${definition.slug}`}
-              className="quiet-card group block p-5 transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(23,23,23,0.12)] focus-visible:focus-ring"
+              className="quiet-card interactive-card group block p-5 focus-visible:focus-ring"
             >
-              <span className="flex h-11 w-11 items-center justify-center rounded-lg bg-civic/10 text-civic shadow-sm">
+              <span className="icon-tile">
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <h2 className="mt-4 text-xl font-bold text-ink">{categoryLabel(locale, category)}</h2>

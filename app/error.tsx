@@ -22,7 +22,7 @@ export default function ErrorPage({
         <button
           type="button"
           onClick={reset}
-          className="mt-5 inline-flex min-h-10 items-center gap-2 rounded-md bg-civic px-4 text-sm font-bold text-white"
+          className="action-primary-sm mt-5"
         >
           <RotateCcw aria-hidden className="h-4 w-4" />
           {t(locale, "tryAgain")}

@@ -61,7 +61,7 @@ export default async function MeetingDetailPage({
       <div className="mb-8 max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={meeting.status} locale={locale} />
-          <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
+          <span className="chip chip-selected">
             {jurisdictionLabel}
           </span>
           <span className="text-sm font-semibold text-black/70">
@@ -81,7 +81,7 @@ export default async function MeetingDetailPage({
                 href={meetingHref(olderMeeting.id, publicJurisdiction)}
                 aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting)}`}
                 title={displayMeetingTitle(olderMeeting)}
-                className="group inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition hover:border-civic/25 hover:bg-black/[0.035] focus-visible:focus-ring"
+                className="action-secondary-sm group"
               >
                 <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-ink" />
                 <span>{locale === "es" ? "Anterior" : "Previous"}</span>
@@ -89,7 +89,7 @@ export default async function MeetingDetailPage({
             ) : (
               <div
                 aria-disabled="true"
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/35 shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
+                className="action-disabled-sm"
               >
                 <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
                 <span>{locale === "es" ? "Anterior" : "Previous"}</span>
@@ -101,7 +101,7 @@ export default async function MeetingDetailPage({
                 href={meetingHref(newerMeeting.id, publicJurisdiction)}
                 aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting)}`}
                 title={displayMeetingTitle(newerMeeting)}
-                className="group inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition hover:border-civic/25 hover:bg-black/[0.035] focus-visible:focus-ring"
+                className="action-secondary-sm group"
               >
                 <span>{locale === "es" ? "Siguiente" : "Next"}</span>
                 <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-ink" />
@@ -109,7 +109,7 @@ export default async function MeetingDetailPage({
             ) : (
               <div
                 aria-disabled="true"
-                className="inline-flex min-h-10 items-center justify-center gap-1.5 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/35 shadow-[0_1px_2px_rgba(23,23,23,0.04)]"
+                className="action-disabled-sm"
               >
                 <span>{locale === "es" ? "Siguiente" : "Next"}</span>
                 <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
@@ -162,7 +162,7 @@ export default async function MeetingDetailPage({
                     href={doc.source_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-start gap-3 rounded-lg border border-black/10 bg-white p-4 text-sm transition hover:-translate-y-0.5 hover:bg-black/[0.025] hover:shadow-sm focus-visible:focus-ring"
+                    className="quiet-card interactive-card flex items-start gap-3 p-4 text-sm focus-visible:focus-ring"
                   >
                     <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
                     <span className="min-w-0 flex-1">

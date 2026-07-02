@@ -1,18 +1,28 @@
 import { STATUS_TONES } from "@/lib/constants";
+import { HighlightedText } from "@/components/HighlightedText";
 import { cn } from "@/lib/utils/cn";
 import { type Locale, statusLabel } from "@/lib/i18n";
 
-export function StatusPill({ status, locale = "en" }: { status?: string | null; locale?: Locale }) {
+export function StatusPill({
+  status,
+  locale = "en",
+  highlight
+}: {
+  status?: string | null;
+  locale?: Locale;
+  highlight?: string;
+}) {
   const label = status || "Unknown";
+  const displayLabel = statusLabel(locale, label);
 
   return (
     <span
       className={cn(
-        "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold shadow-sm",
+        "status-pill",
         STATUS_TONES[label] || "border-black/20 bg-black/5 text-black/70"
       )}
     >
-      {statusLabel(locale, label)}
+      <HighlightedText text={displayLabel} query={highlight} />
     </span>
   );
 }

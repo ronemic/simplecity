@@ -57,7 +57,7 @@ export function ListboxSelect({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className="flex min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-black/20 bg-white px-4 py-3 text-left text-base font-semibold text-ink shadow-sm transition hover:border-black/40 hover:bg-black/[0.025] focus-visible:focus-ring"
+        className="select-trigger"
         onClick={() => setIsOpen((open) => !open)}
       >
         <span className="truncate">{selectedOption?.label || label}</span>
@@ -67,7 +67,7 @@ export function ListboxSelect({
         />
       </button>
       {isOpen ? (
-        <div className="absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/20 bg-white py-1 shadow-soft">
+        <div className="menu-popover border-black/20 shadow-soft">
           <div role="listbox" aria-label={label} className="max-h-64 overflow-auto">
             {options.map((option) => {
               const isSelected = option.value === selectedValue;
@@ -78,11 +78,7 @@ export function ListboxSelect({
                   type="button"
                   role="option"
                   aria-selected={isSelected}
-                  className={`grid min-h-10 w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm font-bold transition ${
-                    isSelected
-                      ? "bg-civic text-white"
-                      : "text-ink hover:bg-black/[0.04] focus-visible:bg-black/[0.04]"
-                  }`}
+                  className={`menu-option ${isSelected ? "menu-option-selected" : ""}`}
                   onClick={() => {
                     setSelectedValue(option.value);
                     setIsOpen(false);

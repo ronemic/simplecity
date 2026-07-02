@@ -142,7 +142,9 @@ export default async function AboutPage() {
             }
           ].map((item) => (
             <section key={item.title} className="quiet-card p-6">
-              <item.icon aria-hidden className="h-7 w-7 text-civic" />
+              <span className="icon-tile-sm">
+                <item.icon aria-hidden className="h-5 w-5" />
+              </span>
               <h2 className="mt-4 text-lg font-bold text-ink">{item.title}</h2>
               <p className="mt-2 text-sm leading-6 text-black/75">{item.body}</p>
             </section>

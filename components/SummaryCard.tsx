@@ -199,14 +199,11 @@ export function SummaryCard({
   const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
-  const primaryButtonClass =
-    "inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[#12365f] px-4 py-2 text-sm font-black text-white shadow-sm transition hover:bg-[#0d2949] focus-visible:focus-ring active:translate-y-px whitespace-nowrap";
+  const primaryButtonClass = "action-primary-sm font-black";
   const noCommentLabel = t(locale, "noCommentOptionListed");
 
   return (
-    <article
-      className="overflow-hidden rounded-[10px] border border-black/10 bg-white shadow-[0_1px_2px_rgba(23,23,23,0.04)] transition duration-200 hover:border-civic/25"
-    >
+    <article className="quiet-card interactive-card overflow-hidden">
       <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
@@ -230,7 +227,7 @@ export function SummaryCard({
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
             <span
               className={cn(
-                "inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-black",
+                "status-chip",
                 status.className
               )}
             >
@@ -244,7 +241,7 @@ export function SummaryCard({
             <span className="inline-flex items-center gap-1.5">
               <span
                 aria-hidden
-                className="flex h-5 w-5 items-center justify-center rounded bg-[#eef3f6] text-[#12365f]"
+                className="icon-badge"
               >
                 <TopicIcon className="h-3.5 w-3.5" />
               </span>
@@ -302,7 +299,7 @@ export function SummaryCard({
               {affectedTags.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {affectedTags.map((resident) => (
-                    <span key={resident} className="rounded-md border border-black/10 bg-white px-2.5 py-1 text-xs text-black/70">
+                    <span key={resident} className="meta-chip">
                       <HighlightedText text={resident} query={highlight} />
                     </span>
                   ))}
@@ -345,7 +342,7 @@ export function SummaryCard({
             {meetingPageHref ? (
               <PendingLink
                 href={meetingPageHref}
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
+                className="action-link"
                 pendingLabel={t(locale, "openingMeeting")}
               >
                 {t(locale, "meetingPage")}
@@ -356,14 +353,14 @@ export function SummaryCard({
                 href={card.source_url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-civic transition hover:bg-civic/5 focus-visible:focus-ring"
+                className="action-link"
               >
                 {t(locale, "source")}
                 <ExternalLink aria-hidden className="h-4 w-4" />
               </a>
             ) : null}
             {summaryConfidence ? (
-              <span className="rounded-md border border-black/10 bg-white px-2 py-1 text-xs font-bold uppercase tracking-normal text-black/50">
+              <span className="meta-chip uppercase tracking-normal text-black/50">
                 {summaryConfidence}
               </span>
             ) : null}

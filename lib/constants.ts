@@ -82,12 +82,12 @@ export const CATEGORY_DEFINITIONS: Record<
 };
 
 export const STATUS_TONES: Record<string, string> = {
-  "Upcoming vote": "bg-civic/10 text-civic border-civic/30",
-  "Under discussion": "bg-[#fef3cd] text-[#7d5a00] border-[#e6c663]",
-  Passed: "bg-moss/10 text-moss border-moss/30",
-  Tabled: "bg-sun/20 text-[#73561a] border-sun/40",
-  Cancelled: "bg-clay/10 text-clay border-clay/30",
-  "Information only": "bg-[#e6f1fb] text-[#0c447c] border-[#9ec8e8]",
-  Upcoming: "bg-civic/10 text-civic border-civic/30",
-  Past: "bg-black/5 text-black/70 border-black/20"
+  "Upcoming vote": "border-civic/25 bg-[#eef5ff] text-[#164a91]",
+  "Under discussion": "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
+  Passed: "border-[#9fc6b2] bg-[#effbf3] text-[#24613c]",
+  Tabled: "border-[#f0c75e] bg-[#fff9e9] text-[#73561a]",
+  Cancelled: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]",
+  "Information only": "border-[#bed0dc] bg-[#eef3f6] text-[#12365f]",
+  Upcoming: "border-civic/25 bg-[#eef5ff] text-[#164a91]",
+  Past: "border-black/15 bg-[#f4f5f6] text-black/65"
 };

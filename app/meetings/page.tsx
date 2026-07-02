@@ -97,6 +97,7 @@ export default async function MeetingsPage({
         meetings={meetings}
         month={params.month}
         selectedDate={params.date}
+        search={search}
         view={view}
         locale={locale}
       />
