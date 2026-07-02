@@ -138,11 +138,11 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     meetingPage: "Meeting page",
     meetingTypeNotListed: "Meeting type not listed",
     meetings: "Meetings",
-    meetingsDescription: "See every scraped meeting by month, day, or list, with search and status filters.",
+    meetingsDescription: "See every collected meeting by month, day, or list, with search and status filters.",
     monthView: "Month view",
     next: "Next",
     noCardsInCategory: "No cards in this topic yet",
-    noCardsInCategoryDescription: "Cards will appear here once official agenda items are scraped and summarized.",
+    noCardsInCategoryDescription: "Cards will appear here once official agenda items are collected and summarized.",
     noCardsYet: "No cards yet",
     noDecisionsYet: "No decisions yet",
     noMatchingDecisions: "No matching decisions",
@@ -296,7 +296,7 @@ const categoryLabels: Record<Locale, Record<CategoryName, string>> = {
     "Budget & Taxes": "Budget & Taxes",
     "Business & Development": "Business & Development",
     "Schools & Youth": "Schools & Youth",
-    "City Services": "City Services"
+    "City Services": "Public Services"
   },
   es: {
     Housing: "Vivienda",
@@ -306,7 +306,7 @@ const categoryLabels: Record<Locale, Record<CategoryName, string>> = {
     "Budget & Taxes": "Presupuesto e impuestos",
     "Business & Development": "Negocios y desarrollo",
     "Schools & Youth": "Escuelas y jóvenes",
-    "City Services": "Servicios municipales"
+    "City Services": "Servicios públicos"
   }
 };
 
@@ -340,13 +340,13 @@ const categoryDescriptions: Record<Locale, Record<CategoryName, string>> = {
   ) as Record<CategoryName, string>,
   es: {
     Housing: "Rentas, viviendas asequibles, zonificación y decisiones que influyen en dónde puede vivir la gente.",
-    Transportation: "Calles, ciclovías, estacionamiento, transporte público, seguridad vial y cómo se mueve la gente por la ciudad.",
+    Transportation: "Calles, ciclovías, estacionamiento, transporte público, seguridad vial y cómo se mueve la gente por la comunidad.",
     "Public Safety": "Policía, bomberos, respuesta a emergencias, preparación ante desastres y seguridad vecinal.",
     "Parks & Environment": "Parques, costas, trabajo climático, árboles, espacios abiertos y protecciones ambientales.",
-    "Budget & Taxes": "Gasto municipal, tarifas, impuestos, bonos, contratos y decisiones sobre dinero público.",
+    "Budget & Taxes": "Gasto público, tarifas, impuestos, bonos, contratos y decisiones sobre dinero público.",
     "Business & Development": "Nuevos edificios, negocios locales, desarrollo económico, permisos y proyectos importantes.",
     "Schools & Youth": "Programas juveniles, alianzas escolares, estudiantes, cuidado infantil y servicios para familias.",
-    "City Services": "Servicios públicos, obras públicas, permisos, bibliotecas, mantenimiento y operaciones cotidianas de la ciudad."
+    "City Services": "Servicios públicos, obras públicas, permisos, bibliotecas, mantenimiento y operaciones cotidianas del gobierno local."
   }
 };
 

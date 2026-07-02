@@ -30,12 +30,12 @@ function noCardsDescription(locale: "en" | "es", jurisdiction: string, jurisdict
   if (jurisdiction === ALL_JURISDICTIONS_SLUG) {
     return locale === "es"
       ? "Las tarjetas oficiales de agenda aparecerán aquí cuando se recopilen las reuniones."
-      : "Official agenda cards will appear here once meetings are scraped.";
+      : "Official agenda cards will appear here once meetings are collected.";
   }
 
   return locale === "es"
     ? `Las tarjetas oficiales de agenda de ${jurisdictionLabel} aparecerán aquí cuando se recopilen las reuniones.`
-    : `Official ${jurisdictionLabel} agenda cards will appear here once meetings are scraped.`;
+    : `Official ${jurisdictionLabel} agenda cards will appear here once meetings are collected.`;
 }
 
 export default async function DecisionsPage({

@@ -43,7 +43,7 @@ export function CategoryPill({
       <PendingLink
         href={href}
         aria-current={selected ? "true" : undefined}
-        className={cn(className, "focus-visible:focus-ring")}
+        className={cn(className, "chip-action focus-visible:focus-ring")}
         pendingLabel={t(locale, "loading")}
       >
         {content}

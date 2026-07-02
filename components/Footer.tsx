@@ -17,8 +17,8 @@ function readCookieLocale() {
 
 function footerDescription(locale: Locale) {
   return locale === "es"
-    ? "SimpleCity es un sitio independiente compilado por ciudadanos privados, no un sitio oficial de la ciudad. Resume documentos de reuniones públicas para que sean más fáciles de entender. Siempre revisa la fuente original antes de tomar decisiones formales."
-    : "SimpleCity is an independent site compiled by private citizens, not an official City website. It summarizes public meeting documents to make them easier to understand. Always review the original source before making formal decisions.";
+    ? "SimpleCity es un sitio independiente compilado por ciudadanos privados, no un sitio oficial del gobierno local. Resume documentos de reuniones públicas para que sean más fáciles de entender. Siempre revisa la fuente original antes de tomar decisiones formales."
+    : "SimpleCity is an independent site compiled by private citizens, not an official local government website. It summarizes public meeting documents to make them easier to understand. Always review the original source before making formal decisions.";
 }
 
 function aboutSourcesLabel(locale: Locale) {

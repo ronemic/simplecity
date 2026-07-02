@@ -203,7 +203,7 @@ export function SummaryCard({
   const noCommentLabel = t(locale, "noCommentOptionListed");
 
   return (
-    <article className="quiet-card interactive-card overflow-hidden">
+    <article className="quiet-card overflow-hidden">
       <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">

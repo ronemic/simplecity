@@ -60,8 +60,8 @@ export default async function AboutPage() {
           </h1>
           <p className="page-copy mt-4">
             {locale === "es"
-              ? "SimpleCity ayuda a residentes a entender agendas de reuniones municipales sin tener que descifrar lenguaje gubernamental ni revisar paquetes largos en PDF."
-              : "SimpleCity helps residents understand city meeting agendas without needing to decode government language or dig through packet PDFs."}
+              ? "SimpleCity ayuda a residentes a entender agendas de reuniones del gobierno local sin tener que descifrar lenguaje gubernamental ni revisar paquetes o avisos extensos."
+              : "SimpleCity helps residents understand local government meeting agendas without needing to decode government language or dig through long agenda packets and notices."}
           </p>
 
           <section className="mt-10">
@@ -71,8 +71,8 @@ export default async function AboutPage() {
             <div className="mt-4 space-y-4">
               <p className="page-copy">
                 {locale === "es"
-                  ? "Somos Ruiwen, Patrick y Samuel, un equipo de tres estudiantes de secundaria del Área de la Bahía que queríamos entender qué estaban discutiendo nuestros gobiernos locales, pero encontramos agendas difíciles de leer y a menudo enterradas en largos paquetes PDF."
-                  : "We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school students who wanted to understand what our local governments were discussing, but found meeting agendas difficult to read and often buried in long PDF packets."}
+                  ? "Somos Ruiwen, Patrick y Samuel, un equipo de tres estudiantes de secundaria del Área de la Bahía que queríamos entender qué estaban discutiendo nuestros gobiernos locales, pero encontramos agendas difíciles de leer y a menudo enterradas en paquetes, avisos o portales extensos."
+                  : "We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school students who wanted to understand what our local governments were discussing, but found meeting agendas difficult to read and often buried in long packets, notices, or portals."}
               </p>
               <p className="page-copy">
                 {locale === "es"
@@ -81,8 +81,8 @@ export default async function AboutPage() {
               </p>
               <p className="page-copy">
                 {locale === "es"
-                  ? "Nuestro objetivo no es reemplazar los registros de la ciudad, sino ayudar a residentes a descubrirlos y entenderlos para mantenerse informados sobre su comunidad y participar cuando sea necesario."
-                  : "Our goal is not to replace city records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
+                  ? "Nuestro objetivo no es reemplazar los registros oficiales, sino ayudar a residentes a descubrirlos y entenderlos para mantenerse informados sobre su comunidad y participar cuando sea necesario."
+                  : "Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
               </p>
             </div>
           </section>
@@ -121,8 +121,8 @@ export default async function AboutPage() {
               title: locale === "es" ? "Documentos oficiales primero" : "Official documents first",
               body:
                 locale === "es"
-                  ? "El recopilador lee tablas de agendas de PrimeGov y conserva cada URL de fuente oficial."
-                  : "The scraper reads PrimeGov agenda tables and preserves each official source URL."
+                  ? "El proceso de recopilación lee portales oficiales de agendas y reuniones y conserva cada URL de fuente oficial."
+                  : "The collection pipeline reads official agenda and meeting portals and preserves each official source URL."
             },
             {
               icon: ShieldCheck,
@@ -158,8 +158,8 @@ export default async function AboutPage() {
         </h2>
         <p className="mt-3 text-base leading-7 text-black/75">
           {locale === "es"
-            ? "SimpleCity no reemplaza registros oficiales de la ciudad, avisos legales, informes del personal ni instrucciones formales de la ciudad. Es una capa de lectura que ayuda a las personas a entender qué está pasando y dónde verificarlo."
-            : "SimpleCity does not replace official city records, legal notices, staff reports, or formal instructions from the city. It is a reading layer that helps people understand what is happening and where to verify it."}
+            ? "SimpleCity no reemplaza registros oficiales del gobierno local, avisos legales, informes del personal ni instrucciones formales de la agencia pública. Es una capa de lectura que ayuda a las personas a entender qué está pasando y dónde verificarlo."
+            : "SimpleCity does not replace official local government records, legal notices, staff reports, or formal instructions from the public agency. It is a reading layer that helps people understand what is happening and where to verify it."}
         </p>
       </section>
     </div>

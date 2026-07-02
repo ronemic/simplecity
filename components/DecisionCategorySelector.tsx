@@ -36,7 +36,7 @@ export function DecisionCategorySelector({
           href={categoryHref(null, search, jurisdiction)}
           aria-current={!selectedCategory ? "true" : undefined}
           pendingLabel={locale === "es" ? "Mostrando todos los temas" : "Showing all topics"}
-          className={`chip chip-lg ${!selectedCategory ? "chip-selected" : ""}`}
+          className={`chip chip-action chip-lg ${!selectedCategory ? "chip-selected" : ""}`}
         >
           <Layers3 aria-hidden className="h-4 w-4 shrink-0" />
           <span>{t(locale, "allTopics")}</span>

@@ -97,7 +97,7 @@ Rules:
 - Keep official names, addresses, fiscal years, money amounts, tax rates, percentages, dates, and public deadlines when they are central to understanding the item.
 - “whatIsHappening” must be 2-3 plain sentences.
 - “whyItMatters” must explain concrete impact.
-- “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or city taxpayers.
+- “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or taxpayers.
 - “categoryTags” must only use allowed topics.
 - Every factual claim must be directly supported by the provided meeting metadata, raw agenda text, or optional public-comment text.
 - If a fact is not clearly supported, omit it or write “Not listed in the source document.”
@@ -108,7 +108,7 @@ Rules:
 - Include closed session items only when the agenda lists a meaningful public topic, such as labor negotiations, litigation, property acquisition, or public employee appointment or dismissal.
 - Include meeting cancellations, continuances, and special meeting notices because they affect public participation.
 - Include public comment periods when the agenda gives concrete instructions, deadlines, time limits, remote participation options, or online submission details.
-- Consent calendar items can be summarized if they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or city services.
+- Consent calendar items can be summarized if they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or public services.
 - If the meeting is cancelled, return exactly one card explaining the cancellation.
 - If an item is a public hearing, mark status as “Upcoming vote” or “Under discussion” depending on source wording.
 - If the source only says receive report or presentation, mark status as “Information only.”

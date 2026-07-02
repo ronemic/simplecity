@@ -42,7 +42,7 @@ export default function manifest(): MetadataRoute.Manifest {
       {
         name: "Meetings",
         short_name: "Meetings",
-        description: "Browse scraped public meetings.",
+        description: "Browse collected public meetings.",
         url: "/meetings",
         icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }]
       }

@@ -57,7 +57,7 @@ export const CATEGORY_DEFINITIONS: Record<
   },
   "Budget & Taxes": {
     slug: "budget-taxes",
-    description: "City spending, fees, taxes, bonds, contracts, and the tradeoffs behind public money.",
+    description: "Public spending, fees, taxes, bonds, contracts, and the tradeoffs behind public money.",
     tone: "bg-white text-[#725722] border-black/15",
     icon: CircleDollarSign
   },
@@ -75,7 +75,7 @@ export const CATEGORY_DEFINITIONS: Record<
   },
   "City Services": {
     slug: "city-services",
-    description: "Utilities, public works, permits, libraries, maintenance, and everyday city operations.",
+    description: "Utilities, public works, permits, libraries, maintenance, and everyday local government operations.",
     tone: "bg-white text-[#365d6a] border-black/15",
     icon: Building2
   }

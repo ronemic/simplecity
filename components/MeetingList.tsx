@@ -450,8 +450,8 @@ export function MeetingList({
                         <div
                           key={day}
                           className={cn(
-                            "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2 transition",
-                            inMonth ? "hover:bg-[#f9fbfd]" : "bg-[#eef1f4] text-black/25",
+                            "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2",
+                            !inMonth && "bg-[#eef1f4] text-black/25",
                             isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
                           )}
                         >
@@ -463,12 +463,12 @@ export function MeetingList({
                               aria-current={isToday ? "date" : undefined}
                               aria-pressed={isSelected}
                               className={cn(
-                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition hover:bg-civic/10 focus-visible:focus-ring",
+                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition focus-visible:focus-ring",
                                 isSelected || isToday
                                   ? "bg-civic text-white hover:bg-civic"
                                   : inMonth
-                                    ? "text-ink"
-                                    : "cursor-default text-black/25 hover:bg-transparent"
+                                    ? "text-ink hover:bg-civic/10"
+                                    : "cursor-default text-black/25"
                               )}
                             >
                               {Number(day.slice(-2))}
@@ -579,7 +579,7 @@ export function MeetingList({
             </div>
             <div className="divide-y divide-black/10">
               {sortedMeetings.map((meeting) => (
-                <article key={meeting.id} className="grid gap-2 p-5 transition hover:bg-black/[0.025] sm:p-6">
+                <article key={meeting.id} className="grid gap-2 p-5 sm:p-6">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
                     <StatusPill status={meeting.status} locale={locale} highlight={highlight} />
                     <span className="inline-flex items-center gap-1.5">

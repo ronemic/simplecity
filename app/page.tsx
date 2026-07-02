@@ -294,7 +294,7 @@ export default async function Home({
                 return (
                   <article
                     key={meeting.id}
-                    className="grid gap-3 p-4 transition hover:bg-[#f4f8fb] sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-center"
+                    className="grid gap-3 p-4 sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-center"
                   >
                     <div className="flex items-center gap-2 text-sm font-black text-[#12365f]">
                       <CalendarDays aria-hidden className="h-4 w-4" />

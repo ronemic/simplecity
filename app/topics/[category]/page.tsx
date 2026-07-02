@@ -90,7 +90,7 @@ export default async function CategoryDetailPage({
             key={item.href}
             href={item.href}
             aria-current={item.selected ? "true" : undefined}
-            className={`chip chip-lg ${item.selected ? "chip-selected" : ""}`}
+            className={`chip chip-action chip-lg ${item.selected ? "chip-selected" : ""}`}
             pendingLabel={`${t(locale, "loading")} ${item.label.toLowerCase()}`}
           >
             {item.label}
