@@ -14,6 +14,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { cookies } from "next/headers";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
+import { displayDocumentLabel, displayDocumentType } from "@/lib/utils/documentDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { getAdjacentMeetings } from "@/lib/utils/meetingNavigation";
 import { getEmbeddableVideoDocuments } from "@/lib/utils/videoEmbed";
@@ -55,6 +56,7 @@ export default async function MeetingDetailPage({
   const jurisdictionLabel = getJurisdictionDisplayLabel(
     meeting.jurisdiction_slug || meeting.jurisdiction_name
   );
+  const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
 
   return (
     <div className="section-shell py-10">
@@ -68,8 +70,8 @@ export default async function MeetingDetailPage({
             {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
           </span>
         </div>
-        <h1 className="page-title mt-3">{displayMeetingTitle(meeting)}</h1>
-        <p className="page-copy mt-3 text-base">{displayMeetingType(meeting)}</p>
+        <h1 className="page-title mt-3">{displayMeetingTitle(meeting, meetingTitleFallback, locale)}</h1>
+        <p className="page-copy mt-3 text-base">{displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)}</p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <AddToGoogleCalendarLink meeting={meeting} locale={locale} />
           <nav
@@ -79,8 +81,8 @@ export default async function MeetingDetailPage({
             {olderMeeting ? (
               <Link
                 href={meetingHref(olderMeeting.id, publicJurisdiction)}
-                aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting)}`}
-                title={displayMeetingTitle(olderMeeting)}
+                aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting, meetingTitleFallback, locale)}`}
+                title={displayMeetingTitle(olderMeeting, meetingTitleFallback, locale)}
                 className="action-secondary-sm group"
               >
                 <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-ink" />
@@ -99,8 +101,8 @@ export default async function MeetingDetailPage({
             {newerMeeting ? (
               <Link
                 href={meetingHref(newerMeeting.id, publicJurisdiction)}
-                aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting)}`}
-                title={displayMeetingTitle(newerMeeting)}
+                aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting, meetingTitleFallback, locale)}`}
+                title={displayMeetingTitle(newerMeeting, meetingTitleFallback, locale)}
                 className="action-secondary-sm group"
               >
                 <span>{locale === "es" ? "Siguiente" : "Next"}</span>
@@ -166,8 +168,10 @@ export default async function MeetingDetailPage({
                   >
                     <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
                     <span className="min-w-0 flex-1">
-                      <span className="block font-semibold text-ink">{doc.type || "Document"}</span>
-                      <span className="block break-words text-black/70">{doc.label || t(locale, "officialSource")}</span>
+                      <span className="block font-semibold text-ink">{displayDocumentType(doc, locale)}</span>
+                      <span className="block break-words text-black/70">
+                        {displayDocumentLabel(doc, locale, t(locale, "officialSource"))}
+                      </span>
                     </span>
                     <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-black/40" />
                   </a>

@@ -209,7 +209,7 @@ export function SummaryCard({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
             <span>
               <HighlightedText
-                text={meeting ? displayMeetingType(meeting) : t(locale, "meetingTypeNotListed")}
+                text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
                 query={highlight}
               />
             </span>

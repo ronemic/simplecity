@@ -302,10 +302,14 @@ export default async function Home({
                     </div>
                     <div className="min-w-0">
                       <h3 className="line-clamp-2 text-base font-black leading-snug text-ink">
-                        {displayMeetingTitle(meeting)}
+                        {displayMeetingTitle(
+                          meeting,
+                          locale === "es" ? "Reunión no indicada" : "Meeting not listed",
+                          locale
+                        )}
                       </h3>
                       <p className="mt-1 text-sm font-semibold text-black/[0.58]">
-                        {displayMeetingType(meeting)} ·{" "}
+                        {displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)} ·{" "}
                         {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
                       </p>
                       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">

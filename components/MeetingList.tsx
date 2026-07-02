@@ -123,7 +123,8 @@ function MeetingLine({
   highlight?: string;
   locale: Locale;
 }) {
-  const meetingType = displayMeetingType(meeting);
+  const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
+  const meetingType = displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale);
   const meetingJurisdiction = jurisdictionLabel(meeting);
 
   return (
@@ -150,7 +151,7 @@ function MeetingLine({
           )}
           pendingLabel={t(locale, "openingMeeting")}
         >
-          <HighlightedText text={displayMeetingTitle(meeting)} query={highlight} />
+          <HighlightedText text={displayMeetingTitle(meeting, meetingTitleFallback, locale)} query={highlight} />
         </PendingLink>
         <p className="mt-0.5 text-xs font-semibold leading-5 text-black/55">
           <HighlightedText text={meetingType} query={highlight} />
@@ -490,7 +491,14 @@ export function MeetingList({
                                   {meetingTimeLabel(meeting, locale)}
                                 </span>
                                 <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
-                                  <HighlightedText text={displayMeetingTitle(meeting)} query={highlight} />
+                                  <HighlightedText
+                                    text={displayMeetingTitle(
+                                      meeting,
+                                      locale === "es" ? "Reunión no indicada" : "Meeting not listed",
+                                      locale
+                                    )}
+                                    query={highlight}
+                                  />
                                 </span>
                               </PendingLink>
                             ))}

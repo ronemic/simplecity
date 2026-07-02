@@ -32,7 +32,7 @@ export function AddToGoogleCalendarLink({
       )}
       aria-label={
         locale === "es"
-          ? `Agregar ${displayMeetingText(meeting.title)} a Google Calendar`
+          ? `Agregar ${displayMeetingText(meeting.title, "No indicado", locale)} a Google Calendar`
           : `Add ${displayMeetingText(meeting.title)} to Google Calendar`
       }
     >

@@ -69,21 +69,23 @@ export function HeaderNav({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const routeSelectedJurisdiction = normalizeJurisdiction(searchParams.get("jurisdiction") || initialJurisdiction);
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
-  const [selected, setSelected] = useState(() => normalizeJurisdiction(initialJurisdiction));
+  const [optimisticJurisdiction, setOptimisticJurisdiction] = useState(routeSelectedJurisdiction);
   const [selectedLocale, setSelectedLocale] = useState<Locale>(locale);
   const [isPending, startTransition] = useTransition();
   const [pendingSelector, setPendingSelector] = useState<"jurisdiction" | "language" | null>(null);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
   const languageMenuRef = useRef<HTMLDivElement>(null);
+  const isJurisdictionPending = isPending && pendingSelector === "jurisdiction";
+  const isLanguagePending = isPending && pendingSelector === "language";
+  const selected = isJurisdictionPending ? optimisticJurisdiction : routeSelectedJurisdiction;
   const selectedJurisdiction =
     jurisdictions.find((jurisdiction) => jurisdiction.slug === selected) ||
     jurisdictions.find((jurisdiction) => jurisdiction.slug === "san-mateo")!;
   const selectedLanguage =
     LANGUAGE_OPTIONS.find((option) => option.locale === selectedLocale) || LANGUAGE_OPTIONS[0];
-  const isJurisdictionPending = isPending && pendingSelector === "jurisdiction";
-  const isLanguagePending = isPending && pendingSelector === "language";
 
   useEffect(() => {
     if (!isJurisdictionMenuOpen) return;
@@ -151,7 +153,7 @@ export function HeaderNav({
 
   function changeJurisdiction(value: string) {
     setIsJurisdictionMenuOpen(false);
-    setSelected(value);
+    setOptimisticJurisdiction(value);
     setPendingSelector("jurisdiction");
     try {
       window.localStorage.setItem(JURISDICTION_STORAGE_KEY, value);
