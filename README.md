@@ -47,6 +47,9 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    CEREBRAS_MODEL=gpt-oss-120b
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ADMIN_PASSWORD=choose-a-long-random-password
+   RESEND_API_KEY=
+   RESEND_FROM_EMAIL="SimpleCity <onboarding@resend.dev>"
+   RESEND_REPLY_TO_EMAIL=
    ```
 
    OpenRouter is tried first when configured. If it is rate-limited or unavailable and `CEREBRAS_API_KEY` is set, the summarizer falls back to Cerebras direct API.
@@ -85,6 +88,7 @@ npm run scrape:san-francisco:download
 npm run scrape:san-francisco:items
 npm run pipeline:san-francisco
 npm run pipeline:all
+npm run email:digests
 ```
 
 Local scraper output is written to `scraped-primegov/<jurisdiction-slug>/`. Source URLs are always the official source portal URLs, even when document downloads redirect behind the scenes.
@@ -103,6 +107,7 @@ The production scrapers run from the `Nightly scrapers` GitHub Actions workflow.
 | San Mateo County scraper | `15 11 * * *` | 4:15 AM PDT | `npm run pipeline:san-mateo-county` |
 | Mountain View scraper | `20 12 * * *` | 5:20 AM PDT | `npm run pipeline:mountain-view` |
 | San Francisco scraper | `40 12 * * *` | 5:40 AM PDT | `npm run pipeline:san-francisco` |
+| Daily email digests | `0 15 * * *` | 8:00 AM PDT | `npm run email:digests` |
 
 Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
 
@@ -133,6 +138,29 @@ select cron.schedule(
 ## Admin
 
 The admin portal lives at `/admin` and uses a single shared password from `ADMIN_PASSWORD` in your `.env.local` file. After 3 failed login attempts, the browser session is locked out for 15 minutes.
+
+## Email Notifications
+
+SimpleCity sends email through the Resend HTTP API. For the free Resend plan, set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in `.env.local`; `"SimpleCity <onboarding@resend.dev>"` is useful for initial testing, and a verified domain address should replace it before real resident notifications.
+
+Public subscriptions live at `/subscribe`. Subscribers choose one or more jurisdictions, receive a confirmation email, and only become active after clicking the confirmation link.
+
+Admins can send a test digest with the protected `POST /api/admin/email-test` route:
+
+```json
+{
+  "to": "you@example.com",
+  "jurisdiction": "san-mateo-city",
+  "limit": 5
+}
+```
+
+Daily subscriber digests can be sent with:
+
+```bash
+npm run email:digests
+npm run email:digests -- --dry-run
+```
 
 ## Source Transparency
 

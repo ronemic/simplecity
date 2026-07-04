@@ -1,0 +1,188 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildNewPostsDigestEmail } from "@/lib/email/newPosts";
+import { sendEmail } from "@/lib/email/resend";
+import {
+  hashEmailToken,
+  isValidSubscriberEmail,
+  normalizeSubscriberEmail,
+  normalizeSubscriptionJurisdictions,
+  publicEmailJurisdictionOptions,
+  unsubscribeUrl
+} from "@/lib/email/subscriptions";
+import type { SummaryCardRow } from "@/lib/types";
+
+function testCard(overrides: Partial<SummaryCardRow> = {}): SummaryCardRow {
+  return {
+    id: "card-1",
+    meeting_id: "meeting-1",
+    jurisdiction_name: "San Mateo",
+    jurisdiction_slug: "san-mateo-city",
+    platform: "primegov",
+    agenda_item: "Item 4 - Approve park contract",
+    what_is_happening: "The council will consider a maintenance contract for Central Park.",
+    why_it_matters: "The contract affects park upkeep.",
+    who_it_affects: ["park users"],
+    category_tags: ["Parks & Environment"],
+    status: "Upcoming vote",
+    comment_window_opens: "Not listed in the source document.",
+    comment_window_closes: "Not listed in the source document.",
+    how_to_act_attend: "Attend the meeting.",
+    how_to_act_email: "Not listed in the source document.",
+    how_to_act_submit_comment: "Not listed in the source document.",
+    source_url: "https://city.example/source",
+    confidence: "high",
+    is_published: true,
+    is_featured: false,
+    admin_notes: null,
+    created_at: "2026-06-01T00:00:00.000Z",
+    updated_at: "2026-06-01T00:00:00.000Z",
+    meetings: {
+      id: "meeting-1",
+      external_id: "external-meeting-1",
+      jurisdiction_name: "San Mateo",
+      jurisdiction_slug: "san-mateo-city",
+      platform: "primegov",
+      title: "City Council Meeting",
+      meeting_type: "City Council",
+      date_text: "June 10, 2026 7:00 PM",
+      time_text: "7:00 PM",
+      location: "City Hall",
+      meeting_datetime: "2026-06-11T02:00:00.000Z",
+      section: "Upcoming Meetings",
+      status: "Upcoming",
+      source_type: "Agenda",
+      source_url: "https://city.example/agenda",
+      row_text: "",
+      has_html_agenda: true,
+      has_pdf: false,
+      llm_input_text: null,
+      public_comments_input_text: null,
+      source_hash: null,
+      summarized_source_hash: null,
+      cards_generated_at: null,
+      extraction_notes: [],
+      raw: null,
+      scraped_at: null,
+      created_at: "2026-06-01T00:00:00.000Z",
+      updated_at: "2026-06-01T00:00:00.000Z"
+    },
+    ...overrides
+  };
+}
+
+test("builds a new posts digest with escaped card content and meeting links", () => {
+  const email = buildNewPostsDigestEmail({
+    cards: [
+      testCard({
+        agenda_item: "Item 4 - <Approve> park contract",
+        what_is_happening: "The council will consider a maintenance contract."
+      })
+    ],
+    appUrl: "https://simplecity.example",
+    selectionLabel: "San Mateo"
+  });
+
+  assert.match(email.subject, /1 new SimpleCity post/);
+  assert.match(email.html, /&lt;Approve&gt;/);
+  assert.doesNotMatch(email.html, /<Approve>/);
+  assert.match(email.html, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
+  assert.match(email.text, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
+});
+
+test("sends email through Resend", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; init: RequestInit }> = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async (url, init) => {
+    requests.push({ url: String(url), init: init || {} });
+    return new Response(JSON.stringify({ id: "email-123" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" }
+    });
+  }) as typeof fetch;
+
+  const result = await sendEmail(
+    {
+      to: "resident@example.com",
+      subject: "New SimpleCity posts",
+      text: "Hello"
+    },
+    {
+      apiKey: "test-resend-key",
+      from: "SimpleCity <onboarding@resend.dev>",
+      replyTo: null,
+      appUrl: "http://localhost:3000"
+    }
+  );
+
+  const body = JSON.parse(String(requests[0].init.body || "{}")) as {
+    from?: string;
+    to?: string[];
+    subject?: string;
+    text?: string;
+  };
+  const headers = requests[0].init.headers as Record<string, string>;
+
+  assert.equal(result.id, "email-123");
+  assert.equal(requests[0].url, "https://api.resend.com/emails");
+  assert.equal(headers.Authorization, "Bearer test-resend-key");
+  assert.equal(body.from, "SimpleCity <onboarding@resend.dev>");
+  assert.deepEqual(body.to, ["resident@example.com"]);
+  assert.equal(body.subject, "New SimpleCity posts");
+  assert.equal(body.text, "Hello");
+});
+
+test("requires Resend config before sending", async () => {
+  await assert.rejects(
+    () =>
+      sendEmail(
+        {
+          to: "resident@example.com",
+          subject: "New SimpleCity posts",
+          text: "Hello"
+        },
+        {
+          apiKey: "",
+          from: "SimpleCity <onboarding@resend.dev>",
+          replyTo: null,
+          appUrl: "http://localhost:3000"
+        }
+      ),
+    /Missing RESEND_API_KEY/
+  );
+});
+
+test("normalizes subscription emails and concrete jurisdictions", () => {
+  assert.equal(normalizeSubscriberEmail(" Resident@Example.COM "), "resident@example.com");
+  assert.equal(isValidSubscriberEmail("resident@example.com"), true);
+  assert.equal(isValidSubscriberEmail("not-an-email"), false);
+  assert.deepEqual(
+    normalizeSubscriptionJurisdictions([
+      "san-mateo",
+      "san-mateo-city",
+      "all",
+      "mountain-view"
+    ]),
+    ["san-mateo-city", "mountain-view"]
+  );
+  assert.equal(
+    publicEmailJurisdictionOptions().map((option) => String(option.value)).includes("all"),
+    false
+  );
+});
+
+test("builds stable email token hashes and unsubscribe URLs", () => {
+  const hash = hashEmailToken("token-123");
+
+  assert.equal(hash, hashEmailToken("token-123"));
+  assert.notEqual(hash, "token-123");
+  assert.equal(
+    unsubscribeUrl("token-123", "https://simplecity.example/"),
+    "https://simplecity.example/api/email/unsubscribe?token=token-123"
+  );
+});

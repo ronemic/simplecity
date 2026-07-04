@@ -79,6 +79,9 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
           <Link className="action-ghost" href="/about">
             {aboutSourcesLabel(currentLocale)}
           </Link>
+          <Link className="action-ghost" href="/subscribe">
+            {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
+          </Link>
           <a className="action-ghost" href="mailto:simplecityadmin@gmail.com">
             {t(currentLocale, "contact")}
           </a>

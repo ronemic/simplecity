@@ -80,6 +80,7 @@ type TranslationKey =
   | "sourceNote"
   | "sourceTransparency"
   | "status"
+  | "subscribe"
   | "submitComment"
   | "summaryCards"
   | "summaryConfidence"
@@ -172,6 +173,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     sourceNote: "Source note",
     sourceTransparency: "Source transparency",
     status: "Status",
+    subscribe: "Subscribe",
     submitComment: "Submit comment",
     summaryCards: "Summary cards",
     summaryConfidence: "Summary confidence",
@@ -263,6 +265,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     sourceNote: "Nota sobre la fuente",
     sourceTransparency: "Transparencia de fuentes",
     status: "Estado",
+    subscribe: "Suscribirse",
     submitComment: "Enviar comentario",
     summaryCards: "Tarjetas de resumen",
     summaryConfidence: "Confianza del resumen",

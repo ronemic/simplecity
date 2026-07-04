@@ -22,6 +22,7 @@ const nav = [
   { href: "/decisions", labelKey: "decisions" },
   { href: "/meetings", labelKey: "meetings" },
   { href: "/topics", labelKey: "topics" },
+  { href: "/subscribe", labelKey: "subscribe" },
   { href: "/about", labelKey: "about" }
 ] as const;
 
@@ -189,9 +190,9 @@ export function HeaderNav({
   return (
     <nav
       aria-label="Primary navigation"
-      className="grid w-full grid-cols-4 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
+      className="grid w-full grid-cols-5 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
     >
-      <div ref={jurisdictionMenuRef} className="relative col-span-4 md:col-span-1 md:mr-2 md:w-48">
+      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:col-span-1 md:mr-2 md:w-48">
         <button
           type="button"
           aria-haspopup="listbox"
@@ -242,7 +243,7 @@ export function HeaderNav({
           </div>
         ) : null}
       </div>
-      <div ref={languageMenuRef} className="relative col-span-4 md:col-span-1 md:mr-2 md:w-36">
+      <div ref={languageMenuRef} className="relative col-span-5 md:col-span-1 md:mr-2 md:w-36">
         <button
           type="button"
           aria-haspopup="listbox"
@@ -319,9 +320,9 @@ export function HeaderNavFallback() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="grid w-full grid-cols-4 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
+      className="grid w-full grid-cols-5 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
     >
-      <label className="menu-trigger col-span-4 md:col-span-1 md:mr-2 md:w-48">
+      <label className="menu-trigger col-span-5 md:col-span-1 md:mr-2 md:w-48">
         <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
@@ -335,7 +336,7 @@ export function HeaderNavFallback() {
           ))}
         </select>
       </label>
-      <label className="menu-trigger col-span-4 md:col-span-1 md:mr-2 md:w-36">
+      <label className="menu-trigger col-span-5 md:col-span-1 md:mr-2 md:w-36">
         <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Language</span>
         <select
