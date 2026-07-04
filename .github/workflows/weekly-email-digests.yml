@@ -1,8 +1,8 @@
-name: Daily email digests
+name: Weekly email digests
 
 on:
   schedule:
-    - cron: "0 15 * * *"
+    - cron: "0 15 * * 1"
   workflow_dispatch:
 
 env:
@@ -40,12 +40,12 @@ permissions:
   contents: read
 
 jobs:
-  daily-email-digests:
-    name: Send daily email digests
+  weekly-email-digests:
+    name: Send weekly email digests
     runs-on: ubuntu-latest
     timeout-minutes: 20
     concurrency:
-      group: daily-email-digests
+      group: weekly-email-digests
       cancel-in-progress: false
     steps:
       - name: Checkout

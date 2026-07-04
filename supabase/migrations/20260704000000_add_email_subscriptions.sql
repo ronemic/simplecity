@@ -17,7 +17,7 @@ create table if not exists public.email_subscriptions (
   id uuid primary key default gen_random_uuid(),
   subscriber_id uuid not null references public.email_subscribers(id) on delete cascade,
   jurisdiction_slug text not null,
-  frequency text not null default 'daily' check (frequency in ('daily')),
+  frequency text not null default 'weekly' check (frequency in ('daily', 'weekly')),
   last_digest_sent_at timestamptz default now(),
   created_at timestamptz default now(),
   updated_at timestamptz default now(),

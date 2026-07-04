@@ -9,14 +9,14 @@ import { publicEmailJurisdictionOptions } from "@/lib/email/subscriptions";
 
 export const metadata: Metadata = {
   title: "Subscribe | SimpleCity",
-  description: "Get daily SimpleCity email digests for local public meeting decisions."
+  description: "Get weekly SimpleCity email digests for local public meeting decisions."
 };
 
 function statusMessage(status: string | undefined) {
   if (status === "confirmed") {
     return {
       title: "Your email updates are confirmed",
-      body: "Daily digests will use your latest selected areas when new SimpleCity cards are published.",
+      body: "Weekly digests will use your latest selected areas when new SimpleCity cards are published.",
       className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]"
     };
   }
@@ -65,7 +65,7 @@ export default async function SubscribePage({
         <p className="label-eyebrow text-civic">Email updates</p>
         <h1 className="page-title mt-2">Get new SimpleCity posts by email.</h1>
         <p className="page-copy mt-4 text-base">
-          Choose the cities and counties you care about. We will send a daily digest when new public-meeting cards are published.
+          Choose the cities and counties you care about. We will send a weekly digest when new public-meeting cards are published.
         </p>
 
         {message ? (

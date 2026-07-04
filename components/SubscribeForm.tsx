@@ -118,7 +118,7 @@ export function SubscribeForm({
       />
 
       <fieldset className="grid gap-3">
-        <legend className="text-sm font-black text-ink">Daily digest areas</legend>
+        <legend className="text-sm font-black text-ink">Weekly digest areas</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {jurisdictions.map((jurisdiction) => {
             const checked = selectedJurisdictions.includes(jurisdiction.value);

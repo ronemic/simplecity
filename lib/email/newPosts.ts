@@ -140,10 +140,10 @@ export function buildNewPostsDigestEmail({
   const count = cards.length;
   const subject =
     count === 1
-      ? `1 new SimpleCity post for ${selectionLabel}`
-      : `${count} new SimpleCity posts for ${selectionLabel}`;
+      ? `Weekly SimpleCity digest: 1 new post for ${selectionLabel}`
+      : `Weekly SimpleCity digest: ${count} new posts for ${selectionLabel}`;
   const safeAppUrl = normalizeAppUrl(appUrl);
-  const preheader = "Fresh plain-English civic updates are ready.";
+  const preheader = "Your weekly plain-English civic updates are ready.";
   const cardRows = cards.map((card) => htmlForCard(card, safeAppUrl)).join("");
   const unsubscribeFooter = unsubscribeUrl
     ? `<p style="margin: 18px 0 0; font-size: 12px; line-height: 1.5; color: ${EMAIL_MUTED};">
@@ -166,7 +166,7 @@ export function buildNewPostsDigestEmail({
                   ${escapeHtml(subject)}
                 </h1>
                 <p style="margin: 0; font-size: 15px; line-height: 1.6; color: ${EMAIL_MUTED};">
-                  New public-meeting summaries were published. Here are the latest cards.
+                  New public-meeting summaries were published since your last digest. Here are the latest cards.
                 </p>
               </td>
             </tr>
@@ -191,7 +191,7 @@ export function buildNewPostsDigestEmail({
   const text = [
     subject,
     "",
-    "New public-meeting summaries were published. Here are the latest cards.",
+    "New public-meeting summaries were published since your last digest. Here are the latest cards.",
     "",
     ...cards.flatMap((card) => [...textLinesForCard(card, safeAppUrl), ""]),
     "SimpleCity summarizes official public meeting documents. Always check the original source before making formal decisions.",

@@ -228,11 +228,11 @@ async function main() {
   }
 
   console.log(
-    `Daily digest complete. Subscribers sent: ${sentCount}. Cards included: ${cardCount}. Failures: ${failureCount}.`
+    `Weekly digest complete. Subscribers sent: ${sentCount}. Cards included: ${cardCount}. Failures: ${failureCount}.`
   );
 
   if (failureCount > 0) {
-    throw new Error(`Daily digest failed for ${failureCount} subscriber(s).`);
+    throw new Error(`Weekly digest failed for ${failureCount} subscriber(s).`);
   }
 }
 

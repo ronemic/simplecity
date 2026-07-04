@@ -13,7 +13,7 @@ import { getEmailConfig } from "@/lib/email/config";
 import { sendEmail } from "@/lib/email/resend";
 
 export type EmailSubscriberStatus = "pending" | "active" | "unsubscribed";
-export type EmailFrequency = "daily";
+export type EmailFrequency = "daily" | "weekly";
 
 export type EmailSubscriberRow = {
   id: string;
@@ -54,6 +54,7 @@ type SubscriptionClient = Pick<SupabaseClient, "from">;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_BYTES = 32;
+const DEFAULT_EMAIL_FREQUENCY: EmailFrequency = "weekly";
 
 export class EmailSubscriptionInputError extends Error {
   constructor(message: string) {
@@ -160,7 +161,7 @@ function buildConfirmationEmail({
                 <div style="font-size:14px;font-weight:900;color:#0f5e7c;">SimpleCity</div>
                 <h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#111827;">Confirm your email updates</h1>
                 <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
-                  Confirm that ${escapeHtml(email)} should start or update daily SimpleCity digests for ${escapeHtml(labelText)}.
+                  Confirm that ${escapeHtml(email)} should start or update weekly SimpleCity digests for ${escapeHtml(labelText)}.
                 </p>
                 <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
                   Confirm email updates
@@ -179,7 +180,7 @@ function buildConfirmationEmail({
   const text = [
     "Confirm your SimpleCity email updates",
     "",
-    `Confirm that ${email} should start or update daily SimpleCity digests for ${labelText}.`,
+    `Confirm that ${email} should start or update weekly SimpleCity digests for ${labelText}.`,
     "",
     link,
     "",
@@ -321,7 +322,7 @@ export async function confirmEmailSubscription(
     jurisdictions.map((jurisdiction) => ({
       subscriber_id: subscriber.id,
       jurisdiction_slug: jurisdiction,
-      frequency: "daily",
+      frequency: DEFAULT_EMAIL_FREQUENCY,
       last_digest_sent_at: now
     }))
   );
@@ -373,6 +374,7 @@ export async function unsubscribeEmailSubscriber(
 }
 
 export async function getActiveSubscribersForDigest(
+  frequency: EmailFrequency = DEFAULT_EMAIL_FREQUENCY,
   supabase: SubscriptionClient = subscriptionSupabase()
 ) {
   const { data, error } = await supabase
@@ -387,7 +389,7 @@ export async function getActiveSubscribersForDigest(
     .map((subscriber) => ({
       ...subscriber,
       email_subscriptions: (subscriber.email_subscriptions || []).filter(
-        (subscription) => subscription.frequency === "daily"
+        (subscription) => subscription.frequency === frequency
       )
     }))
     .filter((subscriber) => (subscriber.email_subscriptions || []).length > 0);

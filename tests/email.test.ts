@@ -89,7 +89,7 @@ test("builds a new posts digest with escaped card content and meeting links", ()
     selectionLabel: "San Mateo"
   });
 
-  assert.match(email.subject, /1 new SimpleCity post/);
+  assert.match(email.subject, /Weekly SimpleCity digest: 1 new post/);
   assert.match(email.html, /&lt;Approve&gt;/);
   assert.doesNotMatch(email.html, /<Approve>/);
   assert.match(email.html, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
@@ -253,7 +253,7 @@ test("confirmed subscription links are idempotent", async () => {
     created_at: null,
     updated_at: null
   };
-  const insertedSubscriptions: Array<{ jurisdiction_slug: string }> = [];
+  const insertedSubscriptions: Array<{ jurisdiction_slug: string; frequency: string }> = [];
   const supabase = {
     from(table: string) {
       if (table === "email_subscribers") {
@@ -299,7 +299,7 @@ test("confirmed subscription links are idempotent", async () => {
             eq: async () => ({ error: null })
           };
         },
-        insert(rows: Array<{ jurisdiction_slug: string }>) {
+        insert(rows: Array<{ jurisdiction_slug: string; frequency: string }>) {
           insertedSubscriptions.push(...rows);
           return Promise.resolve({ error: null });
         }
@@ -311,8 +311,11 @@ test("confirmed subscription links are idempotent", async () => {
   assert.equal(firstResult?.status, "active");
   assert.equal(firstResult?.confirmation_token_hash, tokenHash);
   assert.deepEqual(
-    insertedSubscriptions.map((subscription) => subscription.jurisdiction_slug),
-    ["san-mateo-city"]
+    insertedSubscriptions.map((subscription) => ({
+      jurisdiction_slug: subscription.jurisdiction_slug,
+      frequency: subscription.frequency
+    })),
+    [{ jurisdiction_slug: "san-mateo-city", frequency: "weekly" }]
   );
 
   const secondResult = await confirmEmailSubscription(token, supabase as never);
