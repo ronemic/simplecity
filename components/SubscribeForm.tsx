@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Loader2, Mail, Send } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
+import { t, type Locale } from "@/lib/i18n";
 
 type JurisdictionOption = {
   value: string;
@@ -12,10 +13,12 @@ type SubscribeStatus = "idle" | "success" | "error";
 
 export function SubscribeForm({
   jurisdictions,
-  initialJurisdiction
+  initialJurisdiction,
+  locale
 }: {
   jurisdictions: JurisdictionOption[];
   initialJurisdiction?: string;
+  locale: Locale;
 }) {
   const initialSelections = useMemo(() => {
     const fallback = jurisdictions[0]?.value;
@@ -69,15 +72,16 @@ export function SubscribeForm({
 
       if (!response.ok) {
         setStatus("error");
-        setMessage(result.error || "Something went wrong. Please try again.");
+        setMessage(
+          locale === "en"
+            ? result.error || t(locale, "subscribeFormFallbackError")
+            : t(locale, "subscribeFormFallbackError")
+        );
         return;
       }
 
       setStatus("success");
-      setMessage(
-        result.message ||
-          "Check your inbox to confirm your SimpleCity email updates. If you were already subscribed, your preferences will update after you confirm."
-      );
+      setMessage(t(locale, "subscribeFormSuccess"));
     } finally {
       setIsSubmitting(false);
     }
@@ -87,7 +91,7 @@ export function SubscribeForm({
     <form className="quiet-card grid gap-5 p-5 sm:p-6" onSubmit={handleSubmit}>
       <div className="grid gap-2">
         <label className="text-sm font-black text-ink" htmlFor="subscribe-email">
-          Email address
+          {t(locale, "subscribeEmailAddress")}
         </label>
         <div className="relative">
           <Mail
@@ -103,7 +107,7 @@ export function SubscribeForm({
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             className="input-control input-control--with-icon"
-            placeholder="you@example.com"
+            placeholder={t(locale, "subscribeEmailPlaceholder")}
           />
         </div>
       </div>
@@ -118,7 +122,9 @@ export function SubscribeForm({
       />
 
       <fieldset className="grid gap-3">
-        <legend className="text-sm font-black text-ink">Weekly digest areas</legend>
+        <legend className="text-sm font-black text-ink">
+          {t(locale, "subscribeWeeklyDigestAreas")}
+        </legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {jurisdictions.map((jurisdiction) => {
             const checked = selectedJurisdictions.includes(jurisdiction.value);
@@ -147,7 +153,7 @@ export function SubscribeForm({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold leading-6 text-black/60">
-          Already subscribed? Enter the same email and choose new areas to update your email preferences. We will send a confirmation email before changing anything.
+          {t(locale, "subscribeAlreadySubscribedHelp")}
         </p>
         <button className="action-primary shrink-0" disabled={isSubmitting} type="submit">
           {isSubmitting ? (
@@ -155,7 +161,7 @@ export function SubscribeForm({
           ) : (
             <Send aria-hidden className="h-4 w-4" />
           )}
-          Subscribe
+          {t(locale, "subscribe")}
         </button>
       </div>
 
