@@ -203,6 +203,7 @@ async function main() {
     options.limitSubscribers === null ? subscribers : subscribers.slice(0, options.limitSubscribers);
   let sentCount = 0;
   let cardCount = 0;
+  let failureCount = 0;
 
   for (const subscriber of limitedSubscribers) {
     try {
@@ -210,6 +211,7 @@ async function main() {
       if (result.sent) sentCount += 1;
       cardCount += result.cardCount;
     } catch (error) {
+      failureCount += 1;
       console.error(`Failed to send digest to ${maskEmail(subscriber.email)}:`, error);
       await recordDigestDelivery({
         subscriberId: subscriber.id,
@@ -225,7 +227,13 @@ async function main() {
     }
   }
 
-  console.log(`Daily digest complete. Subscribers sent: ${sentCount}. Cards included: ${cardCount}.`);
+  console.log(
+    `Daily digest complete. Subscribers sent: ${sentCount}. Cards included: ${cardCount}. Failures: ${failureCount}.`
+  );
+
+  if (failureCount > 0) {
+    throw new Error(`Daily digest failed for ${failureCount} subscriber(s).`);
+  }
 }
 
 main().catch((error) => {
