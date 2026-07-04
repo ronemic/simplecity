@@ -107,7 +107,7 @@ The production scrapers run from the `Nightly scrapers` GitHub Actions workflow.
 | San Mateo County scraper | `15 11 * * *` | 4:15 AM PDT | `npm run pipeline:san-mateo-county` |
 | Mountain View scraper | `20 12 * * *` | 5:20 AM PDT | `npm run pipeline:mountain-view` |
 | San Francisco scraper | `40 12 * * *` | 5:40 AM PDT | `npm run pipeline:san-francisco` |
-| Weekly email digests | `0 15 * * 1` | Monday 8:00 AM PDT | `npm run email:digests` |
+| Weekly email digests | `0 17 * * 1` | Monday 10:00 AM PDT | `npm run email:digests` |
 
 Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
 
