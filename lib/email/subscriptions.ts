@@ -295,7 +295,9 @@ export async function confirmEmailSubscription(
   const jurisdictions = normalizeSubscriptionJurisdictions(
     subscriber.pending_jurisdiction_slugs || []
   );
-  if (jurisdictions.length === 0) return null;
+  if (jurisdictions.length === 0) {
+    return subscriber.status === "active" ? subscriber : null;
+  }
 
   const now = new Date().toISOString();
   const { error: deleteError } = await supabase
@@ -321,7 +323,6 @@ export async function confirmEmailSubscription(
     .update({
       status: "active",
       pending_jurisdiction_slugs: [],
-      confirmation_token_hash: null,
       confirmed_at: now,
       unsubscribed_at: null
     })

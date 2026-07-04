@@ -31,8 +31,8 @@ function statusMessage(status: string | undefined) {
 
   if (status === "invalid" || status === "invalid-unsubscribe") {
     return {
-      title: "That link is not valid",
-      body: "Submit the form again if you need a fresh confirmation email.",
+      title: "That link is expired or already used",
+      body: "If you already confirmed, you are all set. Submit the form again only if you need a fresh confirmation email.",
       className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]"
     };
   }

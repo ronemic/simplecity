@@ -4,6 +4,8 @@ import { getPublicAppUrlForRequest } from "@/lib/email/config";
 import { buildNewPostsDigestEmail } from "@/lib/email/newPosts";
 import { sendEmail } from "@/lib/email/resend";
 import {
+  confirmEmailSubscription,
+  type EmailSubscriberRow,
   hashEmailToken,
   isValidSubscriberEmail,
   normalizeSubscriberEmail,
@@ -186,6 +188,90 @@ test("builds stable email token hashes and unsubscribe URLs", () => {
     unsubscribeUrl("token-123", "https://simplecity.example/"),
     "https://simplecity.example/api/email/unsubscribe?token=token-123"
   );
+});
+
+test("confirmed subscription links are idempotent", async () => {
+  const token = "token-123";
+  const tokenHash = hashEmailToken(token);
+  let subscriber: EmailSubscriberRow = {
+    id: "subscriber-1",
+    email: "resident@example.com",
+    email_normalized: "resident@example.com",
+    status: "pending",
+    pending_jurisdiction_slugs: ["san-mateo-city"],
+    confirmation_token_hash: tokenHash,
+    unsubscribe_token: "unsubscribe-123",
+    confirmation_sent_at: null,
+    confirmed_at: null,
+    unsubscribed_at: null,
+    created_at: null,
+    updated_at: null
+  };
+  const insertedSubscriptions: Array<{ jurisdiction_slug: string }> = [];
+  const supabase = {
+    from(table: string) {
+      if (table === "email_subscribers") {
+        return {
+          select() {
+            return {
+              eq(column: string, value: string) {
+                return {
+                  maybeSingle: async () => ({
+                    data:
+                      column === "confirmation_token_hash" &&
+                      subscriber.confirmation_token_hash === value
+                        ? subscriber
+                        : null,
+                    error: null
+                  })
+                };
+              }
+            };
+          },
+          update(values: Partial<EmailSubscriberRow>) {
+            return {
+              eq() {
+                return {
+                  select() {
+                    return {
+                      single: async () => {
+                        subscriber = { ...subscriber, ...values };
+                        return { data: subscriber, error: null };
+                      }
+                    };
+                  }
+                };
+              }
+            };
+          }
+        };
+      }
+
+      return {
+        delete() {
+          return {
+            eq: async () => ({ error: null })
+          };
+        },
+        insert(rows: Array<{ jurisdiction_slug: string }>) {
+          insertedSubscriptions.push(...rows);
+          return Promise.resolve({ error: null });
+        }
+      };
+    }
+  };
+
+  const firstResult = await confirmEmailSubscription(token, supabase as never);
+  assert.equal(firstResult?.status, "active");
+  assert.equal(firstResult?.confirmation_token_hash, tokenHash);
+  assert.deepEqual(
+    insertedSubscriptions.map((subscription) => subscription.jurisdiction_slug),
+    ["san-mateo-city"]
+  );
+
+  const secondResult = await confirmEmailSubscription(token, supabase as never);
+  assert.equal(secondResult?.status, "active");
+  assert.equal(insertedSubscriptions.length, 1);
 });
 
 test("uses forwarded public host when configured app URL is local", () => {
