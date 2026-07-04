@@ -27,7 +27,8 @@ export async function POST(request: Request) {
 
     return Response.json({
       ok: true,
-      message: "Check your inbox to confirm your SimpleCity email updates."
+      message:
+        "Check your inbox to confirm your SimpleCity email updates. If you were already subscribed, your preferences will update after you confirm."
     });
   } catch (error) {
     return Response.json(

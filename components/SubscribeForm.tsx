@@ -74,7 +74,10 @@ export function SubscribeForm({
       }
 
       setStatus("success");
-      setMessage(result.message || "Check your inbox to confirm your SimpleCity email updates.");
+      setMessage(
+        result.message ||
+          "Check your inbox to confirm your SimpleCity email updates. If you were already subscribed, your preferences will update after you confirm."
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -144,7 +147,7 @@ export function SubscribeForm({
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold leading-6 text-black/60">
-          We will send one confirmation email first. Daily digests only start after you confirm.
+          Already subscribed? Enter the same email and choose new areas to update your email preferences. We will send a confirmation email before changing anything.
         </p>
         <button className="action-primary shrink-0" disabled={isSubmitting} type="submit">
           {isSubmitting ? (

@@ -15,8 +15,8 @@ export const metadata: Metadata = {
 function statusMessage(status: string | undefined) {
   if (status === "confirmed") {
     return {
-      title: "You are subscribed",
-      body: "Daily digests will start when new SimpleCity cards are published for your selected areas.",
+      title: "Your email updates are confirmed",
+      body: "Daily digests will use your latest selected areas when new SimpleCity cards are published.",
       className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]"
     };
   }

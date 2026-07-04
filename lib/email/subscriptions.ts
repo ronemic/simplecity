@@ -156,10 +156,10 @@ function buildConfirmationEmail({
                 <div style="font-size:14px;font-weight:900;color:#0f5e7c;">SimpleCity</div>
                 <h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#111827;">Confirm your email updates</h1>
                 <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
-                  Please confirm that ${escapeHtml(email)} should receive daily SimpleCity digests for ${escapeHtml(labelText)}.
+                  Confirm that ${escapeHtml(email)} should start or update daily SimpleCity digests for ${escapeHtml(labelText)}.
                 </p>
                 <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
-                  Confirm subscription
+                  Confirm email updates
                 </a>
                 <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
                   If you did not request this, you can ignore this email.
@@ -175,7 +175,7 @@ function buildConfirmationEmail({
   const text = [
     "Confirm your SimpleCity email updates",
     "",
-    `Please confirm that ${email} should receive daily SimpleCity digests for ${labelText}.`,
+    `Confirm that ${email} should start or update daily SimpleCity digests for ${labelText}.`,
     "",
     link,
     "",
