@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { getPublicAppUrlForRequest } from "@/lib/email/config";
 import { buildNewPostsDigestEmail } from "@/lib/email/newPosts";
 import { sendEmail } from "@/lib/email/resend";
 import {
@@ -184,5 +185,24 @@ test("builds stable email token hashes and unsubscribe URLs", () => {
   assert.equal(
     unsubscribeUrl("token-123", "https://simplecity.example/"),
     "https://simplecity.example/api/email/unsubscribe?token=token-123"
+  );
+});
+
+test("uses forwarded public host when configured app URL is local", () => {
+  const request = new Request("https://localhost:10000/api/email/confirm?token=test", {
+    headers: {
+      "x-forwarded-host": "simplecity.app",
+      "x-forwarded-proto": "https"
+    }
+  });
+
+  assert.equal(
+    getPublicAppUrlForRequest(request, {
+      apiKey: "test-key",
+      from: "SimpleCity <updates@simplecity.app>",
+      replyTo: null,
+      appUrl: "http://localhost:3000"
+    }),
+    "https://simplecity.app"
   );
 });

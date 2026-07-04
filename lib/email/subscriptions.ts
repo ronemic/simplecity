@@ -46,6 +46,7 @@ export type EmailSubscriberWithSubscriptions = EmailSubscriberRow & {
 type SubscribeInput = {
   email: string;
   jurisdictions: string[];
+  baseUrl?: string;
 };
 
 type SubscriptionClient = Pick<SupabaseClient, "from">;
@@ -254,7 +255,8 @@ export async function createOrRefreshSubscription(
   const email = buildConfirmationEmail({
     email: subscriber.email,
     jurisdictions,
-    token: confirmationToken
+    token: confirmationToken,
+    baseUrl: input.baseUrl
   });
 
   await sendEmail({

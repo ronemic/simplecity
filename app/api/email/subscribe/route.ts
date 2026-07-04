@@ -1,4 +1,5 @@
 import { createOrRefreshSubscription } from "@/lib/email/subscriptions";
+import { getPublicAppUrlForRequest } from "@/lib/email/config";
 
 export const runtime = "nodejs";
 
@@ -20,7 +21,8 @@ export async function POST(request: Request) {
 
     await createOrRefreshSubscription({
       email: String(body.email || ""),
-      jurisdictions
+      jurisdictions,
+      baseUrl: getPublicAppUrlForRequest(request)
     });
 
     return Response.json({

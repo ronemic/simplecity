@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { unsubscribeEmailSubscriber } from "@/lib/email/subscriptions";
+import { getPublicAppUrlForRequest } from "@/lib/email/config";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const token = url.searchParams.get("token") || "";
-  const redirectUrl = new URL("/subscribe", url.origin);
+  const redirectUrl = new URL("/subscribe", getPublicAppUrlForRequest(request));
 
   if (!token) {
     redirectUrl.searchParams.set("status", "invalid-unsubscribe");
