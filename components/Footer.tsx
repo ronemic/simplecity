@@ -26,8 +26,8 @@ function footerDescription(locale: Locale) {
     : "SimpleCity is an independent, student-led platform, not an official local government website. It summarizes public meeting documents to make them easier to understand. Always review the original source before making formal decisions.";
 }
 
-function aboutSourcesLabel(locale: Locale) {
-  return locale === "es" ? "Acerca de y fuentes" : "About & sources";
+function aboutLabel(locale: Locale) {
+  return locale === "es" ? "Acerca de" : "About";
 }
 
 export function Footer({ locale = "en" }: { locale?: Locale }) {
@@ -77,7 +77,7 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
           className="flex flex-wrap gap-2 font-bold md:justify-end"
         >
           <Link className="action-ghost" href="/about">
-            {aboutSourcesLabel(currentLocale)}
+            {aboutLabel(currentLocale)}
           </Link>
           <Link className="action-ghost" href="/subscribe">
             {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
