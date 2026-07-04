@@ -1,6 +1,7 @@
 import type { LlmReadyMeeting, PrimeGovDocument, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { extractPdfTextForDocument } from "./pdfText";
+import { enrichMenloParkMeetingTimesFromAgendaText } from "@/lib/sources/menlo-park";
 
 export const MAX_CHARS_FOR_LLM = 30000;
 const MIN_PRIMARY_SOURCE_CHARS = 300;
@@ -343,6 +344,13 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       publicCommentsSummaryInput = truncateForLLM(commentsText.text);
     } else {
       extractionNotes.push("Public comments PDF had little or no extractable text.");
+    }
+  }
+
+  if (isMenloParkMeeting && !meeting.timeText) {
+    enrichMenloParkMeetingTimesFromAgendaText([meeting]);
+    for (const note of meeting.extractionNotes || []) {
+      if (!extractionNotes.includes(note)) extractionNotes.push(note);
     }
   }
 

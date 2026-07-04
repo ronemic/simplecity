@@ -15,6 +15,7 @@ import {
   normalizeMenloParkRows,
   type MenloParkExtractedRow
 } from "@/lib/sources/menlo-park";
+import { buildLlmReadyMeeting } from "@/lib/scraper/prepareLlmInput";
 
 function row(overrides: Partial<MenloParkExtractedRow>): MenloParkExtractedRow {
   return {
@@ -224,6 +225,26 @@ test("extracts Menlo Park agenda times from labeled agenda text", () => {
 
   assert.equal(extractMenloParkAgendaTimeText(text), "7:00 p.m.");
   assert.equal(extractMenloParkAgendaTimeText("Time: 10 AM Location: Chambers"), "10:00 a.m.");
+  assert.equal(
+    extractMenloParkAgendaTimeText("The regular meeting begins at 6:00 p.m. in the Council Chambers."),
+    "6:00 p.m."
+  );
+  assert.equal(
+    extractMenloParkAgendaTimeText("PLANNING COMMISSION REGULAR MEETING 7 PM City Council Chambers"),
+    "7:00 p.m."
+  );
+  assert.equal(
+    extractMenloParkAgendaTimeText("The closed session will convene at 5:30 p.m."),
+    "5:30 p.m."
+  );
+  assert.equal(
+    extractMenloParkAgendaTimeText("Date: 6/23/2026 Time: 5:3 0 p.m. Location: City Council Chambers"),
+    "5:30 p.m."
+  );
+  assert.equal(
+    extractMenloParkAgendaTimeText("Date: 6/29/2026 Time: 5:3 0 – 6:30 p.m. Location: City Hall"),
+    "5:30 p.m."
+  );
   assert.equal(extractMenloParkAgendaTimeText("Submit comments up to 1 hour before meeting start time."), null);
 });
 
@@ -261,4 +282,37 @@ test("enriches Menlo Park meetings with agenda PDF times", () => {
       note.includes("Extracted meeting time (7:00 p.m.)")
     )
   );
+});
+
+test("LLM preparation enriches Menlo Park times after agenda text is available", async () => {
+  const jurisdiction = getJurisdictionBySlug("menlo-park");
+  assert.ok(jurisdiction);
+
+  const [meeting] = normalizeMenloParkRows(
+    [
+      row({
+        bodyName: "Planning Commission",
+        sectionId: "section-9",
+        sectionUrl: "https://www.menlopark.gov/Agendas-and-minutes#section-9",
+        dateText: "June 8, 2026",
+        rowText: "June 8, 2026 Agenda packet",
+        links: [
+          {
+            label: "Agenda packet (PDF, 500KB)",
+            url: "https://www.menlopark.gov/files/planning-agenda.pdf",
+            column: "Agenda"
+          }
+        ]
+      })
+    ],
+    jurisdiction
+  );
+  meeting.documents[0].extractedText =
+    "PLANNING COMMISSION REGULAR MEETING 7 PM City Council Chambers";
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.equal(prepared.timeText, "7:00 p.m.");
+  assert.equal(prepared.id, "june-8-2026-7-00-p-m-planning-commission-june-8-2026");
+  assert.ok(prepared.extractionNotes.some((note) => note.includes("Extracted meeting time")));
 });

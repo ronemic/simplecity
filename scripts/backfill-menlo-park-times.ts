@@ -55,6 +55,21 @@ function groupDocumentsByMeeting(documents: BackfillDocument[]) {
   return grouped;
 }
 
+function rawDocumentsForMeeting(row: BackfillMeeting) {
+  if (!isRecord(row.raw) || !Array.isArray(row.raw.documents)) return [];
+
+  return row.raw.documents
+    .filter(isRecord)
+    .map((document): BackfillDocument => ({
+      meeting_id: row.id,
+      type: typeof document.type === "string" ? document.type : null,
+      label: typeof document.label === "string" ? document.label : null,
+      source_url: typeof document.url === "string" ? document.url : null,
+      extracted_text:
+        typeof document.extractedText === "string" ? document.extractedText : null
+    }));
+}
+
 function findMeetingTime(documents: BackfillDocument[]) {
   const candidates = documents
     .filter((document) => document.type && TIME_SOURCE_DOCUMENT_TYPES.has(document.type))
@@ -133,7 +148,10 @@ async function main() {
       continue;
     }
 
-    const result = findMeetingTime(documentsByMeeting.get(row.id) || []);
+    const result = findMeetingTime([
+      ...(documentsByMeeting.get(row.id) || []),
+      ...rawDocumentsForMeeting(row)
+    ]);
     if (!result) {
       noAgendaTimeFound += 1;
       continue;

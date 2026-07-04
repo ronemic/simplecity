@@ -6,7 +6,7 @@ const DEFAULT_MEETING_DURATION_MINUTES = 120;
 
 type CalendarMeeting = Pick<
   MeetingRow,
-  "title" | "meeting_type" | "date_text" | "meeting_datetime" | "source_url"
+  "title" | "meeting_type" | "date_text" | "time_text" | "meeting_datetime" | "source_url"
 >;
 
 function toGoogleCalendarDate(date: Date) {
@@ -22,7 +22,7 @@ export function buildGoogleCalendarUrl(
 ) {
   const startValue = meeting.meeting_datetime || parseMeetingDate(meeting.date_text);
   if (!startValue) return null;
-  if (!hasDisplayableMeetingTime(meeting.date_text, startValue)) return null;
+  if (!hasDisplayableMeetingTime(meeting.date_text, startValue, meeting.time_text)) return null;
 
   const start = new Date(startValue);
   if (Number.isNaN(start.getTime())) return null;
