@@ -55,6 +55,13 @@ type SubscriptionClient = Pick<SupabaseClient, "from">;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_BYTES = 32;
 
+export class EmailSubscriptionInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailSubscriptionInputError";
+  }
+}
+
 function subscriptionSupabase() {
   return getServiceSupabaseClientForJurisdiction(getDefaultJurisdiction().slug);
 }
@@ -199,12 +206,18 @@ export async function createOrRefreshSubscription(
 ) {
   const emailNormalized = normalizeSubscriberEmail(input.email);
   if (!isValidSubscriberEmail(emailNormalized)) {
-    throw new Error("Enter a valid email address.");
+    throw new EmailSubscriptionInputError("Enter a valid email address.");
   }
 
-  const jurisdictions = normalizeSubscriptionJurisdictions(input.jurisdictions);
+  let jurisdictions: JurisdictionSlug[];
+  try {
+    jurisdictions = normalizeSubscriptionJurisdictions(input.jurisdictions);
+  } catch {
+    throw new EmailSubscriptionInputError("Choose at least one valid city or county.");
+  }
+
   if (jurisdictions.length === 0) {
-    throw new Error("Choose at least one city or county.");
+    throw new EmailSubscriptionInputError("Choose at least one city or county.");
   }
 
   const confirmationToken = createEmailToken();

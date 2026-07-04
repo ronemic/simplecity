@@ -61,6 +61,12 @@ function hasFlag(name: string) {
   return process.argv.includes(`--${name}`);
 }
 
+function maskEmail(email: string) {
+  const [localPart = "", domain = ""] = email.split("@");
+  if (!localPart || !domain) return "[redacted email]";
+  return `${localPart[0]}***@${domain}`;
+}
+
 function getOptions(): DigestOptions {
   const rawLimit = getArgValue("limit-subscribers");
   const limitSubscribers = rawLimit ? Number(rawLimit) : null;
@@ -159,12 +165,12 @@ async function sendDigestForSubscriber(
     .map((batch) => batch.subscription.jurisdiction_slug);
 
   if (cards.length === 0) {
-    console.log(`No new cards for ${subscriber.email}.`);
+    console.log(`No new cards for ${maskEmail(subscriber.email)}.`);
     return { sent: false, cardCount: 0 };
   }
 
   if (options.dryRun) {
-    console.log(`[dry-run] Would send ${cards.length} cards to ${subscriber.email}.`);
+    console.log(`[dry-run] Would send ${cards.length} cards to ${maskEmail(subscriber.email)}.`);
     return { sent: false, cardCount: cards.length };
   }
 
@@ -186,7 +192,7 @@ async function sendDigestForSubscriber(
     providerMessageId: result.id,
     sentAt
   });
-  console.log(`Sent ${cards.length} cards to ${subscriber.email}.`);
+  console.log(`Sent ${cards.length} cards to ${maskEmail(subscriber.email)}.`);
   return { sent: true, cardCount: cards.length };
 }
 
@@ -204,7 +210,7 @@ async function main() {
       if (result.sent) sentCount += 1;
       cardCount += result.cardCount;
     } catch (error) {
-      console.error(`Failed to send digest to ${subscriber.email}:`, error);
+      console.error(`Failed to send digest to ${maskEmail(subscriber.email)}:`, error);
       await recordDigestDelivery({
         subscriberId: subscriber.id,
         jurisdictionSlugs: (subscriber.email_subscriptions || []).map(

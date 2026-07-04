@@ -1,4 +1,7 @@
-import { createOrRefreshSubscription } from "@/lib/email/subscriptions";
+import {
+  createOrRefreshSubscription,
+  EmailSubscriptionInputError
+} from "@/lib/email/subscriptions";
 import { getPublicAppUrlForRequest } from "@/lib/email/config";
 
 export const runtime = "nodejs";
@@ -31,9 +34,14 @@ export async function POST(request: Request) {
         "Check your inbox to confirm your SimpleCity email updates. If you were already subscribed, your preferences will update after you confirm."
     });
   } catch (error) {
+    if (error instanceof EmailSubscriptionInputError) {
+      return Response.json({ error: error.message }, { status: 400 });
+    }
+
+    console.error("[SimpleCity] Email subscription failed:", error);
     return Response.json(
-      { error: error instanceof Error ? error.message : "Failed to subscribe." },
-      { status: 400 }
+      { error: "We could not start that subscription. Please try again in a moment." },
+      { status: 500 }
     );
   }
 }

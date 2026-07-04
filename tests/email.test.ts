@@ -5,6 +5,8 @@ import { buildNewPostsDigestEmail } from "@/lib/email/newPosts";
 import { sendEmail } from "@/lib/email/resend";
 import {
   confirmEmailSubscription,
+  createOrRefreshSubscription,
+  EmailSubscriptionInputError,
   type EmailSubscriberRow,
   hashEmailToken,
   isValidSubscriberEmail,
@@ -194,6 +196,32 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
   assert.equal(
     publicEmailJurisdictionOptions().map((option) => String(option.value)).includes("all"),
     false
+  );
+});
+
+test("subscription input errors are safe for public responses", async () => {
+  await assert.rejects(
+    () =>
+      createOrRefreshSubscription(
+        {
+          email: "not-an-email",
+          jurisdictions: ["san-mateo-city"]
+        },
+        {} as never
+      ),
+    EmailSubscriptionInputError
+  );
+
+  await assert.rejects(
+    () =>
+      createOrRefreshSubscription(
+        {
+          email: "resident@example.com",
+          jurisdictions: ["not-a-real-city"]
+        },
+        {} as never
+      ),
+    EmailSubscriptionInputError
   );
 });
 
