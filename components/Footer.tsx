@@ -2,9 +2,14 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { LOCALE_COOKIE, normalizeLocale, type Locale, t } from "@/lib/i18n";
-
-const LOCALE_STORAGE_KEY = "simplecity.locale";
+import {
+  LOCALE_CHANGE_EVENT,
+  LOCALE_COOKIE,
+  LOCALE_STORAGE_KEY,
+  normalizeLocale,
+  type Locale,
+  t
+} from "@/lib/i18n";
 
 function readCookieLocale() {
   const localeCookie = document.cookie
@@ -17,8 +22,8 @@ function readCookieLocale() {
 
 function footerDescription(locale: Locale) {
   return locale === "es"
-    ? "SimpleCity es un sitio independiente compilado por ciudadanos privados, no un sitio oficial del gobierno local. Resume documentos de reuniones públicas para que sean más fáciles de entender. Siempre revisa la fuente original antes de tomar decisiones formales."
-    : "SimpleCity is an independent site compiled by private citizens, not an official local government website. It summarizes public meeting documents to make them easier to understand. Always review the original source before making formal decisions.";
+    ? "SimpleCity es una plataforma independiente dirigida por estudiantes, no un sitio web oficial del gobierno local. Resume documentos de reuniones públicas para que sean más fáciles de entender. Siempre revisa la fuente original antes de tomar decisiones formales."
+    : "SimpleCity is an independent, student-led platform, not an official local government website. It summarizes public meeting documents to make them easier to understand. Always review the original source before making formal decisions.";
 }
 
 function aboutSourcesLabel(locale: Locale) {
@@ -50,11 +55,11 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
       syncLocale(lang);
     }
 
-    window.addEventListener("simplecity:localechange", handleLocaleChange);
+    window.addEventListener(LOCALE_CHANGE_EVENT, handleLocaleChange);
     window.addEventListener("popstate", handlePopState);
 
     return () => {
-      window.removeEventListener("simplecity:localechange", handleLocaleChange);
+      window.removeEventListener(LOCALE_CHANGE_EVENT, handleLocaleChange);
       window.removeEventListener("popstate", handlePopState);
     };
   }, []);

@@ -5,7 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { JURISDICTION_PREFERENCE_COOKIE } from "@/lib/config/jurisdictions";
-import { LANGUAGE_OPTIONS, LOCALE_COOKIE, type Locale, t } from "@/lib/i18n";
+import {
+  LANGUAGE_OPTIONS,
+  LOCALE_CHANGE_EVENT,
+  LOCALE_COOKIE,
+  LOCALE_STORAGE_KEY,
+  type Locale,
+  t
+} from "@/lib/i18n";
 import { cn } from "@/lib/utils/cn";
 
 const nav = [
@@ -26,7 +33,6 @@ const jurisdictions = [
 ];
 
 const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";
-const LOCALE_STORAGE_KEY = "simplecity.locale";
 
 function normalizeJurisdiction(value: string | null | undefined): string {
   if (value === "san-mateo-city") return "san-mateo";
@@ -48,7 +54,7 @@ function writeLocalePreference(value: Locale) {
 
 function announceLocalePreference(value: Locale) {
   document.documentElement.lang = value;
-  window.dispatchEvent(new CustomEvent("simplecity:localechange", { detail: { locale: value } }));
+  window.dispatchEvent(new CustomEvent(LOCALE_CHANGE_EVENT, { detail: { locale: value } }));
 }
 
 function jurisdictionLabel(jurisdiction: (typeof jurisdictions)[number], locale: Locale) {
@@ -173,10 +179,10 @@ export function HeaderNav({
     try {
       window.localStorage.setItem(LOCALE_STORAGE_KEY, value);
       writeLocalePreference(value);
-      announceLocalePreference(value);
     } catch {
-      announceLocalePreference(value);
+      // Ignore storage failures so the selector still works normally.
     }
+    announceLocalePreference(value);
     startTransition(() => {
       router.push(hrefWithSelection("lang", value), { scroll: false });
     });

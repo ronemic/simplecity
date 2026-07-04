@@ -1,6 +1,8 @@
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 
 export const LOCALE_COOKIE = "simplecity_locale";
+export const LOCALE_CHANGE_EVENT = "simplecity:localechange";
+export const LOCALE_STORAGE_KEY = "simplecity.locale";
 
 export const LOCALES = ["en", "es"] as const;
 export type Locale = (typeof LOCALES)[number];
