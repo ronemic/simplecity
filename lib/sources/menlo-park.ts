@@ -131,7 +131,7 @@ function normalizeAgendaTime(hourText: string, minuteText: string | undefined, m
   const hour = Number(hourText);
   if (!Number.isFinite(hour) || hour < 1 || hour > 12) return null;
 
-  const minute = Number(minuteText || "0");
+  const minute = Number((minuteText || "0").replace(/\D/g, ""));
   if (!Number.isFinite(minute) || minute < 0 || minute > 59) return null;
 
   const meridiem = meridiemText.toLowerCase().replace(/[^apm]/g, "");
@@ -140,23 +140,27 @@ function normalizeAgendaTime(hourText: string, minuteText: string | undefined, m
   return `${hour}:${String(minute).padStart(2, "0")} ${meridiem[0]}.m.`;
 }
 
+function normalizeAgendaTimeMatch(match: RegExpMatchArray | null) {
+  return match ? normalizeAgendaTime(match[1], match[2], match[3]) : null;
+}
+
 export function extractMenloParkAgendaTimeText(text?: string | null) {
   const normalized = cleanText(String(text || "").replace(/\u00a0/g, " "));
   if (!normalized) return null;
 
   const head = normalized.slice(0, 12000).replace(/\s+/g, " ");
-  const labeledTime = head.match(
-    /\bTime\s*:\s*(?:approximately\s*)?(\d{1,2})(?::([0-5]\d))?\s*([ap]\.?\s*m\.?)/i
-  );
-  if (labeledTime) {
-    return normalizeAgendaTime(labeledTime[1], labeledTime[2], labeledTime[3]);
-  }
+  const timePattern = String.raw`(\d{1,2})(?::([0-5]\s*\d))?\s*(?:(?:-|–|—|\bto\b)\s*\d{1,2}(?::[0-5]\s*\d)?\s*)?([ap]\.?\s*m\.?)`;
+  const patterns = [
+    new RegExp(String.raw`\bTime\s*:?\s*(?:approximately\s*)?${timePattern}`, "i"),
+    new RegExp(String.raw`\b(?:meeting|session|hearing)\s+(?:will\s+)?(?:begin|start|starts|convene|commence)s?\s+(?:at\s+)?${timePattern}`, "i"),
+    new RegExp(String.raw`\b(?:begins?|starts?|convenes?|commences?)\s+(?:at\s+)?${timePattern}`, "i"),
+    new RegExp(String.raw`\b(?:regular|special|adjourned|closed)\s+(?:meeting|session|hearing)\s+${timePattern}`, "i"),
+    new RegExp(String.raw`\b(?:meeting|session|hearing)\s+${timePattern}`, "i")
+  ];
 
-  const startTime = head.match(
-    /\b(?:meeting|session|hearing)\s+(?:will\s+)?(?:begin|start|starts|convene|commence)s?\s+(?:at\s+)?(\d{1,2})(?::([0-5]\d))?\s*([ap]\.?\s*m\.?)/i
-  );
-  if (startTime) {
-    return normalizeAgendaTime(startTime[1], startTime[2], startTime[3]);
+  for (const pattern of patterns) {
+    const timeText = normalizeAgendaTimeMatch(head.match(pattern));
+    if (timeText) return timeText;
   }
 
   return null;

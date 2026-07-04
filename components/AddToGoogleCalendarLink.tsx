@@ -6,7 +6,10 @@ import { cn } from "@/lib/utils/cn";
 import { type Locale, t } from "@/lib/i18n";
 
 type AddToGoogleCalendarLinkProps = {
-  meeting: Pick<MeetingRow, "title" | "meeting_type" | "date_text" | "meeting_datetime" | "source_url">;
+  meeting: Pick<
+    MeetingRow,
+    "title" | "meeting_type" | "date_text" | "time_text" | "meeting_datetime" | "source_url"
+  >;
   className?: string;
   compact?: boolean;
   locale?: Locale;

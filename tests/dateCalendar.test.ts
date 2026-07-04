@@ -27,6 +27,7 @@ test("calendar links are omitted for date-only meetings", () => {
     title: "City Council",
     meeting_type: "Regular Meeting",
     date_text: "June 13, 2026",
+    time_text: null,
     meeting_datetime: "2026-06-13T07:00:00.000Z",
     source_url: "https://city.example/meeting"
   });
@@ -39,6 +40,7 @@ test("calendar links are available when an actual meeting time exists", () => {
     title: "City Council",
     meeting_type: "Regular Meeting",
     date_text: "June 13, 2026",
+    time_text: "10:00 AM",
     meeting_datetime: "2026-06-13T17:00:00.000Z",
     source_url: "https://city.example/meeting"
   });
