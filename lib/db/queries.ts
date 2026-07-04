@@ -28,11 +28,11 @@ import type { Locale } from "@/lib/i18n";
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
-  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,meeting_datetime,status";
+  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
 const PUBLIC_MEETING_LIST_COLUMNS =
-  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,meeting_datetime,status,source_type,source_url";
+  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,source_type,source_url";
 const PUBLIC_MEETING_DETAIL_COLUMNS =
-  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,meeting_datetime,status,source_type,source_url,public_comments_input_text";
+  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,source_type,source_url,public_comments_input_text";
 const PUBLIC_DOCUMENT_COLUMNS =
   "id,meeting_id,jurisdiction_name,jurisdiction_slug,platform,type,label,source_url";
 const PUBLIC_ANNOUNCEMENT_COLUMNS =

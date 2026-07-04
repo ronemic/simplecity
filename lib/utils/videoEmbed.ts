@@ -1,6 +1,6 @@
 import type { DocumentRow } from "@/lib/types";
 
-const VIDEO_DOCUMENT_TYPES = new Set(["media", "video"]);
+const VIDEO_DOCUMENT_TYPES = new Set(["media", "video", "spanish video"]);
 
 function asUrl(value: string | null | undefined) {
   if (!value) return null;
@@ -123,7 +123,8 @@ function hasVideoUrlInText(value: string) {
     value.includes("granicus.com/player/clip") ||
     value.includes("granicus.com/mediaplayer") ||
     value.includes("swagit.com/videos") ||
-    value.includes("youtube.com/watch")
+    value.includes("youtube.com/watch") ||
+    value.includes("youtu.be/")
   );
 }
 
@@ -162,7 +163,10 @@ export function isVideoDocument(
   return (
     VIDEO_DOCUMENT_TYPES.has(type) ||
     label.includes("video") ||
+    label.includes("vídeo") ||
     label.includes("media") ||
+    sourceUrl.includes("youtube.com") ||
+    sourceUrl.includes("youtu.be") ||
     sourceUrl.includes("swagit.com") ||
     sourceUrl.includes("granicus.com") ||
     sourceUrl.includes("video") ||

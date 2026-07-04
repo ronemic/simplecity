@@ -31,7 +31,7 @@ function normalizeYear(yearText: string) {
 function normalizeTime(hourText?: string, minuteText?: string, meridiemText?: string) {
   let hour = Number(hourText || 0);
   const minute = Number(minuteText || 0);
-  const meridiem = meridiemText?.toLowerCase();
+  const meridiem = meridiemText?.toLowerCase().replace(/[^apm]/g, "");
 
   if (meridiem === "pm" && hour < 12) hour += 12;
   if (meridiem === "am" && hour === 12) hour = 0;
@@ -42,7 +42,7 @@ function normalizeTime(hourText?: string, minuteText?: string, meridiemText?: st
 function parseCivicDateTimeParts(dateText: string): DateTimeParts | null {
   const normalized = dateText.replace(/\s+/g, " ").trim();
   const numericMatch = normalized.match(
-    /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\D+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?)?/i
+    /\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:\D+(\d{1,2})(?::(\d{2}))?\s*([AP]\.?\s*M\.?)?)?/i
   );
 
   if (numericMatch) {
@@ -56,7 +56,7 @@ function parseCivicDateTimeParts(dateText: string): DateTimeParts | null {
   }
 
   const monthNameMatch = normalized.match(
-    /\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})(?:\D+(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?)?/i
+    /\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})(?:\D+(\d{1,2})(?::(\d{2}))?\s*([AP]\.?\s*M\.?)?)?/i
   );
 
   if (monthNameMatch) {

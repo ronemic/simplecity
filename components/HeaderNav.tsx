@@ -4,7 +4,10 @@ import { Check, ChevronDown, Languages, Loader2, MapPin } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { JURISDICTION_PREFERENCE_COOKIE } from "@/lib/config/jurisdictions";
+import {
+  JURISDICTION_PREFERENCE_COOKIE,
+  getPublicJurisdictionOptions
+} from "@/lib/config/jurisdictions";
 import {
   LANGUAGE_OPTIONS,
   LOCALE_CHANGE_EVENT,
@@ -22,15 +25,10 @@ const nav = [
   { href: "/about", labelKey: "about" }
 ] as const;
 
-const jurisdictions = [
-  { slug: "all", label: "All" },
-  { slug: "foster-city", label: "Foster City" },
-  { slug: "san-mateo", label: "San Mateo" },
-  { slug: "san-mateo-county", label: "San Mateo County" },
-  { slug: "mountain-view", label: "Mountain View" },
-  { slug: "santa-clara-county", label: "Santa Clara County" },
-  { slug: "san-francisco", label: "San Francisco" }
-];
+const jurisdictions = getPublicJurisdictionOptions().map((jurisdiction) => ({
+  slug: jurisdiction.slug,
+  label: jurisdiction.name
+}));
 
 const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";
 

@@ -1,0 +1,48 @@
+name: Menlo Park Pipeline
+
+on:
+  schedule:
+    - cron: "10 13 * * *"
+  workflow_dispatch:
+
+env:
+  CI: true
+  NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'https://simplecity.app' }}
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-oss-120b:free' }}
+  CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+  CEREBRAS_MODEL: ${{ secrets.CEREBRAS_MODEL || 'gpt-oss-120b' }}
+  NEXT_PUBLIC_MENLO_PARK_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_MENLO_PARK_SUPABASE_URL }}
+  NEXT_PUBLIC_MENLO_PARK_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_MENLO_PARK_SUPABASE_ANON_KEY }}
+  MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY }}
+  MENLO_PARK_AGENDAS_URL: https://www.menlopark.gov/Agendas-and-minutes
+
+permissions:
+  contents: read
+
+jobs:
+  menlo-park:
+    name: Menlo Park pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: menlo-park-pipeline
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Run Menlo Park pipeline
+        run: npm run pipeline:menlo-park -- --max-runtime-minutes=50

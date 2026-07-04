@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { BrowserContext } from "playwright";
@@ -94,6 +95,67 @@ function isIqm2DownloadCandidate(doc: PrimeGovDocument) {
     url.includes("fileopen.aspx") ||
     url.endsWith(".pdf")
   );
+}
+
+const OFFICIAL_SITE_DOWNLOADABLE_DOCUMENT_TYPES = new Set<PrimeGovDocument["type"]>([
+  "Agenda",
+  "Agenda Packet",
+  "Minutes",
+  "Notice of Cancellation",
+  "Special Event Notice",
+  "Early Staff Report Release",
+  "Document",
+  "Attachment"
+]);
+
+function officialSiteDocumentFilename(
+  meeting: PrimeGovMeeting,
+  docType: string,
+  sourceUrl: string
+) {
+  let documentId = "unknown-id";
+
+  try {
+    const parsed = new URL(sourceUrl);
+    documentId =
+      parsed.searchParams.get("id") ||
+      parsed.searchParams.get("file") ||
+      parsed.pathname.split("/").filter(Boolean).at(-1) ||
+      documentId;
+  } catch {
+    documentId = sourceUrl.slice(-24);
+  }
+
+  const sourceHash = crypto.createHash("sha256").update(sourceUrl).digest("hex").slice(0, 10);
+  const meetingSlug = slugify(
+    meeting.externalId || `${meeting.dateText || "no-date"}-${meeting.title || "untitled-meeting"}`
+  ).slice(0, 70);
+  const docSlug = slugify(documentId).slice(0, 48);
+
+  return [
+    meeting.jurisdictionSlug || "official-site",
+    meetingSlug,
+    slugify(docType).slice(0, 32),
+    `${docSlug}-${sourceHash}`
+  ]
+    .filter(Boolean)
+    .join("__");
+}
+
+function isOfficialSiteDownloadCandidate(doc: PrimeGovDocument) {
+  if (!OFFICIAL_SITE_DOWNLOADABLE_DOCUMENT_TYPES.has(doc.type)) return false;
+
+  const url = doc.url.toLowerCase();
+  if (
+    url.includes("youtube.com") ||
+    url.includes("youtu.be") ||
+    url.includes("zoom.us") ||
+    url.includes("openforms.com")
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export async function downloadCompiledDocuments(
@@ -275,6 +337,106 @@ export async function downloadIqm2Documents(
         doc.bytes = buffer.length;
         doc.downloadError = `Downloaded file was not a PDF or HTML document. Saved response to ${errorPath}`;
         log(`Unsupported IQM2 document response: ${doc.url}`);
+      } catch (error) {
+        failed += 1;
+        doc.localPath = null;
+        doc.downloadError = error instanceof Error ? error.message : "Unknown download error";
+        log(`Download error for ${doc.url}: ${doc.downloadError}`);
+      }
+    }
+  }
+
+  return { downloaded, failed };
+}
+
+export async function downloadOfficialSiteDocuments(
+  context: BrowserContext,
+  meetings: PrimeGovMeeting[],
+  options: DownloadDocumentsOptions = {}
+) {
+  const docsDir = options.outputDir || DOCUMENTS_DIR;
+  const log = options.log || (() => undefined);
+  let downloaded = 0;
+  let failed = 0;
+
+  await fs.mkdir(docsDir, { recursive: true });
+
+  for (const meeting of meetings) {
+    const officialDocs = meeting.documents.filter(isOfficialSiteDownloadCandidate);
+
+    for (const doc of officialDocs) {
+      if (options.shouldStop?.()) {
+        log("Stopping official-site document downloads early because the pipeline deadline is near.");
+        return { downloaded, failed };
+      }
+
+      const baseFilename = officialSiteDocumentFilename(meeting, doc.type, doc.url);
+
+      try {
+        const response = await context.request.get(doc.url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 SimpleCity official-site agenda scraper",
+            Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
+          },
+          timeout: 60000
+        });
+
+        if (!response.ok()) {
+          failed += 1;
+          doc.localPath = null;
+          doc.downloadError = `HTTP ${response.status()}`;
+          log(`Failed download ${doc.url}: ${response.status()}`);
+          continue;
+        }
+
+        const buffer = await response.body();
+        const contentType = response.headers()["content-type"] || "";
+        const firstBytes = buffer.subarray(0, 5).toString();
+
+        if (firstBytes === "%PDF-") {
+          const filePath = path.join(docsDir, `${baseFilename}.pdf`);
+          await fs.writeFile(filePath, buffer);
+
+          downloaded += 1;
+          doc.localPath = filePath;
+          doc.bytes = buffer.length;
+          doc.downloadError = null;
+          log(`Downloaded: ${filePath}`);
+          continue;
+        }
+
+        const bodyText = buffer.toString("utf8");
+        if (contentType.includes("text/html") || /^\s*</.test(bodyText)) {
+          const extractedText = htmlToText(bodyText);
+          const filePath = path.join(docsDir, `${baseFilename}.html`);
+          await fs.writeFile(filePath, buffer);
+
+          downloaded += 1;
+          doc.localPath = filePath;
+          doc.bytes = buffer.length;
+          doc.extractedText = extractedText;
+          doc.extractionCharacterCount = extractedText.length;
+          doc.downloadError = null;
+
+          if (extractedText.length < 200) {
+            meeting.extractionNotes = [
+              ...(meeting.extractionNotes || []),
+              `${doc.type} HTML had little extractable text.`
+            ];
+          }
+
+          log(`Saved HTML document text: ${filePath}`);
+          continue;
+        }
+
+        const errorPath = path.join(docsDir, `${baseFilename}.download`);
+        await fs.writeFile(errorPath, buffer);
+
+        failed += 1;
+        doc.localPath = null;
+        doc.bytes = buffer.length;
+        doc.downloadError = `Downloaded file was not a PDF or HTML document. Saved response to ${errorPath}`;
+        log(`Unsupported official-site document response: ${doc.url}`);
       } catch (error) {
         failed += 1;
         doc.localPath = null;

@@ -1,4 +1,10 @@
-export type MeetingStatus = "Upcoming" | "Past" | "Cancelled" | "Unknown";
+export type MeetingStatus =
+  | "Upcoming"
+  | "Past"
+  | "Cancelled"
+  | "Notice"
+  | "Staff Report Release"
+  | "Unknown";
 
 export type MeetingSection =
   | "Current And Upcoming Meetings"
@@ -18,12 +24,18 @@ export type DocumentType =
   | "Minutes"
   | "Accessible Minutes"
   | "Notice of Cancellation"
+  | "Special Event Notice"
+  | "Early Staff Report Release"
   | "Media"
   | "Video"
+  | "Spanish Video"
   | "Audio"
   | "Captions"
   | "Meeting Details"
   | "Calendar"
+  | "Zoom"
+  | "Transportation Form"
+  | "Spanish Interpretation Form"
   | "Attachment"
   | "Document"
   | "Other";
@@ -45,6 +57,7 @@ export type PrimeGovDocument = {
 };
 
 export type PrimeGovMeeting = {
+  externalId?: string | null;
   jurisdictionName?: string | null;
   jurisdictionSlug?: string | null;
   platform?: string | null;
@@ -60,6 +73,7 @@ export type PrimeGovMeeting = {
   sourceType?: string | null;
   sourceUrl?: string | null;
   source?: string | null;
+  sectionUrl?: string | null;
   meetingDetailsUrl?: string | null;
   hasHtmlAgenda: boolean;
   hasPdf: boolean;

@@ -4,6 +4,9 @@ import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { AnnouncementRow } from "@/lib/types";
+import { getPublicJurisdictionOptions } from "@/lib/config/jurisdictions";
+
+const jurisdictionOptions = getPublicJurisdictionOptions();
 
 function toAnnouncementPayload(formData: FormData) {
   const jurisdiction = String(formData.get("jurisdiction") || "all");
@@ -114,13 +117,11 @@ function AnnouncementEditor({
             defaultValue={announcement ? announcementPublicJurisdiction || "all" : selectedPublicJurisdiction}
             className="input-control"
           >
-            <option value="all">All</option>
-            <option value="foster-city">Foster City</option>
-            <option value="san-mateo">San Mateo</option>
-            <option value="san-mateo-county">San Mateo County</option>
-            <option value="mountain-view">Mountain View</option>
-            <option value="santa-clara-county">Santa Clara County</option>
-            <option value="san-francisco">San Francisco</option>
+            {jurisdictionOptions.map((option) => (
+              <option key={option.slug} value={option.slug}>
+                {option.name}
+              </option>
+            ))}
           </select>
         </label>
         <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">

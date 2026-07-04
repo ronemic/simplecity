@@ -25,6 +25,10 @@ import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
 import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
+import {
+  enrichMenloParkMeetingTimesFromAgendaText,
+  scrapeMenloParkMeetings
+} from "@/lib/sources/menlo-park";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -220,15 +224,25 @@ export async function runSimpleCityPipeline(
               shouldStop: deadlineExceeded,
               log
             })
-        : await scrapePortal({
-            ...options,
-            portalUrl: options.portalUrl || jurisdiction.primegovUrl || jurisdiction.sourceUrl,
-            documentOutputDir,
-            scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
-            downloadDocuments: options.downloadDocuments ?? true,
-            shouldStop: deadlineExceeded,
-            log
-          });
+          : jurisdiction.platform === "official-site"
+            ? await scrapeMenloParkMeetings({
+                ...options,
+                jurisdiction,
+                portalUrl: options.portalUrl || jurisdiction.officialSiteUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              })
+            : await scrapePortal({
+                ...options,
+                portalUrl: options.portalUrl || jurisdiction.primegovUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              });
     applyJurisdictionMetadata(scrapeResult.meetings, jurisdiction);
 
     meetingsFound = scrapeResult.totalMeetingCount;
@@ -240,6 +254,13 @@ export async function runSimpleCityPipeline(
       log("Extracting PDF text.");
       const pdfNotes = await extractPdfTextForMeetings(scrapeResult.meetings);
       for (const note of pdfNotes) log(note);
+
+      if (jurisdiction.slug === "menlo-park") {
+        const enrichedCount = enrichMenloParkMeetingTimesFromAgendaText(scrapeResult.meetings);
+        if (enrichedCount > 0) {
+          log(`Extracted Menlo Park meeting times from agenda documents for ${enrichedCount} meeting(s).`);
+        }
+      }
     }
 
     log("Preparing LLM input.");

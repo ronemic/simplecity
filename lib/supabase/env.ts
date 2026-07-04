@@ -1,6 +1,7 @@
 import {
   getDefaultJurisdiction,
   getJurisdictionBySlug,
+  MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE,
   SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
@@ -42,6 +43,10 @@ export function getRequiredPublicSupabaseEnv(slug?: JurisdictionSlug) {
 
     if (slug === "san-francisco") {
       throw new Error(SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE);
+    }
+
+    if (slug === "menlo-park") {
+      throw new Error(MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE);
     }
 
     throw new Error("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.");

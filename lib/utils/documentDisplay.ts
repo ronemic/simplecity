@@ -14,6 +14,7 @@ const DOCUMENT_TYPE_LABELS_ES: Record<string, string> = {
   Captions: "Subtítulos",
   Document: "Documento",
   Download: "Descarga",
+  "Early Staff Report Release": "Publicación anticipada del informe del personal",
   "HTML Agenda": "Agenda HTML",
   Media: "Grabación",
   "Meeting Details": "Detalles de la reunión",
@@ -22,7 +23,12 @@ const DOCUMENT_TYPE_LABELS_ES: Record<string, string> = {
   Other: "Otro",
   Packet: "Paquete",
   "Public Comments": "Comentarios públicos",
-  Video: "Video"
+  "Spanish Interpretation Form": "Formulario de interpretación en español",
+  "Spanish Video": "Video en español",
+  "Special Event Notice": "Aviso de evento especial",
+  "Transportation Form": "Formulario de transporte",
+  Video: "Video",
+  Zoom: "Zoom"
 };
 
 const DOCUMENT_LABELS_ES: Record<string, string> = {

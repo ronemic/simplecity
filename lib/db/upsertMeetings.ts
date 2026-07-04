@@ -276,7 +276,9 @@ export async function upsertMeetings(
     const safeMeeting = sanitizeForDatabase(meeting);
     const identitySourceUrl = canonicalMeetingSourceUrl(meeting);
     const selectedSourceUrl = meeting.sourceUrl || identitySourceUrl;
-    const externalId = externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
+    const externalId =
+      safeMeeting.externalId ||
+      externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
     const jurisdictionColumns = jurisdiction
       ? {
@@ -295,6 +297,7 @@ export async function upsertMeetings(
           title: safeMeeting.title,
           meeting_type: safeMeeting.meetingType,
           date_text: safeMeeting.dateText,
+          time_text: safeMeeting.timeText || null,
           meeting_datetime: parseMeetingDate(meetingDateTimeText(safeMeeting)),
           section: safeMeeting.section,
           status: safeMeeting.status,

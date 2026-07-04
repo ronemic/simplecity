@@ -11,6 +11,10 @@ function findDoc(meeting: PrimeGovMeeting, type: PrimeGovDocument["type"]) {
   return meeting.documents.find((doc) => doc.type === type);
 }
 
+function findDocs(meeting: PrimeGovMeeting, type: PrimeGovDocument["type"]) {
+  return meeting.documents.filter((doc) => doc.type === type);
+}
+
 export function truncateForLLM(text?: string | null) {
   if (!text) return "";
   if (text.length <= MAX_CHARS_FOR_LLM) return text;
@@ -131,7 +135,10 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   const packetPdf = findDoc(meeting, "Packet") || findDoc(meeting, "Agenda Packet");
   const publicCommentsPdf = findDoc(meeting, "Public Comments");
   const cancellationPdf = findDoc(meeting, "Notice of Cancellation");
+  const specialEventNotice = findDoc(meeting, "Special Event Notice");
+  const earlyStaffReports = findDocs(meeting, "Early Staff Report Release");
   const fallbackSourceUrl = sourceUrlFallback(meeting);
+  const isMenloParkMeeting = meeting.jurisdictionSlug === "menlo-park";
 
   let selectedSourceType: string | null = null;
   let selectedSourceUrl: string | null = null;
@@ -155,6 +162,35 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
           : "No cancellation document was available; used source row text."
       );
     }
+  } else if (isMenloParkMeeting && meeting.status === "Notice" && specialEventNotice) {
+    selectedSourceType = "Special Event Notice";
+    selectedSourceUrl = specialEventNotice.url || fallbackSourceUrl;
+
+    const noticeText = await extractTextForDocument(specialEventNotice);
+    selectedText =
+      noticeText ||
+      `This Menlo Park row is listed as a special event notice.\n\nSource row:\n${meeting.rowText}`;
+
+    if (!noticeText) {
+      extractionNotes.push("Special event notice document had no extractable text; used source row text.");
+    }
+  } else if (
+    isMenloParkMeeting &&
+    meeting.status === "Staff Report Release" &&
+    earlyStaffReports.length > 0
+  ) {
+    const primaryStaffReport = earlyStaffReports[0];
+    selectedSourceType = "Early Staff Report Release";
+    selectedSourceUrl = primaryStaffReport.url || fallbackSourceUrl;
+
+    const staffReportText = await extractTextForDocument(primaryStaffReport);
+    selectedText =
+      staffReportText ||
+      `This Menlo Park row is listed as an early staff report release.\n\nSource row:\n${meeting.rowText}`;
+
+    if (!staffReportText) {
+      extractionNotes.push("Early staff report release document had no extractable text; used source row text.");
+    }
   } else {
     const candidates: SourceCandidate[] = [];
 
@@ -169,7 +205,8 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       });
     }
 
-    if (agendaPdf?.localPath || agendaPdf?.extractedText) {
+    const addAgendaCandidate = () => {
+      if (!agendaPdf?.localPath && !agendaPdf?.extractedText) return;
       candidates.push({
         sourceType: documentSourceType(agendaPdf, "Agenda"),
         sourceUrl: agendaPdf.url,
@@ -177,9 +214,10 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         loadText: () => extractTextForDocument(agendaPdf),
         emptyNote: "Agenda document had little or no extractable text."
       });
-    }
+    };
 
-    if (accessibleAgenda?.localPath || accessibleAgenda?.extractedText) {
+    const addAccessibleAgendaCandidate = () => {
+      if (!accessibleAgenda?.localPath && !accessibleAgenda?.extractedText) return;
       candidates.push({
         sourceType: documentSourceType(accessibleAgenda, "Accessible Agenda"),
         sourceUrl: accessibleAgenda.url,
@@ -187,6 +225,32 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         loadText: () => extractTextForDocument(accessibleAgenda),
         emptyNote: "Accessible agenda had little or no usable agenda text."
       });
+    };
+
+    const addPacketCandidate = () => {
+      if (!packetPdf?.localPath && !packetPdf?.extractedText) return;
+      candidates.push({
+        sourceType: documentSourceType(
+          packetPdf,
+          packetPdf.type === "Agenda Packet" ? "Agenda Packet" : "Packet"
+        ),
+        sourceUrl: packetPdf.url,
+        minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
+        loadText: () => extractTextForDocument(packetPdf),
+        emptyNote: "Packet document had little or no extractable text.",
+        selectedNote: isMenloParkMeeting
+          ? "Used Menlo Park agenda packet as the primary agenda source."
+          : "Used packet document because a higher-priority agenda source was unavailable or unreadable."
+      });
+    };
+
+    if (isMenloParkMeeting) {
+      addPacketCandidate();
+      addAgendaCandidate();
+      addAccessibleAgendaCandidate();
+    } else {
+      addAgendaCandidate();
+      addAccessibleAgendaCandidate();
     }
 
     const mountainViewDetailText = meeting.detailText;
@@ -201,18 +265,8 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       });
     }
 
-    if (packetPdf?.localPath || packetPdf?.extractedText) {
-      candidates.push({
-        sourceType: documentSourceType(
-          packetPdf,
-          packetPdf.type === "Agenda Packet" ? "Agenda Packet" : "Packet"
-        ),
-        sourceUrl: packetPdf.url,
-        minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
-        loadText: () => extractTextForDocument(packetPdf),
-        emptyNote: "Packet document had little or no extractable text.",
-        selectedNote: "Used packet document because a higher-priority agenda source was unavailable or unreadable."
-      });
+    if (!isMenloParkMeeting) {
+      addPacketCandidate();
     }
 
     const detailText = meeting.jurisdictionSlug === "mountain-view" ? null : meeting.detailText;
@@ -244,6 +298,29 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
       selectedSourceType = selectedSource.sourceType;
       selectedSourceUrl = selectedSource.sourceUrl;
       selectedText = selectedSource.text;
+
+      if (isMenloParkMeeting && earlyStaffReports.length > 0) {
+        const supplementalTexts: string[] = [];
+
+        for (const doc of earlyStaffReports) {
+          if (doc.url === selectedSourceUrl) continue;
+          const text = await extractTextForDocument(doc);
+          if (text.length < MIN_ROW_SOURCE_CHARS) {
+            extractionNotes.push(`${doc.label || doc.type} had little or no extractable text.`);
+            continue;
+          }
+          supplementalTexts.push(`${doc.label || doc.type}:\n${text}`);
+        }
+
+        if (supplementalTexts.length > 0) {
+          selectedText = [
+            selectedText,
+            "Supplemental Menlo Park early staff report release text:",
+            ...supplementalTexts
+          ].join("\n\n");
+          extractionNotes.push("Included Menlo Park early staff report release text as supplemental context.");
+        }
+      }
     } else {
       selectedSourceType = htmlAgenda ? "HTML Agenda" : null;
       selectedSourceUrl =

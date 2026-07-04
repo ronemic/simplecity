@@ -80,10 +80,11 @@ test("finds unique meeting video documents", () => {
     document({ id: "video", type: "Media", source_url: "https://city.example/Video.aspx?ID=1" }),
     document({ id: "dupe", type: "Video", source_url: "https://city.example/Video.aspx?ID=1" }),
     document({ id: "label", label: "Meeting video", source_url: "https://city.example/watch/2" }),
+    document({ id: "spanish-youtube", type: "Spanish Video", label: "Vídeo en español", source_url: "https://youtu.be/spanish" }),
     document({ id: "swagit", source_url: "https://fostercity.new.swagit.com/videos/391680" })
   ]);
 
-  assert.deepEqual(videos.map((item) => item.id), ["video", "label", "swagit"]);
+  assert.deepEqual(videos.map((item) => item.id), ["video", "label", "spanish-youtube", "swagit"]);
 });
 
 test("finds video links in a meeting raw document payload", () => {

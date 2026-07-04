@@ -1,6 +1,7 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { getPublicSupabaseEnv, getServiceRoleKey } from "./env";
 import {
+  MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE,
   SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
@@ -30,6 +31,10 @@ export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
 
     if (slug === "san-francisco") {
       throw new Error(SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE);
+    }
+
+    if (slug === "menlo-park") {
+      throw new Error(MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE);
     }
 
     throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY.");
