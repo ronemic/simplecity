@@ -8,6 +8,7 @@ import {
   requireValidJurisdictionSlug,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
+import { normalizeAppUrl } from "@/lib/appUrl";
 import { getEmailConfig } from "@/lib/email/config";
 import { sendEmail } from "@/lib/email/resend";
 
@@ -65,10 +66,6 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-function normalizeAppUrl(value: string) {
-  return value.replace(/\/+$/, "") || "http://localhost:3000";
 }
 
 function appUrl() {

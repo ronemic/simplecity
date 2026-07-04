@@ -1,10 +1,10 @@
 Deno.serve(async (request) => {
-  const appUrl = Deno.env.get("NEXT_PUBLIC_APP_URL");
+  const appUrl = getConfiguredAppUrl();
   const cronSecret = Deno.env.get("SUPABASE_CRON_SECRET");
 
-  if (!appUrl || !cronSecret) {
+  if (!cronSecret) {
     return new Response(
-      JSON.stringify({ error: "NEXT_PUBLIC_APP_URL and SUPABASE_CRON_SECRET are required." }),
+      JSON.stringify({ error: "SUPABASE_CRON_SECRET is required." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
@@ -29,3 +29,22 @@ Deno.serve(async (request) => {
     headers: { "Content-Type": response.headers.get("Content-Type") || "application/json" }
   });
 });
+
+function getConfiguredAppUrl() {
+  const configured = normalizeAppUrl(Deno.env.get("NEXT_PUBLIC_APP_URL"), "");
+  if (configured && !isLocalAppUrl(configured)) return configured;
+  return "https://simplecity.app";
+}
+
+function normalizeAppUrl(value: string | null | undefined, fallback = "https://simplecity.app") {
+  return String(value || "").trim().replace(/\/+$/, "") || fallback;
+}
+
+function isLocalAppUrl(value: string) {
+  try {
+    const hostname = new URL(value).hostname;
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return true;
+  }
+}

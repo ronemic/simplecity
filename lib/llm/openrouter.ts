@@ -1,4 +1,5 @@
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import {
   parseAndValidateSummary,
@@ -84,7 +85,7 @@ function parseRetryAfterMs(headers: Headers) {
 
 function getConfiguredSummaryProviders() {
   const providers: SummaryProvider[] = [];
-  const referer = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const referer = getConfiguredAppUrl();
 
   if (process.env.OPENROUTER_API_KEY) {
     providers.push({

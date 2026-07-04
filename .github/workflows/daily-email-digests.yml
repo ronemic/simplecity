@@ -7,7 +7,7 @@ on:
 
 env:
   CI: true
-  NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL || 'https://simplecity.app' }}
+  NEXT_PUBLIC_APP_URL: https://simplecity.app
   RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
   RESEND_FROM_EMAIL: ${{ secrets.RESEND_FROM_EMAIL }}
   RESEND_REPLY_TO_EMAIL: ${{ secrets.RESEND_REPLY_TO_EMAIL }}

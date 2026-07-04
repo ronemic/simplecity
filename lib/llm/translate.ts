@@ -1,4 +1,5 @@
 import { jsonrepair } from "jsonrepair";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
 
 export type TranslationLocale = "es";
 
@@ -165,7 +166,7 @@ export async function generateTranslations(
   if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY.");
 
   const model = process.env.OPENROUTER_TRANSLATION_MODEL || process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free";
-  const referer = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const referer = getConfiguredAppUrl();
 
   options.log?.(
     `Requesting ${input.locale} translations for ${(input.meetings || []).length} meetings and ${(input.cards || []).length} cards.`

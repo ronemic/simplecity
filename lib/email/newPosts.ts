@@ -2,6 +2,7 @@ import {
   getJurisdictionDisplayLabel,
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
+import { normalizeAppUrl } from "@/lib/appUrl";
 import { sendEmail, type SendEmailResult } from "@/lib/email/resend";
 import type { SummaryCardRow } from "@/lib/types";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
@@ -33,10 +34,6 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/'/g, "&#39;");
 }
 
-function normalizeBaseUrl(value: string) {
-  return (value || "http://localhost:3000").replace(/\/+$/, "");
-}
-
 function publicJurisdictionParam(slug: string | null | undefined) {
   if (!slug) return null;
   if (slug === "san-mateo-city") return "san-mateo";
@@ -44,7 +41,7 @@ function publicJurisdictionParam(slug: string | null | undefined) {
 }
 
 function cardUrl(card: SummaryCardRow, appUrl: string) {
-  const baseUrl = normalizeBaseUrl(appUrl);
+  const baseUrl = normalizeAppUrl(appUrl);
   const meeting = card.meetings;
 
   if (meeting?.id) {
@@ -145,7 +142,7 @@ export function buildNewPostsDigestEmail({
     count === 1
       ? `1 new SimpleCity post for ${selectionLabel}`
       : `${count} new SimpleCity posts for ${selectionLabel}`;
-  const safeAppUrl = normalizeBaseUrl(appUrl);
+  const safeAppUrl = normalizeAppUrl(appUrl);
   const preheader = "Fresh plain-English civic updates are ready.";
   const cardRows = cards.map((card) => htmlForCard(card, safeAppUrl)).join("");
   const unsubscribeFooter = unsubscribeUrl

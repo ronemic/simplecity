@@ -1,4 +1,5 @@
 import { getPublishedCards } from "@/lib/db/queries";
+import { getPublicAppUrlForRequest } from "@/lib/appUrl";
 import { labelForEmailSelection, sendNewPostsDigestEmail } from "@/lib/email/newPosts";
 import {
   getDefaultJurisdiction,
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
     const result = await sendNewPostsDigestEmail({
       to,
       cards,
-      appUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+      appUrl: getPublicAppUrlForRequest(request),
       selectionLabel: labelForEmailSelection(jurisdiction)
     });
 

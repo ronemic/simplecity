@@ -1,3 +1,8 @@
+import {
+  getConfiguredAppUrl,
+  getPublicAppUrlForRequest as resolvePublicAppUrlForRequest
+} from "@/lib/appUrl";
+
 export type EmailConfig = {
   apiKey: string;
   from: string;
@@ -5,28 +10,8 @@ export type EmailConfig = {
   appUrl: string;
 };
 
-const DEFAULT_APP_URL = "http://localhost:3000";
-
 function readEnv(name: string) {
   return process.env[name]?.trim() || "";
-}
-
-export function normalizeAppUrl(value: string) {
-  const trimmed = value.trim().replace(/\/+$/, "");
-  return trimmed || DEFAULT_APP_URL;
-}
-
-function isLocalAppUrl(value: string) {
-  try {
-    const hostname = new URL(value).hostname;
-    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-  } catch {
-    return true;
-  }
-}
-
-function firstForwardedValue(value: string | null) {
-  return value?.split(",")[0]?.trim() || "";
 }
 
 export function getEmailConfig(): EmailConfig {
@@ -34,7 +19,7 @@ export function getEmailConfig(): EmailConfig {
     apiKey: readEnv("RESEND_API_KEY"),
     from: readEnv("RESEND_FROM_EMAIL"),
     replyTo: readEnv("RESEND_REPLY_TO_EMAIL") || null,
-    appUrl: normalizeAppUrl(readEnv("NEXT_PUBLIC_APP_URL") || DEFAULT_APP_URL)
+    appUrl: getConfiguredAppUrl()
   };
 }
 
@@ -42,17 +27,7 @@ export function getPublicAppUrlForRequest(
   request: Request,
   config: EmailConfig = getEmailConfig()
 ) {
-  if (!isLocalAppUrl(config.appUrl)) return config.appUrl;
-
-  const forwardedHost = firstForwardedValue(request.headers.get("x-forwarded-host"));
-  const host = forwardedHost || firstForwardedValue(request.headers.get("host"));
-  if (!host || host.startsWith("localhost") || host.startsWith("127.0.0.1")) {
-    return config.appUrl;
-  }
-
-  const forwardedProto = firstForwardedValue(request.headers.get("x-forwarded-proto"));
-  const protocol = forwardedProto || "https";
-  return normalizeAppUrl(`${protocol}://${host}`);
+  return resolvePublicAppUrlForRequest(request, config.appUrl);
 }
 
 export function hasEmailConfig(config: EmailConfig = getEmailConfig()) {

@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { headers } from "next/headers";
+import { getConfiguredAppUrl, isLocalAppUrl, normalizeAppUrl } from "@/lib/appUrl";
 
 export const dynamic = "force-dynamic";
 
@@ -11,19 +12,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const host = headersList.get("x-forwarded-host") || headersList.get("host");
     if (host) {
       const proto = headersList.get("x-forwarded-proto") || (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
-      appUrl = `${proto}://${host}`;
+      const requestAppUrl = normalizeAppUrl(`${proto}://${host}`);
+      if (!isLocalAppUrl(requestAppUrl)) {
+        appUrl = requestAppUrl;
+      }
     }
   } catch {
     // Fallback if headers() is called outside of request context (e.g. static build or tests)
   }
 
   if (!appUrl) {
-    appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  }
-
-  // Final fallback
-  if (!appUrl) {
-    appUrl = "http://localhost:3000";
+    appUrl = getConfiguredAppUrl();
   }
   const routes: MetadataRoute.Sitemap = [];
 
