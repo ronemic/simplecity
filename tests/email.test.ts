@@ -11,6 +11,7 @@ import {
   normalizeSubscriberEmail,
   normalizeSubscriptionJurisdictions,
   publicEmailJurisdictionOptions,
+  unsubscribeEmailSubscriber,
   unsubscribeUrl
 } from "@/lib/email/subscriptions";
 import type { SummaryCardRow } from "@/lib/types";
@@ -91,6 +92,23 @@ test("builds a new posts digest with escaped card content and meeting links", ()
   assert.doesNotMatch(email.html, /<Approve>/);
   assert.match(email.html, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
   assert.match(email.text, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
+});
+
+test("digest unsubscribe footer only advertises unsubscribe", () => {
+  const email = buildNewPostsDigestEmail({
+    cards: [testCard()],
+    appUrl: "https://simplecity.example",
+    selectionLabel: "San Mateo",
+    unsubscribeUrl: "https://simplecity.example/api/email/unsubscribe?token=unsubscribe-123"
+  });
+
+  assert.match(email.html, />Unsubscribe<\/a>/);
+  assert.match(
+    email.text,
+    /Unsubscribe: https:\/\/simplecity\.example\/api\/email\/unsubscribe\?token=unsubscribe-123/
+  );
+  assert.doesNotMatch(email.html, /change preferences/i);
+  assert.doesNotMatch(email.text, /change preferences/i);
 });
 
 test("sends email through Resend", async (t) => {
@@ -272,6 +290,68 @@ test("confirmed subscription links are idempotent", async () => {
   const secondResult = await confirmEmailSubscription(token, supabase as never);
   assert.equal(secondResult?.status, "active");
   assert.equal(insertedSubscriptions.length, 1);
+});
+
+test("unsubscribe token marks the subscriber unsubscribed", async () => {
+  let subscriber: EmailSubscriberRow = {
+    id: "subscriber-1",
+    email: "resident@example.com",
+    email_normalized: "resident@example.com",
+    status: "active",
+    pending_jurisdiction_slugs: [],
+    confirmation_token_hash: null,
+    unsubscribe_token: "unsubscribe-123",
+    confirmation_sent_at: null,
+    confirmed_at: "2026-07-04T18:00:00.000Z",
+    unsubscribed_at: null,
+    created_at: null,
+    updated_at: null
+  };
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "email_subscribers");
+      return {
+        select() {
+          return {
+            eq(column: string, value: string) {
+              assert.equal(column, "unsubscribe_token");
+              return {
+                maybeSingle: async () => ({
+                  data: subscriber.unsubscribe_token === value ? subscriber : null,
+                  error: null
+                })
+              };
+            }
+          };
+        },
+        update(values: Partial<EmailSubscriberRow>) {
+          return {
+            eq(column: string, value: string) {
+              assert.equal(column, "id");
+              assert.equal(value, subscriber.id);
+              return {
+                select() {
+                  return {
+                    single: async () => {
+                      subscriber = { ...subscriber, ...values };
+                      return { data: subscriber, error: null };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const result = await unsubscribeEmailSubscriber(" unsubscribe-123 ", supabase as never);
+  assert.equal(result?.status, "unsubscribed");
+  assert.ok(result?.unsubscribed_at);
+
+  const invalidResult = await unsubscribeEmailSubscriber("missing-token", supabase as never);
+  assert.equal(invalidResult, null);
 });
 
 test("uses forwarded public host when configured app URL is local", () => {

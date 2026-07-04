@@ -150,7 +150,7 @@ export function buildNewPostsDigestEmail({
   const cardRows = cards.map((card) => htmlForCard(card, safeAppUrl)).join("");
   const unsubscribeFooter = unsubscribeUrl
     ? `<p style="margin: 18px 0 0; font-size: 12px; line-height: 1.5; color: ${EMAIL_MUTED};">
-        <a href="${escapeHtml(unsubscribeUrl)}" style="color: ${EMAIL_MUTED};">Unsubscribe or change preferences</a>
+        <a href="${escapeHtml(unsubscribeUrl)}" style="color: ${EMAIL_MUTED};">Unsubscribe</a>
       </p>`
     : "";
 
@@ -198,7 +198,7 @@ export function buildNewPostsDigestEmail({
     "",
     ...cards.flatMap((card) => [...textLinesForCard(card, safeAppUrl), ""]),
     "SimpleCity summarizes official public meeting documents. Always check the original source before making formal decisions.",
-    unsubscribeUrl ? `Unsubscribe or change preferences: ${unsubscribeUrl}` : ""
+    unsubscribeUrl ? `Unsubscribe: ${unsubscribeUrl}` : ""
   ]
     .filter((line, index, lines) => line || lines[index - 1])
     .join("\n");
