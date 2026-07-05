@@ -6,7 +6,11 @@ import {
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { getEmailConfig } from "@/lib/email/config";
-import { labelForEmailSelection, sendNewPostsDigestEmail } from "@/lib/email/newPosts";
+import {
+  labelForEmailSelection,
+  sendNewPostsDigestEmail,
+  type LocalizedDigestCard
+} from "@/lib/email/newPosts";
 import {
   getActiveSubscribersForDigest,
   recordDigestDelivery,
@@ -15,7 +19,16 @@ import {
   type EmailSubscriberWithSubscriptions,
   type EmailSubscriptionRow
 } from "@/lib/email/subscriptions";
-import type { SummaryCardRow } from "@/lib/types";
+import {
+  meetingTranslationFingerprint,
+  summaryCardTranslationFingerprint
+} from "@/lib/db/translationFingerprint";
+import type {
+  MeetingRow,
+  MeetingTranslationRow,
+  SummaryCardRow,
+  SummaryCardTranslationRow
+} from "@/lib/types";
 
 type DigestOptions = {
   dryRun: boolean;
@@ -50,6 +63,24 @@ const DIGEST_SUMMARY_CARD_COLUMNS = [
   "updated_at"
 ].join(",");
 const DIGEST_SUMMARY_CARD_SELECT = `${DIGEST_SUMMARY_CARD_COLUMNS},meetings(${DIGEST_CARD_MEETING_COLUMNS})`;
+const DIGEST_CARD_TRANSLATION_COLUMNS = [
+  "summary_card_id",
+  "locale",
+  "agenda_item",
+  "what_is_happening",
+  "why_it_matters",
+  "who_it_affects",
+  "status",
+  "comment_window_opens",
+  "comment_window_closes",
+  "how_to_act_attend",
+  "how_to_act_email",
+  "how_to_act_submit_comment",
+  "source_fingerprint",
+  "translation_status"
+].join(",");
+const DIGEST_MEETING_TRANSLATION_COLUMNS =
+  "meeting_id,locale,title,meeting_type,source_fingerprint,translation_status";
 
 function getArgValue(name: string) {
   const prefix = `--${name}=`;
@@ -115,6 +146,108 @@ function uniqueCards(cards: SummaryCardRow[]) {
   return result;
 }
 
+function translatedMeeting(
+  meeting: MeetingRow | null | undefined,
+  translations: Map<string, MeetingTranslationRow>
+) {
+  if (!meeting?.id) return meeting || null;
+
+  const translation = translations.get(meeting.id);
+  if (!translation) return meeting;
+  if (translation.source_fingerprint !== meetingTranslationFingerprint(meeting)) return meeting;
+
+  return {
+    ...meeting,
+    title: translation.title || meeting.title,
+    meeting_type: translation.meeting_type || meeting.meeting_type
+  };
+}
+
+function translatedCard(
+  card: SummaryCardRow,
+  cardTranslations: Map<string, SummaryCardTranslationRow>,
+  meetingTranslations: Map<string, MeetingTranslationRow>
+) {
+  const translation = cardTranslations.get(card.id);
+  if (!translation) return null;
+  if (translation.source_fingerprint !== summaryCardTranslationFingerprint(card)) return null;
+
+  return {
+    ...card,
+    agenda_item: translation.agenda_item || card.agenda_item,
+    what_is_happening: translation.what_is_happening || card.what_is_happening,
+    why_it_matters: translation.why_it_matters || card.why_it_matters,
+    who_it_affects: translation.who_it_affects || card.who_it_affects,
+    status: translation.status || card.status,
+    comment_window_opens: translation.comment_window_opens || card.comment_window_opens,
+    comment_window_closes: translation.comment_window_closes || card.comment_window_closes,
+    how_to_act_attend: translation.how_to_act_attend || card.how_to_act_attend,
+    how_to_act_email: translation.how_to_act_email || card.how_to_act_email,
+    how_to_act_submit_comment:
+      translation.how_to_act_submit_comment || card.how_to_act_submit_comment,
+    meetings: translatedMeeting(card.meetings, meetingTranslations)
+  };
+}
+
+async function applySpanishTranslations(
+  supabase: ReturnType<typeof getServiceSupabaseClientForJurisdiction>,
+  cards: SummaryCardRow[]
+) {
+  if (cards.length === 0) return cards as LocalizedDigestCard[];
+
+  const cardIds = cards.map((card) => card.id);
+  const meetingIds = cards
+    .map((card) => card.meetings?.id)
+    .filter((id): id is string => Boolean(id));
+
+  const [{ data: cardTranslationRows, error: cardTranslationError }, meetingResult] =
+    await Promise.all([
+      supabase
+        .from("summary_card_translations")
+        .select(DIGEST_CARD_TRANSLATION_COLUMNS)
+        .eq("locale", "es")
+        .in("translation_status", ["machine", "reviewed"])
+        .in("summary_card_id", cardIds),
+      meetingIds.length > 0
+        ? supabase
+            .from("meeting_translations")
+            .select(DIGEST_MEETING_TRANSLATION_COLUMNS)
+            .eq("locale", "es")
+            .in("translation_status", ["machine", "reviewed"])
+            .in("meeting_id", meetingIds)
+        : Promise.resolve({ data: [], error: null })
+    ]);
+
+  if (cardTranslationError) {
+    throw new Error(`Failed to load Spanish digest card translations: ${cardTranslationError.message}`);
+  }
+
+  if (meetingResult.error) {
+    throw new Error(`Failed to load Spanish digest meeting translations: ${meetingResult.error.message}`);
+  }
+
+  const cardTranslations = new Map(
+    ((cardTranslationRows || []) as unknown as SummaryCardTranslationRow[]).map(
+      (translation) => [translation.summary_card_id, translation]
+    )
+  );
+  const meetingTranslations = new Map(
+    ((meetingResult.data || []) as unknown as MeetingTranslationRow[]).map(
+      (translation) => [translation.meeting_id, translation]
+    )
+  );
+
+  return cards.map((card) => {
+    const spanish = translatedCard(card, cardTranslations, meetingTranslations);
+    return spanish
+      ? ({
+          ...card,
+          translations: { es: spanish }
+        } satisfies LocalizedDigestCard)
+      : (card as LocalizedDigestCard);
+  });
+}
+
 async function cardsForSubscription(subscription: EmailSubscriptionRow) {
   const jurisdiction = getJurisdictionBySlug(subscription.jurisdiction_slug);
   if (!jurisdiction) throw new Error(`Unknown jurisdiction: ${subscription.jurisdiction_slug}`);
@@ -132,9 +265,10 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
     throw new Error(`Failed to load ${jurisdiction.name} digest cards: ${error.message}`);
   }
 
-  return ((data || []) as unknown as SummaryCardRow[]).map((card) =>
+  const cards = ((data || []) as unknown as SummaryCardRow[]).map((card) =>
     withJurisdictionFallback(card, jurisdiction)
   );
+  return applySpanishTranslations(supabase, cards);
 }
 
 function subscriptionLabel(subscriptions: EmailSubscriptionRow[]) {

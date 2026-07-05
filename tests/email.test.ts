@@ -96,6 +96,39 @@ test("builds a new posts digest with escaped card content and meeting links", ()
   assert.match(email.text, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
 });
 
+test("builds a bilingual digest when Spanish translations are attached", () => {
+  const spanishCard = testCard({
+    agenda_item: "Aprobar contrato de mantenimiento del parque",
+    what_is_happening:
+      "El concejo considerará un contrato de mantenimiento para Central Park.",
+    category_tags: ["Parks & Environment"],
+    meetings: {
+      ...testCard().meetings!,
+      title: "Reunión del Concejo Municipal",
+      meeting_type: "Concejo Municipal"
+    }
+  });
+  const email = buildNewPostsDigestEmail({
+    cards: [
+      {
+        ...testCard(),
+        translations: {
+          es: spanishCard
+        }
+      }
+    ],
+    appUrl: "https://simplecity.example",
+    selectionLabel: "San Mateo"
+  });
+
+  assert.match(email.subject, /Resumen semanal de SimpleCity/);
+  assert.match(email.html, /En español/);
+  assert.match(email.html, /Aprobar contrato de mantenimiento del parque/);
+  assert.match(email.html, /Parques y ambiente/);
+  assert.match(email.html, /Leer la tarjeta de SimpleCity/);
+  assert.match(email.text, /El concejo considerará un contrato de mantenimiento/);
+});
+
 test("digest unsubscribe footer only advertises unsubscribe", () => {
   const email = buildNewPostsDigestEmail({
     cards: [testCard()],
@@ -104,10 +137,10 @@ test("digest unsubscribe footer only advertises unsubscribe", () => {
     unsubscribeUrl: "https://simplecity.example/api/email/unsubscribe?token=unsubscribe-123"
   });
 
-  assert.match(email.html, />Unsubscribe<\/a>/);
+  assert.match(email.html, />Unsubscribe \/ Cancelar suscripción<\/a>/);
   assert.match(
     email.text,
-    /Unsubscribe: https:\/\/simplecity\.example\/api\/email\/unsubscribe\?token=unsubscribe-123/
+    /Unsubscribe \/ Cancelar suscripción: https:\/\/simplecity\.example\/api\/email\/unsubscribe\?token=unsubscribe-123/
   );
   assert.doesNotMatch(email.html, /change preferences/i);
   assert.doesNotMatch(email.text, /change preferences/i);
