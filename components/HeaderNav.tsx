@@ -74,7 +74,13 @@ export function HeaderNav({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const routeSelectedJurisdiction = normalizeJurisdiction(searchParams.get("jurisdiction") || initialJurisdiction);
+  const routeJurisdiction = searchParams.get("jurisdiction");
+  const [storedJurisdiction, setStoredJurisdiction] = useState(() =>
+    normalizeJurisdiction(initialJurisdiction)
+  );
+  const routeSelectedJurisdiction = normalizeJurisdiction(
+    routeJurisdiction || storedJurisdiction || initialJurisdiction
+  );
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
   const [optimisticJurisdiction, setOptimisticJurisdiction] = useState(routeSelectedJurisdiction);
@@ -141,7 +147,11 @@ export function HeaderNav({
   }, [isLanguageMenuOpen]);
 
   function hrefWithJurisdiction(href: string) {
-    return href;
+    const params = new URLSearchParams();
+    params.set("jurisdiction", selected);
+    const lang = searchParams.get("lang");
+    if (lang) params.set("lang", lang);
+    return `${href}?${params.toString()}`;
   }
 
   function hrefWithSelection(key: "jurisdiction" | "lang", value: string) {
@@ -159,6 +169,7 @@ export function HeaderNav({
   function changeJurisdiction(value: string) {
     setIsJurisdictionMenuOpen(false);
     setOptimisticJurisdiction(value);
+    setStoredJurisdiction(value);
     setPendingSelector("jurisdiction");
     try {
       window.localStorage.setItem(JURISDICTION_STORAGE_KEY, value);
