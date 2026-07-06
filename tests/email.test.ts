@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getPublicAppUrlForRequest } from "@/lib/email/config";
-import { buildNewPostsDigestEmail } from "@/lib/email/newPosts";
+import { buildNewPostsDigestEmail, labelForEmailSelections } from "@/lib/email/newPosts";
 import { sendEmail } from "@/lib/email/resend";
 import {
   confirmEmailSubscription,
@@ -144,6 +144,22 @@ test("digest unsubscribe footer only advertises unsubscribe", () => {
   );
   assert.doesNotMatch(email.html, /change preferences/i);
   assert.doesNotMatch(email.text, /change preferences/i);
+});
+
+test("labels digest subjects by updated areas only", () => {
+  assert.equal(labelForEmailSelections(["san-mateo-city"]), "San Mateo");
+  assert.equal(
+    labelForEmailSelections(["san-mateo-city", "mountain-view"]),
+    "2 SimpleCity areas"
+  );
+  assert.match(
+    buildNewPostsDigestEmail({
+      cards: [testCard()],
+      appUrl: "https://simplecity.test",
+      selectionLabel: labelForEmailSelections(["san-mateo-city", "mountain-view"])
+    }).subject,
+    /Weekly SimpleCity digest: 1 new post for 2 SimpleCity areas/
+  );
 });
 
 test("sends email through Resend", async (t) => {

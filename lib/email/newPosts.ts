@@ -328,3 +328,11 @@ export async function sendNewPostsDigestEmail({
 export function labelForEmailSelection(selection: JurisdictionSelection) {
   return selection === "all" ? "all SimpleCity cities" : getJurisdictionDisplayLabel(selection);
 }
+
+export function labelForEmailSelections(selections: JurisdictionSelection[]) {
+  if (selections.length === 1) {
+    return labelForEmailSelection(selections[0]);
+  }
+
+  return `${selections.length} SimpleCity areas`;
+}

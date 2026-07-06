@@ -7,7 +7,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { getEmailConfig } from "@/lib/email/config";
 import {
-  labelForEmailSelection,
+  labelForEmailSelections,
   sendNewPostsDigestEmail,
   type LocalizedDigestCard
 } from "@/lib/email/newPosts";
@@ -272,11 +272,7 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
 }
 
 function subscriptionLabel(subscriptions: EmailSubscriptionRow[]) {
-  if (subscriptions.length === 1) {
-    return labelForEmailSelection(subscriptions[0].jurisdiction_slug);
-  }
-
-  return `${subscriptions.length} SimpleCity areas`;
+  return labelForEmailSelections(subscriptions.map((subscription) => subscription.jurisdiction_slug));
 }
 
 async function sendDigestForSubscriber(
@@ -290,13 +286,13 @@ async function sendDigestForSubscriber(
       cards: await cardsForSubscription(subscription)
     }))
   );
-  const cards = uniqueCards(batches.flatMap((batch) => batch.cards));
-  const subscriptionIds = batches
-    .filter((batch) => batch.cards.length > 0)
-    .map((batch) => batch.subscription.id);
-  const jurisdictionSlugs = batches
-    .filter((batch) => batch.cards.length > 0)
-    .map((batch) => batch.subscription.jurisdiction_slug);
+  const updatedBatches = batches.filter((batch) => batch.cards.length > 0);
+  const cards = uniqueCards(updatedBatches.flatMap((batch) => batch.cards));
+  const updatedSubscriptions = updatedBatches.map((batch) => batch.subscription);
+  const subscriptionIds = updatedSubscriptions.map((subscription) => subscription.id);
+  const jurisdictionSlugs = updatedSubscriptions.map(
+    (subscription) => subscription.jurisdiction_slug
+  );
 
   if (cards.length === 0) {
     console.log(`No new cards for ${maskEmail(subscriber.email)}.`);
@@ -313,7 +309,7 @@ async function sendDigestForSubscriber(
     to: subscriber.email,
     cards,
     appUrl: getEmailConfig().appUrl,
-    selectionLabel: subscriptionLabel(subscriptions),
+    selectionLabel: subscriptionLabel(updatedSubscriptions),
     unsubscribeUrl: unsubscribeUrl(subscriber.unsubscribe_token)
   });
 
