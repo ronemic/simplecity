@@ -455,33 +455,44 @@ export function MeetingList({
                             isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
                           )}
                         >
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={(e) => handleDateClick(e, day)}
-                              disabled={!inMonth}
-                              aria-current={isToday ? "date" : undefined}
-                              aria-pressed={isSelected}
+                          <button
+                            type="button"
+                            onClick={(e) => handleDateClick(e, day)}
+                            disabled={!inMonth}
+                            aria-current={isToday ? "date" : undefined}
+                            aria-pressed={isSelected}
+                            aria-label={
+                              locale === "es"
+                                ? `Seleccionar ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
+                                : `Select ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
+                            }
+                            className={cn(
+                              "absolute inset-0 z-0 transition focus-visible:focus-ring",
+                              inMonth ? "cursor-pointer hover:bg-civic/[0.04]" : "cursor-default"
+                            )}
+                          />
+                          <div className="pointer-events-none relative z-10 flex items-center gap-1">
+                            <span
                               className={cn(
-                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition focus-visible:focus-ring",
+                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition",
                                 isSelected || isToday
-                                  ? "bg-civic text-white hover:bg-civic"
+                                  ? "bg-civic text-white"
                                   : inMonth
-                                    ? "text-ink hover:bg-civic/10"
-                                    : "cursor-default text-black/25"
+                                    ? "text-ink"
+                                    : "text-black/25"
                               )}
                             >
                               {Number(day.slice(-2))}
-                            </button>
+                            </span>
                           </div>
-                          <div className="mt-2 grid flex-1 content-start gap-1.5">
+                          <div className="pointer-events-none relative z-10 mt-2 grid flex-1 content-start gap-1.5">
                             {dayMeetings.map((meeting) => (
                               <PendingLink
                                 key={meeting.id}
                                 href={meetingHref(meeting)}
                                 mode="overlay"
                                 className={cn(
-                                  "block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
+                                  "pointer-events-auto relative z-20 block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
                                   calendarMeetingTone(meeting.status)
                                 )}
                                 contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
