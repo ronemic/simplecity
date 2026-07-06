@@ -7,8 +7,12 @@ import {
   confirmEmailSubscription,
   createOrRefreshSubscription,
   EmailSubscriptionInputError,
+  filterSubscribersDueForDigest,
   type EmailSubscriberRow,
+  type EmailSubscriberWithSubscriptions,
+  type EmailSubscriptionRow,
   hashEmailToken,
+  isSubscriptionDueForDigest,
   isValidSubscriberEmail,
   normalizeSubscriberEmail,
   normalizeSubscriptionJurisdictions,
@@ -73,6 +77,19 @@ function testCard(overrides: Partial<SummaryCardRow> = {}): SummaryCardRow {
       created_at: "2026-06-01T00:00:00.000Z",
       updated_at: "2026-06-01T00:00:00.000Z"
     },
+    ...overrides
+  };
+}
+
+function testSubscription(overrides: Partial<EmailSubscriptionRow> = {}): EmailSubscriptionRow {
+  return {
+    id: "subscription-1",
+    subscriber_id: "subscriber-1",
+    jurisdiction_slug: "san-mateo-city",
+    frequency: "weekly",
+    last_digest_sent_at: "2026-07-01T00:00:00.000Z",
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: null,
     ...overrides
   };
 }
@@ -245,6 +262,87 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
   assert.equal(
     publicEmailJurisdictionOptions().map((option) => String(option.value)).includes("all"),
     false
+  );
+});
+
+test("weekly digest subscriptions are only due after their cadence window", () => {
+  const now = new Date("2026-07-08T00:00:00.000Z");
+
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({ last_digest_sent_at: "2026-07-01T00:00:00.000Z" }),
+      now
+    ),
+    true
+  );
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({ last_digest_sent_at: "2026-07-02T00:00:00.000Z" }),
+      now
+    ),
+    false
+  );
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({
+        frequency: "daily",
+        last_digest_sent_at: "2026-07-07T00:00:00.000Z"
+      }),
+      now
+    ),
+    true
+  );
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({
+        frequency: "daily",
+        last_digest_sent_at: "2026-07-07T12:00:00.000Z"
+      }),
+      now
+    ),
+    false
+  );
+});
+
+test("filters digest subscribers down to due subscriptions", () => {
+  const subscribers: EmailSubscriberWithSubscriptions[] = [
+    {
+      id: "subscriber-1",
+      email: "resident@example.com",
+      email_normalized: "resident@example.com",
+      status: "active",
+      pending_jurisdiction_slugs: [],
+      confirmation_token_hash: null,
+      unsubscribe_token: "unsubscribe-123",
+      confirmation_sent_at: null,
+      confirmed_at: "2026-07-01T00:00:00.000Z",
+      unsubscribed_at: null,
+      created_at: "2026-07-01T00:00:00.000Z",
+      updated_at: null,
+      email_subscriptions: [
+        testSubscription({
+          id: "subscription-due",
+          last_digest_sent_at: "2026-07-01T00:00:00.000Z"
+        }),
+        testSubscription({
+          id: "subscription-not-due",
+          jurisdiction_slug: "mountain-view",
+          last_digest_sent_at: "2026-07-04T00:00:00.000Z"
+        })
+      ]
+    }
+  ];
+
+  const dueSubscribers = filterSubscribersDueForDigest(
+    subscribers,
+    new Date("2026-07-08T00:00:00.000Z")
+  );
+
+  assert.deepEqual(
+    dueSubscribers.flatMap((subscriber) =>
+      (subscriber.email_subscriptions || []).map((subscription) => subscription.id)
+    ),
+    ["subscription-due"]
   );
 });
 

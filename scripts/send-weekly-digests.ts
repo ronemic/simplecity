@@ -12,6 +12,7 @@ import {
   type LocalizedDigestCard
 } from "@/lib/email/newPosts";
 import {
+  filterSubscribersDueForDigest,
   getActiveSubscribersForDigest,
   recordDigestDelivery,
   unsubscribeUrl,
@@ -23,6 +24,11 @@ import {
   meetingTranslationFingerprint,
   summaryCardTranslationFingerprint
 } from "@/lib/db/translationFingerprint";
+import {
+  compareDigestCards,
+  selectDigestCardGroups,
+  selectDigestCards
+} from "@/lib/utils/civicPriority";
 import type {
   MeetingRow,
   MeetingTranslationRow,
@@ -81,6 +87,8 @@ const DIGEST_CARD_TRANSLATION_COLUMNS = [
 ].join(",");
 const DIGEST_MEETING_TRANSLATION_COLUMNS =
   "meeting_id,locale,title,meeting_type,source_fingerprint,translation_status";
+const DIGEST_CANDIDATE_CARD_LIMIT = 80;
+const DIGEST_CARD_LIMIT = 20;
 
 function getArgValue(name: string) {
   const prefix = `--${name}=`;
@@ -259,7 +267,7 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
     .eq("is_published", true)
     .gt("created_at", mostRecentSentAt(subscription))
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(DIGEST_CANDIDATE_CARD_LIMIT);
 
   if (error) {
     throw new Error(`Failed to load ${jurisdiction.name} digest cards: ${error.message}`);
@@ -268,7 +276,9 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
   const cards = ((data || []) as unknown as SummaryCardRow[]).map((card) =>
     withJurisdictionFallback(card, jurisdiction)
   );
-  return applySpanishTranslations(supabase, cards);
+  const digestCards = selectDigestCards(cards, DIGEST_CARD_LIMIT);
+
+  return applySpanishTranslations(supabase, digestCards);
 }
 
 function subscriptionLabel(subscriptions: EmailSubscriptionRow[]) {
@@ -287,8 +297,11 @@ async function sendDigestForSubscriber(
     }))
   );
   const updatedBatches = batches.filter((batch) => batch.cards.length > 0);
-  const cards = uniqueCards(updatedBatches.flatMap((batch) => batch.cards));
-  const updatedSubscriptions = updatedBatches.map((batch) => batch.subscription);
+  const selectedBatches = selectDigestCardGroups(updatedBatches, DIGEST_CARD_LIMIT);
+  const cards = uniqueCards(selectedBatches.flatMap((batch) => batch.cards))
+    .sort(compareDigestCards)
+    .slice(0, DIGEST_CARD_LIMIT);
+  const updatedSubscriptions = selectedBatches.map((batch) => batch.subscription);
   const subscriptionIds = updatedSubscriptions.map((subscription) => subscription.id);
   const jurisdictionSlugs = updatedSubscriptions.map(
     (subscription) => subscription.jurisdiction_slug
@@ -328,7 +341,24 @@ async function sendDigestForSubscriber(
 
 async function main() {
   const options = getOptions();
-  const subscribers = await getActiveSubscribersForDigest();
+  const activeSubscribers = await getActiveSubscribersForDigest();
+  const subscribers = filterSubscribersDueForDigest(activeSubscribers);
+  const activeSubscriptionCount = activeSubscribers.reduce(
+    (count, subscriber) => count + (subscriber.email_subscriptions || []).length,
+    0
+  );
+  const dueSubscriptionCount = subscribers.reduce(
+    (count, subscriber) => count + (subscriber.email_subscriptions || []).length,
+    0
+  );
+  const skippedSubscriptionCount = activeSubscriptionCount - dueSubscriptionCount;
+
+  if (skippedSubscriptionCount > 0) {
+    console.log(
+      `Skipped ${skippedSubscriptionCount} subscription(s) still inside their digest cadence window.`
+    );
+  }
+
   const limitedSubscribers =
     options.limitSubscribers === null ? subscribers : subscribers.slice(0, options.limitSubscribers);
   let sentCount = 0;

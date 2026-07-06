@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  compareDigestCards,
   compareCardsByPublicInterest,
+  isDigestWorthyCard,
   isPublicInterestCard,
   publicAgendaTitle,
-  publicInterestScore
+  publicInterestScore,
+  selectDigestCardGroups,
+  selectDigestCards
 } from "@/lib/utils/civicPriority";
 import type { SummaryCardRow } from "@/lib/types";
 
@@ -100,6 +104,87 @@ test("public-interest ranking puts impactful items before routine recognitions a
   ]);
   assert.equal(isPublicInterestCard(budget), true);
   assert.equal(isPublicInterestCard(minutes), false);
+});
+
+test("digest selection keeps public-interest or featured cards only", () => {
+  const budget = card({
+    id: "budget",
+    agenda_item: "Continued Budget Hearing",
+    what_is_happening: "The board will discuss budget funding and service levels.",
+    category_tags: ["Budget & Taxes"],
+    status: "Upcoming vote"
+  });
+  const minutes = card({
+    id: "minutes",
+    agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
+    category_tags: ["City Services"],
+    status: "Upcoming vote"
+  });
+  const featuredMinutes = card({
+    id: "featured-minutes",
+    agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
+    category_tags: ["City Services"],
+    status: "Upcoming vote",
+    is_featured: true
+  });
+
+  assert.equal(isDigestWorthyCard(budget), true);
+  assert.equal(isDigestWorthyCard(minutes), false);
+  assert.equal(isDigestWorthyCard(featuredMinutes), true);
+  assert.deepEqual(
+    [budget, featuredMinutes].sort(compareDigestCards).map((item) => item.id),
+    ["featured-minutes", "budget"]
+  );
+  assert.deepEqual(
+    selectDigestCards([minutes, budget], 10).map((item) => item.id),
+    ["budget"]
+  );
+  assert.deepEqual(
+    selectDigestCards([minutes], 10).map((item) => item.id),
+    ["minutes"]
+  );
+});
+
+test("digest group selection keeps represented jurisdictions before filling extras", () => {
+  const budget = card({
+    id: "budget",
+    agenda_item: "Continued Budget Hearing",
+    what_is_happening: "The board will discuss budget funding and service levels.",
+    category_tags: ["Budget & Taxes"],
+    status: "Upcoming vote"
+  });
+  const housing = card({
+    id: "housing",
+    agenda_item: "Affordable housing zoning vote",
+    what_is_happening: "The council will vote on zoning changes for affordable housing.",
+    category_tags: ["Housing"],
+    status: "Upcoming vote"
+  });
+  const minutes = card({
+    id: "minutes",
+    agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
+    category_tags: ["City Services"],
+    status: "Upcoming vote"
+  });
+
+  const selected = selectDigestCardGroups(
+    [
+      { jurisdiction: "san-mateo-city", cards: [budget, housing] },
+      { jurisdiction: "mountain-view", cards: [minutes] }
+    ],
+    2
+  );
+
+  assert.deepEqual(
+    selected.map((group) => ({
+      jurisdiction: group.jurisdiction,
+      cardIds: group.cards.map((item) => item.id)
+    })),
+    [
+      { jurisdiction: "san-mateo-city", cardIds: ["housing"] },
+      { jurisdiction: "mountain-view", cardIds: ["minutes"] }
+    ]
+  );
 });
 
 test("future meetings sort ahead of past ones even when the past item scores higher", () => {

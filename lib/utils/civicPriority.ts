@@ -307,6 +307,81 @@ export function compareCardsByPublicInterest(left: SummaryCardRow, right: Summar
   return rightTime - leftTime;
 }
 
+export function isDigestWorthyCard(card: SummaryCardRow) {
+  return Boolean(card.is_featured) || isPublicInterestCard(card);
+}
+
+export function compareDigestCards(left: SummaryCardRow, right: SummaryCardRow, now = Date.now()) {
+  const featuredDelta = Number(Boolean(right.is_featured)) - Number(Boolean(left.is_featured));
+  if (featuredDelta !== 0) return featuredDelta;
+
+  return compareCardsByPublicInterest(left, right, now);
+}
+
+export function selectDigestCards(cards: SummaryCardRow[], limit: number, now = Date.now()) {
+  const digestWorthyCards = cards.filter(isDigestWorthyCard);
+  const candidates = digestWorthyCards.length > 0 ? digestWorthyCards : cards;
+
+  return [...candidates]
+    .sort((left, right) => compareDigestCards(left, right, now))
+    .slice(0, limit);
+}
+
+export function selectDigestCardGroups<
+  TCard extends SummaryCardRow,
+  TGroup extends { cards: TCard[] }
+>(groups: TGroup[], limit: number, now = Date.now()) {
+  if (limit <= 0) return [] as Array<TGroup & { cards: TCard[] }>;
+
+  const groupsWithCards = groups
+    .map((group) => ({
+      group,
+      cards: [...group.cards].sort((left, right) => compareDigestCards(left, right, now))
+    }))
+    .filter((entry) => entry.cards.length > 0);
+  const selectedCardIds = new Set<string>();
+  const selectedCardsByGroup = new Map<TGroup, TCard[]>();
+  let selectedCardCount = 0;
+
+  function addCard(group: TGroup, card: TCard) {
+    if (selectedCardIds.has(card.id) || selectedCardCount >= limit) return false;
+    selectedCardIds.add(card.id);
+    selectedCardCount += 1;
+    selectedCardsByGroup.set(group, [...(selectedCardsByGroup.get(group) || []), card]);
+    return true;
+  }
+
+  const rankedGroups = groupsWithCards
+    .map((entry) => ({
+      ...entry,
+      bestCard: entry.cards[0]
+    }))
+    .sort((left, right) => compareDigestCards(left.bestCard, right.bestCard, now));
+
+  for (const { group, cards } of rankedGroups) {
+    const firstUnselectedCard = cards.find((card) => !selectedCardIds.has(card.id));
+    if (firstUnselectedCard) addCard(group, firstUnselectedCard);
+    if (selectedCardCount >= limit) break;
+  }
+
+  const remainingCards = groupsWithCards
+    .flatMap(({ group, cards }) => cards.map((card) => ({ group, card })))
+    .filter(({ card }) => !selectedCardIds.has(card.id))
+    .sort((left, right) => compareDigestCards(left.card, right.card, now));
+
+  for (const { group, card } of remainingCards) {
+    if (selectedCardCount >= limit) break;
+    addCard(group, card);
+  }
+
+  return groupsWithCards
+    .map(({ group }) => {
+      const cards = selectedCardsByGroup.get(group) || [];
+      return cards.length > 0 ? ({ ...group, cards } as TGroup & { cards: TCard[] }) : null;
+    })
+    .filter((group): group is TGroup & { cards: TCard[] } => Boolean(group));
+}
+
 export function publicAgendaTitle(card: SummaryCardRow) {
   const agendaItem = String(card.agenda_item || "").trim();
   if (!agendaItem) return "Agenda item not listed";

@@ -55,6 +55,10 @@ type SubscriptionClient = Pick<SupabaseClient, "from">;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_BYTES = 32;
 const DEFAULT_EMAIL_FREQUENCY: EmailFrequency = "weekly";
+const EMAIL_DIGEST_INTERVAL_MS: Record<EmailFrequency, number> = {
+  daily: 24 * 60 * 60 * 1000,
+  weekly: 7 * 24 * 60 * 60 * 1000
+};
 
 export class EmailSubscriptionInputError extends Error {
   constructor(message: string) {
@@ -390,6 +394,33 @@ export async function getActiveSubscribersForDigest(
       ...subscriber,
       email_subscriptions: (subscriber.email_subscriptions || []).filter(
         (subscription) => subscription.frequency === frequency
+      )
+    }))
+    .filter((subscriber) => (subscriber.email_subscriptions || []).length > 0);
+}
+
+export function isSubscriptionDueForDigest(
+  subscription: EmailSubscriptionRow,
+  now: Date = new Date()
+) {
+  const baseline = subscription.last_digest_sent_at || subscription.created_at;
+  if (!baseline) return true;
+
+  const baselineTime = Date.parse(baseline);
+  if (Number.isNaN(baselineTime)) return true;
+
+  return now.getTime() - baselineTime >= EMAIL_DIGEST_INTERVAL_MS[subscription.frequency];
+}
+
+export function filterSubscribersDueForDigest(
+  subscribers: EmailSubscriberWithSubscriptions[],
+  now: Date = new Date()
+) {
+  return subscribers
+    .map((subscriber) => ({
+      ...subscriber,
+      email_subscriptions: (subscriber.email_subscriptions || []).filter((subscription) =>
+        isSubscriptionDueForDigest(subscription, now)
       )
     }))
     .filter((subscriber) => (subscriber.email_subscriptions || []).length > 0);
