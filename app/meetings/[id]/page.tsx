@@ -5,7 +5,11 @@ import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { MeetingVideoEmbed } from "@/components/MeetingVideoEmbed";
 import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
-import { getMeetingDetail, getMeetingRawVideoDocuments, getMeetings } from "@/lib/db/queries";
+import {
+  getAdjacentMeetingsForMeeting,
+  getMeetingDetail,
+  getMeetingRawVideoDocuments
+} from "@/lib/db/queries";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionDisplayLabel,
@@ -16,7 +20,6 @@ import { cookies } from "next/headers";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { displayDocumentLabel, displayDocumentType } from "@/lib/utils/documentDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
-import { getAdjacentMeetings } from "@/lib/utils/meetingNavigation";
 import { getEmbeddableVideoDocuments } from "@/lib/utils/videoEmbed";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -34,25 +37,26 @@ export default async function MeetingDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ jurisdiction?: string }>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
-  const locale = await getRequestLocale();
-  const cookieStore = await cookies();
+  const [{ id }, query, locale, cookieStore] = await Promise.all([
+    params,
+    searchParams,
+    getRequestLocale(),
+    cookies()
+  ]);
   const jurisdiction = normalizeJurisdictionSelection(
     query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
-  const [{ meeting, cards, documents }, meetings] = await Promise.all([
-    getMeetingDetail(id, jurisdiction, locale),
-    getMeetings({ jurisdiction, locale })
-  ]);
+  const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction, locale);
 
   if (!meeting) notFound();
-  const rawVideoDocuments =
+  const [rawVideoDocuments, { newerMeeting, olderMeeting }] = await Promise.all([
     getEmbeddableVideoDocuments(documents).length > 0
-      ? []
-      : await getMeetingRawVideoDocuments(id, jurisdiction);
+      ? Promise.resolve([])
+      : getMeetingRawVideoDocuments(id, jurisdiction),
+    getAdjacentMeetingsForMeeting(meeting, jurisdiction, locale)
+  ]);
   const videoDocuments = rawVideoDocuments.length > 0 ? [...documents, ...rawVideoDocuments] : documents;
-  const { newerMeeting, olderMeeting } = getAdjacentMeetings(meetings, meeting.id);
   const jurisdictionLabel = getJurisdictionDisplayLabel(
     meeting.jurisdiction_slug || meeting.jurisdiction_name
   );

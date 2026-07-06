@@ -5,7 +5,12 @@ import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
-import { getActiveAnnouncements, getPublishedCards } from "@/lib/db/queries";
+import {
+  getActiveAnnouncements,
+  getDecisionCardPage,
+  getPublishedCardCount,
+  getPublishedCardPreview
+} from "@/lib/db/queries";
 import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
@@ -86,20 +91,35 @@ export default async function Home({
 }: {
   searchParams: Promise<{ q?: string; jurisdiction?: string }>;
 }) {
-  const params = await searchParams;
-  const locale = await getRequestLocale();
+  const [params, locale, cookieStore] = await Promise.all([
+    searchParams,
+    getRequestLocale(),
+    cookies()
+  ]);
   const search = (params.q || "").trim();
-  const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const hasSearch = search.length > 0;
-  const [cards, announcements] = await Promise.all([
-    getPublishedCards(jurisdiction, locale),
+  const cardResultPromise = hasSearch
+    ? getDecisionCardPage({ jurisdiction, locale, search })
+    : Promise.all([
+        getPublishedCardPreview(jurisdiction, locale),
+        getPublishedCardCount(jurisdiction)
+      ]).then(([previewCards, publishedCardCount]) => ({
+        cards: previewCards,
+        totalCount: Math.max(publishedCardCount, previewCards.length)
+      }));
+  const [cardResult, announcements] = await Promise.all([
+    cardResultPromise,
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG)
   ]);
-  const filteredCards = cards.filter((card) => matchesSearch(card, search));
+  const cards = cardResult.cards;
+  const availableCardCount = cardResult.totalCount;
+  const filteredCards = hasSearch
+    ? cards
+    : cards.filter((card) => matchesSearch(card, search));
   const prioritizedCards = [...filteredCards].sort(compareCardsByPublicInterest);
   const publicInterestCards = prioritizedCards.filter(isPublicInterestCard);
   const decisionCards =
@@ -138,8 +158,8 @@ export default async function Home({
     summaryItems.length > 0
       ? summaryItems.join(" · ")
       : locale === "es"
-        ? `${pluralize(filteredCards.length, "decisión publicada", "decisiones publicadas")} disponibles`
-        : `${pluralize(filteredCards.length, "published decision", "published decisions")} available`;
+        ? `${pluralize(availableCardCount, "decisión publicada", "decisiones publicadas")} disponibles`
+        : `${pluralize(availableCardCount, "published decision", "published decisions")} available`;
   const decisionSectionTitle =
     hasSearch
       ? locale === "es"
@@ -254,7 +274,7 @@ export default async function Home({
             </div>
           ) : null}
         </div>
-        {!hasSearch && filteredCards.length > 4 ? (
+        {!hasSearch && availableCardCount > 4 ? (
           <Link
             href="/decisions"
             className="action-link mt-4 font-black underline-offset-4 hover:underline"

@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { CategoryName } from "@/lib/constants";
 import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
@@ -25,6 +26,7 @@ import type {
   SummaryCardTranslationRow
 } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
+import { compareCardsByPublicInterest } from "@/lib/utils/civicPriority";
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
@@ -62,6 +64,32 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
   "updated_at"
 ].join(",");
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
+export const DECISION_CARD_PAGE_SIZE = 12;
+const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
+const DECISION_RANKING_BUFFER_PER_JURISDICTION = 12;
+const MAX_DECISION_CANDIDATES_PER_JURISDICTION = 120;
+
+type AdjacentMeetings = {
+  newerMeeting: MeetingRow | null;
+  olderMeeting: MeetingRow | null;
+};
+
+type DecisionCardPageFilters = {
+  selection: JurisdictionSelection;
+  locale: Locale;
+  search: string;
+  category?: CategoryName;
+  page: number;
+  pageSize: number;
+};
+
+export type DecisionCardPageResult = {
+  cards: SummaryCardRow[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  pageCount: number;
+};
 
 function logQueryError(context: string, error: unknown) {
   if (!error) return;
@@ -84,6 +112,25 @@ function normalizeSearch(value?: string | null) {
 function toIlikePattern(value: string) {
   const safeValue = value.replace(/[%,()]/g, " ").replace(/\s+/g, "%").trim();
   return safeValue ? `%${safeValue}%` : "";
+}
+
+function normalizePositiveInteger(value: number, fallback: number) {
+  return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+function decisionCardSearchFilters(pattern: string, meetingIds: string[]) {
+  const filters = [
+    `agenda_item.ilike.${pattern}`,
+    `what_is_happening.ilike.${pattern}`,
+    `why_it_matters.ilike.${pattern}`,
+    `status.ilike.${pattern}`
+  ];
+
+  if (meetingIds.length > 0) {
+    filters.push(`meeting_id.in.(${meetingIds.join(",")})`);
+  }
+
+  return filters.join(",");
 }
 
 function getSafePublicClients(selection: JurisdictionSelection) {
@@ -194,6 +241,37 @@ function sortByCreatedAt<T extends { created_at?: string | null }>(rows: T[]) {
   });
 }
 
+function rowTime(value?: string | null) {
+  if (!value) return 0;
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function isAnnouncementActive(row: AnnouncementRow, now = Date.now()) {
+  const startsAt = rowTime(row.starts_at);
+  const endsAt = rowTime(row.ends_at);
+
+  return (!startsAt || startsAt <= now) && (!endsAt || endsAt >= now);
+}
+
+function closestNewerMeeting(rows: MeetingRow[], currentTime: number) {
+  return rows.reduce<MeetingRow | null>((closest, row) => {
+    const time = rowTime(row.meeting_datetime);
+    if (!time || time <= currentTime) return closest;
+    if (!closest) return row;
+    return time < rowTime(closest.meeting_datetime) ? row : closest;
+  }, null);
+}
+
+function closestOlderMeeting(rows: MeetingRow[], currentTime: number) {
+  return rows.reduce<MeetingRow | null>((closest, row) => {
+    const time = rowTime(row.meeting_datetime);
+    if (!time || time >= currentTime) return closest;
+    if (!closest) return row;
+    return time > rowTime(closest.meeting_datetime) ? row : closest;
+  }, null);
+}
+
 function dedupeAnnouncements(rows: AnnouncementRow[]) {
   const seen = new Set<string>();
   const deduped: AnnouncementRow[] = [];
@@ -264,36 +342,39 @@ async function applyCardTranslations(
   const meetingRows = rows
     .map((row) => row.meetings)
     .filter((meeting): meeting is MeetingRow => Boolean(meeting?.id));
-  const { data, error } = await supabase
-    .from("summary_card_translations")
-    .select(
-      [
-        "summary_card_id",
-        "locale",
-        "agenda_item",
-        "what_is_happening",
-        "why_it_matters",
-        "who_it_affects",
-        "status",
-        "comment_window_opens",
-        "comment_window_closes",
-        "how_to_act_attend",
-        "how_to_act_email",
-        "how_to_act_submit_comment",
-        "source_fingerprint",
-        "translation_status"
-      ].join(",")
-    )
-    .eq("locale", locale)
-    .in("translation_status", ["machine", "reviewed"])
-    .in("summary_card_id", cardIds);
+  const [cardTranslations, translatedMeetings] = await Promise.all([
+    supabase
+      .from("summary_card_translations")
+      .select(
+        [
+          "summary_card_id",
+          "locale",
+          "agenda_item",
+          "what_is_happening",
+          "why_it_matters",
+          "who_it_affects",
+          "status",
+          "comment_window_opens",
+          "comment_window_closes",
+          "how_to_act_attend",
+          "how_to_act_email",
+          "how_to_act_submit_comment",
+          "source_fingerprint",
+          "translation_status"
+        ].join(",")
+      )
+      .eq("locale", locale)
+      .in("translation_status", ["machine", "reviewed"])
+      .in("summary_card_id", cardIds),
+    applyMeetingTranslations(supabase, meetingRows, locale)
+  ]);
+  const { data, error } = cardTranslations;
 
   if (error) {
     logQueryError("Failed to load summary card translations", error);
     return rows;
   }
 
-  const translatedMeetings = await applyMeetingTranslations(supabase, meetingRows, locale);
   const meetingById = new Map(translatedMeetings.map((meeting) => [meeting.id, meeting]));
   const translations = new Map(
     ((data || []) as unknown as SummaryCardTranslationRow[]).map((row) => [
@@ -327,30 +408,48 @@ async function applyCardTranslations(
   });
 }
 
+async function loadPublishedCardsForJurisdiction(
+  {
+    jurisdiction,
+    supabase
+  }: {
+    jurisdiction: JurisdictionConfig;
+    supabase: SupabaseClient;
+  },
+  locale: Locale,
+  options: { limit?: number } = {}
+) {
+  let query = supabase
+    .from("summary_cards")
+    .select(PUBLIC_SUMMARY_CARD_SELECT)
+    .eq("is_published", true)
+    .order("is_featured", { ascending: false })
+    .order("created_at", { ascending: false });
+
+  if (options.limit) {
+    query = query.limit(options.limit);
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    logQueryError(`Failed to load ${jurisdiction.name} published summary cards`, error);
+    return [] as SummaryCardRow[];
+  }
+
+  const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+    withCardJurisdictionFallback(row, jurisdiction)
+  );
+  return applyCardTranslations(supabase, rows, locale);
+}
+
 const getCachedPublishedCards = unstable_cache(
   async (selection: JurisdictionSelection, locale: Locale) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as SummaryCardRow[];
 
     const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
-        const { data, error } = await supabase
-          .from("summary_cards")
-          .select(PUBLIC_SUMMARY_CARD_SELECT)
-          .eq("is_published", true)
-          .order("is_featured", { ascending: false })
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          logQueryError(`Failed to load ${jurisdiction.name} published summary cards`, error);
-          return [] as SummaryCardRow[];
-        }
-
-        const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
-          withCardJurisdictionFallback(row, jurisdiction)
-        );
-        return applyCardTranslations(supabase, rows, locale);
-      })
+      clients.map((client) => loadPublishedCardsForJurisdiction(client, locale))
     );
 
     return sortCards(results.flat());
@@ -359,34 +458,235 @@ const getCachedPublishedCards = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
-async function getCachedActiveAnnouncements(selection: JurisdictionSelection) {
-  const clients = getSafeServiceClients(selection);
-  if (clients.length === 0) return [] as AnnouncementRow[];
+const getCachedPublishedCardPreview = unstable_cache(
+  async (selection: JurisdictionSelection, locale: Locale) => {
+    const clients = getSafePublicClients(selection);
+    if (clients.length === 0) return [] as SummaryCardRow[];
 
-  const results = await Promise.all(
-    clients.map(async ({ jurisdiction, supabase }) => {
-      const { data, error } = await supabase
-        .from("announcements")
-        .select(PUBLIC_ANNOUNCEMENT_COLUMNS)
-        .eq("is_published", true)
-        .order("created_at", { ascending: false });
+    const results = await Promise.all(
+      clients.map((client) =>
+        loadPublishedCardsForJurisdiction(client, locale, {
+          limit: HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION
+        })
+      )
+    );
 
-      if (error) {
-        logQueryError(`Failed to load ${jurisdiction.name} announcements`, error);
-        return [] as AnnouncementRow[];
-      }
+    return sortCards(results.flat());
+  },
+  ["published-summary-card-preview"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
 
-      return ((data || []) as unknown as AnnouncementRow[])
-        .map((row) => withAnnouncementJurisdictionFallback(row))
-        .filter((row) => {
-          if (selection === ALL_JURISDICTIONS_SLUG) return true;
-          return row.jurisdiction_slug === null || row.jurisdiction_slug === selection;
-        });
-    })
+const getCachedPublishedCardCount = unstable_cache(
+  async (selection: JurisdictionSelection) => {
+    const clients = getSafePublicClients(selection);
+    if (clients.length === 0) return 0;
+
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        const { count, error } = await supabase
+          .from("summary_cards")
+          .select("id", { count: "exact", head: true })
+          .eq("is_published", true);
+
+        if (error) {
+          logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, error);
+          return 0;
+        }
+
+        return count || 0;
+      })
+    );
+
+    return results.reduce((sum, count) => sum + count, 0);
+  },
+  ["published-summary-card-count"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
+const getCachedActiveAnnouncements = unstable_cache(
+  async (selection: JurisdictionSelection) => {
+    const clients = getSafePublicClients(selection);
+    if (clients.length === 0) return [] as AnnouncementRow[];
+
+    const now = Date.now();
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        const { data, error } = await supabase
+          .from("announcements")
+          .select(PUBLIC_ANNOUNCEMENT_COLUMNS)
+          .eq("is_published", true)
+          .order("created_at", { ascending: false });
+
+        if (error) {
+          logQueryError(`Failed to load ${jurisdiction.name} announcements`, error);
+          return [] as AnnouncementRow[];
+        }
+
+        return ((data || []) as unknown as AnnouncementRow[])
+          .map((row) => withAnnouncementJurisdictionFallback(row))
+          .filter((row) => isAnnouncementActive(row, now))
+          .filter((row) => {
+            if (selection === ALL_JURISDICTIONS_SLUG) return true;
+            return row.jurisdiction_slug === null || row.jurisdiction_slug === selection;
+          });
+      })
+    );
+
+    return dedupeAnnouncements(sortByCreatedAt(results.flat()));
+  },
+  ["active-announcements"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
+async function getMatchingMeetingIdsForSearch(
+  supabase: SupabaseClient,
+  jurisdictionName: string,
+  pattern: string
+) {
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id")
+    .or(
+      [
+        `title.ilike.${pattern}`,
+        `meeting_type.ilike.${pattern}`,
+        `date_text.ilike.${pattern}`,
+        `status.ilike.${pattern}`
+      ].join(",")
+    )
+    .limit(100);
+
+  if (error) {
+    logQueryError(`Failed to search ${jurisdictionName} meetings for decisions`, error);
+    return [] as string[];
+  }
+
+  return ((data || []) as Array<{ id?: string | null }>)
+    .map((row) => row.id)
+    .filter((id): id is string => Boolean(id));
+}
+
+async function loadDecisionCardCandidatesForJurisdiction(
+  {
+    jurisdiction,
+    supabase
+  }: {
+    jurisdiction: JurisdictionConfig;
+    supabase: SupabaseClient;
+  },
+  filters: Omit<DecisionCardPageFilters, "selection" | "locale">,
+  locale: Locale,
+  range: { from: number; to: number }
+) {
+  const search = normalizeSearch(filters.search);
+  const pattern = toIlikePattern(search);
+  const meetingIds = pattern
+    ? await getMatchingMeetingIdsForSearch(supabase, jurisdiction.name, pattern)
+    : [];
+  let query = supabase
+    .from("summary_cards")
+    .select(PUBLIC_SUMMARY_CARD_SELECT, { count: "exact" })
+    .eq("is_published", true);
+
+  if (filters.category) {
+    query = query.contains("category_tags", [filters.category]);
+  }
+
+  if (pattern) {
+    query = query.or(decisionCardSearchFilters(pattern, meetingIds));
+  }
+
+  const { data, error, count } = await query
+    .order("is_featured", { ascending: false })
+    .order("created_at", { ascending: false })
+    .range(range.from, range.to);
+
+  if (error) {
+    logQueryError(`Failed to load ${jurisdiction.name} decision cards`, error);
+    return {
+      cards: [] as SummaryCardRow[],
+      count: 0
+    };
+  }
+
+  const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+    withCardJurisdictionFallback(row, jurisdiction)
   );
 
-  return dedupeAnnouncements(sortByCreatedAt(results.flat()));
+  return {
+    cards: await applyCardTranslations(supabase, rows, locale),
+    count: count || 0
+  };
 }
+
+const getCachedDecisionCardPage = unstable_cache(
+  async (
+    selection: JurisdictionSelection,
+    locale: Locale,
+    search: string,
+    category: CategoryName | "",
+    page: number,
+    pageSize: number
+  ): Promise<DecisionCardPageResult> => {
+    const normalizedPage = normalizePositiveInteger(page, 1);
+    const normalizedPageSize = normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE);
+    const offset = (normalizedPage - 1) * normalizedPageSize;
+    const clients = getSafePublicClients(selection);
+
+    if (clients.length === 0) {
+      return {
+        cards: [],
+        totalCount: 0,
+        page: normalizedPage,
+        pageSize: normalizedPageSize,
+        pageCount: 0
+      };
+    }
+
+    const isAggregatePage = selection === ALL_JURISDICTIONS_SLUG && clients.length > 1;
+    const candidateCount = isAggregatePage
+      ? Math.min(
+          normalizedPage * normalizedPageSize + DECISION_RANKING_BUFFER_PER_JURISDICTION,
+          MAX_DECISION_CANDIDATES_PER_JURISDICTION
+        )
+      : normalizedPageSize;
+    const range = isAggregatePage
+      ? { from: 0, to: candidateCount - 1 }
+      : { from: offset, to: offset + normalizedPageSize - 1 };
+    const results = await Promise.all(
+      clients.map((client) =>
+        loadDecisionCardCandidatesForJurisdiction(
+          client,
+          {
+            search,
+            category: category || undefined,
+            page: normalizedPage,
+            pageSize: normalizedPageSize
+          },
+          locale,
+          range
+        )
+      )
+    );
+    const totalCount = results.reduce((sum, result) => sum + result.count, 0);
+    const candidates = results.flatMap((result) => result.cards);
+    const sortedCards = [...candidates].sort(compareCardsByPublicInterest);
+    const cards = isAggregatePage
+      ? sortedCards.slice(offset, offset + normalizedPageSize)
+      : sortedCards;
+
+    return {
+      cards,
+      totalCount,
+      page: normalizedPage,
+      pageSize: normalizedPageSize,
+      pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
+    };
+  },
+  ["decision-card-page"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
 
 const getCachedMeetings = unstable_cache(
   async (selection: JurisdictionSelection, search: string, status: string, locale: Locale) => {
@@ -505,6 +805,73 @@ const getCachedMeetingDetail = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
+const getCachedAdjacentMeetings = unstable_cache(
+  async (
+    selection: JurisdictionSelection,
+    currentMeetingId: string,
+    currentMeetingDatetime: string,
+    locale: Locale
+  ): Promise<AdjacentMeetings> => {
+    const currentTime = rowTime(currentMeetingDatetime);
+    if (!currentTime) {
+      return {
+        newerMeeting: null,
+        olderMeeting: null
+      };
+    }
+
+    const clients = getSafePublicClients(selection);
+    if (clients.length === 0) {
+      return {
+        newerMeeting: null,
+        olderMeeting: null
+      };
+    }
+
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        const [newer, older] = await Promise.all([
+          supabase
+            .from("meetings")
+            .select(PUBLIC_MEETING_LIST_COLUMNS)
+            .not("meeting_datetime", "is", null)
+            .neq("id", currentMeetingId)
+            .gt("meeting_datetime", currentMeetingDatetime)
+            .order("meeting_datetime", { ascending: true, nullsFirst: false })
+            .limit(1),
+          supabase
+            .from("meetings")
+            .select(PUBLIC_MEETING_LIST_COLUMNS)
+            .not("meeting_datetime", "is", null)
+            .neq("id", currentMeetingId)
+            .lt("meeting_datetime", currentMeetingDatetime)
+            .order("meeting_datetime", { ascending: false, nullsFirst: false })
+            .limit(1)
+        ]);
+
+        logQueryError(`Failed to load newer ${jurisdiction.name} meeting for ${currentMeetingId}`, newer.error);
+        logQueryError(`Failed to load older ${jurisdiction.name} meeting for ${currentMeetingId}`, older.error);
+
+        const rows = ([...(newer.data || []), ...(older.data || [])] as unknown as MeetingRow[]).map(
+          (row) => withMeetingJurisdictionFallback(row, jurisdiction)
+        );
+        const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
+
+        return translatedRows;
+      })
+    );
+
+    const candidates = results.flat();
+
+    return {
+      newerMeeting: closestNewerMeeting(candidates, currentTime),
+      olderMeeting: closestOlderMeeting(candidates, currentTime)
+    };
+  },
+  ["adjacent-meetings"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
 const getCachedCategoryCards = unstable_cache(
   async (selection: JurisdictionSelection, category: string, locale: Locale) => {
     const clients = getSafePublicClients(selection);
@@ -604,6 +971,44 @@ export async function getPublishedCards(
   return getCachedPublishedCards(selection, locale);
 }
 
+export async function getPublishedCardPreview(
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
+) {
+  return getCachedPublishedCardPreview(selection, locale);
+}
+
+export async function getPublishedCardCount(
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug
+) {
+  return getCachedPublishedCardCount(selection);
+}
+
+export async function getDecisionCardPage({
+  jurisdiction = getDefaultJurisdiction().slug,
+  locale = "en",
+  search = "",
+  category,
+  page = 1,
+  pageSize = DECISION_CARD_PAGE_SIZE
+}: {
+  jurisdiction?: JurisdictionSelection;
+  locale?: Locale;
+  search?: string;
+  category?: CategoryName;
+  page?: number;
+  pageSize?: number;
+}) {
+  return getCachedDecisionCardPage(
+    jurisdiction,
+    locale,
+    normalizeSearch(search),
+    category || "",
+    normalizePositiveInteger(page, 1),
+    normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE)
+  );
+}
+
 export async function getActiveAnnouncements(selection: JurisdictionSelection = getDefaultJurisdiction().slug) {
   return getCachedActiveAnnouncements(selection);
 }
@@ -625,6 +1030,27 @@ export async function getMeetingDetail(
   locale: Locale = "en"
 ) {
   return getCachedMeetingDetail(selection, id, locale);
+}
+
+export async function getAdjacentMeetingsForMeeting(
+  meeting: MeetingRow,
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
+): Promise<AdjacentMeetings> {
+  if (!meeting.meeting_datetime) {
+    const meetings = await getCachedMeetings(selection, "", "", locale);
+    const currentIndex = meetings.findIndex((row) => row.id === meeting.id);
+
+    return {
+      newerMeeting: currentIndex > 0 ? meetings[currentIndex - 1] : null,
+      olderMeeting:
+        currentIndex >= 0 && currentIndex < meetings.length - 1
+          ? meetings[currentIndex + 1]
+          : null
+    };
+  }
+
+  return getCachedAdjacentMeetings(selection, meeting.id, meeting.meeting_datetime, locale);
 }
 
 export async function getMeetingRawVideoDocuments(

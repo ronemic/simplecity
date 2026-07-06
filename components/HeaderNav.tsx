@@ -157,6 +157,7 @@ export function HeaderNav({
   function hrefWithSelection(key: "jurisdiction" | "lang", value: string) {
     const params = new URLSearchParams(searchParams.toString());
     params.set(key, value);
+    if (key === "jurisdiction") params.delete("page");
     const query = params.toString();
     const nextPathname =
       key === "jurisdiction" && /^\/meetings\/[^/]+/.test(pathname)

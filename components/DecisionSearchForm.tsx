@@ -36,6 +36,7 @@ export function DecisionSearchForm({
       const params = new URLSearchParams(searchParams.toString());
       if (query) params.set("q", query);
       else params.delete("q");
+      params.delete("page");
       const nextQuery = params.toString();
       router.replace(`${pathname}${nextQuery ? `?${nextQuery}` : ""}`, { scroll: false });
     }
