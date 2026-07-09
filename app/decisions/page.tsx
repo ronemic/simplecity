@@ -70,6 +70,52 @@ function resultSummary(locale: "en" | "es", start: number, end: number, total: n
     : `Showing ${start}-${end} of ${total} decisions`;
 }
 
+function PaginationJumpForm({
+  search,
+  category,
+  jurisdiction,
+  page,
+  pageCount,
+  locale
+}: {
+  search: string;
+  category?: CategoryName;
+  jurisdiction?: string;
+  page: number;
+  pageCount: number;
+  locale: "en" | "es";
+}) {
+  return (
+    <form
+      action="/decisions"
+      className="flex flex-wrap items-center justify-center gap-2 text-sm font-bold text-black/60"
+    >
+      {jurisdiction ? <input type="hidden" name="jurisdiction" value={jurisdiction} /> : null}
+      {search ? <input type="hidden" name="q" value={search} /> : null}
+      {category ? (
+        <input type="hidden" name="category" value={CATEGORY_DEFINITIONS[category].slug} />
+      ) : null}
+      <label className="inline-flex items-center gap-2">
+        <span>{locale === "es" ? "Página" : "Page"}</span>
+        <input
+          aria-label={locale === "es" ? "Número de página" : "Page number"}
+          className="h-9 w-16 rounded-lg border border-black/15 bg-white px-2 text-center text-sm font-black text-ink shadow-sm focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/15"
+          defaultValue={page}
+          inputMode="numeric"
+          max={pageCount}
+          min={1}
+          name="page"
+          type="number"
+        />
+      </label>
+      <span>{locale === "es" ? `de ${pageCount}` : `of ${pageCount}`}</span>
+      <button className="action-secondary-sm min-h-9 px-3 py-1.5" type="submit">
+        {locale === "es" ? "Ir" : "Go"}
+      </button>
+    </form>
+  );
+}
+
 export default async function DecisionsPage({
   searchParams
 }: {
@@ -164,11 +210,14 @@ export default async function DecisionsPage({
           >
             {locale === "es" ? "Anterior" : "Previous"}
           </PendingLink>
-          <p className="text-sm font-bold text-black/60">
-            {locale === "es"
-              ? `Página ${decisionPage.page} de ${decisionPage.pageCount}`
-              : `Page ${decisionPage.page} of ${decisionPage.pageCount}`}
-          </p>
+          <PaginationJumpForm
+            search={search}
+            category={selectedCategory}
+            jurisdiction={params.jurisdiction}
+            page={decisionPage.page}
+            pageCount={decisionPage.pageCount}
+            locale={locale}
+          />
           <PendingLink
             href={pageHref({
               search,

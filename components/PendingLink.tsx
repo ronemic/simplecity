@@ -47,21 +47,26 @@ export function PendingLink({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!pending) return;
+    if (!pending || !pendingHref) return;
 
     const currentHref = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ""}`;
-    if (currentHref === normalizeHref(href)) {
-      const timer = window.setTimeout(() => setPending(false), 0);
+    if (currentHref === pendingHref) {
+      const timer = window.setTimeout(() => {
+        setPending(false);
+        setPendingHref(null);
+      }, 0);
       return () => window.clearTimeout(timer);
     }
-  }, [pending, pathname, searchParams, href]);
+  }, [pending, pendingHref, pathname, searchParams]);
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
     if (shouldIgnoreClick(event)) return;
 
     event.preventDefault();
+    setPendingHref(normalizeHref(href));
     setPending(true);
     router.push(href);
   }
