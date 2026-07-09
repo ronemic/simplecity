@@ -25,7 +25,6 @@ export async function generateMetadata({
   const title = `${cardShareTitle(card)} | SimpleCity`;
   const description = cardShareDescription(card, "en");
   const canonical = `${getConfiguredAppUrl()}/cards/${encodeURIComponent(id)}`;
-  const image = `${canonical}/image`;
 
   return {
     title,
@@ -36,14 +35,7 @@ export async function generateMetadata({
       description,
       type: "article",
       url: canonical,
-      siteName: "SimpleCity",
-      images: [{ url: image, width: 1200, height: 630, alt: cardShareTitle(card) }]
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [image]
+      siteName: "SimpleCity"
     }
   };
 }

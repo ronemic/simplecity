@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Download, Share2 } from "lucide-react";
+import { Check, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export function CardShareActions({
@@ -8,14 +8,12 @@ export function CardShareActions({
   title,
   description,
   compact = false,
-  showDownload = !compact,
   locale = "en"
 }: {
   cardId: string;
   title: string;
   description: string;
   compact?: boolean;
-  showDownload?: boolean;
   locale?: "en" | "es";
 }) {
   const [copied, setCopied] = useState(false);
@@ -76,16 +74,6 @@ export function CardShareActions({
           ? locale === "es" ? "Enlace copiado" : "Link copied"
           : locale === "es" ? "Compartir" : "Share"}
       </button>
-      {showDownload ? (
-        <a
-          href={`/cards/${encodeURIComponent(cardId)}/image`}
-          download={`simplecity-${cardId}.png`}
-          className={compact ? "action-secondary-sm" : "action-secondary"}
-        >
-          <Download aria-hidden className="h-4 w-4" />
-          {locale === "es" ? "Descargar imagen" : "Download image"}
-        </a>
-      ) : null}
     </div>
   );
 }

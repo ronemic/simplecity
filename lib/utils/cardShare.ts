@@ -9,10 +9,6 @@ export function cardSharePath(cardId: string) {
   return `/cards/${encodeURIComponent(cardId)}`;
 }
 
-export function cardImagePath(cardId: string) {
-  return `${cardSharePath(cardId)}/image`;
-}
-
 export function cardShareTitle(card: SummaryCardRow) {
   return publicAgendaTitle(card);
 }
