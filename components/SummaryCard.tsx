@@ -15,7 +15,7 @@ import { formatCompactDisplayDate, formatDisplayDate, formatPacificTimestamp } f
 import { cn } from "@/lib/utils/cn";
 import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
-import { cardShareDescription, cardShareTitle, cardSummaryPoints } from "@/lib/utils/cardShare";
+import { cardSummaryPoints } from "@/lib/utils/cardShare";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -272,8 +272,6 @@ export function SummaryCard({
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <CardShareActions
             cardId={card.id}
-            title={cardShareTitle(card)}
-            description={cardShareDescription(card, locale)}
             compact
             locale={locale}
           />

@@ -1,22 +1,32 @@
 "use client";
 
 import { Check, Share2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+
+function subscribeToStaticBrowserCapability() {
+  return () => {};
+}
+
+function hasNativeShare() {
+  return typeof navigator !== "undefined" && typeof navigator.share === "function";
+}
 
 export function CardShareActions({
   cardId,
-  title,
-  description,
   compact = false,
   locale = "en"
 }: {
   cardId: string;
-  title: string;
-  description: string;
   compact?: boolean;
   locale?: "en" | "es";
 }) {
   const [copied, setCopied] = useState(false);
+  const browserCanNativeShare = useSyncExternalStore(
+    subscribeToStaticBrowserCapability,
+    hasNativeShare,
+    () => false
+  );
+  const canNativeShare = browserCanNativeShare;
 
   useEffect(() => {
     if (!copied) return;
@@ -46,8 +56,8 @@ export function CardShareActions({
     const url = `${window.location.origin}/cards/${encodeURIComponent(cardId)}`;
 
     try {
-      if (navigator.share) {
-        await navigator.share({ title, text: description, url });
+      if (canNativeShare) {
+        await navigator.share({ url });
         return;
       }
 
@@ -72,7 +82,9 @@ export function CardShareActions({
         {copied ? <Check aria-hidden className="h-4 w-4" /> : <Share2 aria-hidden className="h-4 w-4" />}
         {copied
           ? locale === "es" ? "Enlace copiado" : "Link copied"
-          : locale === "es" ? "Compartir" : "Share"}
+          : canNativeShare
+            ? locale === "es" ? "Compartir" : "Share"
+            : locale === "es" ? "Copiar enlace" : "Copy link"}
       </button>
     </div>
   );
