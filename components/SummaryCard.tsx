@@ -10,7 +10,7 @@ import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
-import { formatCompactDisplayDate, formatDisplayDate } from "@/lib/utils/date";
+import { formatCompactDisplayDate, formatDisplayDate, formatPacificTimestamp } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
@@ -196,6 +196,8 @@ export function SummaryCard({
   const hasCommentOption = hasCardCommentOptionInfo(card);
   const status = statusSummary(card, commentDeadline, hasCommentOption, locale);
   const summaryConfidence = confidenceLabel(card, locale);
+  const createdTimestamp = formatPacificTimestamp(card.created_at);
+  const updatedTimestamp = formatPacificTimestamp(card.updated_at);
   const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
@@ -337,32 +339,46 @@ export function SummaryCard({
             </section>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68]">
-            <span>{meetingDate}</span>
-            {meetingPageHref ? (
-              <PendingLink
-                href={meetingPageHref}
-                className="action-link"
-                pendingLabel={t(locale, "openingMeeting")}
-              >
-                {t(locale, "meetingPage")}
-              </PendingLink>
-            ) : null}
-            {card.source_url ? (
-              <a
-                href={card.source_url}
-                target="_blank"
-                rel="noreferrer"
-                className="action-link"
-              >
-                {t(locale, "source")}
-                <ExternalLink aria-hidden className="h-4 w-4" />
-              </a>
-            ) : null}
-            {summaryConfidence ? (
-              <span className="meta-chip uppercase tracking-normal text-black/50">
-                {summaryConfidence}
-              </span>
+          <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span>{meetingDate}</span>
+              {meetingPageHref ? (
+                <PendingLink
+                  href={meetingPageHref}
+                  className="action-link"
+                  pendingLabel={t(locale, "openingMeeting")}
+                >
+                  {t(locale, "meetingPage")}
+                </PendingLink>
+              ) : null}
+              {card.source_url ? (
+                <a
+                  href={card.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="action-link"
+                >
+                  {t(locale, "source")}
+                  <ExternalLink aria-hidden className="h-4 w-4" />
+                </a>
+              ) : null}
+              {summaryConfidence ? (
+                <span className="meta-chip uppercase tracking-normal text-black/50">
+                  {summaryConfidence}
+                </span>
+              ) : null}
+            </div>
+            {createdTimestamp ? (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-black/45 sm:justify-end sm:text-right">
+                <span>
+                  {locale === "es" ? "Publicado" : "Posted"} {createdTimestamp}
+                </span>
+                {updatedTimestamp && updatedTimestamp !== createdTimestamp ? (
+                  <span>
+                    {locale === "es" ? "Actualizado" : "Updated"} {updatedTimestamp}
+                  </span>
+                ) : null}
+              </div>
             ) : null}
           </div>
         </div>

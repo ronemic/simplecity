@@ -206,3 +206,19 @@ export function formatCompactDisplayDate(dateText?: string | null, iso?: string 
   const compactMatch = value.match(/[A-Za-z]{3,9}\.?\s+\d{1,2}/);
   return compactMatch?.[0].replace(".", "") || value;
 }
+
+export function formatPacificTimestamp(value?: string | null) {
+  if (!value) return null;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  return `${new Intl.DateTimeFormat("en-US", {
+    timeZone: CIVIC_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(parsed)} PT`;
+}
