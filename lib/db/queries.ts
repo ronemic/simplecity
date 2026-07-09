@@ -504,6 +504,41 @@ const getCachedPublishedCardCount = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
+const getCachedPublishedCard = unstable_cache(
+  async (id: string, locale: Locale) => {
+    const clients = getSafePublicClients(ALL_JURISDICTIONS_SLUG);
+    if (clients.length === 0) return null;
+
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        const { data, error } = await supabase
+          .from("summary_cards")
+          .select(PUBLIC_SUMMARY_CARD_SELECT)
+          .eq("id", id)
+          .eq("is_published", true)
+          .maybeSingle();
+
+        if (error) {
+          logQueryError(`Failed to load shared card ${id} from ${jurisdiction.name}`, error);
+          return null;
+        }
+        if (!data) return null;
+
+        const [translated] = await applyCardTranslations(
+          supabase,
+          [withCardJurisdictionFallback(data as unknown as SummaryCardRow, jurisdiction)],
+          locale
+        );
+        return translated || null;
+      })
+    );
+
+    return results.find((card): card is SummaryCardRow => Boolean(card)) || null;
+  },
+  ["published-summary-card"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
 const getCachedActiveAnnouncements = unstable_cache(
   async (selection: JurisdictionSelection) => {
     const clients = getSafePublicClients(selection);
@@ -982,6 +1017,10 @@ export async function getPublishedCardCount(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug
 ) {
   return getCachedPublishedCardCount(selection);
+}
+
+export async function getPublishedCard(id: string, locale: Locale = "en") {
+  return getCachedPublishedCard(id, locale);
 }
 
 export async function getDecisionCardPage({

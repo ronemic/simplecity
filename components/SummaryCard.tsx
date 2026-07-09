@@ -2,6 +2,7 @@
 
 import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
+import { CardShareActions } from "@/components/CardShareActions";
 import { PendingLink } from "@/components/PendingLink";
 import { HighlightedText } from "@/components/HighlightedText";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
@@ -14,20 +15,7 @@ import { formatCompactDisplayDate, formatDisplayDate, formatPacificTimestamp } f
 import { cn } from "@/lib/utils/cn";
 import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
-
-function summaryPoints(text: string | null | undefined, locale: Locale) {
-  const fallback = t(locale, "notListedInSource");
-  const content = (text?.trim() || fallback).replace(/\s+/g, " ");
-  const sentenceSafeContent = content
-    .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, "$1__SIMPLECITY_DOT__")
-    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|St|No|Inc|Co|Ltd|LLC)\.(?=\s+)/gi, "$1__SIMPLECITY_DOT__");
-
-  return sentenceSafeContent
-    .split(/(?<=[.!?])\s+(?=[A-Z0-9"$“])/)
-    .map((item) => item.replace(/__SIMPLECITY_DOT__/g, ".").trim())
-    .filter(Boolean)
-    .slice(0, 3);
-}
+import { cardShareDescription, cardShareTitle, cardSummaryPoints } from "@/lib/utils/cardShare";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -162,16 +150,21 @@ function confidenceLabel(card: SummaryCardRow, locale: Locale) {
 export function SummaryCard({
   card,
   highlight,
-  locale = "en"
+  locale = "en",
+  presentation = "list"
 }: {
   card: SummaryCardRow;
   highlight?: string;
   locale?: Locale;
+  presentation?: "list" | "share";
 }) {
   const [open, setOpen] = useState(false);
+  const isSharePresentation = presentation === "share";
+  const showDetails = open || isSharePresentation;
+  const TitleTag = isSharePresentation ? "h1" : "h3";
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
-  const points = summaryPoints(card.what_is_happening, locale);
+  const points = cardSummaryPoints(card, locale);
   const defaultTitlePreview = points[0] === t(locale, "notListedInSource") ? null : points[0];
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
@@ -205,8 +198,16 @@ export function SummaryCard({
   const noCommentLabel = t(locale, "noCommentOptionListed");
 
   return (
-    <article className="quiet-card overflow-hidden">
-      <div className="grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5">
+    <article
+      className={cn("quiet-card overflow-hidden", isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)]")}
+      data-card-id={card.id}
+    >
+      <div
+        className={cn(
+          "grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5",
+          isSharePresentation && "p-6 sm:p-8"
+        )}
+      >
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
             <span>
@@ -218,11 +219,21 @@ export function SummaryCard({
             <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
             <span><HighlightedText text={cardJurisdictionLabel} query={highlight} /></span>
           </div>
-          <h3 className="mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2">
+          <TitleTag
+            className={cn(
+              "mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2",
+              isSharePresentation && "line-clamp-none text-3xl sm:line-clamp-none sm:text-4xl"
+            )}
+          >
             <HighlightedText text={agendaTitle} query={highlight} />
-          </h3>
+          </TitleTag>
           {titlePreview ? (
-            <p className="mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2">
+            <p
+              className={cn(
+                "mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
+                isSharePresentation && "line-clamp-none max-w-5xl text-base leading-7 sm:line-clamp-none"
+              )}
+            >
               <HighlightedText text={titlePreview} query={highlight} />
             </p>
           ) : null}
@@ -259,24 +270,43 @@ export function SummaryCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            className={primaryButtonClass}
-            aria-expanded={open}
-          >
-            {open ? t(locale, "hideSummary") : t(locale, "readSummary")}
-            <ChevronDown
-              aria-hidden
-              className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
-            />
-          </button>
+          <CardShareActions
+            cardId={card.id}
+            title={cardShareTitle(card)}
+            description={cardShareDescription(card, locale)}
+            compact
+            locale={locale}
+          />
+          {!isSharePresentation ? (
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              className={primaryButtonClass}
+              aria-expanded={open}
+            >
+              {open ? t(locale, "hideSummary") : t(locale, "readSummary")}
+              <ChevronDown
+                aria-hidden
+                className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
+              />
+            </button>
+          ) : null}
         </div>
       </div>
 
-      {open ? (
-        <div className="border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6">
-          <div className="grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]">
+      {showDetails ? (
+        <div
+          className={cn(
+            "border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6",
+            isSharePresentation && "px-6 py-7 sm:px-8 sm:py-8"
+          )}
+        >
+          <div
+            className={cn(
+              "grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]",
+              isSharePresentation && "text-base leading-7 lg:gap-10"
+            )}
+          >
             <section>
               <p className="text-xs font-black uppercase text-civic">{t(locale, "whatIsHappening")}</p>
               <ul className="mt-2 space-y-2">
