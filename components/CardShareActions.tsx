@@ -11,6 +11,10 @@ function hasNativeShare() {
   return typeof navigator !== "undefined" && typeof navigator.share === "function";
 }
 
+function unknownNativeShareSupport() {
+  return null;
+}
+
 export function CardShareActions({
   cardId,
   compact = false,
@@ -21,12 +25,12 @@ export function CardShareActions({
   locale?: "en" | "es";
 }) {
   const [copied, setCopied] = useState(false);
-  const browserCanNativeShare = useSyncExternalStore(
+  const nativeShareSupport = useSyncExternalStore(
     subscribeToStaticBrowserCapability,
     hasNativeShare,
-    () => false
+    unknownNativeShareSupport
   );
-  const canNativeShare = browserCanNativeShare;
+  const canNativeShare = nativeShareSupport === true;
 
   useEffect(() => {
     if (!copied) return;
@@ -82,9 +86,9 @@ export function CardShareActions({
         {copied ? <Check aria-hidden className="h-4 w-4" /> : <Share2 aria-hidden className="h-4 w-4" />}
         {copied
           ? locale === "es" ? "Enlace copiado" : "Link copied"
-          : canNativeShare
-            ? locale === "es" ? "Compartir" : "Share"
-            : locale === "es" ? "Copiar enlace" : "Copy link"}
+          : nativeShareSupport === false
+            ? locale === "es" ? "Copiar enlace" : "Copy link"
+            : locale === "es" ? "Compartir" : "Share"}
       </button>
     </div>
   );
