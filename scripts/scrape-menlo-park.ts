@@ -73,6 +73,7 @@ async function main() {
     portalUrl: jurisdiction.officialSiteUrl || jurisdiction.sourceUrl,
     headful: HEADFUL,
     downloadDocuments: SHOULD_DOWNLOAD,
+    enrichAgendaAttachments: !process.argv.includes("--no-agenda-attachments"),
     documentOutputDir: documentsDir,
     allYears: SCRAPE_ALL_YEARS,
     year: getYear(),

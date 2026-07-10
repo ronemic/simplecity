@@ -54,6 +54,10 @@ export type PrimeGovDocument = {
   extractedText?: string | null;
   extractionCharacterCount?: number | null;
   isScanned?: boolean;
+  agendaItemNumber?: string | null;
+  agendaItemTitle?: string | null;
+  parentDocumentUrl?: string | null;
+  isAgendaItemAttachment?: boolean;
 };
 
 export type PrimeGovMeeting = {
@@ -80,13 +84,13 @@ export type PrimeGovMeeting = {
   documents: PrimeGovDocument[];
   htmlAgendaText?: string | null;
   detailText?: string | null;
-  items?: LegistarItem[];
+  items?: AgendaItem[];
   extractionNotes?: string[];
   llmInputText?: string;
   publicCommentsInputText?: string | null;
 };
 
-export type LegistarItem = {
+export type AgendaItem = {
   externalId: string;
   fileNumber: string | null;
   agendaNumber: string | null;
@@ -104,6 +108,8 @@ export type LegistarItem = {
   attachments?: PrimeGovDocument[];
   extractionError?: string | null;
 };
+
+export type LegistarItem = AgendaItem;
 
 export type ScrapePortalResult = {
   source: string;

@@ -5,6 +5,12 @@ import type { DocumentType, MeetingStatus, PrimeGovDocument, PrimeGovMeeting, Sc
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
+import {
+  discoverMenloParkAgendaAttachments,
+  MENLO_PARK_ATTACHMENT_MAX_BYTES,
+  MENLO_PARK_ATTACHMENT_TIMEOUT_MS,
+  normalizeMenloParkAttachmentUrl
+} from "@/lib/scraper/agendaAttachments";
 
 export const DEFAULT_MENLO_PARK_AGENDAS_URL =
   "https://www.menlopark.gov/Agendas-and-minutes";
@@ -1063,6 +1069,34 @@ export async function scrapeMenloParkMeetings(
       log(
         `Menlo Park document downloads complete: ${downloadResult.downloaded} downloaded, ${downloadResult.failed} failed.`
       );
+
+      if (options.enrichAgendaAttachments !== false && !options.shouldStop?.()) {
+        log("Discovering item-aware links in Menlo Park agenda PDFs.");
+        const discoveryResult = await discoverMenloParkAgendaAttachments(meetings, {
+          log,
+          shouldStop: options.shouldStop
+        });
+        log(
+          `Menlo Park agenda attachment discovery complete: ${discoveryResult.discovered} new document(s), ${discoveryResult.skipped} agenda(s) skipped.`
+        );
+
+        if (discoveryResult.discovered > 0 && !options.shouldStop?.()) {
+          const attachmentDownloadResult = await downloadOfficialSiteDocuments(context, meetings, {
+            log,
+            outputDir: options.documentOutputDir,
+            shouldStop: options.shouldStop,
+            onlyPending: true,
+            maxBytes: MENLO_PARK_ATTACHMENT_MAX_BYTES,
+            timeoutMs: MENLO_PARK_ATTACHMENT_TIMEOUT_MS,
+            validateFinalUrl: (url) => Boolean(normalizeMenloParkAttachmentUrl(url))
+          });
+          log(
+            `Menlo Park item attachment downloads complete: ${attachmentDownloadResult.downloaded} downloaded, ${attachmentDownloadResult.failed} failed.`
+          );
+        }
+      } else if (options.enrichAgendaAttachments === false) {
+        log("Menlo Park item-aware agenda attachment enrichment is disabled.");
+      }
     }
 
     return {

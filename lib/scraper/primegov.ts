@@ -13,6 +13,7 @@ export type ScrapePortalOptions = {
   headful?: boolean;
   scrapeHtmlAgendas?: boolean;
   downloadDocuments?: boolean;
+  enrichAgendaAttachments?: boolean;
   documentOutputDir?: string;
   allYears?: boolean;
   log?: (message: string) => void;

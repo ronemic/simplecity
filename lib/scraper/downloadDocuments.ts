@@ -21,6 +21,10 @@ export type DownloadDocumentsOptions = {
   outputDir?: string;
   log?: (message: string) => void;
   shouldStop?: () => boolean;
+  onlyPending?: boolean;
+  maxBytes?: number;
+  timeoutMs?: number;
+  validateFinalUrl?: (url: string) => boolean;
 };
 
 function decodeBasicHtmlEntities(text: string) {
@@ -156,6 +160,40 @@ function isOfficialSiteDownloadCandidate(doc: PrimeGovDocument) {
   }
 
   return true;
+}
+
+async function requestOfficialSiteDocument(
+  context: BrowserContext,
+  url: string,
+  options: DownloadDocumentsOptions,
+  headers: Record<string, string>
+) {
+  if (!options.validateFinalUrl) {
+    return context.request.get(url, {
+      headers,
+      timeout: options.timeoutMs || 60000
+    });
+  }
+
+  let requestUrl = url;
+  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+    if (!options.validateFinalUrl(requestUrl)) {
+      throw new Error(`Redirected to a disallowed URL: ${requestUrl}`);
+    }
+
+    const response = await context.request.get(requestUrl, {
+      headers,
+      timeout: options.timeoutMs || 60000,
+      maxRedirects: 0
+    });
+    if (response.status() < 300 || response.status() >= 400) return response;
+
+    const location = response.headers().location;
+    if (!location) return response;
+    requestUrl = new URL(location, requestUrl).toString();
+  }
+
+  throw new Error("Document exceeded the three-redirect limit.");
 }
 
 export async function downloadCompiledDocuments(
@@ -362,7 +400,11 @@ export async function downloadOfficialSiteDocuments(
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const officialDocs = meeting.documents.filter(isOfficialSiteDownloadCandidate);
+    const officialDocs = meeting.documents.filter(
+      (doc) =>
+        isOfficialSiteDownloadCandidate(doc) &&
+        (!options.onlyPending || (!doc.localPath && !doc.downloadError))
+    );
 
     for (const doc of officialDocs) {
       if (options.shouldStop?.()) {
@@ -373,13 +415,19 @@ export async function downloadOfficialSiteDocuments(
       const baseFilename = officialSiteDocumentFilename(meeting, doc.type, doc.url);
 
       try {
-        const response = await context.request.get(doc.url, {
-          headers: {
+        const response = await requestOfficialSiteDocument(context, doc.url, options, {
             "User-Agent": "Mozilla/5.0 SimpleCity official-site agenda scraper",
             Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
-          },
-          timeout: 60000
         });
+
+        const finalUrl = response.url();
+        if (options.validateFinalUrl && !options.validateFinalUrl(finalUrl)) {
+          failed += 1;
+          doc.localPath = null;
+          doc.downloadError = `Redirected to a disallowed URL: ${finalUrl}`;
+          log(`Rejected redirected document URL: ${finalUrl}`);
+          continue;
+        }
 
         if (!response.ok()) {
           failed += 1;
@@ -389,8 +437,31 @@ export async function downloadOfficialSiteDocuments(
           continue;
         }
 
-        const buffer = await response.body();
         const contentType = response.headers()["content-type"] || "";
+        const contentLength = Number(response.headers()["content-length"] || 0);
+        if (
+          options.maxBytes &&
+          Number.isFinite(contentLength) &&
+          contentLength > options.maxBytes
+        ) {
+          failed += 1;
+          doc.localPath = null;
+          doc.bytes = contentLength;
+          doc.downloadError = `Document exceeded the ${options.maxBytes}-byte download limit.`;
+          log(`Skipped oversized document (${contentLength} bytes): ${doc.url}`);
+          continue;
+        }
+
+        const buffer = await response.body();
+        if (options.maxBytes && buffer.length > options.maxBytes) {
+          failed += 1;
+          doc.localPath = null;
+          doc.bytes = buffer.length;
+          doc.downloadError = `Document exceeded the ${options.maxBytes}-byte download limit.`;
+          log(`Discarded oversized document (${buffer.length} bytes): ${doc.url}`);
+          continue;
+        }
+
         const firstBytes = buffer.subarray(0, 5).toString();
 
         if (firstBytes === "%PDF-") {

@@ -60,6 +60,7 @@ async function main() {
     headful: process.argv.includes("--headful"),
     scrapeHtmlAgendas: true,
     downloadDocuments: true,
+    enrichAgendaAttachments: !process.argv.includes("--no-agenda-attachments"),
     enrichDetails: !process.argv.includes("--no-enrich"),
     clickSeeMore: process.argv.includes("--see-more"),
     limit: getLimit(),

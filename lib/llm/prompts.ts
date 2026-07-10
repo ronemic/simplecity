@@ -100,6 +100,7 @@ Rules:
 - “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or taxpayers.
 - “categoryTags” must only use allowed topics.
 - Every factual claim must be directly supported by the provided meeting metadata, raw agenda text, or optional public-comment text.
+- Treat each labeled “Linked agenda-item context” block as evidence only for the agenda item named in that block. Never transfer facts, amounts, dates, or actions from one item’s linked document to another item.
 - If a fact is not clearly supported, omit it or write “Not listed in the source document.”
 - If the provided source text is short, noisy, scanned, or truncated, only summarize items that are visible in the provided text.
 - Preserve money amounts, tax rates, percentages, dates, times, item numbers, and decimals exactly as written in the source text. For example, keep “$0.0030” as “$0.0030”; do not rewrite it as “$0.” or “0030”.

@@ -4,6 +4,7 @@ import { extractPdfTextForDocument } from "./pdfText";
 import { enrichMenloParkMeetingTimesFromAgendaText } from "@/lib/sources/menlo-park";
 
 export const MAX_CHARS_FOR_LLM = 30000;
+export const MAX_ATTACHMENT_CONTEXT_CHARS_PER_ITEM = 2500;
 const MIN_PRIMARY_SOURCE_CHARS = 300;
 const MIN_HTML_AGENDA_CHARS = 500;
 const MIN_ROW_SOURCE_CHARS = 40;
@@ -74,6 +75,82 @@ async function extractTextForDocument(doc: PrimeGovDocument | undefined | null) 
 
   const extracted = await extractPdfTextForDocument(doc);
   return extracted?.text || "";
+}
+
+export async function appendAgendaItemAttachmentContext(
+  meeting: PrimeGovMeeting,
+  baseText: string
+) {
+  if (meeting.jurisdictionSlug !== "menlo-park" || !meeting.items?.length) {
+    return { text: baseText, included: 0 };
+  }
+
+  const cleanedBase = cleanText(baseText);
+  const remainingCharacters = MAX_CHARS_FOR_LLM - cleanedBase.length;
+  if (remainingCharacters < 400) return { text: cleanedBase, included: 0 };
+
+  const seenUrls = new Set<string>();
+  const candidates: Array<{
+    agendaNumber: string;
+    title: string;
+    label: string;
+    url: string;
+    text: string;
+  }> = [];
+
+  for (const item of meeting.items) {
+    const attachment = item.attachments?.find(
+      (doc) => doc.isAgendaItemAttachment && !seenUrls.has(doc.url)
+    );
+    if (!attachment) continue;
+
+    seenUrls.add(attachment.url);
+    const text = cleanText(await extractTextForDocument(attachment));
+    if (text.length < 200) continue;
+
+    candidates.push({
+      agendaNumber: item.agendaNumber || attachment.agendaItemNumber || "Unnumbered",
+      title: item.title || attachment.agendaItemTitle || item.rowText,
+      label: attachment.label || "Attachment",
+      url: attachment.url,
+      text
+    });
+  }
+
+  if (candidates.length === 0) return { text: cleanedBase, included: 0 };
+
+  let includedCandidates = [...candidates];
+  let perItemBudget = 0;
+  let headers: string[] = [];
+
+  while (includedCandidates.length > 0) {
+    headers = includedCandidates.map(
+      (candidate) =>
+        `Agenda item ${candidate.agendaNumber} — ${candidate.title}\nLinked document: ${candidate.label}\nSource URL: ${candidate.url}\nExtracted context:`
+    );
+    const formattingCharacters =
+      "Linked agenda-item context:".length +
+      headers.reduce((sum, header) => sum + header.length, 0) +
+      (includedCandidates.length + 1) * 2;
+    perItemBudget = Math.min(
+      MAX_ATTACHMENT_CONTEXT_CHARS_PER_ITEM,
+      Math.floor((remainingCharacters - formattingCharacters) / includedCandidates.length)
+    );
+    if (perItemBudget >= 200) break;
+    includedCandidates = includedCandidates.slice(0, -1);
+  }
+
+  if (includedCandidates.length === 0) return { text: cleanedBase, included: 0 };
+
+  const blocks = includedCandidates.map(
+    (candidate, index) => `${headers[index]}\n${candidate.text.slice(0, perItemBudget)}`
+  );
+  const text = [cleanedBase, "Linked agenda-item context:", ...blocks].join("\n\n");
+
+  return {
+    text: text.slice(0, MAX_CHARS_FOR_LLM),
+    included: includedCandidates.length
+  };
 }
 
 type SourceCandidate = {
@@ -352,6 +429,14 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     for (const note of meeting.extractionNotes || []) {
       if (!extractionNotes.includes(note)) extractionNotes.push(note);
     }
+  }
+
+  const attachmentContext = await appendAgendaItemAttachmentContext(meeting, selectedText);
+  selectedText = attachmentContext.text;
+  if (attachmentContext.included > 0) {
+    extractionNotes.push(
+      `Included item-aware context from ${attachmentContext.included} Menlo Park agenda attachment(s).`
+    );
   }
 
   return {
