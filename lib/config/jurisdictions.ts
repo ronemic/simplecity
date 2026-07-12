@@ -53,6 +53,7 @@ export type JurisdictionConfig = {
 export type JurisdictionPublicOption = {
   name: string;
   slug: PublicJurisdictionSelection;
+  parentCountySlug?: PublicJurisdictionSlug;
 };
 
 const DEFAULT_FOSTER_CITY_PRIMEGOV_URL = "https://fostercity.primegov.com/public/portal";
@@ -108,14 +109,14 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
 
 export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "All", slug: ALL_JURISDICTIONS_SLUG },
-  { name: "Foster City", slug: "foster-city" },
-  { name: "San Mateo", slug: "san-mateo" },
-  { name: "San Mateo County", slug: "san-mateo-county" },
-  { name: "Mountain View", slug: "mountain-view" },
-  { name: "Santa Clara County", slug: "santa-clara-county" },
-  { name: "Los Altos", slug: "los-altos" },
   { name: "San Francisco", slug: "san-francisco" },
-  { name: "Menlo Park", slug: "menlo-park" }
+  { name: "San Mateo County", slug: "san-mateo-county" },
+  { name: "Foster City", slug: "foster-city", parentCountySlug: "san-mateo-county" },
+  { name: "Menlo Park", slug: "menlo-park", parentCountySlug: "san-mateo-county" },
+  { name: "San Mateo", slug: "san-mateo", parentCountySlug: "san-mateo-county" },
+  { name: "Santa Clara County", slug: "santa-clara-county" },
+  { name: "Los Altos", slug: "los-altos", parentCountySlug: "santa-clara-county" },
+  { name: "Mountain View", slug: "mountain-view", parentCountySlug: "santa-clara-county" }
 ];
 
 export function toInternalJurisdictionSlug(

@@ -20,11 +20,25 @@ test("the first-time jurisdiction defaults to San Mateo in data and navigation",
   assert.equal(toPublicJurisdictionSlug(defaultJurisdiction.slug), "san-mateo");
 });
 
-test("lists Mountain View between San Mateo County and Santa Clara County", () => {
-  const slugs = getPublicJurisdictionOptions().map((jurisdiction) => jurisdiction.slug);
+test("groups alphabetized cities beneath their clickable counties", () => {
+  const options = getPublicJurisdictionOptions();
 
-  assert.ok(slugs.indexOf("san-mateo-county") < slugs.indexOf("mountain-view"));
-  assert.ok(slugs.indexOf("mountain-view") < slugs.indexOf("santa-clara-county"));
+  assert.deepEqual(
+    options
+      .filter((jurisdiction) => jurisdiction.parentCountySlug === "san-mateo-county")
+      .map((jurisdiction) => jurisdiction.slug),
+    ["foster-city", "menlo-park", "san-mateo"]
+  );
+  assert.deepEqual(
+    options
+      .filter((jurisdiction) => jurisdiction.parentCountySlug === "santa-clara-county")
+      .map((jurisdiction) => jurisdiction.slug),
+    ["los-altos", "mountain-view"]
+  );
+  assert.equal(
+    options.find((jurisdiction) => jurisdiction.slug === "san-mateo-county")?.parentCountySlug,
+    undefined
+  );
 });
 
 test("Mountain View is a valid Legistar jurisdiction", () => {

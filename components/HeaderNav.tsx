@@ -28,7 +28,8 @@ const nav = [
 
 const jurisdictions = getPublicJurisdictionOptions().map((jurisdiction) => ({
   slug: jurisdiction.slug,
-  label: jurisdiction.name
+  label: jurisdiction.name,
+  isChild: Boolean(jurisdiction.parentCountySlug)
 }));
 
 const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";
@@ -240,7 +241,11 @@ export function HeaderNav({
                     type="button"
                     role="option"
                     aria-selected={isSelected}
-                    className={cn("menu-option", isSelected && "menu-option-selected")}
+                    className={cn(
+                      "menu-option",
+                      jurisdiction.isChild && "menu-option-child",
+                      isSelected && "menu-option-selected"
+                    )}
                     onClick={() => changeJurisdiction(jurisdiction.slug)}
                   >
                     <Check
@@ -343,7 +348,7 @@ export function HeaderNavFallback() {
         >
           {jurisdictions.map((jurisdiction) => (
             <option key={jurisdiction.slug} value={jurisdiction.slug}>
-              {jurisdiction.label}
+              {jurisdiction.isChild ? `  ${jurisdiction.label}` : jurisdiction.label}
             </option>
           ))}
         </select>

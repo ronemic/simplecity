@@ -311,6 +311,10 @@ p {
   @apply grid min-h-10 w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm font-bold text-ink transition hover:bg-[#eef4f8] focus-visible:bg-[#eef4f8];
 }
 
+.menu-option-child {
+  @apply pl-5 font-semibold;
+}
+
 .menu-option-selected {
   @apply bg-[#12365f] text-white hover:bg-[#12365f] focus-visible:bg-[#12365f];
 }
