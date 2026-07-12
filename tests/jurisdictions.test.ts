@@ -59,6 +59,40 @@ test("San Francisco is a valid Legistar jurisdiction", () => {
   );
 });
 
+test("regional credentials route jurisdictions without changing their public identity", () => {
+  const previous = {
+    url: process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL,
+    anonKey: process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY,
+    serviceRoleKey: process.env.NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY
+  };
+
+  process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL = "https://north-san-mateo.example.test";
+  process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY = "regional-anon-key";
+  process.env.NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY = "regional-service-key";
+
+  try {
+    for (const slug of ["foster-city", "san-mateo-city", "san-mateo-county"] as const) {
+      const jurisdiction = getJurisdictionBySlug(slug);
+      assert.equal(jurisdiction?.slug, slug);
+      assert.equal(jurisdiction?.regionSlug, "north-san-mateo");
+      assert.equal(jurisdiction?.supabaseUrl, "https://north-san-mateo.example.test");
+    }
+  } finally {
+    if (previous.url === undefined) delete process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL = previous.url;
+    if (previous.anonKey === undefined) {
+      delete process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY;
+    } else {
+      process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY = previous.anonKey;
+    }
+    if (previous.serviceRoleKey === undefined) {
+      delete process.env.NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY;
+    } else {
+      process.env.NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY = previous.serviceRoleKey;
+    }
+  }
+});
+
 test("San Francisco service client requires its own Supabase config", () => {
   const previous = {
     url: process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,

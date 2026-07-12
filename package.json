@@ -52,6 +52,7 @@
     "summarize:menlo-park": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=menlo-park",
     "translations:backfill": "node --import tsx/esm scripts/backfill-translations.ts",
     "backfill:menlo-park-times": "node --import tsx/esm scripts/backfill-menlo-park-times.ts",
+    "migrate:jurisdiction": "node --import tsx/esm scripts/migrate-jurisdiction-to-region.ts",
     "pipeline": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts",
     "pipeline:foster-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=foster-city",
     "pipeline:san-mateo-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=san-mateo-city",

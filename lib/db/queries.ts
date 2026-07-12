@@ -422,6 +422,7 @@ async function loadPublishedCardsForJurisdiction(
   let query = supabase
     .from("summary_cards")
     .select(PUBLIC_SUMMARY_CARD_SELECT)
+    .eq("jurisdiction_slug", jurisdiction.slug)
     .eq("is_published", true)
     .order("is_featured", { ascending: false })
     .order("created_at", { ascending: false });
@@ -487,6 +488,7 @@ const getCachedPublishedCardCount = unstable_cache(
         const { count, error } = await supabase
           .from("summary_cards")
           .select("id", { count: "exact", head: true })
+          .eq("jurisdiction_slug", jurisdiction.slug)
           .eq("is_published", true);
 
         if (error) {
@@ -576,12 +578,14 @@ const getCachedActiveAnnouncements = unstable_cache(
 
 async function getMatchingMeetingIdsForSearch(
   supabase: SupabaseClient,
+  jurisdictionSlug: string,
   jurisdictionName: string,
   pattern: string
 ) {
   const { data, error } = await supabase
     .from("meetings")
     .select("id")
+    .eq("jurisdiction_slug", jurisdictionSlug)
     .or(
       [
         `title.ilike.${pattern}`,
@@ -617,11 +621,17 @@ async function loadDecisionCardCandidatesForJurisdiction(
   const search = normalizeSearch(filters.search);
   const pattern = toIlikePattern(search);
   const meetingIds = pattern
-    ? await getMatchingMeetingIdsForSearch(supabase, jurisdiction.name, pattern)
+    ? await getMatchingMeetingIdsForSearch(
+        supabase,
+        jurisdiction.slug,
+        jurisdiction.name,
+        pattern
+      )
     : [];
   let query = supabase
     .from("summary_cards")
     .select(PUBLIC_SUMMARY_CARD_SELECT, { count: "exact" })
+    .eq("jurisdiction_slug", jurisdiction.slug)
     .eq("is_published", true);
 
   if (filters.category) {
@@ -734,6 +744,7 @@ const getCachedMeetings = unstable_cache(
         let query = supabase
           .from("meetings")
           .select(PUBLIC_MEETING_LIST_COLUMNS)
+          .eq("jurisdiction_slug", jurisdiction.slug)
           .order("meeting_datetime", { ascending: false, nullsFirst: false });
 
         if (status) {
@@ -789,17 +800,24 @@ const getCachedMeetingDetail = unstable_cache(
           { data: cards, error: cardsError },
           { data: documents, error: documentsError }
         ] = await Promise.all([
-          supabase.from("meetings").select(PUBLIC_MEETING_DETAIL_COLUMNS).eq("id", id).maybeSingle(),
+          supabase
+            .from("meetings")
+            .select(PUBLIC_MEETING_DETAIL_COLUMNS)
+            .eq("id", id)
+            .eq("jurisdiction_slug", jurisdiction.slug)
+            .maybeSingle(),
           supabase
             .from("summary_cards")
             .select(PUBLIC_SUMMARY_CARD_SELECT)
             .eq("meeting_id", id)
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .eq("is_published", true)
             .order("created_at", { ascending: true }),
           supabase
             .from("documents")
             .select(PUBLIC_DOCUMENT_COLUMNS)
             .eq("meeting_id", id)
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .order("type", { ascending: true })
         ]);
 
@@ -869,6 +887,7 @@ const getCachedAdjacentMeetings = unstable_cache(
           supabase
             .from("meetings")
             .select(PUBLIC_MEETING_LIST_COLUMNS)
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .not("meeting_datetime", "is", null)
             .neq("id", currentMeetingId)
             .gt("meeting_datetime", currentMeetingDatetime)
@@ -877,6 +896,7 @@ const getCachedAdjacentMeetings = unstable_cache(
           supabase
             .from("meetings")
             .select(PUBLIC_MEETING_LIST_COLUMNS)
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .not("meeting_datetime", "is", null)
             .neq("id", currentMeetingId)
             .lt("meeting_datetime", currentMeetingDatetime)
@@ -917,6 +937,7 @@ const getCachedCategoryCards = unstable_cache(
         const { data, error } = await supabase
           .from("summary_cards")
           .select(PUBLIC_SUMMARY_CARD_SELECT)
+          .eq("jurisdiction_slug", jurisdiction.slug)
           .eq("is_published", true)
           .contains("category_tags", [category])
           .order("is_featured", { ascending: false })
@@ -962,15 +983,18 @@ const getCachedPublicStats = unstable_cache(
           supabase
             .from("summary_cards")
             .select("id", { count: "exact", head: true })
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .eq("is_published", true)
             .not("meeting_id", "is", null),
           supabase
             .from("meetings")
             .select("id", { count: "exact", head: true })
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .not("cards_generated_at", "is", null),
           supabase
             .from("meetings")
             .select("id,summary_cards!inner(id)", { count: "exact", head: true })
+            .eq("jurisdiction_slug", jurisdiction.slug)
             .is("cards_generated_at", null)
             .eq("summary_cards.is_published", true)
         ]);
@@ -1105,6 +1129,7 @@ export async function getMeetingRawVideoDocuments(
         .from("meetings")
         .select("raw")
         .eq("id", id)
+        .eq("jurisdiction_slug", jurisdiction.slug)
         .maybeSingle();
 
       logQueryError(`Failed to load ${jurisdiction.name} raw meeting video documents for ${id}`, error);
@@ -1148,19 +1173,46 @@ export async function getAdminCollections(
     };
   }
 
+  const announcementDatabaseUrls = new Set<string>();
   const results = await Promise.all(
     clients.map(async ({ jurisdiction, supabase }) => {
+      const announcementDatabaseKey = jurisdiction.supabaseUrl || jurisdiction.slug;
+      const shouldLoadAnnouncements = !announcementDatabaseUrls.has(announcementDatabaseKey);
+      announcementDatabaseUrls.add(announcementDatabaseKey);
       const [meetings, cards, announcements, documents, scraperRuns, auditLog] = await Promise.all([
-        supabase.from("meetings").select("*").order("created_at", { ascending: false }).limit(100),
+        supabase
+          .from("meetings")
+          .select("*")
+          .eq("jurisdiction_slug", jurisdiction.slug)
+          .order("created_at", { ascending: false })
+          .limit(100),
         supabase
           .from("summary_cards")
           .select("*, meetings(*)")
+          .eq("jurisdiction_slug", jurisdiction.slug)
           .order("created_at", { ascending: false })
           .limit(100),
-        supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(100),
-        supabase.from("documents").select("*").order("created_at", { ascending: false }).limit(100),
-        supabase.from("scraper_runs").select("*").order("started_at", { ascending: false }).limit(20),
-        supabase.from("admin_audit_log").select("*").order("created_at", { ascending: false }).limit(50)
+        shouldLoadAnnouncements
+          ? supabase.from("announcements").select("*").order("created_at", { ascending: false }).limit(100)
+          : Promise.resolve({ data: [], error: null }),
+        supabase
+          .from("documents")
+          .select("*")
+          .eq("jurisdiction_slug", jurisdiction.slug)
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase
+          .from("scraper_runs")
+          .select("*")
+          .eq("jurisdiction_slug", jurisdiction.slug)
+          .order("started_at", { ascending: false })
+          .limit(20),
+        supabase
+          .from("admin_audit_log")
+          .select("*")
+          .eq("jurisdiction_slug", jurisdiction.slug)
+          .order("created_at", { ascending: false })
+          .limit(50)
       ]);
 
       logQueryError(`Failed to load ${jurisdiction.name} admin meetings`, meetings.error);

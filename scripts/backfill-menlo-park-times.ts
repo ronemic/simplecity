@@ -127,10 +127,12 @@ async function main() {
         .select(
           "id,title,date_text,time_text,meeting_datetime,raw,source_hash,summarized_source_hash,cards_generated_at"
         )
+        .eq("jurisdiction_slug", "menlo-park")
         .order("meeting_datetime", { ascending: false, nullsFirst: false }),
       supabase
         .from("documents")
         .select("meeting_id,type,label,source_url,extracted_text")
+        .eq("jurisdiction_slug", "menlo-park")
     ]);
 
   if (meetingsError) throw new Error(`Failed to load Menlo Park meetings: ${meetingsError.message}`);
@@ -178,7 +180,11 @@ async function main() {
     }
 
     if (!dryRun) {
-      const { error } = await supabase.from("meetings").update(update).eq("id", row.id);
+      const { error } = await supabase
+        .from("meetings")
+        .update(update)
+        .eq("id", row.id)
+        .eq("jurisdiction_slug", "menlo-park");
       if (error) throw new Error(`Failed to update ${row.title}: ${error.message}`);
     }
 

@@ -145,6 +145,7 @@ export async function PUT(request: NextRequest) {
     .from("summary_cards")
     .select("*")
     .eq("id", id)
+    .eq("jurisdiction_slug", jurisdiction)
     .maybeSingle();
 
   if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 500 });
@@ -177,6 +178,7 @@ export async function PUT(request: NextRequest) {
     .from("summary_cards")
     .update(update)
     .eq("id", id)
+    .eq("jurisdiction_slug", jurisdiction)
     .select("id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -187,6 +189,7 @@ export async function PUT(request: NextRequest) {
     action: "update",
     entityType: "summary_card",
     entityId: id,
+    jurisdictionSlug: jurisdiction,
     before,
     after: update
   });
@@ -219,6 +222,7 @@ export async function DELETE(request: NextRequest) {
     .from("summary_cards")
     .select("*")
     .eq("id", id)
+    .eq("jurisdiction_slug", jurisdiction)
     .maybeSingle();
 
   if (beforeError) return NextResponse.json({ error: beforeError.message }, { status: 500 });
@@ -228,6 +232,7 @@ export async function DELETE(request: NextRequest) {
     .from("summary_cards")
     .delete()
     .eq("id", id)
+    .eq("jurisdiction_slug", jurisdiction)
     .select("id")
     .maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -238,6 +243,7 @@ export async function DELETE(request: NextRequest) {
     action: "delete",
     entityType: "summary_card",
     entityId: id,
+    jurisdictionSlug: jurisdiction,
     before
   });
 

@@ -45,6 +45,7 @@ export async function POST(request: Request) {
     .from("meetings")
     .select("*")
     .eq("id", body.meetingId)
+    .eq("jurisdiction_slug", jurisdictionSlug)
     .maybeSingle();
 
   if (error) return Response.json({ error: error.message }, { status: 500 });

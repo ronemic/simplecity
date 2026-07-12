@@ -36,7 +36,12 @@ async function regenerateMeetingAction(formData: FormData) {
 
   const supabase = getServiceSupabaseClientForJurisdiction(validJurisdiction);
 
-  const { data: meeting, error } = await supabase.from("meetings").select("*").eq("id", id).maybeSingle();
+  const { data: meeting, error } = await supabase
+    .from("meetings")
+    .select("*")
+    .eq("id", id)
+    .eq("jurisdiction_slug", validJurisdiction)
+    .maybeSingle();
   if (error) throw new Error(error.message);
   if (!meeting) throw new Error("Meeting not found.");
 
@@ -59,6 +64,7 @@ async function regenerateMeetingAction(formData: FormData) {
     action: "regenerate",
     entityType: "meeting",
     entityId: id,
+    jurisdictionSlug: validJurisdiction,
     after: { cardsGenerated: cards.length, sourceHash }
   });
 

@@ -1,6 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LlmReadyMeeting, SimpleCityCard, SimpleCitySummary } from "@/lib/types";
-import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
+import {
+  usesRegionalSupabase,
+  type JurisdictionConfig
+} from "@/lib/config/jurisdictions";
 import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
 import {
   meetingTranslationFingerprint,
@@ -287,6 +290,7 @@ export async function upsertMeetings(
           platform: jurisdiction.platform
         }
       : {};
+    const regionalDatabase = Boolean(jurisdiction && usesRegionalSupabase(jurisdiction));
 
     const { data, error } = await supabase
       .from("meetings")
@@ -313,7 +317,7 @@ export async function upsertMeetings(
           raw: safeMeeting,
           scraped_at: scrapedAt || new Date().toISOString()
         },
-        { onConflict: "external_id" }
+        { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
       )
       .select("id,summarized_source_hash")
       .single();
@@ -337,7 +341,7 @@ export async function upsertMeetings(
           extraction_character_count: doc.extractionCharacterCount || null,
           is_scanned: doc.isScanned || false
         },
-        { onConflict: "source_url" }
+        { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
       );
 
       if (docError) {
@@ -530,6 +534,7 @@ export async function writeAuditLog(
     action: string;
     entityType: string;
     entityId?: string | null;
+    jurisdictionSlug?: string | null;
     before?: unknown;
     after?: unknown;
   }
@@ -539,6 +544,7 @@ export async function writeAuditLog(
     action: input.action,
     entity_type: input.entityType,
     entity_id: input.entityId || null,
+    jurisdiction_slug: input.jurisdictionSlug || null,
     before: input.before || null,
     after: input.after || null
   });

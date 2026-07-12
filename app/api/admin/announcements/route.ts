@@ -7,7 +7,7 @@ import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
   getServiceSupabaseClientForJurisdiction,
-  getServiceSupabaseClientsForSelection,
+  getUniqueServiceSupabaseClientsForSelection,
   requireValidJurisdictionSlug,
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const clients = getServiceSupabaseClientsForSelection(selection);
+  const clients = getUniqueServiceSupabaseClientsForSelection(selection);
   const ids: string[] = [];
   let duplicate = false;
 
@@ -136,6 +136,7 @@ export async function POST(request: NextRequest) {
       action: "create",
       entityType: "announcement",
       entityId: data.id,
+      jurisdictionSlug: insertRow.jurisdiction_slug,
       after: insertRow
     });
   }
@@ -191,6 +192,7 @@ export async function PUT(request: NextRequest) {
     action: "update",
     entityType: "announcement",
     entityId: id,
+    jurisdictionSlug: jurisdiction,
     before,
     after: row
   });
@@ -247,6 +249,7 @@ export async function DELETE(request: NextRequest) {
     action: "delete",
     entityType: "announcement",
     entityId: id,
+    jurisdictionSlug: jurisdiction,
     before
   });
 

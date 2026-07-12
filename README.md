@@ -23,6 +23,15 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    NEXT_PUBLIC_SUPABASE_URL=
    NEXT_PUBLIC_SUPABASE_ANON_KEY=
    SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL=
+   NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY=
+   NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_URL=
+   NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_ANON_KEY=
+   SOUTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY=
+   NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL=
+   NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY=
+   SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY=
    NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL=
    NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY=
    SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY=
@@ -57,6 +66,22 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
 4. Apply Supabase migrations from `supabase/migrations`.
 
    For a brand-new separate jurisdiction database, including Mountain View and San Francisco, you can also run `supabase/bootstrap_county.sql` once in the Supabase SQL editor to create the full schema in one shot.
+
+### Regional databases
+
+SimpleCity can route multiple jurisdictions into four regional Supabase projects while keeping the existing jurisdiction slugs and public URLs unchanged. Regional environment variables take precedence over the legacy per-jurisdiction variables; the legacy variables remain supported during cutover.
+
+North San Mateo uses the existing San Mateo County credentials as its destination fallback, so San Mateo City and Foster City switch together after the regional schema and data copy are complete.
+
+Santa Clara uses the existing Santa Clara County credentials as its destination fallback. Until the regional schema migration is applied there, the application keeps the legacy conflict keys; enable the dedicated regional variables after the composite constraints are installed.
+
+Apply `20260711000000_add_regional_database_support.sql` to every destination project before copying data. Preview a jurisdiction copy with:
+
+```bash
+npm run migrate:jurisdiction -- --jurisdiction=mountain-view
+```
+
+Add `--execute` only after the dry-run counts are verified. Use `--include-control-data` when moving San Mateo City, the current default project, into North San Mateo. The copy preserves database UUIDs and is idempotent; it does not delete or disable the source project.
 
 5. Run the app:
 

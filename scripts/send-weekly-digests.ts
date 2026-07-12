@@ -264,6 +264,7 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
   const { data, error } = await supabase
     .from("summary_cards")
     .select(DIGEST_SUMMARY_CARD_SELECT)
+    .eq("jurisdiction_slug", subscription.jurisdiction_slug)
     .eq("is_published", true)
     .gt("created_at", mostRecentSentAt(subscription))
     .order("created_at", { ascending: false })

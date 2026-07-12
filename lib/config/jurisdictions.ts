@@ -24,11 +24,17 @@ export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
   | typeof ALL_JURISDICTIONS_SLUG;
 export type CivicPlatform = "primegov" | "iqm2" | "legistar" | "official-site";
+export type RegionSlug =
+  | "san-francisco"
+  | "north-san-mateo"
+  | "south-san-mateo"
+  | "santa-clara";
 
 export type JurisdictionConfig = {
   name: string;
   officialName: string;
   slug: JurisdictionSlug;
+  regionSlug: RegionSlug;
   platform: CivicPlatform;
   timezone: string;
   sourceUrl: string;
@@ -125,12 +131,49 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
 }
 
+function regionalCredentials(
+  url: string | undefined,
+  anonKey: string | undefined,
+  serviceRoleKey: string | undefined
+) {
+  return url && anonKey && serviceRoleKey ? { url, anonKey, serviceRoleKey } : null;
+}
+
 export function getJurisdictions(): JurisdictionConfig[] {
+  const northSanMateo =
+    regionalCredentials(
+      process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY,
+      process.env.NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY
+    ) ||
+    regionalCredentials(
+      process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY,
+      process.env.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+    );
+  const southSanMateo = regionalCredentials(
+    process.env.NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_ANON_KEY,
+    process.env.SOUTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY
+  );
+  const santaClara =
+    regionalCredentials(
+      process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY,
+      process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+    ) ||
+    regionalCredentials(
+      process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
+      process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+    );
+
   return [
     {
       name: "Foster City",
       officialName: "City of Foster City",
       slug: "foster-city",
+      regionSlug: "north-san-mateo",
       platform: "primegov",
       timezone: "America/Los_Angeles",
       sourceUrl:
@@ -142,12 +185,15 @@ export function getJurisdictions(): JurisdictionConfig[] {
         process.env.SCRAPER_BASE_URL ||
         DEFAULT_FOSTER_CITY_PRIMEGOV_URL,
       supabaseUrl:
+        northSanMateo?.url ||
         process.env.NEXT_PUBLIC_FOSTER_CITY_SUPABASE_URL ||
         process.env.NEXT_PUBLIC_SUPABASE_URL,
       supabaseAnonKey:
+        northSanMateo?.anonKey ||
         process.env.NEXT_PUBLIC_FOSTER_CITY_SUPABASE_ANON_KEY ||
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
       supabaseServiceRoleKey:
+        northSanMateo?.serviceRoleKey ||
         process.env.FOSTER_CITY_SUPABASE_SERVICE_ROLE_KEY ||
         process.env.SUPABASE_SERVICE_ROLE_KEY
     },
@@ -155,58 +201,87 @@ export function getJurisdictions(): JurisdictionConfig[] {
       name: "San Mateo",
       officialName: "City of San Mateo",
       slug: "san-mateo-city",
+      regionSlug: "north-san-mateo",
       platform: "primegov",
       timezone: "America/Los_Angeles",
       sourceUrl:
         process.env.SAN_MATEO_CITY_PRIMEGOV_URL || DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL,
       primegovUrl:
         process.env.SAN_MATEO_CITY_PRIMEGOV_URL || DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL,
-      supabaseUrl: process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL,
-      supabaseAnonKey: process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: process.env.SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY
+      supabaseUrl:
+        northSanMateo?.url ||
+        process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_URL,
+      supabaseAnonKey:
+        northSanMateo?.anonKey ||
+        process.env.NEXT_PUBLIC_SAN_MATEO_CITY_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey:
+        northSanMateo?.serviceRoleKey ||
+        process.env.SAN_MATEO_CITY_SUPABASE_SERVICE_ROLE_KEY
     },
     {
       name: "San Mateo County",
       officialName: "County of San Mateo",
       slug: "san-mateo-county",
+      regionSlug: "north-san-mateo",
       platform: "legistar",
       timezone: "America/Los_Angeles",
       sourceUrl: DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL,
       legistarUrl: DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL,
-      supabaseUrl: process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL,
-      supabaseAnonKey: process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: process.env.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+      supabaseUrl:
+        northSanMateo?.url ||
+        process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL,
+      supabaseAnonKey:
+        northSanMateo?.anonKey ||
+        process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey:
+        northSanMateo?.serviceRoleKey ||
+        process.env.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     },
     {
       name: "Mountain View",
       officialName: "City of Mountain View",
       slug: "mountain-view",
+      regionSlug: "santa-clara",
       platform: "legistar",
       timezone: "America/Los_Angeles",
       sourceUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
       legistarUrl: DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL,
-      supabaseUrl: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL,
-      supabaseAnonKey: process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: process.env.MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY
+      supabaseUrl:
+        santaClara?.url ||
+        process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL,
+      supabaseAnonKey:
+        santaClara?.anonKey ||
+        process.env.NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey:
+        santaClara?.serviceRoleKey ||
+        process.env.MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY
     },
     {
       name: "Santa Clara County",
       officialName: "County of Santa Clara",
       slug: "santa-clara-county",
+      regionSlug: "santa-clara",
       platform: "iqm2",
       timezone: "America/Los_Angeles",
       sourceUrl:
         process.env.SANTA_CLARA_COUNTY_IQM2_URL || DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL,
       iqm2Url:
         process.env.SANTA_CLARA_COUNTY_IQM2_URL || DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL,
-      supabaseUrl: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
-      supabaseAnonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+      supabaseUrl:
+        santaClara?.url ||
+        process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
+      supabaseAnonKey:
+        santaClara?.anonKey ||
+        process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey:
+        santaClara?.serviceRoleKey ||
+        process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     },
     {
       name: "San Francisco",
       officialName: "City and County of San Francisco",
       slug: "san-francisco",
+      regionSlug: "san-francisco",
       platform: "legistar",
       timezone: "America/Los_Angeles",
       sourceUrl: DEFAULT_SAN_FRANCISCO_LEGISTAR_URL,
@@ -219,15 +294,58 @@ export function getJurisdictions(): JurisdictionConfig[] {
       name: "Menlo Park",
       officialName: "City of Menlo Park",
       slug: "menlo-park",
+      regionSlug: "south-san-mateo",
       platform: "official-site",
       timezone: "America/Los_Angeles",
       sourceUrl: DEFAULT_MENLO_PARK_AGENDAS_URL,
       officialSiteUrl: DEFAULT_MENLO_PARK_AGENDAS_URL,
-      supabaseUrl: process.env.NEXT_PUBLIC_MENLO_PARK_SUPABASE_URL,
-      supabaseAnonKey: process.env.NEXT_PUBLIC_MENLO_PARK_SUPABASE_ANON_KEY,
-      supabaseServiceRoleKey: process.env.MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY
+      supabaseUrl:
+        southSanMateo?.url ||
+        process.env.NEXT_PUBLIC_MENLO_PARK_SUPABASE_URL,
+      supabaseAnonKey:
+        southSanMateo?.anonKey ||
+        process.env.NEXT_PUBLIC_MENLO_PARK_SUPABASE_ANON_KEY,
+      supabaseServiceRoleKey:
+        southSanMateo?.serviceRoleKey ||
+        process.env.MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY
     }
   ];
+}
+
+export function usesRegionalSupabase(jurisdiction: JurisdictionConfig) {
+  if (jurisdiction.regionSlug === "north-san-mateo") {
+    return Boolean(
+      regionalCredentials(
+        process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_NORTH_SAN_MATEO_SUPABASE_ANON_KEY,
+        process.env.NORTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY
+      ) ||
+        regionalCredentials(
+          process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_URL,
+          process.env.NEXT_PUBLIC_SAN_MATEO_COUNTY_SUPABASE_ANON_KEY,
+          process.env.SAN_MATEO_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+        )
+    );
+  }
+  if (jurisdiction.regionSlug === "south-san-mateo") {
+    return Boolean(
+      regionalCredentials(
+        process.env.NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_ANON_KEY,
+        process.env.SOUTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY
+      )
+    );
+  }
+  if (jurisdiction.regionSlug === "santa-clara") {
+    return Boolean(
+      regionalCredentials(
+        process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY,
+        process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+      )
+    );
+  }
+  return false;
 }
 
 export function getPublicJurisdictionOptions(): JurisdictionPublicOption[] {
@@ -449,4 +567,16 @@ export function getServiceSupabaseClientsForSelection(selection: JurisdictionSel
       supabase: getServiceSupabaseClientForJurisdiction(jurisdiction.slug)
     }
   ];
+}
+
+export function getUniqueServiceSupabaseClientsForSelection(selection: JurisdictionSelection) {
+  const clients = getServiceSupabaseClientsForSelection(selection);
+  const seen = new Set<string>();
+
+  return clients.filter(({ jurisdiction }) => {
+    const key = jurisdiction.supabaseUrl || jurisdiction.slug;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
