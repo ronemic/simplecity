@@ -199,13 +199,15 @@ async function loadMoreEvents(page: Page, direction: "previous" | "upcoming", at
     if ((await button.count()) !== 1 || !(await button.isEnabled())) return;
     const before = await page.locator('[aria-label="Events by date"] a[role="button"][data-id]').count();
     await button.click();
-    await page
+    const expanded = await page
       .waitForFunction(
-        (count) => document.querySelectorAll('[aria-label="Events by date"] a[role="button"][data-id]').length !== count,
+        (count) => document.querySelectorAll('[aria-label="Events by date"] a[role="button"][data-id]').length > count,
         before,
         { timeout: 15_000 }
       )
-      .catch(() => undefined);
+      .then(() => true)
+      .catch(() => false);
+    if (!expanded) return;
   }
 }
 
@@ -490,6 +492,7 @@ export async function scrapeCivicClerkMeetings(
     }
 
     let meetings = normalizeCivicClerkEventCards(cards, jurisdiction);
+    log(`CivicClerk valid meetings in configured window: ${meetings.length}.`);
     if (options.limit) meetings = meetings.slice(0, options.limit);
     log(`CivicClerk unique events after deduplication: ${meetings.length}.`);
     if (meetings.length === 0) {
