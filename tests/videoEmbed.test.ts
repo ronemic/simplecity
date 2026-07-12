@@ -105,6 +105,44 @@ test("converts Swagit and Granicus recording links to embed URLs", () => {
   );
 });
 
+test("prefers a full Legistar video over clips and legacy audio players", () => {
+  const videos = getEmbeddableVideoDocuments([
+    document({
+      id: "audio",
+      type: "Media",
+      source_url: "https://sfgov.legistar.com/Video.aspx?Mode=Granicus&ID1=52767&Mode2=Audio"
+    }),
+    document({
+      id: "clip-1",
+      type: "Media",
+      source_url: "https://sfgov.legistar.com/Video.aspx?Mode=Granicus&ID1=52767&ID2=1251292&Mode2=Video"
+    }),
+    document({
+      id: "full-video",
+      type: "Media",
+      source_url: "https://sfgov.legistar.com/Video.aspx?Mode=Granicus&ID1=52767&Mode2=Video"
+    }),
+    document({
+      id: "audio-download",
+      type: "Media",
+      source_url: "https://sfgov.legistar.com/Video.aspx?Mode=Granicus&ID1=52767&Mode2=AudioDownload"
+    }),
+    document({
+      id: "clip-2",
+      type: "Media",
+      source_url: "https://sfgov.legistar.com/Video.aspx?Mode=Granicus&ID1=52767&ID2=1251291&Mode2=Video"
+    })
+  ]);
+
+  assert.deepEqual(videos.map(({ document }) => document.id), [
+    "full-video",
+    "clip-1",
+    "clip-2",
+    "audio",
+    "audio-download"
+  ]);
+});
+
 test("finds unique meeting video documents", () => {
   const videos = getMeetingVideoDocuments([
     document({ id: "agenda", type: "Agenda", source_url: "https://city.example/agenda.pdf" }),

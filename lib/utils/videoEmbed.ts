@@ -182,6 +182,21 @@ function videoUrlCandidates(document: Pick<DocumentRow, "source_url" | "extracte
   );
 }
 
+function legistarMediaPriority(sourceUrl: string) {
+  const url = asUrl(sourceUrl);
+  if (!url || !url.hostname.toLowerCase().endsWith("legistar.com")) return 0;
+
+  const parameters = new Map(
+    Array.from(url.searchParams.entries(), ([key, value]) => [key.toLowerCase(), value.toLowerCase()])
+  );
+  const mediaMode = parameters.get("mode2") || "";
+
+  if (mediaMode === "video") return parameters.has("id2") ? 1 : 0;
+  if (mediaMode === "audio") return 2;
+  if (mediaMode === "audiodownload") return 3;
+  return 0;
+}
+
 export function isVideoDocument(
   document: Pick<DocumentRow, "type" | "label" | "source_url" | "extracted_text">
 ) {
@@ -267,11 +282,17 @@ export function getMeetingVideoDocuments(documents: DocumentRow[], rawMeeting?: 
 }
 
 export function getEmbeddableVideoDocuments(documents: DocumentRow[], rawMeeting?: unknown) {
-  return getMeetingVideoDocuments(documents, rawMeeting).flatMap((document) => {
+  const embeddableDocuments = getMeetingVideoDocuments(documents, rawMeeting).flatMap((document) => {
     const embedUrl = videoUrlCandidates(document)
       .map((url) => getVideoEmbedUrl(url))
       .find((url): url is string => Boolean(url));
 
     return embedUrl ? [{ document, embedUrl }] : [];
   });
+
+  return embeddableDocuments.sort(
+    (left, right) =>
+      legistarMediaPriority(left.document.source_url) -
+      legistarMediaPriority(right.document.source_url)
+  );
 }
