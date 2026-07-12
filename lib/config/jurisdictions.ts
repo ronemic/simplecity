@@ -345,6 +345,15 @@ export function usesRegionalSupabase(jurisdiction: JurisdictionConfig) {
       )
     );
   }
+  if (jurisdiction.regionSlug === "san-francisco") {
+    return Boolean(
+      regionalCredentials(
+        process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_ANON_KEY,
+        process.env.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY
+      )
+    );
+  }
   return false;
 }
 
