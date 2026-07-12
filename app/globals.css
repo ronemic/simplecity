@@ -312,7 +312,7 @@ p {
 }
 
 .menu-option-child {
-  @apply pl-5 font-semibold;
+  @apply pl-6 font-semibold;
 }
 
 .menu-option-selected {
