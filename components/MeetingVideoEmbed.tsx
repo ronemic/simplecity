@@ -1,7 +1,7 @@
 import { ChevronDown, ExternalLink } from "lucide-react";
 import type { DocumentRow } from "@/lib/types";
 import { type Locale } from "@/lib/i18n";
-import { getEmbeddableVideoDocuments } from "@/lib/utils/videoEmbed";
+import { getEmbeddableVideoDocuments, getVideoLinkUrl } from "@/lib/utils/videoEmbed";
 
 function videoLabel(document: DocumentRow, locale: Locale) {
   return document.label || document.type || (locale === "es" ? "Grabación de la reunión" : "Meeting recording");
@@ -157,6 +157,7 @@ export function MeetingVideoEmbed({
             title={videoLabel(primaryVideo.document, locale)}
             className="h-full w-full"
             loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
           />
@@ -168,7 +169,7 @@ export function MeetingVideoEmbed({
               {locale === "es" ? "Enlaces de grabación" : "Recording links"}
             </span>
             <a
-              href={primaryVideo.document.source_url}
+              href={getVideoLinkUrl(primaryVideo.document.source_url)}
               target="_blank"
               rel="noreferrer"
               className="action-civic-xs"

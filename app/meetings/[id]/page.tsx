@@ -20,7 +20,7 @@ import { cookies } from "next/headers";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { displayDocumentLabel, displayDocumentType } from "@/lib/utils/documentDisplay";
 import { formatDisplayDate } from "@/lib/utils/date";
-import { getEmbeddableVideoDocuments } from "@/lib/utils/videoEmbed";
+import { getEmbeddableVideoDocuments, getVideoLinkUrl } from "@/lib/utils/videoEmbed";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
@@ -165,7 +165,7 @@ export default async function MeetingDetailPage({
                 documents.map((doc) => (
                   <a
                     key={doc.id}
-                    href={doc.source_url}
+                    href={getVideoLinkUrl(doc.source_url)}
                     target="_blank"
                     rel="noreferrer"
                     className="quiet-card interactive-card flex items-start gap-3 p-4 text-sm focus-visible:focus-ring"

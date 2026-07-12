@@ -30,6 +30,41 @@ function youtubeEmbedUrl(url: URL) {
   return videoId ? `https://www.youtube-nocookie.com/embed/${videoId}` : null;
 }
 
+export function getVideoLinkUrl(sourceUrl: string) {
+  const url = asUrl(sourceUrl);
+  if (!url) return sourceUrl;
+
+  const host = url.hostname.replace(/^www\./, "");
+  const isYouTubeEmbedHost = [
+    "youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtube-nocookie.com"
+  ].includes(host);
+  if (!isYouTubeEmbedHost || !url.pathname.startsWith("/embed/")) return sourceUrl;
+
+  const videoId = url.pathname.split("/").filter(Boolean)[1];
+  if (!videoId) return sourceUrl;
+
+  const watchUrl = new URL("https://www.youtube.com/watch");
+  watchUrl.searchParams.set("v", videoId);
+
+  const timestamp = url.searchParams.get("t");
+  const startSeconds = url.searchParams.get("start");
+  if (timestamp) {
+    watchUrl.searchParams.set("t", timestamp);
+  } else if (startSeconds) {
+    watchUrl.searchParams.set("t", /^\d+$/.test(startSeconds) ? `${startSeconds}s` : startSeconds);
+  }
+
+  for (const parameter of ["list", "index"]) {
+    const value = url.searchParams.get(parameter);
+    if (value) watchUrl.searchParams.set(parameter, value);
+  }
+
+  return watchUrl.toString();
+}
+
 function vimeoEmbedUrl(url: URL) {
   const host = url.hostname.replace(/^www\./, "");
   if (host !== "vimeo.com" && host !== "player.vimeo.com") return null;

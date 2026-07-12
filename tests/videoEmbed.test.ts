@@ -3,7 +3,8 @@ import test from "node:test";
 import {
   getEmbeddableVideoDocuments,
   getMeetingVideoDocuments,
-  getVideoEmbedUrl
+  getVideoEmbedUrl,
+  getVideoLinkUrl
 } from "@/lib/utils/videoEmbed";
 import type { DocumentRow } from "@/lib/types";
 
@@ -40,6 +41,36 @@ test("converts YouTube and Vimeo links to embeddable URLs", () => {
   assert.equal(
     getVideoEmbedUrl("https://vimeo.com/123456789"),
     "https://player.vimeo.com/video/123456789"
+  );
+});
+
+test("converts standalone YouTube embed links to watch-page URLs", () => {
+  assert.equal(
+    getVideoLinkUrl("https://www.youtube.com/embed/Ssiblx66EyU"),
+    "https://www.youtube.com/watch?v=Ssiblx66EyU"
+  );
+  assert.equal(
+    getVideoLinkUrl("https://www.youtube-nocookie.com/embed/Ssiblx66EyU"),
+    "https://www.youtube.com/watch?v=Ssiblx66EyU"
+  );
+  assert.equal(
+    getVideoLinkUrl("https://www.youtube.com/embed/Ssiblx66EyU?start=90&list=PL123&index=2"),
+    "https://www.youtube.com/watch?v=Ssiblx66EyU&t=90s&list=PL123&index=2"
+  );
+});
+
+test("preserves existing YouTube watch and share links", () => {
+  assert.equal(
+    getVideoLinkUrl("https://www.youtube.com/watch?v=abc123&t=90s&list=PL123"),
+    "https://www.youtube.com/watch?v=abc123&t=90s&list=PL123"
+  );
+  assert.equal(
+    getVideoLinkUrl("https://youtu.be/abc123?t=90"),
+    "https://youtu.be/abc123?t=90"
+  );
+  assert.equal(
+    getVideoLinkUrl("https://city.example/meeting/video"),
+    "https://city.example/meeting/video"
   );
 });
 
