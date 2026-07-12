@@ -120,3 +120,17 @@ create index if not exists scraper_runs_jurisdiction_id_idx on public.scraper_ru
 
 grant select on public.jurisdictions to anon, authenticated;
 grant all on public.jurisdictions to service_role;
+
+alter table public.jurisdictions enable row level security;
+
+do $$
+begin
+  create policy "Jurisdictions are publicly readable"
+    on public.jurisdictions
+    for select
+    to anon, authenticated
+    using (true);
+exception
+  when duplicate_object then null;
+end;
+$$;
