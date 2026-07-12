@@ -37,6 +37,12 @@ export type DocumentType =
   | "Transportation Form"
   | "Spanish Interpretation Form"
   | "Attachment"
+  | "Staff Report"
+  | "Resolution"
+  | "Ordinance"
+  | "Contract"
+  | "Exhibit"
+  | "Public Comment"
   | "Document"
   | "Other";
 

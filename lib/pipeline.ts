@@ -25,6 +25,7 @@ import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
 import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
+import { scrapeCivicClerkMeetings } from "@/lib/sources/civicclerk";
 import {
   enrichMenloParkMeetingTimesFromAgendaText,
   scrapeMenloParkMeetings
@@ -37,6 +38,10 @@ export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   enrichDetails?: boolean;
   clickSeeMore?: boolean;
   limit?: number;
+  monthsBack?: number;
+  monthsForward?: number;
+  allVisible?: boolean;
+  body?: string;
   maxRuntimeMinutes?: number;
 };
 
@@ -214,7 +219,7 @@ export async function runSimpleCityPipeline(
             shouldStop: deadlineExceeded,
             log
           })
-        : jurisdiction.platform === "legistar"
+          : jurisdiction.platform === "legistar"
           ? await scrapeLegistarMeetings({
               ...options,
               jurisdiction,
@@ -224,6 +229,17 @@ export async function runSimpleCityPipeline(
               shouldStop: deadlineExceeded,
               log
             })
+          : jurisdiction.platform === "civicclerk"
+            ? await scrapeCivicClerkMeetings({
+                ...options,
+                jurisdiction,
+                portalUrl:
+                  options.portalUrl || jurisdiction.civicClerkUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              })
           : jurisdiction.platform === "official-site"
             ? await scrapeMenloParkMeetings({
                 ...options,

@@ -25,6 +25,8 @@ export type DownloadDocumentsOptions = {
   maxBytes?: number;
   timeoutMs?: number;
   validateFinalUrl?: (url: string) => boolean;
+  documentFilter?: (document: PrimeGovDocument) => boolean;
+  userAgent?: string;
 };
 
 function decodeBasicHtmlEntities(text: string) {
@@ -402,7 +404,7 @@ export async function downloadOfficialSiteDocuments(
   for (const meeting of meetings) {
     const officialDocs = meeting.documents.filter(
       (doc) =>
-        isOfficialSiteDownloadCandidate(doc) &&
+        (options.documentFilter?.(doc) ?? isOfficialSiteDownloadCandidate(doc)) &&
         (!options.onlyPending || (!doc.localPath && !doc.downloadError))
     );
 
@@ -416,7 +418,7 @@ export async function downloadOfficialSiteDocuments(
 
       try {
         const response = await requestOfficialSiteDocument(context, doc.url, options, {
-            "User-Agent": "Mozilla/5.0 SimpleCity official-site agenda scraper",
+            "User-Agent": options.userAgent || "Mozilla/5.0 SimpleCity official-site agenda scraper",
             Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
         });
 

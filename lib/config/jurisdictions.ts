@@ -9,6 +9,7 @@ export type JurisdictionSlug =
   | "san-mateo-county"
   | "santa-clara-county"
   | "mountain-view"
+  | "los-altos"
   | "san-francisco"
   | "menlo-park";
 export type PublicJurisdictionSlug =
@@ -17,13 +18,14 @@ export type PublicJurisdictionSlug =
   | "san-mateo-county"
   | "santa-clara-county"
   | "mountain-view"
+  | "los-altos"
   | "san-francisco"
   | "menlo-park";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
 export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
   | typeof ALL_JURISDICTIONS_SLUG;
-export type CivicPlatform = "primegov" | "iqm2" | "legistar" | "official-site";
+export type CivicPlatform = "primegov" | "iqm2" | "legistar" | "official-site" | "civicclerk";
 export type RegionSlug =
   | "san-francisco"
   | "north-san-mateo"
@@ -42,6 +44,7 @@ export type JurisdictionConfig = {
   iqm2Url?: string;
   legistarUrl?: string;
   officialSiteUrl?: string;
+  civicClerkUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
@@ -68,6 +71,14 @@ const DEFAULT_SAN_FRANCISCO_LEGISTAR_URL =
 const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
+export const DEFAULT_LOS_ALTOS_CIVICCLERK_URL =
+  "https://losaltosca.portal.civicclerk.com/";
+export const SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE = [
+  "Santa Clara region Supabase configuration is missing. Set",
+  "NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,",
+  "NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY, and",
+  "SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY."
+].join("\n");
 export const SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE = [
   "San Francisco Supabase configuration is missing. Set",
   "NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,",
@@ -90,6 +101,7 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "san-mateo-county",
   "mountain-view",
   "santa-clara-county",
+  "los-altos",
   "san-francisco",
   "menlo-park"
 ];
@@ -101,6 +113,7 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "San Mateo County", slug: "san-mateo-county" },
   { name: "Mountain View", slug: "mountain-view" },
   { name: "Santa Clara County", slug: "santa-clara-county" },
+  { name: "Los Altos", slug: "los-altos" },
   { name: "San Francisco", slug: "san-francisco" },
   { name: "Menlo Park", slug: "menlo-park" }
 ];
@@ -126,6 +139,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "san-mateo-county") return "San Mateo County";
   if (internalSlug === "santa-clara-county") return "Santa Clara County";
   if (internalSlug === "mountain-view") return "Mountain View";
+  if (internalSlug === "los-altos") return "Los Altos";
   if (internalSlug === "san-francisco") return "San Francisco";
   if (internalSlug === "menlo-park") return "Menlo Park";
   return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
@@ -278,6 +292,21 @@ export function getJurisdictions(): JurisdictionConfig[] {
         process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     },
     {
+      name: "Los Altos",
+      officialName: "City of Los Altos",
+      slug: "los-altos",
+      regionSlug: "santa-clara",
+      platform: "civicclerk",
+      timezone: "America/Los_Angeles",
+      sourceUrl:
+        process.env.LOS_ALTOS_CIVICCLERK_URL || DEFAULT_LOS_ALTOS_CIVICCLERK_URL,
+      civicClerkUrl:
+        process.env.LOS_ALTOS_CIVICCLERK_URL || DEFAULT_LOS_ALTOS_CIVICCLERK_URL,
+      supabaseUrl: santaClara?.url,
+      supabaseAnonKey: santaClara?.anonKey,
+      supabaseServiceRoleKey: santaClara?.serviceRoleKey
+    },
+    {
       name: "San Francisco",
       officialName: "City and County of San Francisco",
       slug: "san-francisco",
@@ -383,6 +412,7 @@ export function requireValidJurisdictionSlug(
     slug === "san-mateo-county" ||
     slug === "santa-clara-county" ||
     slug === "mountain-view" ||
+    slug === "los-altos" ||
     slug === "san-francisco" ||
     slug === "menlo-park"
   ) {
@@ -431,6 +461,10 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
     return scope === "service"
       ? "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
       : "Mountain View public Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL and NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY.";
+  }
+
+  if (jurisdiction.slug === "los-altos") {
+    return SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 
   if (jurisdiction.slug === "san-francisco") {

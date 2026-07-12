@@ -1,6 +1,6 @@
 # SimpleCity
 
-SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, and Legistar scrapers, PDF extraction, and an OpenRouter/Cerebras summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco.
+SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, Legistar, official-site, and CivicClerk scrapers, PDF extraction, and an OpenRouter/Cerebras summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, Mountain View, Los Altos, San Francisco, and Menlo Park.
 
 ## Setup
 
@@ -17,7 +17,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    cp .env.example .env.local
    ```
 
-3. Fill in Supabase and LLM provider values. The default Supabase variables are kept for Foster City compatibility; San Mateo, San Mateo County, Santa Clara County, Mountain View, and San Francisco each use their own Supabase project:
+3. Fill in the regional Supabase and LLM provider values. Legacy jurisdiction-specific variables remain available during database consolidation:
 
    ```bash
    NEXT_PUBLIC_SUPABASE_URL=
@@ -50,6 +50,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    SAN_MATEO_COUNTY_LEGISTAR_URL=https://sanmateocounty.legistar.com/Calendar.aspx
    MOUNTAIN_VIEW_LEGISTAR_URL=https://mountainview.legistar.com/Calendar.aspx
    SAN_FRANCISCO_LEGISTAR_URL=https://sfgov.legistar.com/Calendar.aspx
+   LOS_ALTOS_CIVICCLERK_URL=https://losaltosca.portal.civicclerk.com/
    OPENROUTER_API_KEY=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    CEREBRAS_API_KEY=
@@ -112,6 +113,11 @@ npm run scrape:san-francisco
 npm run scrape:san-francisco:download
 npm run scrape:san-francisco:items
 npm run pipeline:san-francisco
+npm run scrape:menlo-park
+npm run pipeline:menlo-park
+npm run scrape:los-altos
+npm run scrape:los-altos:download
+npm run pipeline:los-altos
 npm run pipeline:all
 npm run email:digests
 ```
@@ -132,6 +138,8 @@ The production scrapers run from the `Nightly scrapers` GitHub Actions workflow.
 | San Mateo County scraper | `15 11 * * *` | 4:15 AM PDT | `npm run pipeline:san-mateo-county` |
 | Mountain View scraper | `20 12 * * *` | 5:20 AM PDT | `npm run pipeline:mountain-view` |
 | San Francisco scraper | `40 12 * * *` | 5:40 AM PDT | `npm run pipeline:san-francisco` |
+| Menlo Park scraper | `10 13 * * *` | 6:10 AM PDT | `npm run pipeline:menlo-park` |
+| Los Altos scraper | `30 13 * * *` | 6:30 AM PDT | `npm run pipeline:los-altos` |
 | Weekly email digests | `0 17 * * 1` | Monday 10:00 AM PDT | `npm run email:digests` |
 
 Keep the jobs separate so one jurisdiction can fail or run long without blocking another.

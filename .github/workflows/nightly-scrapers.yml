@@ -8,6 +8,7 @@ on:
     - cron: "15 11 * * *"
     - cron: "20 12 * * *"
     - cron: "40 12 * * *"
+    - cron: "30 13 * * *"
   workflow_dispatch:
     inputs:
       jurisdiction:
@@ -23,6 +24,7 @@ on:
           - santa-clara-county
           - mountain-view
           - san-francisco
+          - los-altos
 
 env:
   CI: true
@@ -60,6 +62,7 @@ env:
   NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_ANON_KEY }}
   SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY }}
   SAN_FRANCISCO_LEGISTAR_URL: https://sfgov.legistar.com/Calendar.aspx
+  LOS_ALTOS_CIVICCLERK_URL: https://losaltosca.portal.civicclerk.com/
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
   CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
@@ -248,3 +251,33 @@ jobs:
 
       - name: Run San Francisco pipeline
         run: npm run pipeline:san-francisco -- --max-runtime-minutes=50
+
+  los-altos:
+    name: Los Altos scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'los-altos')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '30 13 * * *')
+    concurrency:
+      group: nightly-scraper-los-altos
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Run Los Altos pipeline
+        run: npm run pipeline:los-altos -- --max-runtime-minutes=50

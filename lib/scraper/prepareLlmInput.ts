@@ -81,7 +81,10 @@ export async function appendAgendaItemAttachmentContext(
   meeting: PrimeGovMeeting,
   baseText: string
 ) {
-  if (meeting.jurisdictionSlug !== "menlo-park" || !meeting.items?.length) {
+  if (
+    !["menlo-park", "los-altos"].includes(String(meeting.jurisdictionSlug || "")) ||
+    !meeting.items?.length
+  ) {
     return { text: baseText, included: 0 };
   }
 
@@ -99,9 +102,11 @@ export async function appendAgendaItemAttachmentContext(
   }> = [];
 
   for (const item of meeting.items) {
-    const attachment = item.attachments?.find(
+    const itemAttachments = (item.attachments || []).filter(
       (doc) => doc.isAgendaItemAttachment && !seenUrls.has(doc.url)
     );
+    const attachment =
+      itemAttachments.find((doc) => doc.type === "Staff Report") || itemAttachments[0];
     if (!attachment) continue;
 
     seenUrls.add(attachment.url);
@@ -435,7 +440,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   selectedText = attachmentContext.text;
   if (attachmentContext.included > 0) {
     extractionNotes.push(
-      `Included item-aware context from ${attachmentContext.included} Menlo Park agenda attachment(s).`
+      `Included item-aware context from ${attachmentContext.included} agenda attachment(s).`
     );
   }
 

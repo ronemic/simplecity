@@ -3,6 +3,7 @@ import {
   getJurisdictionBySlug,
   MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE,
   SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
+  SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
 
@@ -39,6 +40,10 @@ export function getRequiredPublicSupabaseEnv(slug?: JurisdictionSlug) {
       throw new Error(
         "Mountain View Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL, NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY, and MOUNTAIN_VIEW_SUPABASE_SERVICE_ROLE_KEY."
       );
+    }
+
+    if (slug === "los-altos") {
+      throw new Error(SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE);
     }
 
     if (slug === "san-francisco") {

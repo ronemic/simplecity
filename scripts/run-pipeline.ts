@@ -34,6 +34,18 @@ function getLimit() {
   return Math.floor(limit);
 }
 
+function getNonNegativeInteger(name: string) {
+  const raw = getArgValue(name);
+  if (!raw) return undefined;
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`--${name} must be a non-negative integer.`);
+  }
+
+  return value;
+}
+
 function getMaxRuntimeMinutes() {
   const raw = getArgValue("max-runtime-minutes");
   if (!raw) return undefined;
@@ -64,6 +76,10 @@ async function main() {
     enrichDetails: !process.argv.includes("--no-enrich"),
     clickSeeMore: process.argv.includes("--see-more"),
     limit: getLimit(),
+    monthsBack: getNonNegativeInteger("months-back"),
+    monthsForward: getNonNegativeInteger("months-forward"),
+    allVisible: process.argv.includes("--all-visible"),
+    body: getArgValue("body") || undefined,
     persist: !process.argv.includes("--no-persist"),
     summarize: !process.argv.includes("--no-summarize"),
     maxRuntimeMinutes: getMaxRuntimeMinutes(),

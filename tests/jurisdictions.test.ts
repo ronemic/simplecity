@@ -8,6 +8,7 @@ import {
   normalizeJurisdictionSelection,
   requireValidJurisdictionSlug,
   SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
+  SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE,
   toPublicJurisdictionSlug
 } from "../lib/config/jurisdictions";
 
@@ -57,6 +58,77 @@ test("San Francisco is a valid Legistar jurisdiction", () => {
       (option) => option.slug === "san-francisco" && option.name === "San Francisco"
     )
   );
+});
+
+test("Los Altos is a valid CivicClerk jurisdiction in the Santa Clara region", () => {
+  const losAltos = getJurisdictionBySlug("los-altos");
+
+  assert.equal(requireValidJurisdictionSlug("los-altos"), "los-altos");
+  assert.equal(losAltos?.name, "Los Altos");
+  assert.equal(losAltos?.officialName, "City of Los Altos");
+  assert.equal(losAltos?.platform, "civicclerk");
+  assert.equal(losAltos?.regionSlug, "santa-clara");
+  assert.equal(losAltos?.timezone, "America/Los_Angeles");
+  assert.equal(losAltos?.sourceUrl, "https://losaltosca.portal.civicclerk.com/");
+  assert.equal(toPublicJurisdictionSlug("los-altos"), "los-altos");
+  assert.ok(
+    getPublicJurisdictionOptions().some(
+      (option) => option.slug === "los-altos" && option.name === "Los Altos"
+    )
+  );
+});
+
+test("Los Altos uses only Santa Clara regional Supabase credentials", () => {
+  const previous = {
+    url: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
+    anonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY,
+    serviceRoleKey: process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+  };
+
+  process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL = "https://santa-clara.example.test";
+  process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY = "regional-anon-key";
+  process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY = "regional-service-key";
+
+  try {
+    const losAltos = getJurisdictionBySlug("los-altos");
+    assert.equal(losAltos?.supabaseUrl, "https://santa-clara.example.test");
+    assert.equal(losAltos?.supabaseAnonKey, "regional-anon-key");
+    assert.equal(losAltos?.supabaseServiceRoleKey, "regional-service-key");
+  } finally {
+    if (previous.url === undefined) delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL = previous.url;
+    if (previous.anonKey === undefined) delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY;
+    else process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY = previous.anonKey;
+    if (previous.serviceRoleKey === undefined) delete process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY = previous.serviceRoleKey;
+  }
+});
+
+test("Los Altos reports missing Santa Clara regional configuration", () => {
+  const previous = {
+    url: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
+    anonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY,
+    serviceRoleKey: process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+  };
+  delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL;
+  delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY;
+  delete process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY;
+
+  try {
+    assert.throws(
+      () => getServiceSupabaseClientForJurisdiction("los-altos"),
+      (error) =>
+        error instanceof Error &&
+        error.message === SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE
+    );
+  } finally {
+    if (previous.url === undefined) delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL = previous.url;
+    if (previous.anonKey === undefined) delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY;
+    else process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY = previous.anonKey;
+    if (previous.serviceRoleKey === undefined) delete process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY = previous.serviceRoleKey;
+  }
 });
 
 test("regional credentials route jurisdictions without changing their public identity", () => {
