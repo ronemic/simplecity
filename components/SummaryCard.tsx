@@ -47,28 +47,10 @@ function getPrimaryCategory(card: SummaryCardRow) {
   return category as CategoryName | undefined;
 }
 
-function statusSummary(
+export function statusSummary(
   card: SummaryCardRow,
-  commentDeadline: CommentDeadlineInfo | null,
-  hasCommentOption: boolean,
   locale: Locale
 ) {
-  if (commentDeadline) {
-    return {
-      label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value)}`,
-      className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
-      icon: Clock
-    };
-  }
-
-  if (hasCommentOption) {
-    return {
-      label: t(locale, "commentOptionListed"),
-      className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]",
-      icon: MessageSquare
-    };
-  }
-
   const status = card.status || card.meetings?.status || "Info only";
   const compactMeetingDate = formatCompactDisplayDate(
     card.meetings?.date_text,
@@ -108,11 +90,41 @@ function statusSummary(
     };
   }
 
+  if (status === "Routine approval") {
+    return {
+      label: statusLabel(locale, status),
+      className: "border-[#c6cbd8] bg-[#f4f5f8] text-[#4b5367]",
+      icon: null
+    };
+  }
+
   return {
     label: statusLabel(locale, status),
     className: "border-black/15 bg-black/[0.035] text-black/[0.65]",
     icon: null
   };
+}
+
+export function commentSummary(
+  commentDeadline: CommentDeadlineInfo | null,
+  hasCommentOption: boolean,
+  locale: Locale
+) {
+  if (commentDeadline) {
+    return {
+      label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value)}`,
+      className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
+      icon: Clock
+    };
+  }
+  if (hasCommentOption) {
+    return {
+      label: t(locale, "commentOptionListed"),
+      className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]",
+      icon: MessageSquare
+    };
+  }
+  return null;
 }
 
 function jurisdictionLabel(card: SummaryCardRow) {
@@ -187,11 +199,12 @@ export function SummaryCard({
   const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
-  const status = statusSummary(card, commentDeadline, hasCommentOption, locale);
+  const status = statusSummary(card, locale);
+  const comment = commentSummary(commentDeadline, hasCommentOption, locale);
   const summaryConfidence = confidenceLabel(card, locale);
   const createdTimestamp = formatPacificTimestamp(card.created_at);
   const updatedTimestamp = formatPacificTimestamp(card.updated_at);
-  const StatusIcon = status.icon;
+  const CommentIcon = comment?.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
   const primaryButtonClass = "action-primary-sm font-black";
@@ -244,9 +257,14 @@ export function SummaryCard({
                 status.className
               )}
             >
-              {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
               <HighlightedText text={status.label} query={highlight} />
             </span>
+            {comment ? (
+              <span className={cn("status-chip", comment.className)}>
+                {CommentIcon ? <CommentIcon aria-hidden className="h-3.5 w-3.5" /> : null}
+                <HighlightedText text={comment.label} query={highlight} />
+              </span>
+            ) : null}
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
               {compactMeetingDate}

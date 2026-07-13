@@ -6,6 +6,14 @@ import {
   validationOptionsForMeeting,
   type SummaryValidationIssue
 } from "./validateSummary";
+import {
+  applyTopicValidation,
+  buildTopicValidationPrompt,
+  parseTopicValidation,
+  topicValidationCandidates,
+  TOPIC_VALIDATION_SYSTEM_PROMPT,
+  type TopicValidationCandidate
+} from "./topicValidation";
 
 export type GenerateSummaryOptions = {
   log?: (message: string) => void;
@@ -44,6 +52,7 @@ class SummaryProviderRequestError extends Error {
 }
 
 const lastSummaryRequestAtByProvider = new Map<SummaryProvider["name"], number>();
+const MAX_TOPIC_VALIDATION_PROMPT_CHARS = 60_000;
 
 function hasUsableSourceText(meeting: LlmReadyMeeting) {
   const input = meeting.llmInputText.trim();
@@ -246,7 +255,7 @@ async function requestSummary(
             ]
           : [])
       ],
-      temperature: 0.2,
+      temperature: 0,
       response_format: {
         type: "json_object"
       }
@@ -298,6 +307,135 @@ async function requestSummary(
       }
     },
     validationIssues
+  };
+}
+
+async function requestTopicValidation(
+  candidates: TopicValidationCandidate[],
+  provider: SummaryProvider,
+  options: GenerateSummaryOptions = {}
+) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+
+  await waitForProviderSlot(provider, options);
+
+  const response = await fetch(provider.baseUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${provider.apiKey}`,
+      "Content-Type": "application/json",
+      ...(provider.headers || {})
+    },
+    signal: controller.signal,
+    body: JSON.stringify({
+      model: provider.model,
+      messages: [
+        { role: "system", content: TOPIC_VALIDATION_SYSTEM_PROMPT },
+        { role: "user", content: buildTopicValidationPrompt(candidates) }
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" }
+    })
+  }).finally(() => clearTimeout(timeout));
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new SummaryProviderRequestError(
+      provider.name,
+      response.status,
+      text,
+      parseRetryAfterMs(response.headers)
+    );
+  }
+
+  const raw = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = raw.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${provider.name} topic response did not include message content.`);
+
+  return {
+    verified: parseTopicValidation(content, candidates),
+    raw: {
+      ...raw,
+      simplecityProvider: { name: provider.name, model: provider.model }
+    }
+  };
+}
+
+async function requestTopicValidationWithFallback(
+  candidates: TopicValidationCandidate[],
+  options: GenerateSummaryOptions = {}
+) {
+  const providers = getConfiguredSummaryProviders();
+  let lastError: unknown;
+
+  for (const [index, provider] of providers.entries()) {
+    try {
+      options.log?.(
+        `Verifying ${candidates.length} agenda-card topic and status selection(s) with ${provider.name} (${provider.model}).`
+      );
+      return await requestTopicValidation(candidates, provider, options);
+    } catch (error) {
+      lastError = error;
+      const hasNextProvider = index < providers.length - 1;
+      if (hasNextProvider && isRetryableSummaryError(error)) {
+        options.log?.(`${provider.name} topic/status verification failed; trying ${providers[index + 1].name}.`);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Unknown topic verification error");
+}
+
+async function verifySummaryTopics(
+  meeting: LlmReadyMeeting,
+  result: SummaryRequestResult,
+  options: GenerateSummaryOptions
+) {
+  const candidates = topicValidationCandidates(meeting, result.summary);
+  if (candidates.length === 0) return { summary: result.summary, raw: result.raw };
+
+  if (candidates.length < result.summary.cards.length) {
+    options.log?.(
+      `Topic verification matched ${candidates.length} of ${result.summary.cards.length} cards to isolated agenda-item context.`
+    );
+  }
+
+  const batches: TopicValidationCandidate[][] = [];
+  let currentBatch: TopicValidationCandidate[] = [];
+  let currentLength = 0;
+  for (const candidate of candidates) {
+    const candidateLength = candidate.context.length + 500;
+    if (currentBatch.length > 0 && currentLength + candidateLength > MAX_TOPIC_VALIDATION_PROMPT_CHARS) {
+      batches.push(currentBatch);
+      currentBatch = [];
+      currentLength = 0;
+    }
+    currentBatch.push(candidate);
+    currentLength += candidateLength;
+  }
+  if (currentBatch.length > 0) batches.push(currentBatch);
+
+  const topicResults = [];
+  for (const batch of batches) {
+    topicResults.push(await requestTopicValidationWithFallback(batch, options));
+  }
+  const verified = topicResults.flatMap((topicResult) => topicResult.verified);
+  const raw =
+    result.raw && typeof result.raw === "object" && !Array.isArray(result.raw)
+      ? { ...result.raw, simplecityTopicValidation: topicResults.map((topicResult) => topicResult.raw) }
+      : {
+          simplecitySummary: result.raw,
+          simplecityTopicValidation: topicResults.map((topicResult) => topicResult.raw)
+        };
+
+  return {
+    summary: applyTopicValidation(result.summary, verified),
+    raw
   };
 }
 
@@ -365,10 +503,7 @@ export async function generateSummaryForMeeting(
       options.log?.(
         `Finished LLM summary for ${meeting.title}: ${finalResult.summary.cards.length} cards.`
       );
-      return {
-        summary: finalResult.summary,
-        raw: finalResult.raw
-      };
+      return await verifySummaryTopics(meeting, finalResult, options);
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : "Unknown LLM error";
@@ -388,10 +523,7 @@ export async function generateSummaryForMeeting(
     options.log?.(
       `Using best validated LLM summary for ${meeting.title} after retry errors: ${bestResult.summary.cards.length} cards.`
     );
-    return {
-      summary: bestResult.summary,
-      raw: bestResult.raw
-    };
+    return await verifySummaryTopics(meeting, bestResult, options);
   }
 
   throw lastError instanceof Error ? lastError : new Error("Unknown LLM error");

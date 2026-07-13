@@ -280,3 +280,144 @@ test("backs off and retries when all configured providers are rate-limited", asy
   assert.deepEqual(sleepDelays, [2000]);
   assert.equal(result.summary.cards.length, 1);
 });
+
+test("verifies topics and status using only matched agenda-item context", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let calls = 0;
+  let topicPrompt = "";
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  const preparedMeeting = meeting();
+  preparedMeeting.llmInputText += " FLAT_PACKET_SENTINEL unrelated police material.";
+  preparedMeeting.items = [
+    {
+      externalId: "item-4",
+      fileNumber: null,
+      agendaNumber: "4",
+      itemType: null,
+      title: "Item 4 - Contract approval",
+      action: "Approve the park maintenance contract.",
+      result: null,
+      sourceUrl: "https://city.example/agendas/4",
+      rowText: "The contract provides maintenance for city parks and recreation spaces."
+    }
+  ];
+
+  globalThis.fetch = (async (_url, init) => {
+    calls += 1;
+    const body = JSON.parse(String(init?.body || "{}")) as {
+      messages?: Array<{ role?: string; content?: string }>;
+    };
+
+    if (calls === 1) {
+      return openRouterResponse({
+        meetingSummary,
+        cards: [card({ categoryTags: ["Public Safety"], status: "Under discussion" })]
+      });
+    }
+
+    topicPrompt = body.messages?.find((message) => message.role === "user")?.content || "";
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                cards: [
+                  {
+                    cardIndex: 0,
+                    categoryTags: ["Parks & Environment"],
+                    status: "Upcoming vote"
+                  }
+                ]
+              })
+            }
+          }
+        ]
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(preparedMeeting);
+
+  assert.equal(calls, 2);
+  assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
+  assert.equal(result.summary.cards[0].status, "Upcoming vote");
+  assert.match(topicPrompt, /maintenance for city parks and recreation spaces/);
+  assert.doesNotMatch(topicPrompt, /FLAT_PACKET_SENTINEL/);
+});
+
+test("falls back to Cerebras when isolated topic and status verification is rate-limited", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const urls: string[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
+  process.env.CEREBRAS_MODEL = "gpt-oss-120b";
+  const preparedMeeting = meeting();
+  preparedMeeting.items = [
+    {
+      externalId: "item-4",
+      fileNumber: null,
+      agendaNumber: "4",
+      itemType: null,
+      title: "Item 4 - Contract approval",
+      action: "Approve the park maintenance contract.",
+      result: null,
+      sourceUrl: "https://city.example/agendas/4",
+      rowText: "The contract provides maintenance for city parks."
+    }
+  ];
+
+  globalThis.fetch = (async (url) => {
+    urls.push(String(url));
+    if (urls.length === 1) {
+      return openRouterResponse({ meetingSummary, cards: [card()] });
+    }
+    if (String(url).includes("openrouter.ai")) {
+      return new Response("topic verifier rate limited", { status: 429 });
+    }
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                cards: [
+                  {
+                    cardIndex: 0,
+                    categoryTags: ["Parks & Environment"],
+                    status: "Upcoming vote"
+                  }
+                ]
+              })
+            }
+          }
+        ]
+      }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(preparedMeeting);
+
+  assert.deepEqual(urls, [
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://api.cerebras.ai/v1/chat/completions"
+  ]);
+  assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
+});

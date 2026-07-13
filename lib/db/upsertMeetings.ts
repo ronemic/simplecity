@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/translationFingerprint";
 import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 
 type UpsertedMeeting = {
   externalId: string;
@@ -477,10 +478,12 @@ export async function appendSummaryCardsForMeeting(
 
   const existingExactKeys = new Set<string>();
   const existingAgendaKeys = new Set<string>();
+  const existingAgendaItems: string[] = [];
 
   for (const card of existingCards || []) {
     existingExactKeys.add(exactCardKey(card.agenda_item, card.source_url));
     existingAgendaKeys.add(normalizeCardKey(card.agenda_item));
+    if (card.agenda_item) existingAgendaItems.push(card.agenda_item);
   }
 
   const newCards = summary.cards
@@ -488,7 +491,13 @@ export async function appendSummaryCardsForMeeting(
     .filter(({ card }) => {
       const exactKey = exactCardKey(card.agendaItem, card.source);
       const agendaKey = normalizeCardKey(card.agendaItem);
-      return !existingExactKeys.has(exactKey) && !existingAgendaKeys.has(agendaKey);
+      return (
+        !existingExactKeys.has(exactKey) &&
+        !existingAgendaKeys.has(agendaKey) &&
+        !existingAgendaItems.some((existing) =>
+          areLikelySameAgendaItem(existing, card.agendaItem)
+        )
+      );
     });
 
   if (newCards.length === 0) {

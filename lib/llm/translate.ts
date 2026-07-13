@@ -48,7 +48,7 @@ Rules:
 - Return the same JSON shape with the same ids.
 - Do not add facts, remove facts, summarize, interpret, or explain.
 - Preserve URLs, email addresses, phone numbers, addresses, proper names, agency names, dates, times, dollar amounts, percentages, ordinance numbers, resolution numbers, agenda item numbers, decimals, and source-specific identifiers exactly as written.
-- Preserve card status values exactly as written. Do not translate values like "Upcoming vote", "Information only", "Under discussion", "Passed", or "Cancelled".
+- Preserve card status values exactly as written. Do not translate values like "Upcoming vote", "Routine approval", "Information only", "Under discussion", "Passed", or "Cancelled".
 - Preserve null values as null and arrays as arrays.
 - Translate "Not listed in the source document." consistently as "No indicado en el documento fuente."
 - Use clear, neutral Spanish for public civic information.

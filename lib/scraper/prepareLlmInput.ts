@@ -2,12 +2,28 @@ import type { LlmReadyMeeting, PrimeGovDocument, PrimeGovMeeting } from "@/lib/t
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { extractPdfTextForDocument } from "./pdfText";
 import { enrichMenloParkMeetingTimesFromAgendaText } from "@/lib/sources/menlo-park";
+import {
+  currentMeetingSourceText,
+  extractAgendaItemsFromText,
+  formatAgendaItemContexts,
+  mergeAgendaItems
+} from "@/lib/scraper/agendaItemContext";
 
 export const MAX_CHARS_FOR_LLM = 30000;
 export const MAX_ATTACHMENT_CONTEXT_CHARS_PER_ITEM = 2500;
 const MIN_PRIMARY_SOURCE_CHARS = 300;
 const MIN_HTML_AGENDA_CHARS = 500;
 const MIN_ROW_SOURCE_CHARS = 40;
+
+export function normalizeSourceText(text = "") {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 function findDoc(meeting: PrimeGovMeeting, type: PrimeGovDocument["type"]) {
   return meeting.documents.find((doc) => doc.type === type);
@@ -70,7 +86,7 @@ async function extractTextForDocument(doc: PrimeGovDocument | undefined | null) 
   if (!doc) return "";
 
   if (doc.extractedText && !doc.localPath) {
-    return cleanText(doc.extractedText);
+    return normalizeSourceText(doc.extractedText);
   }
 
   const extracted = await extractPdfTextForDocument(doc);
@@ -88,7 +104,7 @@ export async function appendAgendaItemAttachmentContext(
     return { text: baseText, included: 0 };
   }
 
-  const cleanedBase = cleanText(baseText);
+  const cleanedBase = normalizeSourceText(baseText);
   const remainingCharacters = MAX_CHARS_FOR_LLM - cleanedBase.length;
   if (remainingCharacters < 400) return { text: cleanedBase, included: 0 };
 
@@ -112,6 +128,7 @@ export async function appendAgendaItemAttachmentContext(
     seenUrls.add(attachment.url);
     const text = cleanText(await extractTextForDocument(attachment));
     if (text.length < 200) continue;
+    if (!attachment.extractedText) attachment.extractedText = text;
 
     candidates.push({
       agendaNumber: item.agendaNumber || attachment.agendaItemNumber || "Unnumbered",
@@ -178,7 +195,7 @@ async function selectFirstUsableSource(
   } | null = null;
 
   for (const candidate of candidates) {
-    const text = cleanText(await candidate.loadText());
+    const text = normalizeSourceText(await candidate.loadText());
 
     if (text && !firstNonEmpty) {
       firstNonEmpty = {
@@ -283,7 +300,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         sourceType: "HTML Agenda",
         sourceUrl: htmlAgenda?.url || fallbackSourceUrl,
         minimumCharacters: MIN_HTML_AGENDA_CHARS,
-        loadText: () => cleanText(htmlAgendaText),
+        loadText: () => normalizeSourceText(htmlAgendaText),
         emptyNote: "HTML agenda had little or no usable agenda text."
       });
     }
@@ -342,7 +359,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         sourceType: "Detail Page",
         sourceUrl: meeting.meetingDetailsUrl || fallbackSourceUrl,
         minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
-        loadText: () => cleanText(mountainViewDetailText),
+        loadText: () => normalizeSourceText(mountainViewDetailText),
         emptyNote: "Detail page had little or no usable agenda text.",
         selectedNote: "Used detail page text because no agenda document text was available."
       });
@@ -358,7 +375,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         sourceType: "Detail Page",
         sourceUrl: meeting.meetingDetailsUrl || fallbackSourceUrl,
         minimumCharacters: MIN_PRIMARY_SOURCE_CHARS,
-        loadText: () => cleanText(detailText),
+        loadText: () => normalizeSourceText(detailText),
         emptyNote: "Detail page had little or no usable agenda text.",
         selectedNote: "Used detail page text because no agenda document text was available."
       });
@@ -369,7 +386,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
         sourceType: "Row Text",
         sourceUrl: fallbackSourceUrl,
         minimumCharacters: MIN_ROW_SOURCE_CHARS,
-        loadText: () => cleanText(meeting.rowText),
+        loadText: () => normalizeSourceText(meeting.rowText),
         emptyNote: "Meeting row text had little or no usable agenda text.",
         selectedNote: "Used source row text because no usable agenda document text was available."
       });
@@ -441,6 +458,21 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   if (attachmentContext.included > 0) {
     extractionNotes.push(
       `Included item-aware context from ${attachmentContext.included} agenda attachment(s).`
+    );
+  }
+
+  const extractedItems = extractAgendaItemsFromText(meeting, selectedText);
+  meeting.items = mergeAgendaItems(meeting.items || [], extractedItems);
+  const structuredItemContext = formatAgendaItemContexts(meeting.items);
+  if (structuredItemContext) {
+    const currentSourceContext = currentMeetingSourceText(selectedText);
+    selectedText = [
+      structuredItemContext,
+      "Current agenda and meeting-wide participation context:",
+      currentSourceContext
+    ].join("\n\n");
+    extractionNotes.push(
+      `Prepared item-specific context for ${meeting.items.length} current agenda item(s) and excluded packet text after the current agenda boundary.`
     );
   }
 

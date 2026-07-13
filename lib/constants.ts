@@ -83,6 +83,7 @@ export const CATEGORY_DEFINITIONS: Record<
 
 export const STATUS_TONES: Record<string, string> = {
   "Upcoming vote": "border-civic/25 bg-[#eef5ff] text-[#164a91]",
+  "Routine approval": "border-[#c6cbd8] bg-[#f4f5f8] text-[#4b5367]",
   "Under discussion": "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
   Passed: "border-[#9fc6b2] bg-[#effbf3] text-[#24613c]",
   Tabled: "border-[#f0c75e] bg-[#fff9e9] text-[#73561a]",

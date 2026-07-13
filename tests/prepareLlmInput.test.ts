@@ -96,3 +96,57 @@ test("uses Accessible Agenda text before packet text for Mountain View", async (
   assert.match(prepared.llmInputText, /safe routes project/);
   assert.doesNotMatch(prepared.llmInputText, /large packet/);
 });
+
+test("structures an unnumbered current agenda and excludes historical packet pages", async () => {
+  const packetText = `
+CITY COMMISSION SPECIAL MEETING AGENDA
+Residents may email comments to clerk@city.example.
+CALL TO ORDER AND ROLL CALL
+DISCUSSION AND ACTION
+Draft Committee Workplan
+Recommendation:
+1. Receive an informational report.
+1. Provide direction and consider adoption of the workplan.
+Public Hearing on Sewer Service Charges
+Recommendation:
+1. Receive an informational report on the charges.
+1. The regional board will consider approval at a later meeting.
+ADJOURNMENT
+This packet is available 72 hours before the meeting.
+COMMITTEE REPORTS 3.1
+CITY COMMISSION STAFF REPORT
+SUBJECT: Historical contract award
+Recommendation: Approve the historical contract.
+${repeatSentence("Historical supporting material.", 20)}
+`;
+  const meeting: PrimeGovMeeting = {
+    externalId: "commission-2026-07-14",
+    section: "Upcoming Meetings",
+    title: "Commission",
+    dateText: "July 14, 2026",
+    meetingType: "Commission",
+    rowText: "Commission July 14, 2026 Agenda Packet",
+    status: "Upcoming",
+    sourceUrl: "https://city.example/agenda",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda Packet",
+        label: "Agenda Packet",
+        url: "https://city.example/packet.pdf",
+        extractedText: packetText
+      }
+    ]
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.deepEqual(
+    prepared.items?.map((item) => item.title),
+    ["Draft Committee Workplan", "Public Hearing on Sewer Service Charges"]
+  );
+  assert.match(prepared.llmInputText, /clerk@city\.example/);
+  assert.doesNotMatch(prepared.llmInputText, /Historical contract award/);
+  assert.doesNotMatch(prepared.llmInputText, /72 hours before/);
+});

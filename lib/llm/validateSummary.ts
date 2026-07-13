@@ -1,18 +1,13 @@
 import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
 import { CATEGORIES } from "@/lib/constants";
-import type { LlmReadyMeeting, SimpleCityCardTranslation, SimpleCitySummary } from "@/lib/types";
+import { CARD_STATUSES } from "@/lib/cardStatus";
+import type { LlmReadyMeeting, MeetingStatus, SimpleCityCardTranslation, SimpleCitySummary } from "@/lib/types";
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
+import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 
 const allowedCategories = new Set<string>(CATEGORIES);
-const allowedStatuses = new Set([
-  "Upcoming vote",
-  "Under discussion",
-  "Passed",
-  "Tabled",
-  "Cancelled",
-  "Information only"
-]);
+const allowedStatuses = new Set<string>(CARD_STATUSES);
 const confidenceRank = {
   low: 0,
   medium: 1,
@@ -127,6 +122,7 @@ export type SummaryValidationOptions = {
   allowedSourceUrls?: string[];
   sourceText?: string;
   maxConfidence?: "high" | "medium" | "low";
+  meetingStatus?: MeetingStatus;
   onIssue?: (issue: SummaryValidationIssue) => void;
 };
 
@@ -218,10 +214,6 @@ function cardGroundingText(card: z.infer<typeof CardSchema>) {
     .join(" ");
 }
 
-function cardDedupeKey(card: SimpleCitySummary["cards"][number]) {
-  return `${normalizeEvidenceText(card.agendaItem)}|${normalizeUrl(card.source)}`;
-}
-
 function cleanCardTranslation(
   translation: z.infer<typeof CardTranslationSchema> | null | undefined,
   sourceStatus: string
@@ -298,6 +290,7 @@ export function validationOptionsForMeeting(
     ].filter((url): url is string => Boolean(url)),
     sourceText: buildMeetingSourceText(meeting),
     maxConfidence: maxConfidenceForMeeting(meeting),
+    meetingStatus: meeting.status,
     onIssue
   };
 }
@@ -378,6 +371,17 @@ export function validateSimpleCitySummary(
         return null;
       }
 
+      if (
+        options.meetingStatus === "Upcoming" &&
+        (status === "Passed" || status === "Tabled")
+      ) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem,
+          reason: `Upcoming meeting card cannot use historical outcome status: ${status}`
+        });
+        return null;
+      }
+
       if (unsupportedValues.length > 0) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
@@ -392,7 +396,9 @@ export function validateSimpleCitySummary(
       const whyItMatters = card.whyItMatters.trim();
       const categoryTags = card.categoryTags
         .map((tag) => tag.trim())
-        .filter((tag) => allowedCategories.has(tag));
+        .filter((tag) => allowedCategories.has(tag))
+        .filter((tag, tagIndex, tags) => tags.indexOf(tag) === tagIndex)
+        .slice(0, 2);
 
       if (!agendaItem || !whatIsHappening || !whyItMatters) {
         options.onIssue?.({
@@ -431,10 +437,14 @@ export function validateSimpleCitySummary(
       };
     })
     .filter((card): card is NonNullable<typeof card> => Boolean(card));
-  const seenCards = new Set<string>();
+  const seenCards: SimpleCitySummary["cards"] = [];
   const dedupedCards = cards.filter((card) => {
-    const key = cardDedupeKey(card.card);
-    if (seenCards.has(key)) {
+    const duplicate = seenCards.some(
+      (seen) =>
+        normalizeUrl(seen.source) === normalizeUrl(card.card.source) &&
+        areLikelySameAgendaItem(seen.agendaItem, card.card.agendaItem)
+    );
+    if (duplicate) {
       options.onIssue?.({
         agendaItem: card.card.agendaItem,
         reason: "Duplicate card for the same agenda item and source was dropped."
@@ -442,7 +452,7 @@ export function validateSimpleCitySummary(
       return false;
     }
 
-    seenCards.add(key);
+    seenCards.push(card.card);
     return true;
   });
 

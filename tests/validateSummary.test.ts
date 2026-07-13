@@ -167,3 +167,72 @@ test("drops cards with ungrounded contact details", () => {
 
   assert.equal(result.cards.length, 0);
 });
+
+test("drops historical outcome statuses from upcoming meeting cards", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ status: "Passed" })]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM.",
+      meetingStatus: "Upcoming"
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+});
+
+test("accepts routine approval as a current procedural status", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Approve meeting minutes",
+          whatIsHappening: "The council will approve its meeting minutes.",
+          whyItMatters: "The minutes provide the official record of the meeting.",
+          categoryTags: ["City Services"],
+          status: "Routine approval",
+          confidence: "medium"
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Approve meeting minutes. The council will approve its meeting minutes. The minutes provide the official record of the meeting. Attend at 7:00 PM.",
+      meetingStatus: "Upcoming"
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.cards[0].status, "Routine approval");
+});
+
+test("keeps at most two unique supported topics in model order", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          categoryTags: [
+            "Transportation",
+            "Transportation",
+            "City Services",
+            "Public Safety"
+          ]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM."
+    }
+  );
+
+  assert.deepEqual(result.cards[0].categoryTags, ["Transportation", "City Services"]);
+});

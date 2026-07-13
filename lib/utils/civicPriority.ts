@@ -267,6 +267,7 @@ export function publicInterestScore(card: SummaryCardRow) {
   }
 
   if (card.status === "Upcoming vote") score += 32;
+  if (card.status === "Routine approval") score -= 20;
   if (card.status === "Under discussion") score += 22;
   if (card.status === "Passed") score += 10;
   if (card.status === "Information only") score -= 8;

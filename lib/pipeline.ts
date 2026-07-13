@@ -1,4 +1,4 @@
-import type { LlmReadyMeeting, PrimeGovMeeting } from "@/lib/types";
+import type { LlmReadyMeeting, PrimeGovMeeting, SimpleCitySummary } from "@/lib/types";
 import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
@@ -56,6 +56,12 @@ export type PipelineResult = {
   documentsDownloaded: number;
   cardsGenerated: number;
   meetings: LlmReadyMeeting[];
+  generatedSummaries: Array<{
+    meetingId: string;
+    meetingTitle: string;
+    dateText: string | null;
+    summary: SimpleCitySummary;
+  }>;
 };
 
 export type MultiJurisdictionPipelineResult = {
@@ -163,7 +169,8 @@ export async function runSimpleCityPipeline(
           meetingsFound: 0,
           documentsDownloaded: 0,
           cardsGenerated: 0,
-          meetings: []
+          meetings: [],
+          generatedSummaries: []
         };
       }
     }
@@ -174,6 +181,7 @@ export async function runSimpleCityPipeline(
   let meetingsFound = 0;
   let documentsDownloaded = 0;
   let cardsGenerated = 0;
+  const generatedSummaries: PipelineResult["generatedSummaries"] = [];
   let persistSummaries = canPersist;
 
   if (persist && !supabase) {
@@ -395,6 +403,12 @@ export async function runSimpleCityPipeline(
               cardsGenerated += inserted.length;
             } else {
               cardsGenerated += summary.cards.length;
+              generatedSummaries.push({
+                meetingId: item.meeting.id,
+                meetingTitle: item.meeting.title,
+                dateText: item.meeting.dateText,
+                summary
+              });
             }
             consecutiveRateLimitFailures = 0;
           } catch (error) {
@@ -453,7 +467,8 @@ export async function runSimpleCityPipeline(
       meetingsFound,
       documentsDownloaded,
       cardsGenerated,
-      meetings: llmReadyMeetings
+      meetings: llmReadyMeetings,
+      generatedSummaries
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown pipeline error";
@@ -489,7 +504,8 @@ export async function runSimpleCityPipeline(
       meetingsFound,
       documentsDownloaded,
       cardsGenerated,
-      meetings: []
+      meetings: [],
+      generatedSummaries
     };
   }
 }
@@ -526,7 +542,8 @@ export async function runJurisdictionPipelines(
         meetingsFound: 0,
         documentsDownloaded: 0,
         cardsGenerated: 0,
-        meetings: []
+        meetings: [],
+        generatedSummaries: []
       };
       results[jurisdiction.slug] = failed;
       logs.push(...failed.logs);

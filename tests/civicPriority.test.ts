@@ -86,7 +86,7 @@ test("public-interest ranking puts impactful items before routine recognitions a
     id: "minutes",
     agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
     category_tags: ["City Services"],
-    status: "Upcoming vote"
+    status: "Routine approval"
   });
   const recognition = card({
     id: "recognition",
@@ -99,8 +99,8 @@ test("public-interest ranking puts impactful items before routine recognitions a
   assert.ok(publicInterestScore(budget) > publicInterestScore(recognition));
   assert.deepEqual([minutes, budget, recognition].sort(compareCardsByPublicInterest).map((item) => item.id), [
     "budget",
-    "minutes",
-    "recognition"
+    "recognition",
+    "minutes"
   ]);
   assert.equal(isPublicInterestCard(budget), true);
   assert.equal(isPublicInterestCard(minutes), false);
@@ -118,13 +118,13 @@ test("digest selection keeps public-interest or featured cards only", () => {
     id: "minutes",
     agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
     category_tags: ["City Services"],
-    status: "Upcoming vote"
+    status: "Routine approval"
   });
   const featuredMinutes = card({
     id: "featured-minutes",
     agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
     category_tags: ["City Services"],
-    status: "Upcoming vote",
+    status: "Routine approval",
     is_featured: true
   });
 
@@ -164,7 +164,7 @@ test("digest group selection keeps represented jurisdictions before filling extr
     id: "minutes",
     agenda_item: "Approve Consent Calendar minutes from February 19, 2026",
     category_tags: ["City Services"],
-    status: "Upcoming vote"
+    status: "Routine approval"
   });
 
   const selected = selectDigestCardGroups(

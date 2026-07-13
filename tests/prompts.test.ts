@@ -14,3 +14,24 @@ test("summarizer prompt includes transparency-worthy routine items", () => {
     /If no non-routine or transparency-worthy source-supported agenda items are visible/
   );
 });
+
+test("summarizer prompt classifies topics from complete item context", () => {
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /agenda item's complete context/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Do not choose a topic from an isolated keyword/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Choose exactly one primary topic/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /no more than two topics/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Classify a work plan by the substantive service area/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /service charge, revenue, or tax-roll collection/);
+});
+
+test("summarizer prompt separates item status from participation and historical minutes", () => {
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Public comment availability and item status are independent/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /prior meeting minutes, historical vote results/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Never mark a current agenda item “Passed” or “Tabled”/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Consider every action requested of the current body/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /a substantive formal decision outranks discussion/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /consider adoption/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Use “Routine approval” only for approval of meeting minutes/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Do not use it for a substantive contract, budget, permit/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /even if the agenda does not mention a roll-call vote/);
+});
