@@ -125,9 +125,12 @@ export function normalizeEastPaloAltoRows(
   return meetings;
 }
 
-async function extractRows(page: Page): Promise<{ headers: string[]; rows: EastPaloAltoExtractedRow[] }> {
+async function extractRows(
+  page: Page,
+  baseUrl: string
+): Promise<{ headers: string[]; rows: EastPaloAltoExtractedRow[] }> {
   await page.evaluate("globalThis.__name = (value) => value");
-  return page.evaluate(() => {
+  return page.evaluate((sourceBaseUrl) => {
     const clean = (value = "") => value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
     const norm = (value = "") => clean(value).toLowerCase();
     const tables = Array.from(document.querySelectorAll("table"));
@@ -140,7 +143,7 @@ async function extractRows(page: Page): Promise<{ headers: string[]; rows: EastP
     const headers = Array.from(headerRow?.querySelectorAll("th,td") || []).map((cell) => clean(cell.textContent || ""));
     const headerMap = new Map(headers.map((header, index) => [norm(header), index]));
     const absolute = (href: string) => {
-      try { return new URL(href, window.location.href).toString(); } catch { return ""; }
+      try { return new URL(href, sourceBaseUrl).toString(); } catch { return ""; }
     };
     const rows = Array.from(table.querySelectorAll("tr")).filter((row) => row !== headerRow).flatMap((row) => {
       const cells = Array.from(row.querySelectorAll(":scope > th, :scope > td"));
@@ -155,7 +158,7 @@ async function extractRows(page: Page): Promise<{ headers: string[]; rows: EastP
       return [{ bodyName, dateTimeText, rowText: clean(row.textContent || ""), links }];
     });
     return { headers, rows };
-  });
+  }, baseUrl);
 }
 
 async function fetchOfficialPage(url: string) {
@@ -201,15 +204,17 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
     }
     await page.getByText("Agenda and Minutes", { exact: false }).first().waitFor({ timeout: 60000 });
     const embeddedUrl = await page.locator('iframe[src*="granicus.com"]').first().getAttribute("src");
+    let tableUrl = portalUrl;
     if (embeddedUrl) {
+      tableUrl = new URL(embeddedUrl, portalUrl).toString();
       log(`Loading the official Upcoming Events table embedded by ${portalUrl}.`);
-      await page.setContent(await fetchOfficialPage(new URL(embeddedUrl, portalUrl).toString()), {
+      await page.setContent(await fetchOfficialPage(tableUrl), {
         waitUntil: "domcontentloaded",
         timeout: 60000
       });
     }
     await page.getByText("Upcoming Events", { exact: false }).first().waitFor({ timeout: 60000 });
-    const extracted = await extractRows(page);
+    const extracted = await extractRows(page, tableUrl);
     log(`East Palo Alto table headers: ${extracted.headers.join(", ")}.`);
     log(`East Palo Alto Upcoming Events rows found: ${extracted.rows.length}.`);
     let meetings = normalizeEastPaloAltoRows(extracted.rows, jurisdiction);

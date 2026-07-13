@@ -11,6 +11,13 @@ test("classifies East Palo Alto table links by label and column", () => {
   assert.equal(classifyEastPaloAltoLink("Notice", "Agenda", "Meeting Cancelled", "https://example.test/c.pdf"), "Notice of Cancellation");
 });
 
+test("resolves East Palo Alto protocol-relative Agenda links against Granicus", () => {
+  assert.equal(
+    new URL("//cityofepa.granicus.com/AgendaViewer.php?event_id=388", "https://cityofepa.granicus.com/ViewPublisher.php?view_id=1").toString(),
+    "https://cityofepa.granicus.com/AgendaViewer.php?event_id=388"
+  );
+});
+
 test("normalizes distinct East Palo Alto meeting bodies and preserves official resources", () => {
   const jurisdiction = getJurisdictionBySlug("east-palo-alto");
   assert.ok(jurisdiction);
