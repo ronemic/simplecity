@@ -19,6 +19,7 @@ import {
   replaceSummaryCardsForMeeting,
   upsertMeetings
 } from "@/lib/db/upsertMeetings";
+import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
 import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
@@ -322,6 +323,18 @@ export async function runSimpleCityPipeline(
           scrapeResult.scrapedAt,
           jurisdiction
         );
+        const reconciliation = await reconcileMeetingRecords(supabase, jurisdiction);
+        if (
+          reconciliation.staleStatusesUpdated > 0 ||
+          reconciliation.orphanDuplicatesDeleted > 0 ||
+          reconciliation.protectedDuplicatesSkipped > 0
+        ) {
+          log(
+            `Reconciled meetings: ${reconciliation.staleStatusesUpdated} stale status(es) updated, ` +
+              `${reconciliation.orphanDuplicatesDeleted} orphan duplicate(s) deleted, ` +
+              `${reconciliation.protectedDuplicatesSkipped} duplicate(s) retained because they own published data.`
+          );
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown persistence error";
         errors.push(message);

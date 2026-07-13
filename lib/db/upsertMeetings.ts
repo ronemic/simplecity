@@ -143,6 +143,47 @@ function canonicalMeetingSourceUrl(meeting: LlmReadyMeeting) {
   );
 }
 
+function chunks<T>(values: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < values.length; index += size) {
+    result.push(values.slice(index, index + size));
+  }
+  return result;
+}
+
+async function loadExistingExternalIdsByMeetingDetailsUrl(
+  supabase: SupabaseClient,
+  meetings: LlmReadyMeeting[],
+  jurisdiction?: JurisdictionConfig
+) {
+  const urls = [...new Set(meetings.map((meeting) => meeting.meetingDetailsUrl).filter(Boolean))] as string[];
+  const externalIds = new Map<string, string>();
+  if (urls.length === 0) return externalIds;
+
+  for (const batch of chunks(urls, 50)) {
+    let query = supabase
+      .from("meetings")
+      .select("external_id,meeting_details_url:raw->>meetingDetailsUrl")
+      .in("raw->>meetingDetailsUrl", batch);
+
+    if (jurisdiction) query = query.eq("jurisdiction_slug", jurisdiction.slug);
+    const { data, error } = await query;
+    if (error) throw new Error(`Failed to reconcile official meeting identifiers: ${error.message}`);
+
+    for (const row of data || []) {
+      const existing = row as unknown as {
+        external_id?: string | null;
+        meeting_details_url?: string | null;
+      };
+      if (existing.external_id && existing.meeting_details_url) {
+        externalIds.set(existing.meeting_details_url, existing.external_id);
+      }
+    }
+  }
+
+  return externalIds;
+}
+
 async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string) {
   const { count, error } = await supabase
     .from("summary_cards")
@@ -275,12 +316,20 @@ export async function upsertMeetings(
   jurisdiction?: JurisdictionConfig
 ) {
   const upserted: UpsertedMeeting[] = [];
+  const existingExternalIds = await loadExistingExternalIdsByMeetingDetailsUrl(
+    supabase,
+    meetings,
+    jurisdiction
+  );
 
   for (const meeting of meetings) {
     const safeMeeting = sanitizeForDatabase(meeting);
     const identitySourceUrl = canonicalMeetingSourceUrl(meeting);
     const selectedSourceUrl = meeting.sourceUrl || identitySourceUrl;
     const externalId =
+      (meeting.meetingDetailsUrl
+        ? existingExternalIds.get(meeting.meetingDetailsUrl)
+        : null) ||
       safeMeeting.externalId ||
       externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);

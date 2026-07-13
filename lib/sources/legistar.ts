@@ -70,6 +70,22 @@ function getUrlIdentity(url: string | null | undefined) {
   }
 }
 
+export function makeLegistarMeetingExternalId(
+  jurisdictionSlug: string,
+  meetingDetailsUrl: string | null | undefined,
+  fallback: string
+) {
+  const { id, guid } = getUrlIdentity(meetingDetailsUrl);
+  if (id || guid) {
+    return [jurisdictionSlug, "legistar-meeting", id, guid]
+      .filter(Boolean)
+      .join(":")
+      .toLowerCase();
+  }
+
+  return slugify(`${jurisdictionSlug}-legistar-meeting-${fallback}`);
+}
+
 function legistarMeetingMergeKey(meeting: LegistarMeeting) {
   const { id, guid } = getUrlIdentity(meeting.meetingDetailsUrl);
 
@@ -1275,7 +1291,18 @@ async function extractVisibleLegistarMeetings(
 
   )) as LegistarMeeting[];
 
-  return mergeLegistarMeetings(rawMeetings).map(inferLegistarMeetingStatus);
+  return mergeLegistarMeetings(rawMeetings)
+    .map(inferLegistarMeetingStatus)
+    .map((meeting) => ({
+      ...meeting,
+      externalId: makeLegistarMeetingExternalId(
+        jurisdiction.slug,
+        meeting.meetingDetailsUrl,
+        [meeting.dateText, meeting.timeText, meeting.bodyName || meeting.title]
+          .filter(Boolean)
+          .join(" ")
+      )
+    }));
 }
 
 export async function scrapeLegistarMeetings(

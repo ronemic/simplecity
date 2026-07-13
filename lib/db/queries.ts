@@ -28,6 +28,7 @@ import type {
 import type { Locale } from "@/lib/i18n";
 import { compareCardsByPublicInterest } from "@/lib/utils/civicPriority";
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
+import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
@@ -163,12 +164,12 @@ function withMeetingJurisdictionFallback<T extends Partial<MeetingRow>>(
   row: T,
   jurisdiction: JurisdictionConfig
 ): T {
-  return {
+  return withEffectiveMeetingStatus({
     ...row,
     jurisdiction_name: row.jurisdiction_name || jurisdiction.name,
     jurisdiction_slug: row.jurisdiction_slug || jurisdiction.slug,
     platform: row.platform || jurisdiction.platform
-  };
+  });
 }
 
 function withCardJurisdictionFallback(
@@ -747,10 +748,6 @@ const getCachedMeetings = unstable_cache(
           .eq("jurisdiction_slug", jurisdiction.slug)
           .order("meeting_datetime", { ascending: false, nullsFirst: false });
 
-        if (status) {
-          query = query.eq("status", status);
-        }
-
         if (pattern) {
           query = query.or(
             [
@@ -772,7 +769,10 @@ const getCachedMeetings = unstable_cache(
         const rows = ((data || []) as unknown as MeetingRow[]).map((row) =>
           withMeetingJurisdictionFallback(row, jurisdiction)
         );
-        return applyMeetingTranslations(supabase, rows, locale);
+        const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
+        return status
+          ? translatedRows.filter((row) => row.status === status)
+          : translatedRows;
       })
     );
 
