@@ -31,6 +31,7 @@ import {
   enrichMenloParkMeetingTimesFromAgendaText,
   scrapeMenloParkMeetings
 } from "@/lib/sources/menlo-park";
+import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -252,7 +253,17 @@ export async function runSimpleCityPipeline(
                 log
               })
           : jurisdiction.platform === "official-site"
-            ? await scrapeMenloParkMeetings({
+            ? jurisdiction.slug === "east-palo-alto"
+              ? await scrapeEastPaloAltoMeetings({
+                  ...options,
+                  jurisdiction,
+                  portalUrl: options.portalUrl || jurisdiction.officialSiteUrl || jurisdiction.sourceUrl,
+                  documentOutputDir,
+                  downloadDocuments: options.downloadDocuments ?? true,
+                  shouldStop: deadlineExceeded,
+                  log
+                })
+              : await scrapeMenloParkMeetings({
                 ...options,
                 jurisdiction,
                 portalUrl: options.portalUrl || jurisdiction.officialSiteUrl || jurisdiction.sourceUrl,
@@ -260,7 +271,7 @@ export async function runSimpleCityPipeline(
                 downloadDocuments: options.downloadDocuments ?? true,
                 shouldStop: deadlineExceeded,
                 log
-              })
+                })
             : await scrapePortal({
                 ...options,
                 portalUrl: options.portalUrl || jurisdiction.primegovUrl || jurisdiction.sourceUrl,

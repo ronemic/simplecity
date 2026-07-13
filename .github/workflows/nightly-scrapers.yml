@@ -10,6 +10,7 @@ on:
     - cron: "40 12 * * *"
     - cron: "30 13 * * *"
     - cron: "0 14 * * *"
+    - cron: "30 14 * * *"
   workflow_dispatch:
     inputs:
       jurisdiction:
@@ -27,6 +28,7 @@ on:
           - san-francisco
           - los-altos
           - redwood-city
+          - east-palo-alto
 
 env:
   CI: true
@@ -65,6 +67,8 @@ env:
   SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY }}
   SAN_FRANCISCO_LEGISTAR_URL: https://sfgov.legistar.com/Calendar.aspx
   LOS_ALTOS_CIVICCLERK_URL: https://losaltosca.portal.civicclerk.com/
+  EAST_PALO_ALTO_AGENDA_URL: https://www.cityofepa.org/agenda
+  EAST_PALO_ALTO_MEETINGS_URL: https://www.cityofepa.org/meetings
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
   CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
@@ -313,3 +317,33 @@ jobs:
 
       - name: Run Redwood City pipeline
         run: npm run pipeline:redwood-city -- --max-runtime-minutes=50
+
+  east-palo-alto:
+    name: East Palo Alto scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'east-palo-alto')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '30 14 * * *')
+    concurrency:
+      group: nightly-scraper-east-palo-alto
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+
+      - name: Run East Palo Alto pipeline
+        run: npm run pipeline:east-palo-alto -- --max-runtime-minutes=50

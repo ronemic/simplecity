@@ -36,6 +36,10 @@
     "scrape:menlo-park:headful": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-menlo-park.ts --jurisdiction=menlo-park --headful",
     "scrape:menlo-park:quick": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-menlo-park.ts --jurisdiction=menlo-park --headful --limit=10",
     "scrape:menlo-park:download": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-menlo-park.ts --jurisdiction=menlo-park --headful --download",
+    "scrape:east-palo-alto": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-east-palo-alto.ts --jurisdiction=east-palo-alto",
+    "scrape:east-palo-alto:headful": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-east-palo-alto.ts --jurisdiction=east-palo-alto --headful",
+    "scrape:east-palo-alto:quick": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-east-palo-alto.ts --jurisdiction=east-palo-alto --limit=10",
+    "scrape:east-palo-alto:download": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-east-palo-alto.ts --jurisdiction=east-palo-alto --headful --download",
     "scrape:los-altos": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-los-altos.ts --jurisdiction=los-altos",
     "scrape:los-altos:headful": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-los-altos.ts --jurisdiction=los-altos --headful",
     "scrape:los-altos:quick": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/scrape-los-altos.ts --jurisdiction=los-altos --headful --limit=10",
@@ -69,6 +73,7 @@
     "pipeline:menlo-park": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=menlo-park",
     "pipeline:los-altos": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=los-altos",
     "pipeline:redwood-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=redwood-city",
+    "pipeline:east-palo-alto": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=east-palo-alto",
     "pipeline:all": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=all",
     "email:digests": "node --import tsx/esm scripts/send-weekly-digests.ts",
     "test": "node --import tsx/esm --test tests/*.test.ts"

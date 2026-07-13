@@ -27,7 +27,7 @@ test("groups alphabetized cities beneath their clickable counties", () => {
     options
       .filter((jurisdiction) => jurisdiction.parentCountySlug === "san-mateo-county")
       .map((jurisdiction) => jurisdiction.slug),
-    ["foster-city", "menlo-park", "redwood-city", "san-mateo"]
+    ["east-palo-alto", "foster-city", "menlo-park", "redwood-city", "san-mateo"]
   );
   assert.deepEqual(
     options

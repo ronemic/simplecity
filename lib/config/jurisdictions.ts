@@ -12,6 +12,7 @@ export type JurisdictionSlug =
   | "los-altos"
   | "san-francisco"
   | "menlo-park"
+  | "east-palo-alto"
   | "redwood-city";
 export type PublicJurisdictionSlug =
   | "foster-city"
@@ -22,6 +23,7 @@ export type PublicJurisdictionSlug =
   | "los-altos"
   | "san-francisco"
   | "menlo-park"
+  | "east-palo-alto"
   | "redwood-city";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
 export type PublicJurisdictionSelection =
@@ -46,6 +48,7 @@ export type JurisdictionConfig = {
   iqm2Url?: string;
   legistarUrl?: string;
   officialSiteUrl?: string;
+  meetingsUrl?: string;
   civicClerkUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
@@ -74,6 +77,10 @@ const DEFAULT_SAN_FRANCISCO_LEGISTAR_URL =
 const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
+export const DEFAULT_EAST_PALO_ALTO_AGENDA_URL =
+  "https://www.cityofepa.org/agenda";
+export const DEFAULT_EAST_PALO_ALTO_MEETINGS_URL =
+  "https://www.cityofepa.org/meetings";
 const DEFAULT_REDWOOD_CITY_AGENDA_ONLINE_URL =
   process.env.REDWOOD_CITY_AGENDA_ONLINE_URL ||
   "https://meetings.redwoodcity.org/AgendaOnline/";
@@ -97,6 +104,12 @@ export const MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE = [
   "NEXT_PUBLIC_MENLO_PARK_SUPABASE_ANON_KEY, and",
   "MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY."
 ].join("\n");
+export const SOUTH_SAN_MATEO_REGION_MISSING_SUPABASE_CONFIG_MESSAGE = [
+  "South San Mateo region Supabase configuration is missing. Set",
+  "NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_URL,",
+  "NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_ANON_KEY, and",
+  "SOUTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY."
+].join("\n");
 
 const publicClients = new Map<JurisdictionSlug, SupabaseClient>();
 const serviceClients = new Map<JurisdictionSlug, SupabaseClient>();
@@ -110,6 +123,7 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "los-altos",
   "san-francisco",
   "menlo-park",
+  "east-palo-alto",
   "redwood-city"
 ];
 
@@ -117,6 +131,7 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "All", slug: ALL_JURISDICTIONS_SLUG },
   { name: "San Francisco", slug: "san-francisco" },
   { name: "San Mateo County", slug: "san-mateo-county" },
+  { name: "East Palo Alto", slug: "east-palo-alto", parentCountySlug: "san-mateo-county" },
   { name: "Foster City", slug: "foster-city", parentCountySlug: "san-mateo-county" },
   { name: "Menlo Park", slug: "menlo-park", parentCountySlug: "san-mateo-county" },
   { name: "Redwood City", slug: "redwood-city", parentCountySlug: "san-mateo-county" },
@@ -150,6 +165,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "los-altos") return "Los Altos";
   if (internalSlug === "san-francisco") return "San Francisco";
   if (internalSlug === "menlo-park") return "Menlo Park";
+  if (internalSlug === "east-palo-alto") return "East Palo Alto";
   if (internalSlug === "redwood-city") return "Redwood City";
   return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
 }
@@ -348,6 +364,23 @@ export function getJurisdictions(): JurisdictionConfig[] {
         process.env.MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY
     },
     {
+      name: "East Palo Alto",
+      officialName: "City of East Palo Alto",
+      slug: "east-palo-alto",
+      regionSlug: "south-san-mateo",
+      platform: "official-site",
+      timezone: "America/Los_Angeles",
+      sourceUrl:
+        process.env.EAST_PALO_ALTO_AGENDA_URL || DEFAULT_EAST_PALO_ALTO_AGENDA_URL,
+      officialSiteUrl:
+        process.env.EAST_PALO_ALTO_AGENDA_URL || DEFAULT_EAST_PALO_ALTO_AGENDA_URL,
+      meetingsUrl:
+        process.env.EAST_PALO_ALTO_MEETINGS_URL || DEFAULT_EAST_PALO_ALTO_MEETINGS_URL,
+      supabaseUrl: southSanMateo?.url,
+      supabaseAnonKey: southSanMateo?.anonKey,
+      supabaseServiceRoleKey: southSanMateo?.serviceRoleKey
+    },
+    {
       name: "Redwood City",
       officialName: "City of Redwood City",
       slug: "redwood-city",
@@ -436,6 +469,7 @@ export function requireValidJurisdictionSlug(
     slug === "los-altos" ||
     slug === "san-francisco" ||
     slug === "menlo-park" ||
+    slug === "east-palo-alto" ||
     slug === "redwood-city"
   ) {
     return slug;
@@ -495,6 +529,10 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
 
   if (jurisdiction.slug === "menlo-park") {
     return MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE;
+  }
+
+  if (jurisdiction.slug === "east-palo-alto" || jurisdiction.slug === "redwood-city") {
+    return SOUTH_SAN_MATEO_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 
   if (jurisdiction.slug === "san-mateo-city") {
