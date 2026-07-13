@@ -24,8 +24,18 @@ const GROUNDABLE_VALUE_PATTERNS = [
   /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
   /\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi,
   /\b(?:agenda\s+item|item|resolution|ordinance)\s+(?:no\.?\s*)?[A-Z]?\d[\w.-]*/gi,
-  /\b\d[\d,]*(?:\.\d+)?\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?|percent|million|billion|thousand)\b/gi
+  /\b\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand)(?:\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?))?|\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?|percent))\b/gi
 ];
+const NUMERIC_VALUE_PATTERN =
+  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?(?:\s*%|\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?|percent))?/gi;
+const NUMERIC_SCALE: Record<string, number> = {
+  thousand: 1_000,
+  k: 1_000,
+  million: 1_000_000,
+  m: 1_000_000,
+  billion: 1_000_000_000,
+  bn: 1_000_000_000
+};
 
 const CardSchema = z.object({
   agendaItem: z.string().min(1),
@@ -158,22 +168,93 @@ function uniqueValues(values: string[]) {
 }
 
 function extractGroundableValues(text: string) {
-  const values: string[] = [];
+  const matches: Array<{ value: string; start: number; end: number }> = [];
 
   for (const pattern of GROUNDABLE_VALUE_PATTERNS) {
     pattern.lastIndex = 0;
     for (const match of text.matchAll(pattern)) {
-      values.push(match[0]);
+      const start = match.index;
+      matches.push({ value: match[0], start, end: start + match[0].length });
     }
   }
 
-  return uniqueValues(values);
+  return uniqueValues(
+    matches
+      .filter(
+        (match) =>
+          !matches.some(
+            (other) =>
+              other !== match &&
+              other.start <= match.start &&
+              other.end >= match.end &&
+              other.value.length > match.value.length
+          )
+      )
+      .map((match) => match.value)
+  );
+}
+
+type ComparableNumericValue = {
+  amount: number;
+  kind: "currency" | "percent" | "number";
+  unit: string | null;
+};
+
+function normalizeNumericUnit(value: string) {
+  const normalized = value.toLowerCase().replace(/\s+/g, " ").replace(/\.$/, "");
+  if (/^units?$/.test(normalized)) return "unit";
+  if (/^homes?$/.test(normalized)) return "home";
+  if (normalized === "feet" || normalized === "ft") return "foot";
+  if (normalized === "sq ft" || normalized === "square feet") return "square-foot";
+  if (/^days?$/.test(normalized)) return "day";
+  if (/^months?$/.test(normalized)) return "month";
+  if (/^years?$/.test(normalized)) return "year";
+  if (/^hours?$/.test(normalized)) return "hour";
+  if (/^acres?$/.test(normalized)) return "acre";
+  return null;
+}
+
+function parseComparableNumericValue(value: string): ComparableNumericValue | null {
+  const match = value.trim().match(
+    /^(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*(million|billion|thousand|m|bn|k))?(?:\s*(%|percent|units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?))?$/i
+  );
+  if (!match) return null;
+
+  const base = Number(match[2].replace(/,/g, ""));
+  const scale = match[3]?.toLowerCase();
+  const amount = base * (scale ? NUMERIC_SCALE[scale] : 1);
+  if (!Number.isFinite(amount)) return null;
+
+  const suffix = match[4]?.toLowerCase() || "";
+  const isPercent = suffix === "%" || suffix === "percent";
+  return {
+    amount,
+    kind: match[1] ? "currency" : isPercent ? "percent" : "number",
+    unit: isPercent ? null : normalizeNumericUnit(suffix)
+  };
+}
+
+function hasEquivalentNumericValue(value: string, sourceText: string) {
+  const expected = parseComparableNumericValue(value);
+  if (!expected) return false;
+
+  NUMERIC_VALUE_PATTERN.lastIndex = 0;
+  for (const match of sourceText.matchAll(NUMERIC_VALUE_PATTERN)) {
+    const candidate = parseComparableNumericValue(match[0]);
+    if (!candidate || candidate.kind !== expected.kind || candidate.unit !== expected.unit) continue;
+    if (Math.abs(candidate.amount - expected.amount) <= Math.max(1, Math.abs(expected.amount)) * 1e-12) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function isGroundedValue(value: string, sourceText: string) {
   const normalizedValue = normalizeEvidenceText(value);
   if (!normalizedValue) return true;
-  return normalizeEvidenceText(sourceText).includes(normalizedValue);
+  if (normalizeEvidenceText(sourceText).includes(normalizedValue)) return true;
+  return hasEquivalentNumericValue(value, sourceText);
 }
 
 function capConfidence(

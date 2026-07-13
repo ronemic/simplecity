@@ -58,6 +58,115 @@ test("drops cards with exact values that are not grounded in the source text", (
   assert.equal(issues[0]?.value, "$250");
 });
 
+test("accepts equivalent abbreviated and expanded numeric values", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: "The council will consider a 200 million bond for park improvements."
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4 - Bond approval. The council will consider a 200,000,000 bond at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+for (const scenario of [
+  {
+    name: "decimal billions",
+    summaryValue: "$0.2 billion",
+    sourceValue: "$200,000,000"
+  },
+  {
+    name: "short currency suffixes",
+    summaryValue: "$200M",
+    sourceValue: "$200,000,000"
+  },
+  {
+    name: "percentage words and symbols",
+    summaryValue: "20 percent",
+    sourceValue: "20%"
+  },
+  {
+    name: "compatible length aliases",
+    summaryValue: "200 ft",
+    sourceValue: "200 feet"
+  },
+  {
+    name: "thousand suffixes",
+    summaryValue: "200 thousand homes",
+    sourceValue: "200,000 homes"
+  }
+]) {
+  test(`accepts equivalent numeric values using ${scenario.name}`, () => {
+    const result = validateSimpleCitySummary(
+      {
+        ...baseSummary,
+        cards: [
+          groundedCard({
+            whatIsHappening: `The proposal includes ${scenario.summaryValue}.`
+          })
+        ]
+      },
+      {
+        fallbackSource: "https://city.example/agendas/4",
+        allowedSourceUrls: ["https://city.example/agendas/4"],
+        sourceText: `Item 4. The proposal includes ${scenario.sourceValue} at 7:00 PM.`
+      }
+    );
+
+    assert.equal(result.cards.length, 1);
+  });
+}
+
+test("does not ground equivalent numbers across incompatible units", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: "The project would build 200 million homes."
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4. The project would use 200,000,000 units at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+});
+
+test("does not ground a currency amount from a plain number", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: "The proposal would cost $200 million."
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4. The proposal includes 200,000,000 units at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+});
+
 test("falls back to the official source URL and caps confidence", () => {
   const result = validateSimpleCitySummary(
     {
