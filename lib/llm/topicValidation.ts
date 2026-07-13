@@ -171,6 +171,18 @@ export function applyTopicValidation(
         categoryTags: verification?.categoryTags || card.categoryTags,
         status: verification?.status || card.status
       };
-    })
+    }),
+    translations: summary.translations?.es
+      ? {
+          ...summary.translations,
+          es: {
+            ...summary.translations.es,
+            cards: summary.translations.es.cards.map((card, cardIndex) => {
+              const verification = verifiedByIndex.get(cardIndex);
+              return card && verification ? { ...card, status: verification.status } : card;
+            })
+          }
+        }
+      : summary.translations
   };
 }

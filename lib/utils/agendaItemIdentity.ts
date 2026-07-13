@@ -61,6 +61,23 @@ export function areLikelySameAgendaItem(left: string, right: string) {
 
   const leftTokens = agendaItemIdentityTokens(left);
   const rightTokens = agendaItemIdentityTokens(right);
-  const shared = leftTokens.filter((token) => rightTokens.includes(token)).length;
-  return shared >= 3 && agendaItemSimilarity(left, right) >= 0.75;
+  const leftNumbers = leftTokens.filter((token) => /\d/.test(token));
+  const rightNumbers = rightTokens.filter((token) => /\d/.test(token));
+  if (
+    leftNumbers.length > 0 &&
+    rightNumbers.length > 0 &&
+    (leftNumbers.some((token) => !rightNumbers.includes(token)) ||
+      rightNumbers.some((token) => !leftNumbers.includes(token)))
+  ) {
+    return false;
+  }
+
+  // Only accept a strict expansion of the shorter identity. Equal-length titles
+  // with substituted subjects (for example, park vs. library contracts) are distinct.
+  const [shorter, longer] =
+    leftTokens.length < rightTokens.length
+      ? [leftTokens, rightTokens]
+      : [rightTokens, leftTokens];
+  if (shorter.length === longer.length || shorter.length < 3) return false;
+  return shorter.every((token) => longer.includes(token));
 }

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
+import {
+  buildAgendaItemSummaryBatches,
+  generateSummaryForMeeting,
+  MAX_AGENDA_ITEM_BATCH_CHARS
+} from "@/lib/llm/openrouter";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 
 const meetingSummary = {
@@ -302,10 +306,10 @@ test("verifies topics and status using only matched agenda-item context", async 
       agendaNumber: "4",
       itemType: null,
       title: "Item 4 - Contract approval",
-      action: "Approve the park maintenance contract.",
+      action: "Approve the $100 park maintenance contract.",
       result: null,
       sourceUrl: "https://city.example/agendas/4",
-      rowText: "The contract provides maintenance for city parks and recreation spaces."
+      rowText: "The $100 contract provides maintenance for city parks and recreation spaces."
     }
   ];
 
@@ -375,10 +379,10 @@ test("falls back to Cerebras when isolated topic and status verification is rate
       agendaNumber: "4",
       itemType: null,
       title: "Item 4 - Contract approval",
-      action: "Approve the park maintenance contract.",
+      action: "Approve the $100 park maintenance contract.",
       result: null,
       sourceUrl: "https://city.example/agendas/4",
-      rowText: "The contract provides maintenance for city parks."
+      rowText: "The $100 contract provides maintenance for city parks."
     }
   ];
 
@@ -420,4 +424,173 @@ test("falls back to Cerebras when isolated topic and status verification is rate
     "https://api.cerebras.ai/v1/chat/completions"
   ]);
   assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
+});
+
+test("keeps a validated summary when topic verification returns malformed JSON", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const logs: string[] = [];
+  let calls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  const preparedMeeting = meeting();
+  preparedMeeting.items = [
+    {
+      externalId: "item-4",
+      fileNumber: null,
+      agendaNumber: "4",
+      itemType: "Business",
+      title: "Item 4 - Contract approval",
+      action: "Consider a $100 contract for park maintenance at 7:00 PM.",
+      result: null,
+      sourceUrl: "https://city.example/agendas/4",
+      rowText: "The council will consider a $100 contract for park maintenance at 7:00 PM."
+    }
+  ];
+
+  globalThis.fetch = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      return openRouterResponse({
+        meetingSummary,
+        cards: [card({ status: "Under discussion" })]
+      });
+    }
+    return new Response(
+      JSON.stringify({ choices: [{ message: { content: "{malformed" } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } }
+    );
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(preparedMeeting, {
+    log: (message) => logs.push(message)
+  });
+
+  assert.equal(calls, 2);
+  assert.equal(result.summary.cards.length, 1);
+  assert.equal(result.summary.cards[0].status, "Under discussion");
+  assert.ok(logs.some((message) => message.includes("keeping the validated summary")));
+});
+
+test("builds bounded agenda-item batches without dropping the final item", () => {
+  const preparedMeeting = meeting();
+  preparedMeeting.items = Array.from({ length: 12 }, (_, index) => ({
+    externalId: `item-${index + 1}`,
+    fileNumber: null,
+    agendaNumber: String(index + 1),
+    itemType: "Business",
+    title: `Decision ${index + 1}`,
+    action: `Approve decision ${index + 1}.`,
+    result: null,
+    sourceUrl: "https://city.example/agendas/4",
+    rowText: `UNIQUE_ITEM_${index + 1} ${"context ".repeat(1000)}`
+  }));
+
+  const batches = buildAgendaItemSummaryBatches(preparedMeeting);
+  assert.ok(batches.length > 1);
+  assert.equal(batches.flatMap((batch) => batch.items || []).length, 12);
+  assert.ok(batches.every((batch) => batch.llmInputText.length <= MAX_AGENDA_ITEM_BATCH_CHARS + 500));
+  assert.ok(batches.some((batch) => batch.llmInputText.includes("UNIQUE_ITEM_12")));
+});
+
+test("summarizes and combines every bounded agenda-item batch", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let summaryCalls = 0;
+  let verificationCalls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  const preparedMeeting = meeting();
+  preparedMeeting.items = ["Alpha", "Beta", "Gamma"].map((name, index) => ({
+    externalId: `item-${name.toLowerCase()}`,
+    fileNumber: null,
+    agendaNumber: String(index + 1),
+    itemType: "Business",
+    title: `Decision ${name}`,
+    action: `Review Decision ${name}.`,
+    result: null,
+    sourceUrl: "https://city.example/agendas/4",
+    rowText: `Decision ${name} context ${"supporting context ".repeat(500)}`
+  }));
+
+  globalThis.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body || "{}")) as {
+      messages?: Array<{ role?: string; content?: string }>;
+    };
+    const system = body.messages?.[0]?.content || "";
+    const user = body.messages?.find((message) => message.role === "user")?.content || "";
+
+    if (system.includes("validate civic agenda-card topics")) {
+      verificationCalls += 1;
+      const indexes = Array.from(user.matchAll(/CARD (\d+)/g), (match) => Number(match[1]));
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  cards: indexes.map((cardIndex) => ({
+                    cardIndex,
+                    categoryTags: ["City Services"],
+                    status: "Under discussion"
+                  }))
+                })
+              }
+            }
+          ]
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    summaryCalls += 1;
+    const titles = Array.from(user.matchAll(/Official title: (Decision [A-Za-z]+)/g), (match) => match[1]);
+    return openRouterResponse({
+      meetingSummary,
+      cards: titles.map((title) =>
+        card({
+          agendaItem: title,
+          whatIsHappening: `${title} will be reviewed.`,
+          whyItMatters: `${title} affects city services.`,
+          whoItAffects: ["residents"],
+          categoryTags: ["City Services"],
+          status: "Under discussion"
+        })
+      ),
+      translations: {
+        es: {
+          cards: titles.map((title) => ({
+            agendaItem: title,
+            whatIsHappening: `${title} será revisada.`,
+            whyItMatters: `${title} afecta los servicios municipales.`,
+            whoItAffects: ["residentes"],
+            status: "Under discussion",
+            commentWindow: { opens: "No indicado.", closes: "No indicado." },
+            howToAct: { attend: "Asista.", email: "No indicado.", submitComment: "No indicado." }
+          }))
+        }
+      }
+    });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(preparedMeeting);
+
+  assert.equal(summaryCalls, 2);
+  assert.equal(verificationCalls, 2);
+  assert.deepEqual(result.summary.cards.map((value) => value.agendaItem), [
+    "Decision Alpha",
+    "Decision Beta",
+    "Decision Gamma"
+  ]);
+  assert.equal(result.summary.translations?.es?.cards.length, 3);
 });

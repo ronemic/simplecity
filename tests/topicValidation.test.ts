@@ -72,7 +72,22 @@ const summary: SimpleCitySummary = {
       source: "https://city.example/agenda",
       confidence: "high"
     }
-  ]
+  ],
+  translations: {
+    es: {
+      cards: [
+        {
+          agendaItem: "Presentación informativa de Canopy",
+          whatIsHappening: "Canopy presentará su trabajo.",
+          whyItMatters: "El trabajo afecta a los árboles locales.",
+          whoItAffects: ["residentes"],
+          status: "Upcoming vote",
+          commentWindow: { opens: "No indicado.", closes: "No indicado." },
+          howToAct: { attend: "Asista.", email: "No indicado.", submitComment: "No indicado." }
+        }
+      ]
+    }
+  }
 };
 
 test("builds topic verification from only the matched agenda-item context", () => {
@@ -106,6 +121,7 @@ test("applies one or two verified topics and requires every matched card", () =>
 
   assert.deepEqual(corrected.cards[0].categoryTags, ["Parks & Environment"]);
   assert.equal(corrected.cards[0].status, "Information only");
+  assert.equal(corrected.translations?.es?.cards[0]?.status, "Information only");
   assert.throws(
     () => parseTopicValidation(JSON.stringify({ cards: [] }), candidates),
     /every matched card exactly once/

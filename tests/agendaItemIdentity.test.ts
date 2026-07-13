@@ -36,3 +36,30 @@ test("does not merge presentations from different organizations", () => {
     false
   );
 });
+
+test("does not merge distinct contracts with similar wording", () => {
+  assert.equal(
+    areLikelySameAgendaItem(
+      "Approve park maintenance contract",
+      "Approve library maintenance contract"
+    ),
+    false
+  );
+  assert.equal(
+    areLikelySameAgendaItem(
+      "Approve housing consultant contract",
+      "Approve transportation consultant contract"
+    ),
+    false
+  );
+});
+
+test("does not merge projects with different agenda numbers", () => {
+  assert.equal(
+    areLikelySameAgendaItem(
+      "Award design contract for sewer project 1.1",
+      "Award design contract for sewer project 1.2"
+    ),
+    false
+  );
+});

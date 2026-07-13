@@ -1,5 +1,7 @@
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
+import { formatAgendaItemContexts } from "@/lib/scraper/agendaItemContext";
+import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import {
   parseAndValidateSummary,
@@ -53,6 +55,43 @@ class SummaryProviderRequestError extends Error {
 
 const lastSummaryRequestAtByProvider = new Map<SummaryProvider["name"], number>();
 const MAX_TOPIC_VALIDATION_PROMPT_CHARS = 60_000;
+export const MAX_AGENDA_ITEM_BATCH_CHARS = 18_000;
+
+export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmReadyMeeting[] {
+  if (meeting.status === "Cancelled" || !meeting.items?.length) return [meeting];
+
+  const itemBatches: NonNullable<LlmReadyMeeting["items"]>[] = [];
+  let currentItems: NonNullable<LlmReadyMeeting["items"]> = [];
+  let currentLength = 0;
+
+  for (const item of meeting.items) {
+    const itemLength = formatAgendaItemContexts([item]).length;
+    if (
+      currentItems.length > 0 &&
+      currentLength + itemLength > MAX_AGENDA_ITEM_BATCH_CHARS
+    ) {
+      itemBatches.push(currentItems);
+      currentItems = [];
+      currentLength = 0;
+    }
+    currentItems.push(item);
+    currentLength += itemLength;
+  }
+  if (currentItems.length > 0) itemBatches.push(currentItems);
+
+  return itemBatches.map((items, index) => ({
+    ...meeting,
+    items,
+    llmInputText: [
+      `Agenda-item batch ${index + 1} of ${itemBatches.length}. Generate cards only for the official items in this batch. Do not create cards for neighboring or omitted items.`,
+      formatAgendaItemContexts(items)
+    ].join("\n\n"),
+    extractionNotes: [
+      ...meeting.extractionNotes,
+      `Summarizing structured agenda-item batch ${index + 1} of ${itemBatches.length}.`
+    ]
+  }));
+}
 
 function hasUsableSourceText(meeting: LlmReadyMeeting) {
   const input = meeting.llmInputText.trim();
@@ -380,8 +419,10 @@ async function requestTopicValidationWithFallback(
     } catch (error) {
       lastError = error;
       const hasNextProvider = index < providers.length - 1;
-      if (hasNextProvider && isRetryableSummaryError(error)) {
-        options.log?.(`${provider.name} topic/status verification failed; trying ${providers[index + 1].name}.`);
+      if (hasNextProvider) {
+        options.log?.(
+          `${provider.name} topic/status verification failed; trying ${providers[index + 1].name}.`
+        );
         continue;
       }
       throw error;
@@ -439,6 +480,22 @@ async function verifySummaryTopics(
   };
 }
 
+async function verifySummaryTopicsSafely(
+  meeting: LlmReadyMeeting,
+  result: SummaryRequestResult,
+  options: GenerateSummaryOptions
+) {
+  try {
+    return await verifySummaryTopics(meeting, result, options);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown topic verification error";
+    options.log?.(
+      `Topic/status verification failed for ${meeting.title}; keeping the validated summary: ${message}`
+    );
+    return { summary: result.summary, raw: result.raw };
+  }
+}
+
 async function requestSummaryWithFallback(
   meeting: LlmReadyMeeting,
   options: GenerateSummaryOptions = {},
@@ -470,12 +527,10 @@ async function requestSummaryWithFallback(
   throw lastError instanceof Error ? lastError : new Error("Unknown LLM error");
 }
 
-export async function generateSummaryForMeeting(
+async function generateSummaryForInput(
   meeting: LlmReadyMeeting,
   options: GenerateSummaryOptions = {}
 ): Promise<{ summary: SimpleCitySummary; raw: unknown }> {
-  options.log?.(`Starting LLM summary for ${meeting.title}.`);
-
   let lastError: unknown;
   let bestResult: SummaryRequestResult | null = null;
   let regenerationGuidance: string | undefined;
@@ -503,7 +558,7 @@ export async function generateSummaryForMeeting(
       options.log?.(
         `Finished LLM summary for ${meeting.title}: ${finalResult.summary.cards.length} cards.`
       );
-      return await verifySummaryTopics(meeting, finalResult, options);
+      return await verifySummaryTopicsSafely(meeting, finalResult, options);
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : "Unknown LLM error";
@@ -523,8 +578,82 @@ export async function generateSummaryForMeeting(
     options.log?.(
       `Using best validated LLM summary for ${meeting.title} after retry errors: ${bestResult.summary.cards.length} cards.`
     );
-    return await verifySummaryTopics(meeting, bestResult, options);
+    return await verifySummaryTopicsSafely(meeting, bestResult, options);
   }
 
   throw lastError instanceof Error ? lastError : new Error("Unknown LLM error");
+}
+
+function combineBatchSummaries(
+  results: Array<{ summary: SimpleCitySummary; raw: unknown }>
+): { summary: SimpleCitySummary; raw: unknown } {
+  const first = results[0];
+  const cards: SimpleCitySummary["cards"] = [];
+  const spanishCards: NonNullable<
+    NonNullable<SimpleCitySummary["translations"]>["es"]
+  >["cards"] = [];
+
+  for (const result of results) {
+    const translations = result.summary.translations?.es?.cards || [];
+    for (const [index, card] of result.summary.cards.entries()) {
+      const duplicate = cards.some(
+        (existing) =>
+          existing.source === card.source &&
+          areLikelySameAgendaItem(existing.agendaItem, card.agendaItem)
+      );
+      if (duplicate) continue;
+      cards.push(card);
+      spanishCards.push(translations[index] || null);
+    }
+  }
+
+  const spanishMeeting = results
+    .map((result) => result.summary.translations?.es?.meeting)
+    .find(Boolean);
+
+  return {
+    summary: {
+      ...first.summary,
+      cards,
+      translations:
+        results.some((result) => result.summary.translations?.es)
+          ? {
+              es: {
+                ...(spanishMeeting ? { meeting: spanishMeeting } : {}),
+                cards: spanishCards
+              }
+            }
+          : undefined
+    },
+    raw: {
+      simplecityItemBatches: results.map((result) => result.raw)
+    }
+  };
+}
+
+export async function generateSummaryForMeeting(
+  meeting: LlmReadyMeeting,
+  options: GenerateSummaryOptions = {}
+): Promise<{ summary: SimpleCitySummary; raw: unknown }> {
+  options.log?.(`Starting LLM summary for ${meeting.title}.`);
+  const batches = buildAgendaItemSummaryBatches(meeting);
+
+  if (batches.length === 1 && batches[0] === meeting) {
+    return generateSummaryForInput(meeting, options);
+  }
+
+  options.log?.(
+    `Summarizing ${meeting.items?.length || 0} structured agenda item(s) in ${batches.length} bounded batch(es).`
+  );
+  const results = [];
+  for (const [index, batch] of batches.entries()) {
+    options.log?.(`Starting agenda-item batch ${index + 1} of ${batches.length} for ${meeting.title}.`);
+    results.push(await generateSummaryForInput(batch, options));
+  }
+
+  const combined = combineBatchSummaries(results);
+  options.log?.(
+    `Finished all agenda-item batches for ${meeting.title}: ${combined.summary.cards.length} cards.`
+  );
+  return combined;
 }

@@ -246,6 +246,9 @@ export function formatAgendaItemContexts(items: AgendaItem[]) {
   return [
     "Current meeting agenda items (use each block only for its named item):",
     ...items.map((item) => {
+      const title = cleanText(item.title || "").slice(0, 500);
+      const action = cleanText(item.action || item.recommendedAction || "").slice(0, 2500);
+      const itemContext = cleanText(item.rowText || "").slice(0, 7000);
       const linkedContext = cleanText(
         (item.attachments || [])
           .map((document) => document.extractedText || "")
@@ -255,9 +258,9 @@ export function formatAgendaItemContexts(items: AgendaItem[]) {
       return [
         `Agenda item ${item.agendaNumber || "Unnumbered"}`,
         `Agenda section: ${item.itemType || "Not listed in the source document."}`,
-        `Official title: ${item.title || "Not listed in the source document."}`,
-        `Recommended action: ${item.action || item.recommendedAction || "Not listed in the source document."}`,
-        `Item context: ${item.rowText || "Not listed in the source document."}`,
+        `Official title: ${title || "Not listed in the source document."}`,
+        `Recommended action: ${action || "Not listed in the source document."}`,
+        `Item context: ${itemContext || "Not listed in the source document."}`,
         ...(linkedContext ? [`Linked supporting-report context: ${linkedContext}`] : []),
         `Official source: ${item.sourceUrl}`
       ].join("\n");
