@@ -108,12 +108,12 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run San Mateo pipeline
-        run: npm run pipeline:san-mateo-city
+        run: npm run pipeline:san-mateo-city -- --max-runtime-minutes=45
 
   san-mateo-county:
     name: San Mateo County scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'san-mateo-county')) ||
@@ -138,7 +138,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run San Mateo County pipeline
-        run: npm run pipeline:san-mateo-county
+        run: npm run pipeline:san-mateo-county -- --max-runtime-minutes=75
 
   foster-city:
     name: Foster City scraper
@@ -168,7 +168,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Foster City pipeline
-        run: npm run pipeline:foster-city
+        run: npm run pipeline:foster-city -- --max-runtime-minutes=45
 
   santa-clara-county:
     name: Santa Clara County scraper
@@ -198,7 +198,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Santa Clara County pipeline
-        run: npm run pipeline:santa-clara-county -- --max-runtime-minutes=110
+        run: npm run pipeline:santa-clara-county -- --max-runtime-minutes=100
 
   mountain-view:
     name: Mountain View scraper
@@ -228,12 +228,12 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Mountain View pipeline
-        run: npm run pipeline:mountain-view -- --max-runtime-minutes=50
+        run: npm run pipeline:mountain-view -- --max-runtime-minutes=45
 
   san-francisco:
     name: San Francisco scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'san-francisco')) ||
@@ -258,7 +258,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run San Francisco pipeline
-        run: npm run pipeline:san-francisco -- --max-runtime-minutes=50
+        run: npm run pipeline:san-francisco -- --max-runtime-minutes=75
 
   los-altos:
     name: Los Altos scraper
@@ -288,7 +288,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Los Altos pipeline
-        run: npm run pipeline:los-altos -- --max-runtime-minutes=50
+        run: npm run pipeline:los-altos -- --max-runtime-minutes=45
 
   redwood-city:
     name: Redwood City scraper
@@ -318,7 +318,7 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run Redwood City pipeline
-        run: npm run pipeline:redwood-city -- --max-runtime-minutes=50
+        run: npm run pipeline:redwood-city -- --max-runtime-minutes=45
 
   east-palo-alto:
     name: East Palo Alto scraper
@@ -348,4 +348,4 @@ jobs:
         run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
 
       - name: Run East Palo Alto pipeline
-        run: npm run pipeline:east-palo-alto -- --max-runtime-minutes=50
+        run: npm run pipeline:east-palo-alto -- --max-runtime-minutes=45
