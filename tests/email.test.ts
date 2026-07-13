@@ -94,7 +94,7 @@ function testSubscription(overrides: Partial<EmailSubscriptionRow> = {}): EmailS
   };
 }
 
-test("builds a new posts digest with escaped card content and meeting links", () => {
+test("builds a new posts digest with escaped card content and localized card links", () => {
   const email = buildNewPostsDigestEmail({
     cards: [
       testCard({
@@ -109,8 +109,14 @@ test("builds a new posts digest with escaped card content and meeting links", ()
   assert.match(email.subject, /Weekly SimpleCity digest: 1 new post/);
   assert.match(email.html, /&lt;Approve&gt;/);
   assert.doesNotMatch(email.html, /<Approve>/);
-  assert.match(email.html, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
-  assert.match(email.text, /https:\/\/simplecity\.example\/meetings\/meeting-1\?jurisdiction=san-mateo/);
+  assert.match(
+    email.html,
+    /https:\/\/simplecity\.example\/cards\/card-1\?lang=en/
+  );
+  assert.match(
+    email.text,
+    /https:\/\/simplecity\.example\/cards\/card-1\?lang=en/
+  );
 });
 
 test("builds a bilingual digest when Spanish translations are attached", () => {
@@ -144,6 +150,18 @@ test("builds a bilingual digest when Spanish translations are attached", () => {
   assert.match(email.html, /Parques y ambiente/);
   assert.match(email.html, /Leer la tarjeta de SimpleCity/);
   assert.match(email.text, /El concejo considerará un contrato de mantenimiento/);
+  assert.match(
+    email.html,
+    /https:\/\/simplecity\.example\/cards\/card-1\?lang=en/
+  );
+  assert.match(
+    email.html,
+    /https:\/\/simplecity\.example\/cards\/card-1\?lang=es/
+  );
+  assert.match(
+    email.text,
+    /https:\/\/simplecity\.example\/cards\/card-1\?lang=es/
+  );
 });
 
 test("digest unsubscribe footer only advertises unsubscribe", () => {

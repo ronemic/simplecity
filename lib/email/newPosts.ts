@@ -5,6 +5,7 @@ import {
 import { normalizeAppUrl } from "@/lib/appUrl";
 import { sendEmail, type SendEmailResult } from "@/lib/email/resend";
 import type { SummaryCardRow } from "@/lib/types";
+import { cardSharePath } from "@/lib/utils/cardShare";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
@@ -80,30 +81,10 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/'/g, "&#39;");
 }
 
-function publicJurisdictionParam(slug: string | null | undefined) {
-  if (!slug) return null;
-  if (slug === "san-mateo-city") return "san-mateo";
-  return slug;
-}
-
-function cardUrl(card: SummaryCardRow, appUrl: string) {
-  const baseUrl = normalizeAppUrl(appUrl);
-  const meeting = card.meetings;
-
-  if (meeting?.id) {
-    const url = new URL(`/meetings/${meeting.id}`, baseUrl);
-    const jurisdiction = publicJurisdictionParam(
-      meeting.jurisdiction_slug || card.jurisdiction_slug
-    );
-
-    if (jurisdiction) {
-      url.searchParams.set("jurisdiction", jurisdiction);
-    }
-
-    return url.toString();
-  }
-
-  return card.source_url || `${baseUrl}/decisions`;
+function cardUrl(card: SummaryCardRow, appUrl: string, locale: Locale) {
+  const url = new URL(cardSharePath(card.id), normalizeAppUrl(appUrl));
+  url.searchParams.set("lang", locale);
+  return url.toString();
 }
 
 function cardJurisdictionLabel(card: SummaryCardRow) {
@@ -149,7 +130,7 @@ function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale =
     meeting?.time_text
   );
   const summary = compactText(card.what_is_happening, COPY[locale].summaryFallback);
-  const url = cardUrl(card, appUrl);
+  const url = cardUrl(card, appUrl, locale);
 
   return [
     title,
