@@ -6,6 +6,7 @@ import type { LegistarItem, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResul
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
 
@@ -1304,6 +1305,13 @@ export async function scrapeLegistarMeetings(
 
     log("Scraping Legistar meeting rows...");
     let meetings = await extractVisibleLegistarMeetings(page, jurisdiction);
+
+    if (!options.allVisible) {
+      meetings = filterMeetingsToWindow(meetings, options) as LegistarMeeting[];
+      log(
+        `Legistar meetings in configured window (${options.monthsBack ?? 1} month(s) back, ${options.monthsForward ?? 1} month(s) forward): ${meetings.length}.`
+      );
+    }
 
     if (typeof options.limit === "number" && options.limit > 0) {
       meetings = meetings.slice(0, options.limit);

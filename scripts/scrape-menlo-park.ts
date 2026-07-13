@@ -55,6 +55,18 @@ function getYear() {
   return year;
 }
 
+function getNonNegativeInteger(name: string) {
+  const raw = getArgValue(name);
+  if (!raw) return undefined;
+
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`--${name} must be a non-negative integer.`);
+  }
+
+  return value;
+}
+
 async function main() {
   const jurisdiction = getJurisdictionBySlug(getRequestedJurisdiction());
   if (!jurisdiction) throw new Error("Unknown jurisdiction.");
@@ -76,6 +88,9 @@ async function main() {
     enrichAgendaAttachments: !process.argv.includes("--no-agenda-attachments"),
     documentOutputDir: documentsDir,
     allYears: SCRAPE_ALL_YEARS,
+    allVisible: process.argv.includes("--all-visible"),
+    monthsBack: getNonNegativeInteger("months-back"),
+    monthsForward: getNonNegativeInteger("months-forward"),
     year: getYear(),
     body: getArgValue("body") || undefined,
     limit: getLimit(),

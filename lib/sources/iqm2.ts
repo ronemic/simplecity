@@ -3,6 +3,7 @@ import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 
 const IQM2_ORIGIN = "https://sccgov.iqm2.com";
 export const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
@@ -719,6 +720,12 @@ export async function scrapeIqm2Meetings(
 
     log("Scraping IQM2 meeting rows...");
     let meetings = dedupeIqm2Meetings(await extractVisibleIqm2Meetings(page, jurisdiction));
+    if (!options.allVisible) {
+      meetings = filterMeetingsToWindow(meetings, options);
+      log(
+        `IQM2 meetings in configured window (${options.monthsBack ?? 1} month(s) back, ${options.monthsForward ?? 1} month(s) forward): ${meetings.length}.`
+      );
+    }
     if (typeof options.limit === "number" && options.limit > 0) {
       meetings = meetings.slice(0, options.limit);
     }

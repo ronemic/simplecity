@@ -5,6 +5,7 @@ import type { DocumentType, MeetingStatus, PrimeGovDocument, PrimeGovMeeting, Sc
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 
 export type EastPaloAltoExtractedLink = { label: string; url: string; column: string };
 export type EastPaloAltoExtractedRow = {
@@ -220,14 +221,7 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
     let meetings = normalizeEastPaloAltoRows(extracted.rows, jurisdiction);
     if (options.body) meetings = meetings.filter((meeting) => slugify(meeting.bodyName || "") === slugify(options.body || ""));
     if (!options.allVisible) {
-      const back = options.monthsBack ?? 1;
-      const forward = options.monthsForward ?? 1;
-      const min = new Date(); min.setMonth(min.getMonth() - back);
-      const max = new Date(); max.setMonth(max.getMonth() + forward);
-      meetings = meetings.filter((meeting) => {
-        const iso = parseMeetingDate(`${meeting.dateText || ""} ${meeting.timeText || ""}`);
-        return !iso || (new Date(iso) >= min && new Date(iso) <= max);
-      });
+      meetings = filterMeetingsToWindow(meetings, options);
     }
     if (options.limit) meetings = meetings.slice(0, options.limit);
     log(`East Palo Alto unique meetings after deduplication: ${meetings.length}.`);

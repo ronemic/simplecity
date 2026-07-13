@@ -5,6 +5,7 @@ import type { DocumentType, MeetingStatus, PrimeGovDocument, PrimeGovMeeting, Sc
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { filterMeetingsToWindow, getMeetingWindow } from "@/lib/utils/meetingWindow";
 import {
   discoverMenloParkAgendaAttachments,
   MENLO_PARK_ATTACHMENT_MAX_BYTES,
@@ -69,6 +70,9 @@ export type ScrapeMenloParkOptions = ScrapePortalOptions & {
   year?: number;
   body?: string;
   limit?: number;
+  monthsBack?: number;
+  monthsForward?: number;
+  allVisible?: boolean;
 };
 
 type ExtractedLink = {
@@ -572,6 +576,30 @@ export function normalizeMenloParkRows(
   return mergeEarlyStaffReports(meetings);
 }
 
+export function filterMenloParkMeetingsByDateWindow(
+  meetings: PrimeGovMeeting[],
+  monthsBack = 1,
+  monthsForward = 1,
+  now = new Date()
+) {
+  return filterMeetingsToWindow(meetings, { monthsBack, monthsForward }, now);
+}
+
+function yearsInMenloParkDateWindow(monthsBack: number, monthsForward: number, now = new Date()) {
+  const window = getMeetingWindow({ monthsBack, monthsForward }, now);
+  const civicYear = (timestamp: number) => {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Los_Angeles",
+      year: "numeric"
+    }).formatToParts(new Date(timestamp));
+    return Number(parts.find((part) => part.type === "year")?.value);
+  };
+  const startYear = civicYear(window.start);
+  const endYear = civicYear(window.end - 1);
+
+  return Array.from({ length: endYear - startYear + 1 }, (_, index) => startYear + index);
+}
+
 async function waitForMenloParkPage(page: Page, sourceUrl: string) {
   await page.goto(sourceUrl, {
     waitUntil: "domcontentloaded",
@@ -586,12 +614,12 @@ async function waitForMenloParkPage(page: Page, sourceUrl: string) {
 async function extractMenloParkRows(
   page: Page,
   bodies: MenloParkBodyConfig[],
-  options: { targetYear: number; allYears?: boolean }
+  options: { targetYears: number[]; allYears?: boolean }
 ): Promise<ExtractionResult> {
   await page.evaluate("globalThis.__name = (value) => value");
 
   return page.evaluate(
-    ({ bodies, targetYear, allYears }) => {
+    ({ bodies, targetYears, allYears }) => {
       function cleanTextInPage(value = "") {
         return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
       }
@@ -740,13 +768,14 @@ async function extractMenloParkRows(
 
         if (allYears) return candidates;
 
-        const requested = candidates.find(
-          (element) =>
-            cleanTextInPage((element as HTMLElement).innerText || element.textContent || "") ===
-            String(targetYear)
+        const requestedYears = new Set(targetYears.map(String));
+        const requested = candidates.filter((element) =>
+          requestedYears.has(
+            cleanTextInPage((element as HTMLElement).innerText || element.textContent || "")
+          )
         );
 
-        return requested ? [requested] : candidates.slice(0, 1);
+        return requested.length > 0 ? requested : candidates.slice(0, 1);
       }
 
       function linksInElement(element: Element, column: string | null) {
@@ -967,7 +996,7 @@ async function extractMenloParkRows(
         sectionId: body.sectionId,
         url: body.url
       })),
-      targetYear: options.targetYear,
+      targetYears: options.targetYears,
       allYears: Boolean(options.allYears)
     }
   );
@@ -987,7 +1016,11 @@ export async function scrapeMenloParkMeetings(
     ...body,
     url: `${portalUrl.split("#")[0]}#${body.sectionId}`
   }));
-  const targetYear = options.year || new Date().getFullYear();
+  const monthsBack = Math.max(0, options.monthsBack ?? 1);
+  const monthsForward = Math.max(0, options.monthsForward ?? 1);
+  const targetYears = options.year
+    ? [options.year]
+    : yearsInMenloParkDateWindow(monthsBack, monthsForward);
 
   if (bodies.length === 0) {
     throw new Error(`No Menlo Park meeting body matched: ${options.body}`);
@@ -1012,8 +1045,8 @@ export async function scrapeMenloParkMeetings(
     await waitForMenloParkPage(page, portalUrl);
 
     const extracted = await extractMenloParkRows(page, bodies, {
-      targetYear,
-      allYears: options.allYears
+      targetYears,
+      allYears: options.allYears || options.allVisible
     });
 
     for (const warning of extracted.warnings) log(warning);
@@ -1024,6 +1057,12 @@ export async function scrapeMenloParkMeetings(
     }
 
     let meetings = normalizeMenloParkRows(extracted.rows, jurisdiction);
+    if (!options.year && !options.allYears && !options.allVisible) {
+      meetings = filterMenloParkMeetingsByDateWindow(meetings, monthsBack, monthsForward);
+      log(
+        `Menlo Park meetings in configured window (${monthsBack} month(s) back, ${monthsForward} month(s) forward): ${meetings.length}.`
+      );
+    }
     if (options.limit) meetings = meetings.slice(0, options.limit);
 
     const cancellationCount = countByStatus(meetings, "Cancelled");

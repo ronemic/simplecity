@@ -11,6 +11,7 @@ import {
   classifyMenloParkLink,
   enrichMenloParkMeetingTimesFromAgendaText,
   extractMenloParkAgendaTimeText,
+  filterMenloParkMeetingsByDateWindow,
   getMenloParkBodies,
   normalizeMenloParkRows,
   type MenloParkExtractedRow
@@ -202,6 +203,34 @@ test("normalizes Menlo Park rows without merging separate bodies", () => {
   const planning = meetings.find((meeting) => meeting.bodyName === "Planning Commission");
   assert.equal(planning?.status, "Notice");
   assert.equal(planning?.sourceUrl, "https://www.menlopark.gov/files/special-event-notice.pdf");
+});
+
+test("filters Menlo Park meetings to one calendar month back and forward", () => {
+  const jurisdiction = getJurisdictionBySlug("menlo-park");
+  assert.ok(jurisdiction);
+
+  const meetings = normalizeMenloParkRows(
+    [
+      row({ dateText: "May 19, 2026" }),
+      row({ dateText: "June 30, 2026" }),
+      row({ dateText: "July 13, 2026" }),
+      row({ dateText: "August 31, 2026" }),
+      row({ dateText: "September 1, 2026" })
+    ],
+    jurisdiction
+  );
+
+  const filtered = filterMenloParkMeetingsByDateWindow(
+    meetings,
+    1,
+    1,
+    new Date(2026, 6, 13)
+  );
+
+  assert.deepEqual(
+    filtered.map((meeting) => meeting.dateText),
+    ["June 30, 2026", "July 13, 2026", "August 31, 2026"]
+  );
 });
 
 test("filters Menlo Park body config by body slug or section id", () => {

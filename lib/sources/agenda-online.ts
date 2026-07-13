@@ -5,6 +5,7 @@ import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { downloadOfficialSiteDocuments } from "@/lib/scraper/downloadDocuments";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 
 type AgendaOnlineRow = {
   meetingId: string;
@@ -34,14 +35,6 @@ function documentType(label: string, url: string): DocumentType {
   if (value.includes("minutes")) return "Minutes";
   if (value.includes("agenda")) return "Agenda";
   return "Document";
-}
-
-function configuredWindow(monthsBack: number, monthsForward: number) {
-  const now = new Date();
-  return {
-    start: new Date(now.getFullYear(), now.getMonth() - monthsBack, 1).getTime(),
-    end: new Date(now.getFullYear(), now.getMonth() + monthsForward + 1, 1).getTime() - 1
-  };
 }
 
 async function resolveDocumentStreams(context: BrowserContext, meetings: PrimeGovMeeting[]) {
@@ -173,13 +166,9 @@ export async function scrapeAgendaOnlineMeetings(
 
     log(`Agenda Online rows extracted: ${rows.length}.`);
     if (!options.allVisible) {
-      const window = configuredWindow(options.monthsBack ?? 1, options.monthsForward ?? 1);
-      rows = rows.filter((row) => {
-        const parsed = parseMeetingDate(row.dateText);
-        if (!parsed) return false;
-        const date = new Date(parsed).getTime();
-        return date >= window.start && date <= window.end;
-      });
+      rows = rows.filter((row) =>
+        isMeetingDateInWindow(row.dateText, null, options)
+      );
     }
     if (options.body) {
       const body = slugify(options.body);

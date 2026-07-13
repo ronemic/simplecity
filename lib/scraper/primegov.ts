@@ -1,6 +1,7 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import type { PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 
 export const DEFAULT_PORTAL_URL =
   process.env.SCRAPER_BASE_URL || "https://fostercity.primegov.com/public/portal";
@@ -16,6 +17,9 @@ export type ScrapePortalOptions = {
   enrichAgendaAttachments?: boolean;
   documentOutputDir?: string;
   allYears?: boolean;
+  monthsBack?: number;
+  monthsForward?: number;
+  allVisible?: boolean;
   log?: (message: string) => void;
   shouldStop?: () => boolean;
 };
@@ -357,7 +361,13 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
     log(`Found ${currentMeetings.length} current/upcoming meetings.`);
     log(`Found ${archivedMeetings.length} archived meetings.`);
 
-    const meetings = dedupeMeetings([...currentMeetings, ...archivedMeetings]);
+    let meetings = dedupeMeetings([...currentMeetings, ...archivedMeetings]);
+    if (!options.allVisible && !options.allYears) {
+      meetings = filterMeetingsToWindow(meetings, options);
+      log(
+        `PrimeGov meetings in configured window (${options.monthsBack ?? 1} month(s) back, ${options.monthsForward ?? 1} month(s) forward): ${meetings.length}.`
+      );
+    }
     const dedupedCurrentMeetings = meetings.filter(
       (meeting) => meeting.section === "Current And Upcoming Meetings"
     );

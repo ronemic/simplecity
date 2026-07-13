@@ -11,6 +11,7 @@ import type {
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { downloadOfficialSiteDocuments } from "@/lib/scraper/downloadDocuments";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import { getVideoEmbedUrl } from "@/lib/utils/videoEmbed";
 import { cleanText, slugify } from "@/lib/utils/slug";
 
@@ -246,20 +247,6 @@ async function extractEventCards(page: Page): Promise<CivicClerkEventCard[]> {
   })()`);
 }
 
-function dateWindow(monthsBack: number, monthsForward: number, now = new Date()) {
-  return {
-    start: new Date(now.getFullYear(), now.getMonth() - monthsBack, 1).getTime(),
-    end: new Date(now.getFullYear(), now.getMonth() + monthsForward + 1, 1).getTime() - 1
-  };
-}
-
-function inConfiguredWindow(card: CivicClerkEventCard, start: number, end: number) {
-  const parsed = parseMeetingDate([card.dateText, card.timeText].filter(Boolean).join(" "));
-  if (!parsed) return true;
-  const value = new Date(parsed).getTime();
-  return value >= start && value <= end;
-}
-
 async function extractFilesPage(page: Page): Promise<CivicClerkFilesPage> {
   return page.evaluate<CivicClerkFilesPage>(String.raw`(() => {
     const compact = (value = "") => value.replace(/\s+/g, " ").trim();
@@ -480,9 +467,10 @@ export async function scrapeCivicClerkMeetings(
 
     let cards = await extractEventCards(page);
     log(`CivicClerk event cards found: ${cards.length}.`);
-    const window = dateWindow(monthsBack, monthsForward);
     if (!options.allVisible) {
-      cards = cards.filter((card) => inConfiguredWindow(card, window.start, window.end));
+      cards = cards.filter((card) =>
+        isMeetingDateInWindow(card.dateText, card.timeText, { monthsBack, monthsForward })
+      );
     }
     if (options.body) {
       const requestedBody = slugify(options.body);
