@@ -52,6 +52,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    SAN_FRANCISCO_LEGISTAR_URL=https://sfgov.legistar.com/Calendar.aspx
    LOS_ALTOS_CIVICCLERK_URL=https://losaltosca.portal.civicclerk.com/
    OPENROUTER_API_KEY=
+   OPENROUTER_API_KEY_2=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    CEREBRAS_API_KEY=
    CEREBRAS_MODEL=gpt-oss-120b

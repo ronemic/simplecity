@@ -70,6 +70,7 @@ env:
   EAST_PALO_ALTO_AGENDA_URL: https://www.cityofepa.org/agenda
   EAST_PALO_ALTO_MEETINGS_URL: https://www.cityofepa.org/meetings
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  OPENROUTER_API_KEY_2: ${{ secrets.OPENROUTER_API_KEY_2 }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
   CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
   CEREBRAS_MODEL: ${{ secrets.CEREBRAS_MODEL || 'gpt-oss-120b' }}

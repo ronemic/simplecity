@@ -30,6 +30,7 @@ type SummaryRequestResult = {
 
 type SummaryProvider = {
   name: "OpenRouter" | "Cerebras";
+  label: string;
   apiKey: string;
   baseUrl: string;
   model: string;
@@ -53,7 +54,7 @@ class SummaryProviderRequestError extends Error {
   }
 }
 
-const lastSummaryRequestAtByProvider = new Map<SummaryProvider["name"], number>();
+const lastSummaryRequestAtByProvider = new Map<string, number>();
 const MAX_TOPIC_VALIDATION_PROMPT_CHARS = 60_000;
 export const MAX_AGENDA_ITEM_BATCH_CHARS = 18_000;
 
@@ -135,10 +136,17 @@ function getConfiguredSummaryProviders() {
   const providers: SummaryProvider[] = [];
   const referer = getConfiguredAppUrl();
 
-  if (process.env.OPENROUTER_API_KEY) {
+  const openRouterKeys = [
+    process.env.OPENROUTER_API_KEY,
+    process.env.OPENROUTER_API_KEY_2,
+    process.env.OPENROUTER_API_KEY_3
+  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+
+  const addOpenRouter = (apiKey: string, index: number) => {
     providers.push({
       name: "OpenRouter",
-      apiKey: process.env.OPENROUTER_API_KEY,
+      label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
+      apiKey,
       baseUrl: "https://openrouter.ai/api/v1/chat/completions",
       model: process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free",
       headers: {
@@ -147,11 +155,14 @@ function getConfiguredSummaryProviders() {
       },
       minIntervalEnv: "OPENROUTER_MIN_REQUEST_INTERVAL_MS"
     });
-  }
+  };
+
+  if (openRouterKeys[0]) addOpenRouter(openRouterKeys[0], 0);
 
   if (process.env.CEREBRAS_API_KEY) {
     providers.push({
       name: "Cerebras",
+      label: "Cerebras",
       apiKey: process.env.CEREBRAS_API_KEY,
       baseUrl: "https://api.cerebras.ai/v1/chat/completions",
       model: process.env.CEREBRAS_MODEL || "gpt-oss-120b",
@@ -159,15 +170,24 @@ function getConfiguredSummaryProviders() {
     });
   }
 
+  for (let index = 1; index < openRouterKeys.length; index += 1) {
+    addOpenRouter(openRouterKeys[index], index);
+  }
+
   if (providers.length === 0) {
-    throw new Error("Missing LLM provider API key. Configure OPENROUTER_API_KEY or CEREBRAS_API_KEY.");
+    throw new Error("Missing LLM provider API key. Configure OPENROUTER_API_KEY, OPENROUTER_API_KEY_2, or CEREBRAS_API_KEY.");
   }
 
   return providers;
 }
 
 export function hasSummaryProviderConfig() {
-  return Boolean(process.env.OPENROUTER_API_KEY || process.env.CEREBRAS_API_KEY);
+  return Boolean(
+    process.env.OPENROUTER_API_KEY ||
+      process.env.OPENROUTER_API_KEY_2 ||
+      process.env.OPENROUTER_API_KEY_3 ||
+      process.env.CEREBRAS_API_KEY
+  );
 }
 
 async function waitForProviderSlot(provider: SummaryProvider, options: GenerateSummaryOptions) {
@@ -175,20 +195,33 @@ async function waitForProviderSlot(provider: SummaryProvider, options: GenerateS
   const minIntervalMs = parseNonNegativeEnv(provider.minIntervalEnv, fallbackMs);
   if (minIntervalMs <= 0) return;
 
-  const lastRequestAt = lastSummaryRequestAtByProvider.get(provider.name) || 0;
+  const lastRequestAt = lastSummaryRequestAtByProvider.get(provider.label) || 0;
   const waitMs = lastRequestAt + minIntervalMs - Date.now();
   if (waitMs > 0) {
     options.log?.(
-      `Waiting ${Math.ceil(waitMs / 1000)}s before the next ${provider.name} summary request.`
+      `Waiting ${Math.ceil(waitMs / 1000)}s before the next ${provider.label} summary request.`
     );
     await (options.sleep || sleep)(waitMs);
   }
 
-  lastSummaryRequestAtByProvider.set(provider.name, Date.now());
+  lastSummaryRequestAtByProvider.set(provider.label, Date.now());
+}
+
+function canTryNextProvider(error: unknown) {
+  if (error instanceof SummaryProviderRequestError) return error.retryable;
+  if (error instanceof Error && error.name === "AbortError") return true;
+  return true;
 }
 
 function isRetryableSummaryError(error: unknown) {
-  if (error instanceof SummaryProviderRequestError) return error.retryable;
+  if (error instanceof SummaryProviderRequestError) {
+    if (!error.retryable) return false;
+    if (/tokens per day limit exceeded|daily (?:token |request )?(?:limit|quota)/i.test(error.message)) {
+      return false;
+    }
+    const maxRetryDelayMs = parseNonNegativeEnv("LLM_MAX_RETRY_DELAY_MS", 60_000);
+    return error.retryAfterMs === null || error.retryAfterMs <= maxRetryDelayMs;
+  }
   if (error instanceof Error && error.name === "AbortError") return true;
   return true;
 }
@@ -413,7 +446,7 @@ async function requestTopicValidationWithFallback(
   for (const [index, provider] of providers.entries()) {
     try {
       options.log?.(
-        `Verifying ${candidates.length} agenda-card topic and status selection(s) with ${provider.name} (${provider.model}).`
+        `Verifying ${candidates.length} agenda-card topic and status selection(s) with ${provider.label} (${provider.model}).`
       );
       return await requestTopicValidation(candidates, provider, options);
     } catch (error) {
@@ -421,7 +454,7 @@ async function requestTopicValidationWithFallback(
       const hasNextProvider = index < providers.length - 1;
       if (hasNextProvider) {
         options.log?.(
-          `${provider.name} topic/status verification failed; trying ${providers[index + 1].name}.`
+          `${provider.label} topic/status verification failed; trying ${providers[index + 1].label}.`
         );
         continue;
       }
@@ -506,16 +539,16 @@ async function requestSummaryWithFallback(
 
   for (const [index, provider] of providers.entries()) {
     try {
-      options.log?.(`Requesting LLM summary for ${meeting.title} with ${provider.name} (${provider.model}).`);
+      options.log?.(`Requesting LLM summary for ${meeting.title} with ${provider.label} (${provider.model}).`);
       return await requestSummary(meeting, provider, options, regenerationGuidance);
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : "Unknown LLM error";
       const hasNextProvider = index < providers.length - 1;
 
-      if (hasNextProvider && isRetryableSummaryError(error)) {
+      if (hasNextProvider && canTryNextProvider(error)) {
         options.log?.(
-          `${provider.name} failed for ${meeting.title}; trying ${providers[index + 1].name}: ${message}`
+          `${provider.label} failed for ${meeting.title}; trying ${providers[index + 1].label}: ${message}`
         );
         continue;
       }

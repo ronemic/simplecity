@@ -83,11 +83,14 @@ function openRouterResponse(summary: SimpleCitySummary) {
 function captureLlmEnv() {
   return {
     openRouterApiKey: process.env.OPENROUTER_API_KEY,
+    openRouterApiKey2: process.env.OPENROUTER_API_KEY_2,
+    openRouterApiKey3: process.env.OPENROUTER_API_KEY_3,
     openRouterModel: process.env.OPENROUTER_MODEL,
     openRouterMinIntervalMs: process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS,
     openRouterMaxAttempts: process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS,
     openRouterRetryBaseMs: process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS,
     openRouterRateLimitRetryBaseMs: process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS,
+    llmMaxRetryDelayMs: process.env.LLM_MAX_RETRY_DELAY_MS,
     cerebrasApiKey: process.env.CEREBRAS_API_KEY,
     cerebrasModel: process.env.CEREBRAS_MODEL,
     cerebrasMinIntervalMs: process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS
@@ -104,11 +107,14 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
   };
 
   restore("OPENROUTER_API_KEY", env.openRouterApiKey);
+  restore("OPENROUTER_API_KEY_2", env.openRouterApiKey2);
+  restore("OPENROUTER_API_KEY_3", env.openRouterApiKey3);
   restore("OPENROUTER_MODEL", env.openRouterModel);
   restore("OPENROUTER_MIN_REQUEST_INTERVAL_MS", env.openRouterMinIntervalMs);
   restore("OPENROUTER_SUMMARY_MAX_ATTEMPTS", env.openRouterMaxAttempts);
   restore("OPENROUTER_SUMMARY_RETRY_BASE_MS", env.openRouterRetryBaseMs);
   restore("OPENROUTER_RATE_LIMIT_RETRY_BASE_MS", env.openRouterRateLimitRetryBaseMs);
+  restore("LLM_MAX_RETRY_DELAY_MS", env.llmMaxRetryDelayMs);
   restore("CEREBRAS_API_KEY", env.cerebrasApiKey);
   restore("CEREBRAS_MODEL", env.cerebrasModel);
   restore("CEREBRAS_MIN_REQUEST_INTERVAL_MS", env.cerebrasMinIntervalMs);
@@ -116,6 +122,8 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
 
 function setLlmTestEnv() {
   process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+  delete process.env.OPENROUTER_API_KEY_2;
+  delete process.env.OPENROUTER_API_KEY_3;
   process.env.OPENROUTER_MODEL = "test-openrouter-model";
   process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS = "0";
   process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "3";
@@ -242,6 +250,71 @@ test("falls back to Cerebras when OpenRouter is rate-limited", async (t) => {
   ]);
   assert.deepEqual(models, ["test-openrouter-model", "gpt-oss-120b"]);
   assert.equal(result.summary.cards.length, 1);
+});
+
+test("uses OpenRouter key 1, then Cerebras, then OpenRouter key 2", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const providers: string[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.OPENROUTER_API_KEY_2 = "test-openrouter-key-2";
+  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
+
+  globalThis.fetch = (async (url, init) => {
+    const authorization = new Headers(init?.headers).get("Authorization");
+    providers.push(`${String(url).includes("openrouter.ai") ? "openrouter" : "cerebras"}:${authorization}`);
+
+    if (authorization !== "Bearer test-openrouter-key-2") {
+      return new Response("temporarily rate-limited", { status: 429 });
+    }
+
+    return openRouterResponse({ meetingSummary, cards: [card()] });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting());
+
+  assert.deepEqual(providers, [
+    "openrouter:Bearer test-openrouter-key",
+    "cerebras:Bearer test-cerebras-key",
+    "openrouter:Bearer test-openrouter-key-2"
+  ]);
+  assert.equal(result.summary.cards.length, 1);
+});
+
+test("does not sleep on an impractical provider retry-after", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const sleepDelays: number[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "3";
+  globalThis.fetch = (async () =>
+    new Response("Tokens per day limit exceeded", {
+      status: 429,
+      headers: { "Retry-After": "86400" }
+    })) as typeof fetch;
+
+  await assert.rejects(
+    generateSummaryForMeeting(meeting(), {
+      sleep: async (ms) => {
+        sleepDelays.push(ms);
+      }
+    }),
+    /Tokens per day limit exceeded/
+  );
+
+  assert.deepEqual(sleepDelays, []);
 });
 
 test("backs off and retries when all configured providers are rate-limited", async (t) => {
