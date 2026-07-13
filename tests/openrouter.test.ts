@@ -92,6 +92,8 @@ function captureLlmEnv() {
     openRouterRateLimitRetryBaseMs: process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS,
     llmMaxRetryDelayMs: process.env.LLM_MAX_RETRY_DELAY_MS,
     cerebrasApiKey: process.env.CEREBRAS_API_KEY,
+    cerebrasApiKey2: process.env.CEREBRAS_API_KEY_2,
+    cerebrasApiKey3: process.env.CEREBRAS_API_KEY_3,
     cerebrasModel: process.env.CEREBRAS_MODEL,
     cerebrasMinIntervalMs: process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS
   };
@@ -116,6 +118,8 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
   restore("OPENROUTER_RATE_LIMIT_RETRY_BASE_MS", env.openRouterRateLimitRetryBaseMs);
   restore("LLM_MAX_RETRY_DELAY_MS", env.llmMaxRetryDelayMs);
   restore("CEREBRAS_API_KEY", env.cerebrasApiKey);
+  restore("CEREBRAS_API_KEY_2", env.cerebrasApiKey2);
+  restore("CEREBRAS_API_KEY_3", env.cerebrasApiKey3);
   restore("CEREBRAS_MODEL", env.cerebrasModel);
   restore("CEREBRAS_MIN_REQUEST_INTERVAL_MS", env.cerebrasMinIntervalMs);
 }
@@ -130,6 +134,8 @@ function setLlmTestEnv() {
   process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS = "0";
   process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS = "0";
   delete process.env.CEREBRAS_API_KEY;
+  delete process.env.CEREBRAS_API_KEY_2;
+  delete process.env.CEREBRAS_API_KEY_3;
   delete process.env.CEREBRAS_MODEL;
   process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS = "0";
 }
@@ -252,7 +258,7 @@ test("falls back to Cerebras when OpenRouter is rate-limited", async (t) => {
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("uses OpenRouter key 1, then Cerebras, then OpenRouter key 2", async (t) => {
+test("alternates OpenRouter and Cerebras keys in slot order", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const providers: string[] = [];
@@ -265,12 +271,13 @@ test("uses OpenRouter key 1, then Cerebras, then OpenRouter key 2", async (t) =>
   setLlmTestEnv();
   process.env.OPENROUTER_API_KEY_2 = "test-openrouter-key-2";
   process.env.CEREBRAS_API_KEY = "test-cerebras-key";
+  process.env.CEREBRAS_API_KEY_2 = "test-cerebras-key-2";
 
   globalThis.fetch = (async (url, init) => {
     const authorization = new Headers(init?.headers).get("Authorization");
     providers.push(`${String(url).includes("openrouter.ai") ? "openrouter" : "cerebras"}:${authorization}`);
 
-    if (authorization !== "Bearer test-openrouter-key-2") {
+    if (authorization !== "Bearer test-cerebras-key-2") {
       return new Response("temporarily rate-limited", { status: 429 });
     }
 
@@ -282,7 +289,8 @@ test("uses OpenRouter key 1, then Cerebras, then OpenRouter key 2", async (t) =>
   assert.deepEqual(providers, [
     "openrouter:Bearer test-openrouter-key",
     "cerebras:Bearer test-cerebras-key",
-    "openrouter:Bearer test-openrouter-key-2"
+    "openrouter:Bearer test-openrouter-key-2",
+    "cerebras:Bearer test-cerebras-key-2"
   ]);
   assert.equal(result.summary.cards.length, 1);
 });

@@ -55,6 +55,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    OPENROUTER_API_KEY_2=
    OPENROUTER_MODEL=openai/gpt-oss-120b:free
    CEREBRAS_API_KEY=
+   CEREBRAS_API_KEY_2=
    CEREBRAS_MODEL=gpt-oss-120b
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    ADMIN_PASSWORD=choose-a-long-random-password

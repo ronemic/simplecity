@@ -73,6 +73,7 @@ env:
   OPENROUTER_API_KEY_2: ${{ secrets.OPENROUTER_API_KEY_2 }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
   CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+  CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
   CEREBRAS_MODEL: ${{ secrets.CEREBRAS_MODEL || 'gpt-oss-120b' }}
 
 permissions:

@@ -141,6 +141,11 @@ function getConfiguredSummaryProviders() {
     process.env.OPENROUTER_API_KEY_2,
     process.env.OPENROUTER_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+  const cerebrasKeys = [
+    process.env.CEREBRAS_API_KEY,
+    process.env.CEREBRAS_API_KEY_2,
+    process.env.CEREBRAS_API_KEY_3
+  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
 
   const addOpenRouter = (apiKey: string, index: number) => {
     providers.push({
@@ -157,25 +162,25 @@ function getConfiguredSummaryProviders() {
     });
   };
 
-  if (openRouterKeys[0]) addOpenRouter(openRouterKeys[0], 0);
-
-  if (process.env.CEREBRAS_API_KEY) {
+  const addCerebras = (apiKey: string, index: number) => {
     providers.push({
       name: "Cerebras",
-      label: "Cerebras",
-      apiKey: process.env.CEREBRAS_API_KEY,
+      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
+      apiKey,
       baseUrl: "https://api.cerebras.ai/v1/chat/completions",
       model: process.env.CEREBRAS_MODEL || "gpt-oss-120b",
       minIntervalEnv: "CEREBRAS_MIN_REQUEST_INTERVAL_MS"
     });
-  }
+  };
 
-  for (let index = 1; index < openRouterKeys.length; index += 1) {
-    addOpenRouter(openRouterKeys[index], index);
+  const providerSlots = Math.max(openRouterKeys.length, cerebrasKeys.length);
+  for (let index = 0; index < providerSlots; index += 1) {
+    if (openRouterKeys[index]) addOpenRouter(openRouterKeys[index], index);
+    if (cerebrasKeys[index]) addCerebras(cerebrasKeys[index], index);
   }
 
   if (providers.length === 0) {
-    throw new Error("Missing LLM provider API key. Configure OPENROUTER_API_KEY, OPENROUTER_API_KEY_2, or CEREBRAS_API_KEY.");
+    throw new Error("Missing LLM provider API key. Configure an OpenRouter or Cerebras API key.");
   }
 
   return providers;
@@ -186,7 +191,9 @@ export function hasSummaryProviderConfig() {
     process.env.OPENROUTER_API_KEY ||
       process.env.OPENROUTER_API_KEY_2 ||
       process.env.OPENROUTER_API_KEY_3 ||
-      process.env.CEREBRAS_API_KEY
+      process.env.CEREBRAS_API_KEY ||
+      process.env.CEREBRAS_API_KEY_2 ||
+      process.env.CEREBRAS_API_KEY_3
   );
 }
 
