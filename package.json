@@ -68,6 +68,7 @@
     "pipeline:san-francisco": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=san-francisco",
     "pipeline:menlo-park": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=menlo-park",
     "pipeline:los-altos": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=los-altos",
+    "pipeline:redwood-city": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=redwood-city",
     "pipeline:all": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=all",
     "email:digests": "node --import tsx/esm scripts/send-weekly-digests.ts",
     "test": "node --import tsx/esm --test tests/*.test.ts"

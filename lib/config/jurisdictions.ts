@@ -11,7 +11,8 @@ export type JurisdictionSlug =
   | "mountain-view"
   | "los-altos"
   | "san-francisco"
-  | "menlo-park";
+  | "menlo-park"
+  | "redwood-city";
 export type PublicJurisdictionSlug =
   | "foster-city"
   | "san-mateo"
@@ -20,12 +21,13 @@ export type PublicJurisdictionSlug =
   | "mountain-view"
   | "los-altos"
   | "san-francisco"
-  | "menlo-park";
+  | "menlo-park"
+  | "redwood-city";
 export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_SLUG;
 export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
   | typeof ALL_JURISDICTIONS_SLUG;
-export type CivicPlatform = "primegov" | "iqm2" | "legistar" | "official-site" | "civicclerk";
+export type CivicPlatform = "primegov" | "iqm2" | "legistar" | "official-site" | "civicclerk" | "agenda-online";
 export type RegionSlug =
   | "san-francisco"
   | "north-san-mateo"
@@ -72,6 +74,9 @@ const DEFAULT_SAN_FRANCISCO_LEGISTAR_URL =
 const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
+const DEFAULT_REDWOOD_CITY_AGENDA_ONLINE_URL =
+  process.env.REDWOOD_CITY_AGENDA_ONLINE_URL ||
+  "https://meetings.redwoodcity.org/AgendaOnline/";
 export const DEFAULT_LOS_ALTOS_CIVICCLERK_URL =
   "https://losaltosca.portal.civicclerk.com/";
 export const SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE = [
@@ -104,7 +109,8 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "santa-clara-county",
   "los-altos",
   "san-francisco",
-  "menlo-park"
+  "menlo-park",
+  "redwood-city"
 ];
 
 export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
@@ -113,6 +119,7 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "San Mateo County", slug: "san-mateo-county" },
   { name: "Foster City", slug: "foster-city", parentCountySlug: "san-mateo-county" },
   { name: "Menlo Park", slug: "menlo-park", parentCountySlug: "san-mateo-county" },
+  { name: "Redwood City", slug: "redwood-city", parentCountySlug: "san-mateo-county" },
   { name: "San Mateo", slug: "san-mateo", parentCountySlug: "san-mateo-county" },
   { name: "Santa Clara County", slug: "santa-clara-county" },
   { name: "Los Altos", slug: "los-altos", parentCountySlug: "santa-clara-county" },
@@ -143,6 +150,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "los-altos") return "Los Altos";
   if (internalSlug === "san-francisco") return "San Francisco";
   if (internalSlug === "menlo-park") return "Menlo Park";
+  if (internalSlug === "redwood-city") return "Redwood City";
   return getJurisdictionBySlug(internalSlug)?.name || "Foster City";
 }
 
@@ -338,6 +346,18 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseServiceRoleKey:
         southSanMateo?.serviceRoleKey ||
         process.env.MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY
+    },
+    {
+      name: "Redwood City",
+      officialName: "City of Redwood City",
+      slug: "redwood-city",
+      regionSlug: "south-san-mateo",
+      platform: "agenda-online",
+      timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_REDWOOD_CITY_AGENDA_ONLINE_URL,
+      supabaseUrl: southSanMateo?.url,
+      supabaseAnonKey: southSanMateo?.anonKey,
+      supabaseServiceRoleKey: southSanMateo?.serviceRoleKey
     }
   ];
 }
@@ -415,7 +435,8 @@ export function requireValidJurisdictionSlug(
     slug === "mountain-view" ||
     slug === "los-altos" ||
     slug === "san-francisco" ||
-    slug === "menlo-park"
+    slug === "menlo-park" ||
+    slug === "redwood-city"
   ) {
     return slug;
   }

@@ -26,6 +26,7 @@ import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
 import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
 import { scrapeCivicClerkMeetings } from "@/lib/sources/civicclerk";
+import { scrapeAgendaOnlineMeetings } from "@/lib/sources/agenda-online";
 import {
   enrichMenloParkMeetingTimesFromAgendaText,
   scrapeMenloParkMeetings
@@ -235,6 +236,16 @@ export async function runSimpleCityPipeline(
                 jurisdiction,
                 portalUrl:
                   options.portalUrl || jurisdiction.civicClerkUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              })
+          : jurisdiction.platform === "agenda-online"
+            ? await scrapeAgendaOnlineMeetings({
+                ...options,
+                jurisdiction,
+                portalUrl: options.portalUrl || jurisdiction.sourceUrl,
                 documentOutputDir,
                 downloadDocuments: options.downloadDocuments ?? true,
                 shouldStop: deadlineExceeded,

@@ -55,6 +55,10 @@ function sourceCredentials(slug: JurisdictionSlug) {
     "menlo-park": [
       process.env.NEXT_PUBLIC_MENLO_PARK_SUPABASE_URL,
       process.env.MENLO_PARK_SUPABASE_SERVICE_ROLE_KEY
+    ],
+    "redwood-city": [
+      process.env.NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_URL,
+      process.env.SOUTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY
     ]
   };
   return values[slug];
