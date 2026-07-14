@@ -1,5 +1,6 @@
 import type { SummaryCardRow } from "@/lib/types";
 import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
+import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 
 const IMPACT_CATEGORY_SCORES: Record<string, number> = {
   Housing: 34,
@@ -208,7 +209,7 @@ function readableAgendaFallback(title: string) {
 function cardText(card: SummaryCardRow) {
   return compactText([
     card.agenda_item,
-    card.what_is_happening,
+    ...normalizeSummaryPoints(card.what_is_happening),
     card.why_it_matters,
     card.status,
     card.meetings?.title,

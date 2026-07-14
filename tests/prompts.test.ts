@@ -15,6 +15,12 @@ test("summarizer prompt includes transparency-worthy routine items", () => {
   );
 });
 
+test("summarizer prompt requires structured and aligned summary points", () => {
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /whatIsHappening” must be an array of 1-3/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Never combine the points into one string/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /same number of points as its matching English card/);
+});
+
 test("summarizer prompt classifies topics from complete item context", () => {
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /agenda item's complete context/);
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /Do not choose a topic from an isolated keyword/);

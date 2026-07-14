@@ -12,6 +12,7 @@ import {
 import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
+import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 
 type UpsertedMeeting = {
   externalId: string;
@@ -73,7 +74,7 @@ function exactCardKey(agendaItem?: string | null, sourceUrl?: string | null) {
 function summaryCardFingerprintInput(card: SimpleCityCard) {
   return {
     agenda_item: card.agendaItem,
-    what_is_happening: card.whatIsHappening,
+    what_is_happening: summaryPointsStorageText(card.whatIsHappening),
     why_it_matters: card.whyItMatters,
     who_it_affects: card.whoItAffects,
     status: card.status,
@@ -255,7 +256,7 @@ async function writeSpanishCardTranslations(
         summary_card_id: inserted.id,
         locale: "es",
         agenda_item: translation.agendaItem,
-        what_is_happening: translation.whatIsHappening,
+        what_is_happening: summaryPointsStorageText(translation.whatIsHappening),
         why_it_matters: translation.whyItMatters,
         who_it_affects: translation.whoItAffects,
         status: card.status,

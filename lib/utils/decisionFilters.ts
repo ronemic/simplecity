@@ -1,5 +1,6 @@
 import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
+import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 
 export function categoryFromSlug(slug: string | null | undefined): CategoryName | undefined {
   return CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
@@ -15,7 +16,7 @@ export function matchesDecisionFilters(
 
   const haystack = [
     card.agenda_item,
-    card.what_is_happening,
+    ...normalizeSummaryPoints(card.what_is_happening),
     card.why_it_matters,
     card.meetings?.title
   ]

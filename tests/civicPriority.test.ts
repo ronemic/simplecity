@@ -21,7 +21,7 @@ function card(input: Partial<SummaryCardRow> = {}): SummaryCardRow {
     jurisdiction_slug: "santa-clara-county",
     platform: "iqm2",
     agenda_item: rest.agenda_item || "",
-    what_is_happening: rest.what_is_happening || "",
+    what_is_happening: rest.what_is_happening || [],
     why_it_matters: rest.why_it_matters || "",
     who_it_affects: rest.who_it_affects || [],
     category_tags: rest.category_tags || [],
@@ -78,7 +78,7 @@ test("public-interest ranking puts impactful items before routine recognitions a
   const budget = card({
     id: "budget",
     agenda_item: "Continued Budget Hearing",
-    what_is_happening: "The board will discuss budget funding and service levels.",
+    what_is_happening: ["The board will discuss budget funding and service levels."],
     category_tags: ["Budget & Taxes"],
     status: "Under discussion"
   });
@@ -110,7 +110,7 @@ test("digest selection keeps public-interest or featured cards only", () => {
   const budget = card({
     id: "budget",
     agenda_item: "Continued Budget Hearing",
-    what_is_happening: "The board will discuss budget funding and service levels.",
+    what_is_happening: ["The board will discuss budget funding and service levels."],
     category_tags: ["Budget & Taxes"],
     status: "Upcoming vote"
   });
@@ -149,14 +149,14 @@ test("digest group selection keeps represented jurisdictions before filling extr
   const budget = card({
     id: "budget",
     agenda_item: "Continued Budget Hearing",
-    what_is_happening: "The board will discuss budget funding and service levels.",
+    what_is_happening: ["The board will discuss budget funding and service levels."],
     category_tags: ["Budget & Taxes"],
     status: "Upcoming vote"
   });
   const housing = card({
     id: "housing",
     agenda_item: "Affordable housing zoning vote",
-    what_is_happening: "The council will vote on zoning changes for affordable housing.",
+    what_is_happening: ["The council will vote on zoning changes for affordable housing."],
     category_tags: ["Housing"],
     status: "Upcoming vote"
   });

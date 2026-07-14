@@ -14,7 +14,7 @@ const baseSummary = {
 function groundedCard(overrides: Record<string, unknown> = {}) {
   return {
     agendaItem: "Item 4 - Contract approval",
-    whatIsHappening: "The council will consider a $100 contract for park maintenance.",
+    whatIsHappening: ["The council will consider a $100 contract for park maintenance."],
     whyItMatters: "The contract affects park maintenance work.",
     whoItAffects: ["park users"],
     categoryTags: ["Parks & Environment"],
@@ -41,7 +41,7 @@ test("drops cards with exact values that are not grounded in the source text", (
       ...baseSummary,
       cards: [
         groundedCard({
-          whatIsHappening: "The council will consider a $250 contract for park maintenance."
+          whatIsHappening: ["The council will consider a $250 contract for park maintenance."]
         })
       ]
     },
@@ -64,7 +64,7 @@ test("accepts equivalent abbreviated and expanded numeric values", () => {
       ...baseSummary,
       cards: [
         groundedCard({
-          whatIsHappening: "The council will consider a 200 million bond for park improvements."
+          whatIsHappening: ["The council will consider a 200 million bond for park improvements."]
         })
       ]
     },
@@ -112,7 +112,7 @@ for (const scenario of [
         ...baseSummary,
         cards: [
           groundedCard({
-            whatIsHappening: `The proposal includes ${scenario.summaryValue}.`
+            whatIsHappening: [`The proposal includes ${scenario.summaryValue}.`]
           })
         ]
       },
@@ -133,7 +133,7 @@ test("does not ground equivalent numbers across incompatible units", () => {
       ...baseSummary,
       cards: [
         groundedCard({
-          whatIsHappening: "The project would build 200 million homes."
+          whatIsHappening: ["The project would build 200 million homes."]
         })
       ]
     },
@@ -153,7 +153,7 @@ test("does not ground a currency amount from a plain number", () => {
       ...baseSummary,
       cards: [
         groundedCard({
-          whatIsHappening: "The proposal would cost $200 million."
+          whatIsHappening: ["The proposal would cost $200 million."]
         })
       ]
     },
@@ -221,7 +221,9 @@ test("keeps Spanish card translations aligned with validated cards", () => {
           cards: [
             {
               agendaItem: "Aprobación de contrato",
-              whatIsHappening: "El concejo considerará un contrato de $100 para mantenimiento de parques.",
+              whatIsHappening: [
+                "El concejo considerará un contrato de $100 para mantenimiento de parques."
+              ],
               whyItMatters: "El contrato afecta el mantenimiento de parques.",
               whoItAffects: ["usuarios de parques"],
               status: "Votación próxima",
@@ -251,6 +253,90 @@ test("keeps Spanish card translations aligned with validated cards", () => {
   assert.equal(result.translations?.es?.cards.length, 1);
   assert.equal(result.translations?.es?.cards[0]?.agendaItem, "Aprobación de contrato");
   assert.equal(result.translations?.es?.cards[0]?.status, "Upcoming vote");
+});
+
+test("preserves structured point boundaries around punctuation-heavy civic text", () => {
+  const points = [
+    "The hearing concerns Smith v. City of Los Altos on Jan. 15 at 6:30 p.m.",
+    "Staff called the U.S. Dept. report “complete.” Council review is still required."
+  ];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ whatIsHappening: points })]
+    },
+    { fallbackSource: "https://city.example/agendas/4" }
+  );
+
+  assert.deepEqual(result.cards[0].whatIsHappening, points);
+});
+
+test("rejects legacy summary strings and arrays longer than three points", () => {
+  assert.throws(() =>
+    validateSimpleCitySummary({
+      ...baseSummary,
+      cards: [groundedCard({ whatIsHappening: "One combined summary string." })]
+    })
+  );
+
+  assert.throws(() =>
+    validateSimpleCitySummary({
+      ...baseSummary,
+      cards: [groundedCard({ whatIsHappening: ["One.", "Two.", "Three.", "Four."] })]
+    })
+  );
+});
+
+test("drops cards with duplicate structured points", () => {
+  const issues: Array<{ reason: string }> = [];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ whatIsHappening: ["Same point.", "same point."] })]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      onIssue: (issue) => issues.push(issue)
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.match(issues[0].reason, /duplicate what-is-happening points/);
+});
+
+test("drops a Spanish translation when its point count does not match English", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ whatIsHappening: ["One.", "Two."] })],
+      translations: {
+        es: {
+          cards: [
+            {
+              agendaItem: "Aprobación de contrato",
+              whatIsHappening: ["Uno."],
+              whyItMatters: "El contrato afecta el mantenimiento de parques.",
+              whoItAffects: ["usuarios de parques"],
+              status: "Upcoming vote",
+              commentWindow: {
+                opens: "No indicado en el documento fuente.",
+                closes: "No indicado en el documento fuente."
+              },
+              howToAct: {
+                attend: "Asista.",
+                email: "No indicado en el documento fuente.",
+                submitComment: "No indicado en el documento fuente."
+              }
+            }
+          ]
+        }
+      }
+    },
+    { fallbackSource: "https://city.example/agendas/4" }
+  );
+
+  assert.deepEqual(result.cards[0].whatIsHappening, ["One.", "Two."]);
+  assert.equal(result.translations?.es?.cards[0], null);
 });
 
 test("drops cards with ungrounded contact details", () => {
@@ -301,7 +387,7 @@ test("accepts routine approval as a current procedural status", () => {
       cards: [
         groundedCard({
           agendaItem: "Approve meeting minutes",
-          whatIsHappening: "The council will approve its meeting minutes.",
+          whatIsHappening: ["The council will approve its meeting minutes."],
           whyItMatters: "The minutes provide the official record of the meeting.",
           categoryTags: ["City Services"],
           status: "Routine approval",

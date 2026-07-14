@@ -17,7 +17,7 @@ const meetingSummary = {
 function card(overrides: Partial<SimpleCitySummary["cards"][number]> = {}) {
   return {
     agendaItem: "Item 4 - Contract approval",
-    whatIsHappening: "The council will consider a $100 contract for park maintenance.",
+    whatIsHappening: ["The council will consider a $100 contract for park maintenance."],
     whyItMatters: "The contract affects park maintenance work.",
     whoItAffects: ["park users"],
     categoryTags: ["Parks & Environment"],
@@ -166,7 +166,7 @@ test("regenerates when validation drops source-unsupported cards", async (t) => 
       meetingSummary,
       cards: [
         card({
-          whatIsHappening: "The council will consider a $250 contract for park maintenance."
+          whatIsHappening: ["The council will consider a $250 contract for park maintenance."]
         })
       ]
     };
@@ -183,7 +183,9 @@ test("regenerates when validation drops source-unsupported cards", async (t) => 
   assert.equal(calls, 2);
   assert.match(secondPrompt, /previous response could not be fully used/i);
   assert.equal(result.summary.cards.length, 1);
-  assert.equal(result.summary.cards[0].whatIsHappening, "The council will consider a $100 contract for park maintenance.");
+  assert.deepEqual(result.summary.cards[0].whatIsHappening, [
+    "The council will consider a $100 contract for park maintenance."
+  ]);
 });
 
 test("regenerates an empty summary when agenda source text is usable", async (t) => {
@@ -641,7 +643,7 @@ test("summarizes and combines every bounded agenda-item batch", async (t) => {
       cards: titles.map((title) =>
         card({
           agendaItem: title,
-          whatIsHappening: `${title} will be reviewed.`,
+          whatIsHappening: [`${title} will be reviewed.`],
           whyItMatters: `${title} affects city services.`,
           whoItAffects: ["residents"],
           categoryTags: ["City Services"],
@@ -652,7 +654,7 @@ test("summarizes and combines every bounded agenda-item batch", async (t) => {
         es: {
           cards: titles.map((title) => ({
             agendaItem: title,
-            whatIsHappening: `${title} será revisada.`,
+            whatIsHappening: [`${title} será revisada.`],
             whyItMatters: `${title} afecta los servicios municipales.`,
             whoItAffects: ["residentes"],
             status: "Under discussion",

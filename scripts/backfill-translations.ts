@@ -19,6 +19,7 @@ import type {
   SummaryCardRow,
   SummaryCardTranslationRow
 } from "@/lib/types";
+import { normalizeSummaryPoints, summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 
 type BackfillOptions = {
   jurisdiction: JurisdictionSlug;
@@ -40,7 +41,6 @@ type CardCandidate = Pick<
   | "meeting_id"
   | "jurisdiction_slug"
   | "agenda_item"
-  | "what_is_happening"
   | "why_it_matters"
   | "who_it_affects"
   | "status"
@@ -50,6 +50,7 @@ type CardCandidate = Pick<
   | "how_to_act_email"
   | "how_to_act_submit_comment"
 > & {
+  what_is_happening: string[];
   source_fingerprint: string;
 };
 
@@ -215,7 +216,7 @@ async function getCardCandidates(
       meeting_id: row.meeting_id,
       jurisdiction_slug: row.jurisdiction_slug,
       agenda_item: row.agenda_item,
-      what_is_happening: row.what_is_happening,
+      what_is_happening: normalizeSummaryPoints(row.what_is_happening),
       why_it_matters: row.why_it_matters,
       who_it_affects: row.who_it_affects,
       status: row.status,
@@ -277,7 +278,7 @@ async function writeCardTranslations(
       summary_card_id: row.id,
       locale,
       agenda_item: row.agenda_item,
-      what_is_happening: row.what_is_happening,
+      what_is_happening: summaryPointsStorageText(row.what_is_happening),
       why_it_matters: row.why_it_matters,
       who_it_affects: row.who_it_affects || [],
       status: row.status,

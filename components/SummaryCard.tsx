@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils/cn";
 import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
 import { cardSummaryPoints } from "@/lib/utils/cardShare";
+import { summaryPointsText } from "@/lib/utils/summaryPoints";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -191,7 +192,7 @@ export function SummaryCard({
     ? agendaTitle.toLowerCase().includes(normalizedHighlight)
     : false;
   const matchingPreview = !titleContainsHighlight && highlight
-    ? [card.what_is_happening, card.why_it_matters, meeting?.title]
+    ? [summaryPointsText(card.what_is_happening), card.why_it_matters, meeting?.title]
       .map((text) => getHighlightExcerpt(text, highlight))
       .find(Boolean)
     : null;

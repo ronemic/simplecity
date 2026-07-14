@@ -10,6 +10,7 @@ import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { categoryLabel, type Locale } from "@/lib/i18n";
+import { summaryPointsText, type SummaryPointsValue } from "@/lib/utils/summaryPoints";
 
 type NewPostsDigestEmailInput = {
   cards: LocalizedDigestCard[];
@@ -99,6 +100,10 @@ function compactText(value: string | null | undefined, fallback: string) {
     .trim();
 }
 
+function compactSummary(value: SummaryPointsValue, fallback: string) {
+  return summaryPointsText(value) || fallback;
+}
+
 function emailTagValue(value: string | null | undefined) {
   const normalized = String(value || "unknown")
     .toLowerCase()
@@ -129,7 +134,7 @@ function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale =
     meeting?.meeting_datetime,
     meeting?.time_text
   );
-  const summary = compactText(card.what_is_happening, COPY[locale].summaryFallback);
+  const summary = compactSummary(card.what_is_happening, COPY[locale].summaryFallback);
   const url = cardUrl(card, appUrl, locale);
 
   return [

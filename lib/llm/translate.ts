@@ -12,7 +12,7 @@ export type MeetingTranslationInput = {
 export type SummaryCardTranslationInput = {
   id: string;
   agenda_item: string | null;
-  what_is_happening: string | null;
+  what_is_happening: string[] | null;
   why_it_matters: string | null;
   who_it_affects: string[] | null;
   status: string | null;
@@ -103,7 +103,7 @@ function parseCard(value: unknown): SummaryCardTranslationOutput {
   return {
     id: requireString(row.id, "Card translation id"),
     agenda_item: optionalString(row.agenda_item, "Card translation agenda_item"),
-    what_is_happening: optionalString(row.what_is_happening, "Card translation what_is_happening"),
+    what_is_happening: optionalStringArray(row.what_is_happening, "Card translation what_is_happening"),
     why_it_matters: optionalString(row.why_it_matters, "Card translation why_it_matters"),
     who_it_affects: optionalStringArray(row.who_it_affects, "Card translation who_it_affects"),
     status: optionalString(row.status, "Card translation status"),

@@ -62,7 +62,7 @@ const summary: SimpleCitySummary = {
   cards: [
     {
       agendaItem: "Receive Canopy informational presentation",
-      whatIsHappening: "Canopy will present its work.",
+      whatIsHappening: ["Canopy will present its work."],
       whyItMatters: "The work affects local trees.",
       whoItAffects: ["residents"],
       categoryTags: ["Public Safety"],
@@ -78,7 +78,7 @@ const summary: SimpleCitySummary = {
       cards: [
         {
           agendaItem: "Presentación informativa de Canopy",
-          whatIsHappening: "Canopy presentará su trabajo.",
+          whatIsHappening: ["Canopy presentará su trabajo."],
           whyItMatters: "El trabajo afecta a los árboles locales.",
           whoItAffects: ["residentes"],
           status: "Upcoming vote",
@@ -192,13 +192,13 @@ test("accepts routine approval for minutes while keeping substantive approvals a
       {
         ...summary.cards[0],
         agendaItem: "Approve Planning Commission meeting minutes",
-        whatIsHappening: "The commission will approve its prior meeting minutes.",
+        whatIsHappening: ["The commission will approve its prior meeting minutes."],
         categoryTags: ["City Services"]
       },
       {
         ...summary.cards[0],
         agendaItem: "Award park maintenance contract",
-        whatIsHappening: "The commission will award a park maintenance contract.",
+        whatIsHappening: ["The commission will award a park maintenance contract."],
         categoryTags: ["Parks & Environment"]
       }
     ]

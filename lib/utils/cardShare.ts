@@ -4,6 +4,7 @@ import type { SummaryCardRow } from "@/lib/types";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
+import { normalizeSummaryPoints, summaryPointsText } from "@/lib/utils/summaryPoints";
 
 export function cardSharePath(cardId: string) {
   return `/cards/${encodeURIComponent(cardId)}`;
@@ -14,9 +15,7 @@ export function cardShareTitle(card: SummaryCardRow) {
 }
 
 export function cardShareDescription(card: SummaryCardRow, locale: Locale = "en") {
-  const summary = String(card.what_is_happening || card.why_it_matters || "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const summary = summaryPointsText(card.what_is_happening) || String(card.why_it_matters || "").trim();
 
   return summary || (locale === "es"
     ? "Un resumen en lenguaje claro de una decisión del gobierno local."
@@ -27,18 +26,8 @@ export function cardSummaryPoints(card: SummaryCardRow, locale: Locale = "en") {
   const fallback = locale === "es"
     ? "No indicado en el documento fuente."
     : "Not listed in the source document.";
-  const content = String(card.what_is_happening || fallback)
-    .replace(/\s+/g, " ")
-    .trim();
-  const sentenceSafeContent = content
-    .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, "$1__SIMPLECITY_DOT__")
-    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|St|No|Inc|Co|Ltd|LLC|v|vs)\.(?=\s+)/gi, "$1__SIMPLECITY_DOT__");
-
-  return sentenceSafeContent
-    .split(/(?<=[.!?])\s+(?=[A-Z0-9"$“])/)
-    .map((item) => item.replace(/__SIMPLECITY_DOT__/g, ".").trim())
-    .filter(Boolean)
-    .slice(0, 3);
+  const points = normalizeSummaryPoints(card.what_is_happening).slice(0, 3);
+  return points.length > 0 ? points : [fallback];
 }
 
 export function cardJurisdictionLabel(card: SummaryCardRow) {

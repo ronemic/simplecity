@@ -39,7 +39,7 @@ const NUMERIC_SCALE: Record<string, number> = {
 
 const CardSchema = z.object({
   agendaItem: z.string().min(1),
-  whatIsHappening: z.string().min(1),
+  whatIsHappening: z.array(z.string().trim().min(1)).min(1).max(3),
   whyItMatters: z.string().min(1),
   whoItAffects: z.array(z.string()).default([]),
   categoryTags: z.array(z.string()).default([]),
@@ -70,7 +70,7 @@ const CardSchema = z.object({
 
 const CardTranslationSchema = z.object({
   agendaItem: z.string().default(""),
-  whatIsHappening: z.string().default(""),
+  whatIsHappening: z.array(z.string().trim().min(1)).max(3).default([]),
   whyItMatters: z.string().default(""),
   whoItAffects: z.array(z.string()).default([]),
   status: z.string().default(""),
@@ -282,7 +282,7 @@ function resolveOfficialSource(source: string, options: SummaryValidationOptions
 function cardGroundingText(card: z.infer<typeof CardSchema>) {
   return [
     card.agendaItem,
-    card.whatIsHappening,
+    ...card.whatIsHappening,
     card.whyItMatters,
     card.status,
     card.commentWindow.opens,
@@ -297,15 +297,20 @@ function cardGroundingText(card: z.infer<typeof CardSchema>) {
 
 function cleanCardTranslation(
   translation: z.infer<typeof CardTranslationSchema> | null | undefined,
-  sourceStatus: string
+  sourceStatus: string,
+  expectedPointCount: number
 ): SimpleCityCardTranslation | null {
   if (!translation) return null;
 
   const agendaItem = translation.agendaItem.trim();
-  const whatIsHappening = translation.whatIsHappening.trim();
+  const whatIsHappening = translation.whatIsHappening.map((point) => point.trim()).filter(Boolean);
   const whyItMatters = translation.whyItMatters.trim();
 
-  if (!agendaItem || !whatIsHappening || !whyItMatters) return null;
+  if (
+    !agendaItem ||
+    whatIsHappening.length !== expectedPointCount ||
+    !whyItMatters
+  ) return null;
 
   return {
     agendaItem,
@@ -473,18 +478,27 @@ export function validateSimpleCitySummary(
       }
 
       const agendaItem = card.agendaItem.trim();
-      const whatIsHappening = card.whatIsHappening.trim();
+      const whatIsHappening = card.whatIsHappening.map((point) => point.trim()).filter(Boolean);
       const whyItMatters = card.whyItMatters.trim();
+      const normalizedSummaryPoints = whatIsHappening.map((point) => point.toLowerCase());
       const categoryTags = card.categoryTags
         .map((tag) => tag.trim())
         .filter((tag) => allowedCategories.has(tag))
         .filter((tag, tagIndex, tags) => tags.indexOf(tag) === tagIndex)
         .slice(0, 2);
 
-      if (!agendaItem || !whatIsHappening || !whyItMatters) {
+      if (!agendaItem || whatIsHappening.length === 0 || !whyItMatters) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
           reason: "Card was missing required summary text."
+        });
+        return null;
+      }
+
+      if (new Set(normalizedSummaryPoints).size !== normalizedSummaryPoints.length) {
+        options.onIssue?.({
+          agendaItem,
+          reason: "Card included duplicate what-is-happening points."
         });
         return null;
       }
@@ -514,7 +528,11 @@ export function validateSimpleCitySummary(
           status,
           confidence: capConfidence(card.confidence, maxConfidence)
         },
-        spanishTranslation: cleanCardTranslation(spanishCardTranslations[index], status)
+        spanishTranslation: cleanCardTranslation(
+          spanishCardTranslations[index],
+          status,
+          whatIsHappening.length
+        )
       };
     })
     .filter((card): card is NonNullable<typeof card> => Boolean(card));

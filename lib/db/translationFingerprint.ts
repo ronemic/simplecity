@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { MeetingRow, SummaryCardRow } from "@/lib/types";
+import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 
 function normalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map((item) => normalize(item));
@@ -44,7 +45,7 @@ export function summaryCardTranslationFingerprint(
 ) {
   return fingerprint({
     agenda_item: card.agenda_item,
-    what_is_happening: card.what_is_happening,
+    what_is_happening: summaryPointsStorageText(card.what_is_happening),
     why_it_matters: card.why_it_matters,
     who_it_affects: card.who_it_affects,
     status: card.status,

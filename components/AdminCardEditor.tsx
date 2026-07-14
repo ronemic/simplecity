@@ -6,6 +6,7 @@ import { useState } from "react";
 import { CATEGORIES } from "@/lib/constants";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { SummaryCardRow } from "@/lib/types";
+import { normalizeSummaryPoints, summaryPointsFromLines } from "@/lib/utils/summaryPoints";
 
 function listFromCommaText(value: FormDataEntryValue | null) {
   return String(value || "")
@@ -41,7 +42,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
           id: card.id,
           jurisdiction: cardJurisdictionSlug,
           agenda_item: String(formData.get("agenda_item") || ""),
-          what_is_happening: String(formData.get("what_is_happening") || ""),
+          what_is_happening: summaryPointsFromLines(formData.get("what_is_happening")),
           why_it_matters: String(formData.get("why_it_matters") || ""),
           who_it_affects: listFromCommaText(formData.get("who_it_affects")),
           category_tags: formData.getAll("category_tags").map(String),
@@ -129,10 +130,11 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             <span className="text-xs font-bold uppercase text-black/70">What is happening</span>
             <textarea
               name="what_is_happening"
-              defaultValue={card.what_is_happening || ""}
+              defaultValue={normalizeSummaryPoints(card.what_is_happening).join("\n")}
               rows={3}
               className="input-control input-control--textarea"
             />
+            <span className="block text-xs text-black/50">Enter one bullet point per line, up to three.</span>
           </label>
           <label className="block space-y-1 md:col-span-2">
             <span className="text-xs font-bold uppercase text-black/70">Why it matters</span>

@@ -11,6 +11,7 @@ import {
   requireValidJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import type { MeetingRow } from "@/lib/types";
+import { summaryPointsFromLines, summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 
 function listFromCommaText(value: unknown) {
   return String(value || "")
@@ -39,7 +40,7 @@ async function validatePublishedCardUpdate(
   before: Record<string, unknown>,
   update: {
     agenda_item: string;
-    what_is_happening: string;
+    what_is_happening: string[];
     why_it_matters: string;
     who_it_affects: string[];
     category_tags: string[];
@@ -153,7 +154,7 @@ export async function PUT(request: NextRequest) {
 
   const update = {
     agenda_item: String(body.agenda_item || ""),
-    what_is_happening: String(body.what_is_happening || ""),
+    what_is_happening: summaryPointsFromLines(body.what_is_happening),
     why_it_matters: String(body.why_it_matters || ""),
     who_it_affects: Array.isArray(body.who_it_affects) ? body.who_it_affects.map(String) : listFromCommaText(body.who_it_affects),
     category_tags: Array.isArray(body.category_tags) ? body.category_tags.map(String) : [],
@@ -169,14 +170,33 @@ export async function PUT(request: NextRequest) {
     admin_notes: String(body.admin_notes || "")
   };
 
+  if (update.what_is_happening.length < 1 || update.what_is_happening.length > 3) {
+    return NextResponse.json(
+      { error: "What is happening must contain between one and three points." },
+      { status: 400 }
+    );
+  }
+
+  const normalizedPoints = update.what_is_happening.map((point) => point.toLowerCase());
+  if (new Set(normalizedPoints).size !== normalizedPoints.length) {
+    return NextResponse.json(
+      { error: "What is happening points must be unique." },
+      { status: 400 }
+    );
+  }
+
   const validationError = await validatePublishedCardUpdate(supabase, before, update);
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
+  const databaseUpdate = {
+    ...update,
+    what_is_happening: summaryPointsStorageText(update.what_is_happening)
+  };
   const { data: updated, error } = await supabase
     .from("summary_cards")
-    .update(update)
+    .update(databaseUpdate)
     .eq("id", id)
     .eq("jurisdiction_slug", jurisdiction)
     .select("id")
@@ -191,7 +211,7 @@ export async function PUT(request: NextRequest) {
     entityId: id,
     jurisdictionSlug: jurisdiction,
     before,
-    after: update
+    after: databaseUpdate
   });
 
   revalidatePath("/admin/cards");

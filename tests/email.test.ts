@@ -30,7 +30,7 @@ function testCard(overrides: Partial<SummaryCardRow> = {}): SummaryCardRow {
     jurisdiction_slug: "san-mateo-city",
     platform: "primegov",
     agenda_item: "Item 4 - Approve park contract",
-    what_is_happening: "The council will consider a maintenance contract for Central Park.",
+    what_is_happening: ["The council will consider a maintenance contract for Central Park."],
     why_it_matters: "The contract affects park upkeep.",
     who_it_affects: ["park users"],
     category_tags: ["Parks & Environment"],
@@ -99,7 +99,7 @@ test("builds a new posts digest with escaped card content and localized card lin
     cards: [
       testCard({
         agenda_item: "Item 4 - <Approve> park contract",
-        what_is_happening: "The council will consider a maintenance contract."
+        what_is_happening: ["The council will consider a maintenance contract."]
       })
     ],
     appUrl: "https://simplecity.example",
@@ -122,8 +122,9 @@ test("builds a new posts digest with escaped card content and localized card lin
 test("builds a bilingual digest when Spanish translations are attached", () => {
   const spanishCard = testCard({
     agenda_item: "Aprobar contrato de mantenimiento del parque",
-    what_is_happening:
-      "El concejo considerará un contrato de mantenimiento para Central Park.",
+    what_is_happening: [
+      "El concejo considerará un contrato de mantenimiento para Central Park."
+    ],
     category_tags: ["Parks & Environment"],
     meetings: {
       ...testCard().meetings!,

@@ -138,7 +138,7 @@ export type LlmReadyMeeting = PrimeGovMeeting & {
 
 export type SimpleCityCard = {
   agendaItem: string;
-  whatIsHappening: string;
+  whatIsHappening: string[];
   whyItMatters: string;
   whoItAffects: string[];
   categoryTags: string[];
@@ -158,7 +158,7 @@ export type SimpleCityCard = {
 
 export type SimpleCityCardTranslation = {
   agendaItem: string;
-  whatIsHappening: string;
+  whatIsHappening: string[];
   whyItMatters: string;
   whoItAffects: string[];
   status: string;
@@ -199,7 +199,8 @@ export type SummaryCardRow = {
   jurisdiction_slug: string | null;
   platform: string | null;
   agenda_item: string | null;
-  what_is_happening: string | null;
+  what_is_happening: string[] | string | null;
+  what_is_happening_points?: string[] | null;
   why_it_matters: string | null;
   who_it_affects: string[] | null;
   category_tags: string[] | null;
@@ -224,7 +225,8 @@ export type SummaryCardTranslationRow = {
   summary_card_id: string;
   locale: string;
   agenda_item: string | null;
-  what_is_happening: string | null;
+  what_is_happening: string[] | string | null;
+  what_is_happening_points?: string[] | null;
   why_it_matters: string | null;
   who_it_affects: string[] | null;
   status: string | null;

@@ -5,7 +5,7 @@ import type { SummaryCardRow } from "@/lib/types";
 
 const card = {
   agenda_item: "Approve protected bicycle lanes",
-  what_is_happening: "The city will vote on a safer street design.",
+  what_is_happening: ["The city will vote on a safer street design."],
   why_it_matters: "The project changes how residents travel downtown.",
   category_tags: ["Transportation", "Public Safety"],
   meetings: { title: "City Council" }

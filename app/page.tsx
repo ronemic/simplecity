@@ -29,6 +29,7 @@ import { formatDisplayDate } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
 import { categoryShortLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 
 export const revalidate = 300;
 
@@ -36,7 +37,7 @@ function matchesSearch(card: SummaryCardRow, search: string) {
   if (!search) return true;
   const haystack = [
     card.agenda_item,
-    card.what_is_happening,
+    ...normalizeSummaryPoints(card.what_is_happening),
     card.why_it_matters,
     card.meetings?.title,
     ...(card.category_tags || [])

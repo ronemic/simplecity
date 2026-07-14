@@ -99,7 +99,7 @@ export function topicValidationCandidates(
     const item =
       findAgendaItemForCard(card.agendaItem, meeting.items || []) ||
       findAgendaItemForCard(
-        `${card.agendaItem} ${card.whatIsHappening}`,
+        `${card.agendaItem} ${card.whatIsHappening.join(" ")}`,
         meeting.items || []
       );
     if (!item) return [];

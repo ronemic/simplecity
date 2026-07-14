@@ -42,7 +42,7 @@ JSON schema:
   "cards": [
     {
       "agendaItem": "string",
-      "whatIsHappening": "string",
+      "whatIsHappening": ["plain-English point 1", "plain-English point 2"],
       "whyItMatters": "string",
       "whoItAffects": ["string"],
       "categoryTags": ["Housing | Transportation | Public Safety | Parks & Environment | Budget & Taxes | Business & Development | Schools & Youth | City Services"],
@@ -69,7 +69,7 @@ JSON schema:
       "cards": [
         {
           "agendaItem": "Spanish translation of cards[0].agendaItem",
-          "whatIsHappening": "Spanish translation of cards[0].whatIsHappening",
+          "whatIsHappening": ["Spanish translation of cards[0].whatIsHappening[0]", "Spanish translation of cards[0].whatIsHappening[1]"],
           "whyItMatters": "Spanish translation of cards[0].whyItMatters",
           "whoItAffects": ["Spanish translations of cards[0].whoItAffects"],
           "status": "exact same English status enum as cards[0].status",
@@ -96,7 +96,8 @@ Rules:
 - Remove agenda item numbers, resolution numbers, ordinance numbers, permit numbers, and file numbers from “agendaItem” unless the number is the only way to identify the item.
 - Avoid broad or legal phrases in “agendaItem” such as “adopt resolution approving”, “authorize execution”, “receive report”, “master plan project”, “multiple resolutions”, “staff report”, or “agreement” by itself.
 - Keep official names, addresses, fiscal years, money amounts, tax rates, percentages, dates, and public deadlines when they are central to understanding the item.
-- “whatIsHappening” must be 2-3 plain sentences.
+- “whatIsHappening” must be an array of 1-3 concise plain-English points. Each point must be a complete sentence and contain one coherent fact or action.
+- Never combine the points into one string and never infer point boundaries from punctuation. Use one point only when the source supports just one useful fact.
 - “whyItMatters” must explain concrete impact.
 - “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or taxpayers.
 - “categoryTags” must only use allowed topics.
@@ -137,6 +138,7 @@ Rules:
 - If no non-routine or transparency-worthy source-supported agenda items are visible, return an empty cards array.
 - Always include translations.es.
 - translations.es.cards must have the same number of items as cards, in the exact same order.
+- Each translations.es.cards[*].whatIsHappening array must have the same number of points as its matching English card, in the exact same order.
 - Translate only public-facing text into Spanish. Preserve URLs, emails, phone numbers, dollar amounts, dates, times, item numbers, ordinance numbers, resolution numbers, vote counts, contract amounts, and project quantities exactly as written.
 - In translations.es.cards[*].status, keep the exact same English enum value as the matching cards[*].status. Do not translate status.
 - If an English field says “Not listed in the source document.”, translate that field as “No indicado en el documento fuente.”
