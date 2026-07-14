@@ -32,7 +32,7 @@ export function cardSummaryPoints(card: SummaryCardRow, locale: Locale = "en") {
     .trim();
   const sentenceSafeContent = content
     .replace(/\b([A-Z])\.(?=\s+[A-Z][a-z])/g, "$1__SIMPLECITY_DOT__")
-    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|St|No|Inc|Co|Ltd|LLC)\.(?=\s+)/gi, "$1__SIMPLECITY_DOT__");
+    .replace(/\b(Mr|Mrs|Ms|Dr|Prof|St|No|Inc|Co|Ltd|LLC|v|vs)\.(?=\s+)/gi, "$1__SIMPLECITY_DOT__");
 
   return sentenceSafeContent
     .split(/(?<=[.!?])\s+(?=[A-Z0-9"$“])/)
