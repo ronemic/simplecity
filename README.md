@@ -53,7 +53,7 @@ SimpleCity turns public meeting agendas into plain-English civic action cards. I
    LOS_ALTOS_CIVICCLERK_URL=https://losaltosca.portal.civicclerk.com/
    OPENROUTER_API_KEY=
    OPENROUTER_API_KEY_2=
-   OPENROUTER_MODEL=openai/gpt-oss-120b:free
+   OPENROUTER_MODEL=google/gemma-4-31b-it:free
    CEREBRAS_API_KEY=
    CEREBRAS_API_KEY_2=
    CEREBRAS_MODEL=gpt-oss-120b

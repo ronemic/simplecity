@@ -153,7 +153,7 @@ function getConfiguredSummaryProviders() {
       label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
       apiKey,
       baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model: process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free",
+      model: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
       headers: {
         "HTTP-Referer": referer,
         "X-OpenRouter-Title": "SimpleCity"

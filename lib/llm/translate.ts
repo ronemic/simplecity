@@ -165,7 +165,10 @@ export async function generateTranslations(
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY.");
 
-  const model = process.env.OPENROUTER_TRANSLATION_MODEL || process.env.OPENROUTER_MODEL || "openai/gpt-oss-120b:free";
+  const model =
+    process.env.OPENROUTER_TRANSLATION_MODEL ||
+    process.env.OPENROUTER_MODEL ||
+    "google/gemma-4-31b-it:free";
   const referer = getConfiguredAppUrl();
 
   options.log?.(
