@@ -173,11 +173,8 @@ function getConfiguredSummaryProviders() {
     });
   };
 
-  const providerSlots = Math.max(openRouterKeys.length, cerebrasKeys.length);
-  for (let index = 0; index < providerSlots; index += 1) {
-    if (openRouterKeys[index]) addOpenRouter(openRouterKeys[index], index);
-    if (cerebrasKeys[index]) addCerebras(cerebrasKeys[index], index);
-  }
+  cerebrasKeys.forEach(addCerebras);
+  openRouterKeys.forEach(addOpenRouter);
 
   if (providers.length === 0) {
     throw new Error("Missing LLM provider API key. Configure an OpenRouter or Cerebras API key.");

@@ -218,7 +218,7 @@ test("regenerates an empty summary when agenda source text is usable", async (t)
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("falls back to Cerebras when OpenRouter is rate-limited", async (t) => {
+test("falls back to OpenRouter when Cerebras is rate-limited", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
@@ -238,7 +238,7 @@ test("falls back to Cerebras when OpenRouter is rate-limited", async (t) => {
     const body = JSON.parse(String(init?.body || "{}")) as { model?: string };
     models.push(body.model || "");
 
-    if (String(url).includes("openrouter.ai")) {
+    if (String(url).includes("cerebras.ai")) {
       return new Response("temporarily rate-limited upstream", { status: 429 });
     }
 
@@ -251,14 +251,14 @@ test("falls back to Cerebras when OpenRouter is rate-limited", async (t) => {
   const result = await generateSummaryForMeeting(meeting());
 
   assert.deepEqual(urls, [
-    "https://openrouter.ai/api/v1/chat/completions",
-    "https://api.cerebras.ai/v1/chat/completions"
+    "https://api.cerebras.ai/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions"
   ]);
-  assert.deepEqual(models, ["test-openrouter-model", "gpt-oss-120b"]);
+  assert.deepEqual(models, ["gpt-oss-120b", "test-openrouter-model"]);
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("alternates OpenRouter and Cerebras keys in slot order", async (t) => {
+test("tries all Cerebras keys before all OpenRouter keys", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const providers: string[] = [];
@@ -277,7 +277,7 @@ test("alternates OpenRouter and Cerebras keys in slot order", async (t) => {
     const authorization = new Headers(init?.headers).get("Authorization");
     providers.push(`${String(url).includes("openrouter.ai") ? "openrouter" : "cerebras"}:${authorization}`);
 
-    if (authorization !== "Bearer test-cerebras-key-2") {
+    if (authorization !== "Bearer test-openrouter-key-2") {
       return new Response("temporarily rate-limited", { status: 429 });
     }
 
@@ -287,10 +287,10 @@ test("alternates OpenRouter and Cerebras keys in slot order", async (t) => {
   const result = await generateSummaryForMeeting(meeting());
 
   assert.deepEqual(providers, [
-    "openrouter:Bearer test-openrouter-key",
     "cerebras:Bearer test-cerebras-key",
-    "openrouter:Bearer test-openrouter-key-2",
-    "cerebras:Bearer test-cerebras-key-2"
+    "cerebras:Bearer test-cerebras-key-2",
+    "openrouter:Bearer test-openrouter-key",
+    "openrouter:Bearer test-openrouter-key-2"
   ]);
   assert.equal(result.summary.cards.length, 1);
 });
@@ -439,7 +439,7 @@ test("verifies topics and status using only matched agenda-item context", async 
   assert.doesNotMatch(topicPrompt, /FLAT_PACKET_SENTINEL/);
 });
 
-test("falls back to Cerebras when isolated topic and status verification is rate-limited", async (t) => {
+test("falls back to OpenRouter when isolated Cerebras topic verification is rate-limited", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
@@ -472,7 +472,7 @@ test("falls back to Cerebras when isolated topic and status verification is rate
     if (urls.length === 1) {
       return openRouterResponse({ meetingSummary, cards: [card()] });
     }
-    if (String(url).includes("openrouter.ai")) {
+    if (urls.length === 2) {
       return new Response("topic verifier rate limited", { status: 429 });
     }
     return new Response(
@@ -500,9 +500,9 @@ test("falls back to Cerebras when isolated topic and status verification is rate
   const result = await generateSummaryForMeeting(preparedMeeting);
 
   assert.deepEqual(urls, [
-    "https://openrouter.ai/api/v1/chat/completions",
-    "https://openrouter.ai/api/v1/chat/completions",
-    "https://api.cerebras.ai/v1/chat/completions"
+    "https://api.cerebras.ai/v1/chat/completions",
+    "https://api.cerebras.ai/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions"
   ]);
   assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
 });
