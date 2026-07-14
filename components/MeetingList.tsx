@@ -25,6 +25,7 @@ import {
 } from "@/lib/utils/calendarGrid";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { meetingSearchMatch } from "@/lib/utils/meetingFilters";
+import { matchesNormalizedDecisionSearchText } from "@/lib/utils/decisionFilters";
 import { cn } from "@/lib/utils/cn";
 import { type Locale, t } from "@/lib/i18n";
 import {
@@ -74,6 +75,12 @@ function meetingTimeLabel(meeting: MeetingRow, locale: Locale) {
     hour: "numeric",
     minute: "2-digit"
   }).format(start);
+}
+
+function searchMatchesMeetingTime(meeting: MeetingRow, search: string, locale: Locale) {
+  return Boolean(
+    search && matchesNormalizedDecisionSearchText(meetingTimeLabel(meeting, locale), search)
+  );
 }
 
 function meetingSortTime(meeting: MeetingRow) {
@@ -133,6 +140,12 @@ function MeetingLine({
   const meetingType = displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale);
   const meetingJurisdiction = jurisdictionLabel(meeting);
   const searchMatch = meetingSearchMatch(meeting, highlight || "", locale);
+  const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight || "", locale);
+  const showCompactSearchMatch =
+    compact &&
+    searchMatch &&
+    !timeMatchIsVisible &&
+    (searchMatch.field === "date" || searchMatch.field === "status");
 
   return (
     <div
@@ -165,7 +178,7 @@ function MeetingLine({
           {" · "}
           <HighlightedText text={meetingJurisdiction} query={highlight} />
         </p>
-        {compact && searchMatch && (searchMatch.field === "date" || searchMatch.field === "status") ? (
+        {showCompactSearchMatch ? (
           <p className="mt-0.5 text-xs font-bold leading-5 text-civic">
             <HighlightedText text={searchMatch.text} query={highlight} />
           </p>
@@ -502,6 +515,11 @@ export function MeetingList({
                           <div className="pointer-events-none relative z-10 mt-2 grid flex-1 content-start gap-1.5">
                             {dayMeetings.map((meeting) => {
                               const searchMatch = meetingSearchMatch(meeting, highlight, locale);
+                              const timeMatchIsVisible = searchMatchesMeetingTime(
+                                meeting,
+                                highlight,
+                                locale
+                              );
 
                               return (
                               <PendingLink
@@ -528,7 +546,7 @@ export function MeetingList({
                                     query={highlight}
                                   />
                                 </span>
-                                {searchMatch && searchMatch.field !== "title" ? (
+                                {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
                                   <span className="block w-full whitespace-normal break-words text-[10px] font-black leading-4 text-current">
                                     <HighlightedText text={searchMatch.text} query={highlight} />
                                   </span>
