@@ -1,5 +1,5 @@
-import { ListboxSelect } from "@/components/ListboxSelect";
 import { MeetingList } from "@/components/MeetingList";
+import { MeetingsFilterForm } from "@/components/MeetingsFilterForm";
 import { getMeetings } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
@@ -10,6 +10,10 @@ import {
 } from "@/lib/config/jurisdictions";
 import { statusLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import {
+  MEETING_VIEW_PREFERENCE_COOKIE,
+  normalizeMeetingView
+} from "@/lib/config/meetingView";
 
 export const revalidate = 300;
 
@@ -42,7 +46,9 @@ export default async function MeetingsPage({
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = params.q || "";
   const status = params.status || "";
-  const view = params.view === "list" ? "list" : "calendar";
+  const view = normalizeMeetingView(
+    params.view || cookieStore.get(MEETING_VIEW_PREFERENCE_COOKIE)?.value
+  );
   const meetings = await getMeetings({ search, status, jurisdiction, locale });
   const meetingListKey = [
     jurisdiction,
@@ -71,26 +77,19 @@ export default async function MeetingsPage({
         </p>
       </div>
 
-      <form className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px_auto] sm:p-5">
-        <input type="hidden" name="view" data-form-sync="view" defaultValue={view} disabled={view === "calendar"} />
-        <input type="hidden" name="month" data-form-sync="month" defaultValue={params.month || ""} disabled={!params.month} />
-        <input type="hidden" name="date" data-form-sync="date" defaultValue={params.date || ""} disabled={!params.date} />
-        <input type="hidden" name="jurisdiction" defaultValue={params.jurisdiction || ""} disabled={!params.jurisdiction} />
-        <input
-          name="q"
-          defaultValue={params.q || ""}
-          placeholder={t(locale, "searchMeetings")}
-          className="input-control"
-        />
-        <ListboxSelect
-          key={status}
-          name="status"
-          label={t(locale, "status")}
-          value={status}
-          options={statusOptions}
-        />
-        <button className="action-primary">{t(locale, "filter")}</button>
-      </form>
+      <MeetingsFilterForm
+        key={status}
+        search={params.q || ""}
+        status={status}
+        view={view}
+        month={params.month}
+        date={params.date}
+        jurisdiction={params.jurisdiction}
+        searchPlaceholder={t(locale, "searchMeetings")}
+        statusLabel={t(locale, "status")}
+        statusOptions={statusOptions}
+        filterLabel={t(locale, "filter")}
+      />
 
       <MeetingList
         key={meetingListKey}

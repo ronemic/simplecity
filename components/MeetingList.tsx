@@ -27,8 +27,11 @@ import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisp
 import { meetingSearchMatch } from "@/lib/utils/meetingFilters";
 import { cn } from "@/lib/utils/cn";
 import { type Locale, t } from "@/lib/i18n";
-
-const MEETING_VIEW_STORAGE_KEY = "simplecity.meeting-list-view";
+import {
+  MEETING_VIEW_PREFERENCE_COOKIE,
+  MEETING_VIEW_STORAGE_KEY,
+  type MeetingView
+} from "@/lib/config/meetingView";
 
 type MeetingCalendarProps = {
   meetings: MeetingRow[];
@@ -39,7 +42,9 @@ type MeetingCalendarProps = {
   locale?: Locale;
 };
 
-type MeetingView = "calendar" | "list";
+function writeMeetingViewPreference(view: MeetingView) {
+  document.cookie = `${MEETING_VIEW_PREFERENCE_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
+}
 
 function jurisdictionLabel(meeting: MeetingRow) {
   return getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name);
@@ -296,6 +301,8 @@ export function MeetingList({
     } catch {
       // Ignore storage failures so the toggle still works normally.
     }
+
+    writeMeetingViewPreference(newView);
   };
 
   const handlePrevMonth = (e: React.MouseEvent) => {

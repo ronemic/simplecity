@@ -94,3 +94,12 @@ test("the first application deploy does not require the expanded database schema
   assert.match(upserts, /what_is_happening: summaryPointsStorageText\(card\.whatIsHappening\)/);
   assert.match(adminRoute, /what_is_happening: summaryPointsStorageText\(update\.what_is_happening\)/);
 });
+
+test("decision search only caches its bounded page result", () => {
+  const queries = readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
+
+  assert.match(queries, /loadPublishedCardsForSelection\(selection, locale\)/);
+  assert.doesNotMatch(queries, /getCachedPublishedCards\(/);
+  assert.doesNotMatch(queries, /\["published-summary-cards"\]/);
+  assert.match(queries, /\["decision-card-page-rendered-search-v4"\]/);
+});

@@ -16,7 +16,7 @@ export function meetingSearchFields(
   meeting: MeetingRow,
   locale: Locale = "en"
 ): MeetingSearchMatch[] {
-  return [
+  const fields: MeetingSearchMatch[] = [
     {
       field: "title",
       text: displayMeetingTitle(
@@ -41,7 +41,9 @@ export function meetingSearchFields(
       field: "status",
       text: statusLabel(locale, meeting.status)
     }
-  ].filter((field) => Boolean(field.text));
+  ];
+
+  return fields.filter((field) => Boolean(field.text));
 }
 
 export function meetingSearchMatch(

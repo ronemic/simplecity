@@ -441,20 +441,19 @@ async function loadPublishedCardsForJurisdiction(
   return applyCardTranslations(supabase, rows, locale);
 }
 
-const getCachedPublishedCards = unstable_cache(
-  async (selection: JurisdictionSelection, locale: Locale) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return [] as SummaryCardRow[];
+async function loadPublishedCardsForSelection(
+  selection: JurisdictionSelection,
+  locale: Locale
+) {
+  const clients = getSafePublicClients(selection);
+  if (clients.length === 0) return [] as SummaryCardRow[];
 
-    const results = await Promise.all(
-      clients.map((client) => loadPublishedCardsForJurisdiction(client, locale))
-    );
+  const results = await Promise.all(
+    clients.map((client) => loadPublishedCardsForJurisdiction(client, locale))
+  );
 
-    return sortCards(results.flat());
-  },
-  ["published-summary-cards"],
-  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
-);
+  return sortCards(results.flat());
+}
 
 const getCachedPublishedCardPreview = unstable_cache(
   async (selection: JurisdictionSelection, locale: Locale) => {
@@ -670,7 +669,7 @@ const getCachedDecisionCardPage = unstable_cache(
     const normalizedSearch = normalizeSearch(search);
 
     if (normalizedSearch) {
-      const matchingCards = (await getCachedPublishedCards(selection, locale))
+      const matchingCards = (await loadPublishedCardsForSelection(selection, locale))
         .filter((card) =>
           matchesDecisionFilters(card, normalizedSearch, category || undefined, locale)
         )
@@ -1021,7 +1020,7 @@ export async function getPublishedCards(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug,
   locale: Locale = "en"
 ) {
-  return getCachedPublishedCards(selection, locale);
+  return loadPublishedCardsForSelection(selection, locale);
 }
 
 export async function getPublishedCardPreview(
