@@ -4,6 +4,7 @@ import type { SummaryCardRow } from "@/lib/types";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
+import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 import { normalizeSummaryPoints, summaryPointsText } from "@/lib/utils/summaryPoints";
 
 export function cardSharePath(cardId: string) {
@@ -28,6 +29,27 @@ export function cardSummaryPoints(card: SummaryCardRow, locale: Locale = "en") {
     : "Not listed in the source document.";
   const points = normalizeSummaryPoints(card.what_is_happening).slice(0, 3);
   return points.length > 0 ? points : [fallback];
+}
+
+export function cardPreviewText(
+  card: SummaryCardRow,
+  locale: Locale = "en",
+  highlight?: string
+) {
+  const points = cardSummaryPoints(card, locale);
+  const fallback = locale === "es"
+    ? "No indicado en el documento fuente."
+    : "Not listed in the source document.";
+  const defaultPreview = points[0] === fallback ? null : points[0];
+  const query = highlight?.trim();
+
+  if (!query || publicAgendaTitle(card).toLowerCase().includes(query.toLowerCase())) {
+    return defaultPreview;
+  }
+
+  return [summaryPointsText(card.what_is_happening), card.why_it_matters]
+    .map((text) => getHighlightExcerpt(text, query))
+    .find(Boolean) || defaultPreview;
 }
 
 export function cardJurisdictionLabel(card: SummaryCardRow) {

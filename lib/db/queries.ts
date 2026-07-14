@@ -27,8 +27,14 @@ import type {
 } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
 import { compareCardsByPublicInterest } from "@/lib/utils/civicPriority";
+import {
+  decisionCardSearchFilters,
+  decisionMeetingSearchFilters,
+  matchesDecisionFilters
+} from "@/lib/utils/decisionFilters";
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
+import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
@@ -111,27 +117,17 @@ function normalizeSearch(value?: string | null) {
 }
 
 function toIlikePattern(value: string) {
-  const safeValue = value.replace(/[%,()]/g, " ").replace(/\s+/g, "%").trim();
+  const safeValue = value
+    .normalize("NFKD")
+    .replace(/\p{M}+/gu, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, "%")
+    .trim();
   return safeValue ? `%${safeValue}%` : "";
 }
 
 function normalizePositiveInteger(value: number, fallback: number) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
-}
-
-function decisionCardSearchFilters(pattern: string, meetingIds: string[]) {
-  const filters = [
-    `agenda_item.ilike.${pattern}`,
-    `what_is_happening.ilike.${pattern}`,
-    `why_it_matters.ilike.${pattern}`,
-    `status.ilike.${pattern}`
-  ];
-
-  if (meetingIds.length > 0) {
-    filters.push(`meeting_id.in.(${meetingIds.join(",")})`);
-  }
-
-  return filters.join(",");
 }
 
 function getSafePublicClients(selection: JurisdictionSelection) {
@@ -587,14 +583,7 @@ async function getMatchingMeetingIdsForSearch(
     .from("meetings")
     .select("id")
     .eq("jurisdiction_slug", jurisdictionSlug)
-    .or(
-      [
-        `title.ilike.${pattern}`,
-        `meeting_type.ilike.${pattern}`,
-        `date_text.ilike.${pattern}`,
-        `status.ilike.${pattern}`
-      ].join(",")
-    )
+    .or(decisionMeetingSearchFilters(pattern))
     .limit(100);
 
   if (error) {
@@ -678,6 +667,25 @@ const getCachedDecisionCardPage = unstable_cache(
     const normalizedPage = normalizePositiveInteger(page, 1);
     const normalizedPageSize = normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE);
     const offset = (normalizedPage - 1) * normalizedPageSize;
+    const normalizedSearch = normalizeSearch(search);
+
+    if (normalizedSearch) {
+      const matchingCards = (await getCachedPublishedCards(selection, locale))
+        .filter((card) =>
+          matchesDecisionFilters(card, normalizedSearch, category || undefined, locale)
+        )
+        .sort(compareCardsByPublicInterest);
+      const totalCount = matchingCards.length;
+
+      return {
+        cards: matchingCards.slice(offset, offset + normalizedPageSize),
+        totalCount,
+        page: normalizedPage,
+        pageSize: normalizedPageSize,
+        pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
+      };
+    }
+
     const clients = getSafePublicClients(selection);
 
     if (clients.length === 0) {
@@ -705,7 +713,7 @@ const getCachedDecisionCardPage = unstable_cache(
         loadDecisionCardCandidatesForJurisdiction(
           client,
           {
-            search,
+            search: "",
             category: category || undefined,
             page: normalizedPage,
             pageSize: normalizedPageSize
@@ -730,7 +738,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page"],
+  ["decision-card-page-rendered-search-v4"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -739,25 +747,13 @@ const getCachedMeetings = unstable_cache(
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as MeetingRow[];
 
-    const pattern = toIlikePattern(search);
     const results = await Promise.all(
       clients.map(async ({ jurisdiction, supabase }) => {
-        let query = supabase
+        const query = supabase
           .from("meetings")
           .select(PUBLIC_MEETING_LIST_COLUMNS)
           .eq("jurisdiction_slug", jurisdiction.slug)
           .order("meeting_datetime", { ascending: false, nullsFirst: false });
-
-        if (pattern) {
-          query = query.or(
-            [
-              `title.ilike.${pattern}`,
-              `meeting_type.ilike.${pattern}`,
-              `date_text.ilike.${pattern}`,
-              `status.ilike.${pattern}`
-            ].join(",")
-          );
-        }
 
         const { data, error } = await query;
 
@@ -770,15 +766,13 @@ const getCachedMeetings = unstable_cache(
           withMeetingJurisdictionFallback(row, jurisdiction)
         );
         const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
-        return status
-          ? translatedRows.filter((row) => row.status === status)
-          : translatedRows;
+        return translatedRows.filter((row) => matchesMeetingFilters(row, search, status, locale));
       })
     );
 
     return sortMeetings(results.flat());
   },
-  ["public-meetings"],
+  ["public-meetings-rendered-search-v2"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 

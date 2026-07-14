@@ -24,6 +24,7 @@ import {
   weekdays
 } from "@/lib/utils/calendarGrid";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
+import { meetingSearchMatch } from "@/lib/utils/meetingFilters";
 import { cn } from "@/lib/utils/cn";
 import { type Locale, t } from "@/lib/i18n";
 
@@ -126,6 +127,7 @@ function MeetingLine({
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
   const meetingType = displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale);
   const meetingJurisdiction = jurisdictionLabel(meeting);
+  const searchMatch = meetingSearchMatch(meeting, highlight || "", locale);
 
   return (
     <div
@@ -136,7 +138,7 @@ function MeetingLine({
     >
       <div className="flex items-center gap-1.5 text-sm font-black text-[#12365f]">
         <Clock aria-hidden className="h-3.5 w-3.5" />
-        <span>{meetingTimeLabel(meeting, locale)}</span>
+        <span><HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} /></span>
       </div>
       <div className="min-w-0">
         <PendingLink
@@ -158,6 +160,11 @@ function MeetingLine({
           {" · "}
           <HighlightedText text={meetingJurisdiction} query={highlight} />
         </p>
+        {compact && searchMatch && (searchMatch.field === "date" || searchMatch.field === "status") ? (
+          <p className="mt-0.5 text-xs font-bold leading-5 text-civic">
+            <HighlightedText text={searchMatch.text} query={highlight} />
+          </p>
+        ) : null}
       </div>
       {!compact ? (
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -486,7 +493,10 @@ export function MeetingList({
                             </span>
                           </div>
                           <div className="pointer-events-none relative z-10 mt-2 grid flex-1 content-start gap-1.5">
-                            {dayMeetings.map((meeting) => (
+                            {dayMeetings.map((meeting) => {
+                              const searchMatch = meetingSearchMatch(meeting, highlight, locale);
+
+                              return (
                               <PendingLink
                                 key={meeting.id}
                                 href={meetingHref(meeting)}
@@ -499,7 +509,7 @@ export function MeetingList({
                                 pendingLabel={t(locale, "openingMeeting")}
                               >
                                 <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
-                                  {meetingTimeLabel(meeting, locale)}
+                                  <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
                                 </span>
                                 <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
                                   <HighlightedText
@@ -511,8 +521,14 @@ export function MeetingList({
                                     query={highlight}
                                   />
                                 </span>
+                                {searchMatch && searchMatch.field !== "title" ? (
+                                  <span className="block w-full whitespace-normal break-words text-[10px] font-black leading-4 text-current">
+                                    <HighlightedText text={searchMatch.text} query={highlight} />
+                                  </span>
+                                ) : null}
                               </PendingLink>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );

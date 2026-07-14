@@ -13,10 +13,8 @@ import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { formatCompactDisplayDate, formatDisplayDate, formatPacificTimestamp } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
-import { getHighlightExcerpt } from "@/lib/utils/highlightText";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
-import { cardSummaryPoints } from "@/lib/utils/cardShare";
-import { summaryPointsText } from "@/lib/utils/summaryPoints";
+import { cardPreviewText, cardSummaryPoints } from "@/lib/utils/cardShare";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -178,25 +176,15 @@ export function SummaryCard({
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
   const points = cardSummaryPoints(card, locale);
-  const defaultTitlePreview = points[0] === t(locale, "notListedInSource") ? null : points[0];
+  const titlePreview = cardPreviewText(card, locale, highlight);
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
   const affectedResidents = compactList(card.who_it_affects, locale);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
-  const normalizedHighlight = highlight?.trim().toLowerCase() || "";
   const topicLabel = categoryTags[0] ? categoryLabel(locale, categoryTags[0]) : t(locale, "topicNotListed");
   const primaryCategory = getPrimaryCategory(card);
   const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
-  const titleContainsHighlight = normalizedHighlight
-    ? agendaTitle.toLowerCase().includes(normalizedHighlight)
-    : false;
-  const matchingPreview = !titleContainsHighlight && highlight
-    ? [summaryPointsText(card.what_is_happening), card.why_it_matters, meeting?.title]
-      .map((text) => getHighlightExcerpt(text, highlight))
-      .find(Boolean)
-    : null;
-  const titlePreview = matchingPreview || defaultTitlePreview;
   const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
@@ -268,7 +256,7 @@ export function SummaryCard({
             ) : null}
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-              {compactMeetingDate}
+              <HighlightedText text={compactMeetingDate} query={highlight} />
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span
@@ -388,7 +376,7 @@ export function SummaryCard({
 
           <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-wrap items-center gap-3">
-              <span>{meetingDate}</span>
+              <span><HighlightedText text={meetingDate} query={highlight} /></span>
               {meetingPageHref ? (
                 <PendingLink
                   href={meetingPageHref}
@@ -418,11 +406,13 @@ export function SummaryCard({
             {createdTimestamp ? (
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-black/45 sm:justify-end sm:text-right">
                 <span>
-                  {locale === "es" ? "Publicado" : "Posted"} {createdTimestamp}
+                  {locale === "es" ? "Publicado" : "Posted"}{" "}
+                  <HighlightedText text={createdTimestamp} query={highlight} />
                 </span>
                 {updatedTimestamp && updatedTimestamp !== createdTimestamp ? (
                   <span>
-                    {locale === "es" ? "Actualizado" : "Updated"} {updatedTimestamp}
+                    {locale === "es" ? "Actualizado" : "Updated"}{" "}
+                    <HighlightedText text={updatedTimestamp} query={highlight} />
                   </span>
                 ) : null}
               </div>

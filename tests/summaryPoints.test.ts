@@ -84,11 +84,13 @@ test("migration expands the schema without changing or removing the legacy text 
 
 test("the first application deploy does not require the expanded database schema", () => {
   const queries = readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
+  const decisionFilters = readFileSync(new URL("../lib/utils/decisionFilters.ts", import.meta.url), "utf8");
   const upserts = readFileSync(new URL("../lib/db/upsertMeetings.ts", import.meta.url), "utf8");
   const adminRoute = readFileSync(new URL("../app/api/admin/cards/route.ts", import.meta.url), "utf8");
+  const decisionSearch = `${queries}\n${decisionFilters}`;
 
-  assert.match(queries, /what_is_happening\.ilike/);
-  assert.doesNotMatch(queries, /what_is_happening_points\.ilike|what_is_happening_search\.ilike/);
+  assert.match(decisionSearch, /what_is_happening\.ilike/);
+  assert.doesNotMatch(decisionSearch, /what_is_happening_points\.ilike|what_is_happening_search\.ilike/);
   assert.match(upserts, /what_is_happening: summaryPointsStorageText\(card\.whatIsHappening\)/);
   assert.match(adminRoute, /what_is_happening: summaryPointsStorageText\(update\.what_is_happening\)/);
 });

@@ -22,6 +22,17 @@ test("treats punctuation as text and ignores empty searches", () => {
   ]);
 });
 
+test("normalizes punctuation differences when highlighting visible text", () => {
+  assert.deepEqual(splitHighlightMatches("Feb 10", "feb."), [
+    { text: "Feb", isMatch: true },
+    { text: " 10", isMatch: false }
+  ]);
+  assert.deepEqual(splitHighlightMatches("Fiscal year 2026‑27", "2026-27"), [
+    { text: "Fiscal year ", isMatch: false },
+    { text: "2026‑27", isMatch: true }
+  ]);
+});
+
 test("builds a compact excerpt around a match in otherwise hidden text", () => {
   const text = `${"Earlier context ".repeat(20)}street repairs will begin next month. ${"Later context ".repeat(20)}`;
   const excerpt = getHighlightExcerpt(text, "street", 120);
