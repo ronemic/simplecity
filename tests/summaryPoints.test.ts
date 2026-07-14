@@ -101,5 +101,5 @@ test("decision search only caches its bounded page result", () => {
   assert.match(queries, /loadPublishedCardsForSelection\(selection, locale\)/);
   assert.doesNotMatch(queries, /getCachedPublishedCards\(/);
   assert.doesNotMatch(queries, /\["published-summary-cards"\]/);
-  assert.match(queries, /\["decision-card-page-rendered-search-v4"\]/);
+  assert.match(queries, /\["decision-card-page-rendered-search-v5"\]/);
 });

@@ -74,7 +74,6 @@ const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PU
 export const DECISION_CARD_PAGE_SIZE = 12;
 const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
 const DECISION_RANKING_BUFFER_PER_JURISDICTION = 12;
-const MAX_DECISION_CANDIDATES_PER_JURISDICTION = 120;
 
 type AdjacentMeetings = {
   newerMeeting: MeetingRow | null;
@@ -699,10 +698,7 @@ const getCachedDecisionCardPage = unstable_cache(
 
     const isAggregatePage = selection === ALL_JURISDICTIONS_SLUG && clients.length > 1;
     const candidateCount = isAggregatePage
-      ? Math.min(
-          normalizedPage * normalizedPageSize + DECISION_RANKING_BUFFER_PER_JURISDICTION,
-          MAX_DECISION_CANDIDATES_PER_JURISDICTION
-        )
+      ? normalizedPage * normalizedPageSize + DECISION_RANKING_BUFFER_PER_JURISDICTION
       : normalizedPageSize;
     const range = isAggregatePage
       ? { from: 0, to: candidateCount - 1 }
@@ -737,7 +733,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v4"],
+  ["decision-card-page-rendered-search-v5"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 

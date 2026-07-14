@@ -1,9 +1,11 @@
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { DecisionCategorySelector } from "@/components/DecisionCategorySelector";
 import { PendingLink } from "@/components/PendingLink";
+import { PaginationJumpForm } from "@/components/PaginationJumpForm";
 import { SummaryCard } from "@/components/SummaryCard";
 import { getDecisionCardPage } from "@/lib/db/queries";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
@@ -70,52 +72,6 @@ function resultSummary(locale: "en" | "es", start: number, end: number, total: n
     : `Showing ${start}-${end} of ${total} decisions`;
 }
 
-function PaginationJumpForm({
-  search,
-  category,
-  jurisdiction,
-  page,
-  pageCount,
-  locale
-}: {
-  search: string;
-  category?: CategoryName;
-  jurisdiction?: string;
-  page: number;
-  pageCount: number;
-  locale: "en" | "es";
-}) {
-  return (
-    <form
-      action="/decisions"
-      className="flex flex-wrap items-center justify-center gap-2 text-sm font-bold text-black/60"
-    >
-      {jurisdiction ? <input type="hidden" name="jurisdiction" value={jurisdiction} /> : null}
-      {search ? <input type="hidden" name="q" value={search} /> : null}
-      {category ? (
-        <input type="hidden" name="category" value={CATEGORY_DEFINITIONS[category].slug} />
-      ) : null}
-      <label className="inline-flex items-center gap-2">
-        <span>{locale === "es" ? "Página" : "Page"}</span>
-        <input
-          aria-label={locale === "es" ? "Número de página" : "Page number"}
-          className="h-9 w-16 rounded-lg border border-black/15 bg-white px-2 text-center text-sm font-black text-ink shadow-sm focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/15"
-          defaultValue={page}
-          inputMode="numeric"
-          max={pageCount}
-          min={1}
-          name="page"
-          type="number"
-        />
-      </label>
-      <span>{locale === "es" ? `de ${pageCount}` : `of ${pageCount}`}</span>
-      <button className="action-secondary-sm min-h-9 px-3 py-1.5" type="submit">
-        {locale === "es" ? "Ir" : "Go"}
-      </button>
-    </form>
-  );
-}
-
 export default async function DecisionsPage({
   searchParams
 }: {
@@ -145,6 +101,22 @@ export default async function DecisionsPage({
     category: selectedCategory,
     page: currentPage
   });
+  const canonicalPage = Math.min(currentPage, Math.max(1, decisionPage.pageCount));
+
+  if (
+    params.page !== undefined &&
+    (params.page !== String(canonicalPage) || canonicalPage === 1)
+  ) {
+    redirect(
+      pageHref({
+        search,
+        category: selectedCategory,
+        jurisdiction: params.jurisdiction,
+        page: canonicalPage
+      })
+    );
+  }
+
   const resultStart =
     decisionPage.totalCount === 0 ? 0 : (decisionPage.page - 1) * decisionPage.pageSize + 1;
   const resultEnd = Math.min(decisionPage.page * decisionPage.pageSize, decisionPage.totalCount);
@@ -211,9 +183,7 @@ export default async function DecisionsPage({
             {locale === "es" ? "Anterior" : "Previous"}
           </PendingLink>
           <PaginationJumpForm
-            search={search}
-            category={selectedCategory}
-            jurisdiction={params.jurisdiction}
+            key={decisionPage.page}
             page={decisionPage.page}
             pageCount={decisionPage.pageCount}
             locale={locale}

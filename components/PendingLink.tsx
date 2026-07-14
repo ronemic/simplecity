@@ -41,6 +41,7 @@ export function PendingLink({
   mode = "inline",
   contentClassName,
   prefetch = true,
+  tabIndex,
   ...rest
 }: PendingLinkProps) {
   const router = useRouter();
@@ -48,6 +49,7 @@ export function PendingLink({
   const searchParams = useSearchParams();
   const [pending, setPending] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const disabled = rest["aria-disabled"] === true || rest["aria-disabled"] === "true";
 
   useEffect(() => {
     if (!pending || !pendingHref) return;
@@ -63,6 +65,10 @@ export function PendingLink({
   }, [pending, pendingHref, pathname, searchParams]);
 
   function handleClick(event: MouseEvent<HTMLAnchorElement>) {
+    if (disabled) {
+      event.preventDefault();
+      return;
+    }
     if (shouldIgnoreClick(event)) return;
 
     event.preventDefault();
@@ -77,6 +83,7 @@ export function PendingLink({
       prefetch={prefetch}
       onClick={handleClick}
       aria-busy={pending}
+      tabIndex={disabled ? -1 : tabIndex}
       className={cn(
         className,
         "relative",
