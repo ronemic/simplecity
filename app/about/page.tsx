@@ -143,8 +143,8 @@ export default async function AboutPage() {
               title: locale === "es" ? "Resúmenes cuidadosos" : "Careful summaries",
               body:
                 locale === "es"
-                  ? "Las tarjetas se generan a partir del texto extraído de la agenda y se validan antes de aparecer en la app."
-                  : "Cards are generated from extracted agenda text and validated before they appear in the app."
+                  ? "Las tarjetas se generan con IA a partir del texto extraído de la agenda y se validan antes de aparecer en la app."
+                  : "Cards are AI-generated from extracted agenda text and validated before they appear in the app."
             },
             {
               icon: LinkIcon,
