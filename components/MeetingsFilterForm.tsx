@@ -1,8 +1,8 @@
 "use client";
 
-import { type FormEvent, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { SearchInput } from "@/components/DecisionSearchForm";
 import { ListboxSelect } from "@/components/ListboxSelect";
+import { type Locale } from "@/lib/i18n";
 
 type StatusOption = {
   value: string;
@@ -19,7 +19,9 @@ export function MeetingsFilterForm({
   searchPlaceholder,
   statusLabel,
   statusOptions,
-  filterLabel
+  onSearchChange,
+  onStatusChange,
+  locale
 }: {
   search: string;
   status: string;
@@ -30,34 +32,12 @@ export function MeetingsFilterForm({
   searchPlaceholder: string;
   statusLabel: string;
   statusOptions: StatusOption[];
-  filterLabel: string;
+  onSearchChange: (search: string) => void;
+  onStatusChange: (status: string) => void;
+  locale: Locale;
 }) {
-  const router = useRouter();
-  const [isPending, startTransition] = useTransition();
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    const formData = new FormData(event.currentTarget);
-    const params = new URLSearchParams();
-
-    for (const [name, value] of formData.entries()) {
-      const normalizedValue = String(value).trim();
-      if (normalizedValue) params.set(name, normalizedValue);
-    }
-
-    const query = params.toString();
-    startTransition(() => {
-      router.push(`/meetings${query ? `?${query}` : ""}`, { scroll: false });
-    });
-  }
-
   return (
-    <form
-      className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px_auto] sm:p-5"
-      onSubmit={handleSubmit}
-      aria-busy={isPending}
-    >
+    <div className="quiet-card mb-6 grid gap-3 p-4 sm:grid-cols-[1fr_180px] sm:p-5" role="search">
       <input
         type="hidden"
         name="view"
@@ -85,21 +65,21 @@ export function MeetingsFilterForm({
         defaultValue={jurisdiction || ""}
         disabled={!jurisdiction}
       />
-      <input
-        name="q"
-        defaultValue={search}
+      <SearchInput
+        search={search}
+        onSearchChange={onSearchChange}
         placeholder={searchPlaceholder}
-        className="input-control"
+        ariaLabel={searchPlaceholder.replace(/\.{3}$/u, "")}
+        locale={locale}
       />
       <ListboxSelect
+        key={status}
         name="status"
         label={statusLabel}
         value={status}
         options={statusOptions}
+        onValueChange={onStatusChange}
       />
-      <button className="action-primary" disabled={isPending}>
-        {filterLabel}
-      </button>
-    </form>
+    </div>
   );
 }

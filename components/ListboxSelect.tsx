@@ -13,13 +13,15 @@ export function ListboxSelect({
   label,
   value,
   options,
-  className
+  className,
+  onValueChange
 }: {
   name: string;
   label: string;
   value: string;
   options: Option[];
   className?: string;
+  onValueChange?: (value: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedValue, setSelectedValue] = useState(value);
@@ -81,6 +83,7 @@ export function ListboxSelect({
                   className={`menu-option ${isSelected ? "menu-option-selected" : ""}`}
                   onClick={() => {
                     setSelectedValue(option.value);
+                    onValueChange?.(option.value);
                     setIsOpen(false);
                   }}
                 >

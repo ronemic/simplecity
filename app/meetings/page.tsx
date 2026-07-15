@@ -1,5 +1,4 @@
-import { MeetingList } from "@/components/MeetingList";
-import { MeetingsFilterForm } from "@/components/MeetingsFilterForm";
+import { MeetingsBrowser } from "@/components/MeetingsBrowser";
 import { getMeetings } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
@@ -49,15 +48,7 @@ export default async function MeetingsPage({
   const view = normalizeMeetingView(
     params.view || cookieStore.get(MEETING_VIEW_PREFERENCE_COOKIE)?.value
   );
-  const meetings = await getMeetings({ search, status, jurisdiction, locale });
-  const meetingListKey = [
-    jurisdiction,
-    search,
-    status,
-    view,
-    params.month || "",
-    params.date || ""
-  ].join("|");
+  const meetings = await getMeetings({ jurisdiction, locale });
   const statusOptions = [
     { value: "", label: t(locale, "allStatuses") },
     { value: "Upcoming", label: statusLabel(locale, "Upcoming") },
@@ -77,10 +68,10 @@ export default async function MeetingsPage({
         </p>
       </div>
 
-      <MeetingsFilterForm
-        key={status}
-        search={params.q || ""}
-        status={status}
+      <MeetingsBrowser
+        meetings={meetings}
+        initialSearch={search}
+        initialStatus={status}
         view={view}
         month={params.month}
         date={params.date}
@@ -88,16 +79,6 @@ export default async function MeetingsPage({
         searchPlaceholder={t(locale, "searchMeetings")}
         statusLabel={t(locale, "status")}
         statusOptions={statusOptions}
-        filterLabel={t(locale, "filter")}
-      />
-
-      <MeetingList
-        key={meetingListKey}
-        meetings={meetings}
-        month={params.month}
-        selectedDate={params.date}
-        search={search}
-        view={view}
         locale={locale}
       />
     </div>
