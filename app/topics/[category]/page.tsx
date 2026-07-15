@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CategoryPill } from "@/components/CategoryPill";
@@ -6,17 +7,54 @@ import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
 import { getCategoryCards } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
+  ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
+  getJurisdictionLabel,
   normalizeJurisdictionSelection,
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
 
 export const revalidate = 300;
 
 function categoryFromSlug(slug: string) {
   return CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
+}
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: {
+  params: Promise<{ category: string }>;
+  searchParams: Promise<{ period?: string; jurisdiction?: string }>;
+}): Promise<Metadata> {
+  const [{ category: slug }, query] = await Promise.all([params, searchParams]);
+  const category = categoryFromSlug(slug);
+  if (!category) return { title: "Topic not found | SimpleCity", robots: { index: false } };
+
+  const jurisdiction = query.jurisdiction
+    ? normalizeJurisdictionSelection(query.jurisdiction)
+    : ALL_JURISDICTIONS_SLUG;
+  const jurisdictionPrefix =
+    jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local" : getJurisdictionLabel(jurisdiction);
+  const definition = CATEGORY_DEFINITIONS[category];
+  const title = `${jurisdictionPrefix} ${category.toLowerCase()} decisions | SimpleCity`;
+  const description = definition.description;
+  const canonicalUrl = new URL(`/topics/${definition.slug}`, getConfiguredAppUrl());
+  if (query.jurisdiction) {
+    canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
+  }
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl.toString() },
+    robots: query.period ? { index: false, follow: true } : undefined,
+    openGraph: { title, description, type: "website", url: canonicalUrl.toString(), siteName: "SimpleCity" },
+    twitter: { card: "summary", title, description }
+  };
 }
 
 export default async function CategoryDetailPage({

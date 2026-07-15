@@ -1,8 +1,27 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+
+export const metadata: Metadata = {
+  title: "Local government topics | SimpleCity",
+  description: "Explore local decisions about housing, transportation, public safety, parks, budgets, development, schools, and city services.",
+  alternates: { canonical: "/topics" },
+  openGraph: {
+    title: "Local government topics | SimpleCity",
+    description: "Explore local decisions by the parts of daily life they affect.",
+    type: "website",
+    url: "/topics",
+    siteName: "SimpleCity"
+  },
+  twitter: {
+    card: "summary",
+    title: "Local government topics | SimpleCity",
+    description: "Explore local decisions by the parts of daily life they affect."
+  }
+};
 
 export default async function TopicsPage() {
   const locale = await getRequestLocale();

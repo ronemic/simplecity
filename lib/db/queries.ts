@@ -39,9 +39,9 @@ import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
 const PUBLIC_MEETING_LIST_COLUMNS =
-  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,source_type,source_url";
+  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,source_type,source_url,scraped_at,created_at,updated_at";
 const PUBLIC_MEETING_DETAIL_COLUMNS =
-  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,source_type,source_url,public_comments_input_text";
+  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,location,meeting_datetime,status,source_type,source_url,public_comments_input_text,scraped_at,created_at,updated_at";
 const PUBLIC_DOCUMENT_COLUMNS =
   "id,meeting_id,jurisdiction_name,jurisdiction_slug,platform,type,label,source_url";
 const PUBLIC_ANNOUNCEMENT_COLUMNS =

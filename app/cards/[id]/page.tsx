@@ -10,6 +10,7 @@ import {
   cardShareDescription,
   cardShareTitle
 } from "@/lib/utils/cardShare";
+import { serializeJsonLd } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -36,7 +37,8 @@ export async function generateMetadata({
       type: "article",
       url: canonical,
       siteName: "SimpleCity"
-    }
+    },
+    twitter: { card: "summary", title, description }
   };
 }
 
@@ -48,9 +50,29 @@ export default async function SharedCardPage({
   const [{ id }, locale] = await Promise.all([params, getRequestLocale()]);
   const card = await getPublishedCard(id, locale);
   if (!card) notFound();
+  const canonical = `${getConfiguredAppUrl()}/cards/${encodeURIComponent(id)}`;
+  const title = cardShareTitle(card);
+  const description = cardShareDescription(card, locale);
+  const articleJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: title,
+    description,
+    datePublished: card.created_at || undefined,
+    dateModified: card.updated_at || card.created_at || undefined,
+    mainEntityOfPage: canonical,
+    author: { "@type": "Organization", name: "SimpleCity" },
+    publisher: { "@type": "Organization", name: "SimpleCity", url: getConfiguredAppUrl() },
+    about: card.category_tags || undefined,
+    isBasedOn: card.source_url || undefined
+  };
 
   return (
     <div className="section-shell py-8 sm:py-12">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(articleJsonLd) }}
+      />
       <div className="mx-auto max-w-[1120px]">
         <Link href="/decisions" className="action-link -ml-2">
           <ArrowLeft aria-hidden className="h-4 w-4" />

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import {
   FileSearch,
   Landmark,
@@ -8,6 +9,19 @@ import {
 } from "lucide-react";
 import { getPublicStats } from "@/lib/db/queries";
 import { getRequestLocale } from "@/lib/i18n/server";
+
+export const metadata: Metadata = {
+  title: "About SimpleCity | Plain-English local government decisions",
+  description: "Learn how SimpleCity turns official Bay Area public meeting agendas into source-linked, plain-English civic decision summaries.",
+  alternates: { canonical: "/about" },
+  openGraph: {
+    title: "About SimpleCity",
+    description: "Official local government agendas, translated into source-linked plain-English summaries.",
+    type: "website",
+    url: "/about",
+    siteName: "SimpleCity"
+  }
+};
 
 export const revalidate = 300;
 

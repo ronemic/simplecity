@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CalendarDays } from "lucide-react";
 import { cookies } from "next/headers";
@@ -32,6 +33,24 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 
 export const revalidate = 300;
+
+export const metadata: Metadata = {
+  title: "SimpleCity | Plain-English local government decisions",
+  description: "Find upcoming local government decisions, public meetings, official sources, and ways to participate across Bay Area communities.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "SimpleCity | Plain-English local government decisions",
+    description: "Find upcoming local decisions, public meetings, official sources, and ways to participate.",
+    type: "website",
+    url: "/",
+    siteName: "SimpleCity"
+  },
+  twitter: {
+    card: "summary",
+    title: "SimpleCity | Plain-English local government decisions",
+    description: "Find upcoming local decisions, public meetings, official sources, and ways to participate."
+  }
+};
 
 function matchesSearch(card: SummaryCardRow, search: string) {
   if (!search) return true;

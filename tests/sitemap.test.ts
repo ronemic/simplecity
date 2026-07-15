@@ -1,19 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import sitemap from "@/app/sitemap";
+import { buildSitemapEntries } from "@/app/sitemap";
 
-test("sitemap lists only core pages", async () => {
-  const urls = await sitemap();
-  const urlStrings = urls.map((r) => r.url);
+test("sitemap exposes discovery pages without individual content", () => {
+  const entries = buildSitemapEntries("https://simplecity.app");
+  const urls = entries.map((entry) => entry.url);
 
-  // 1. Core static pages
-  assert.ok(urlStrings.includes("http://localhost:3000/"));
-  assert.ok(urlStrings.includes("http://localhost:3000/about"));
-  assert.ok(urlStrings.includes("http://localhost:3000/decisions"));
-  assert.ok(urlStrings.includes("http://localhost:3000/meetings"));
-  assert.ok(urlStrings.includes("http://localhost:3000/topics"));
-
-  // 3. Verify individual meeting/topic links are NOT included
-  assert.equal(urlStrings.some(url => url.includes("/meetings/")), false);
-  assert.equal(urlStrings.some(url => url.includes("/topics/")), false);
+  assert.ok(urls.includes("https://simplecity.app/"));
+  assert.ok(urls.includes("https://simplecity.app/decisions"));
+  assert.ok(urls.includes("https://simplecity.app/meetings"));
+  assert.ok(urls.includes("https://simplecity.app/topics/housing"));
+  assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo"));
+  assert.ok(urls.includes("https://simplecity.app/topics/housing?jurisdiction=san-mateo"));
+  assert.equal(urls.some((url) => url.includes("/cards/")), false);
+  assert.equal(urls.some((url) => /\/meetings\/[^?]/.test(url)), false);
 });

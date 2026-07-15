@@ -4,12 +4,25 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getConfiguredAppUrl()),
   applicationName: "SimpleCity",
   title: "SimpleCity",
   description: "Local decisions, translated into plain-English civic action cards.",
+  openGraph: {
+    title: "SimpleCity",
+    description: "Local decisions, translated into plain-English civic action cards.",
+    type: "website",
+    siteName: "SimpleCity"
+  },
+  twitter: {
+    card: "summary",
+    title: "SimpleCity",
+    description: "Local decisions, translated into plain-English civic action cards."
+  },
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { MeetingsBrowser } from "@/components/MeetingsBrowser";
 import { getMeetings } from "@/lib/db/queries";
 import { cookies } from "next/headers";
@@ -5,8 +6,10 @@ import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import {
@@ -15,6 +18,41 @@ import {
 } from "@/lib/config/meetingView";
 
 export const revalidate = 300;
+
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{
+    q?: string;
+    month?: string;
+    date?: string;
+    view?: string;
+    jurisdiction?: string;
+  }>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const jurisdiction = params.jurisdiction
+    ? normalizeJurisdictionSelection(params.jurisdiction)
+    : ALL_JURISDICTIONS_SLUG;
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
+  const title = `${label} public meetings | SimpleCity`;
+  const description = `Browse ${label.toLowerCase()} public meetings, dates, agendas, official documents, and plain-English agenda summaries.`;
+  const canonicalUrl = new URL("/meetings", getConfiguredAppUrl());
+  if (params.jurisdiction) {
+    canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
+  }
+  const isFiltered = Boolean(params.q || params.month || params.date || params.view);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl.toString() },
+    robots: isFiltered ? { index: false, follow: true } : undefined,
+    openGraph: { title, description, type: "website", url: canonicalUrl.toString(), siteName: "SimpleCity" },
+    twitter: { card: "summary", title, description }
+  };
+}
 
 function meetingsTitle(locale: "en" | "es", jurisdiction: string, jurisdictionLabel: string) {
   if (jurisdiction === ALL_JURISDICTIONS_SLUG) {

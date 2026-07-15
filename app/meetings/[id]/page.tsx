@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, ExternalLink, FileText } from "lucide-react";
@@ -23,8 +24,48 @@ import { formatDisplayDate } from "@/lib/utils/date";
 import { getEmbeddableVideoDocuments, getVideoLinkUrl } from "@/lib/utils/videoEmbed";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
+import { serializeJsonLd } from "@/lib/seo";
 
 export const revalidate = 300;
+
+export async function generateMetadata({
+  params,
+  searchParams
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ jurisdiction?: string }>;
+}): Promise<Metadata> {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
+  const { meeting } = await getMeetingDetail(id, jurisdiction, "en");
+  if (!meeting) return { title: "Meeting not found | SimpleCity", robots: { index: false } };
+
+  const jurisdictionSlug = toPublicJurisdictionSlug(jurisdiction);
+  const jurisdictionLabel = getJurisdictionDisplayLabel(
+    meeting.jurisdiction_slug || meeting.jurisdiction_name
+  );
+  const meetingTitle = displayMeetingTitle(meeting, "Public meeting", "en");
+  const date = formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text);
+  const title = `${meetingTitle} - ${jurisdictionLabel} | SimpleCity`;
+  const description = `${meetingTitle} on ${date}. View the agenda, official documents, and plain-English decision summaries from ${jurisdictionLabel}.`;
+  const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
+  canonicalUrl.searchParams.set("jurisdiction", jurisdictionSlug);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl.toString() },
+    openGraph: {
+      title,
+      description,
+      type: "article",
+      url: canonicalUrl.toString(),
+      siteName: "SimpleCity"
+    },
+    twitter: { card: "summary", title, description }
+  };
+}
 
 function meetingHref(meetingId: string, jurisdiction: string) {
   return `/meetings/${meetingId}?jurisdiction=${encodeURIComponent(jurisdiction)}`;
@@ -61,9 +102,36 @@ export default async function MeetingDetailPage({
     meeting.jurisdiction_slug || meeting.jurisdiction_name
   );
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
+  const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
+  canonicalUrl.searchParams.set("jurisdiction", publicJurisdiction);
+  const eventJsonLd = meeting.meeting_datetime
+    ? {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        name: displayMeetingTitle(meeting, meetingTitleFallback, locale),
+        startDate: meeting.meeting_datetime,
+        eventStatus:
+          meeting.status?.toLowerCase().includes("cancel")
+            ? "https://schema.org/EventCancelled"
+            : "https://schema.org/EventScheduled",
+        eventAttendanceMode: "https://schema.org/MixedEventAttendanceMode",
+        location: meeting.location
+          ? { "@type": "Place", name: meeting.location }
+          : undefined,
+        organizer: { "@type": "GovernmentOrganization", name: jurisdictionLabel },
+        url: canonicalUrl.toString(),
+        sameAs: meeting.source_url || undefined
+      }
+    : null;
 
   return (
     <div className="section-shell py-10">
+      {eventJsonLd ? (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(eventJsonLd) }}
+        />
+      ) : null}
       <div className="mb-8 max-w-4xl">
         <div className="flex flex-wrap items-center gap-2">
           <StatusPill status={meeting.status} locale={locale} />

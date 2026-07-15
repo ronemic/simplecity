@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
 import { getPublishedDecisionCards } from "@/lib/db/queries";
 import { cookies } from "next/headers";
@@ -5,13 +6,44 @@ import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
-  normalizeJurisdictionSelection
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
+import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { categoryFromSlug } from "@/lib/utils/decisionFilters";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const revalidate = 300;
+
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{ q?: string; category?: string; jurisdiction?: string; page?: string }>;
+}): Promise<Metadata> {
+  const params = await searchParams;
+  const jurisdiction = params.jurisdiction
+    ? normalizeJurisdictionSelection(params.jurisdiction)
+    : ALL_JURISDICTIONS_SLUG;
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
+  const title = `${label} decisions | SimpleCity`;
+  const description = `Plain-English summaries of ${label.toLowerCase()} decisions, upcoming votes, public meetings, and ways residents can participate.`;
+  const canonicalUrl = new URL("/decisions", getConfiguredAppUrl());
+  if (params.jurisdiction) {
+    canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
+  }
+  const isFiltered = Boolean(params.q || params.category || params.page);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: canonicalUrl.toString() },
+    robots: isFiltered ? { index: false, follow: true } : undefined,
+    openGraph: { title, description, type: "website", url: canonicalUrl.toString(), siteName: "SimpleCity" },
+    twitter: { card: "summary", title, description }
+  };
+}
 
 function decisionsTitle(locale: "en" | "es", jurisdiction: string, jurisdictionLabel: string) {
   if (jurisdiction === ALL_JURISDICTIONS_SLUG) {
