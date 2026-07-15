@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CategoryName } from "@/lib/constants";
+import { DECISION_CARD_PAGE_SIZE, type CategoryName } from "@/lib/constants";
 import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
@@ -71,7 +71,6 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
   "updated_at"
 ].join(",");
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
-export const DECISION_CARD_PAGE_SIZE = 12;
 const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
 const DECISION_RANKING_BUFFER_PER_JURISDICTION = 12;
 
@@ -670,7 +669,7 @@ const getCachedDecisionCardPage = unstable_cache(
     if (normalizedSearch) {
       const matchingCards = (await loadPublishedCardsForSelection(selection, locale))
         .filter((card) =>
-          matchesDecisionFilters(card, normalizedSearch, category || undefined, locale)
+          matchesDecisionFilters(card, normalizedSearch, category || undefined)
         )
         .sort(compareCardsByPublicInterest);
       const totalCount = matchingCards.length;
@@ -1030,6 +1029,13 @@ export async function getPublishedCardCount(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug
 ) {
   return getCachedPublishedCardCount(selection);
+}
+
+export async function getPublishedDecisionCards(
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
+) {
+  return loadPublishedCardsForSelection(selection, locale);
 }
 
 export async function getPublishedCard(id: string, locale: Locale = "en") {

@@ -9,6 +9,8 @@ import {
   Trees
 } from "lucide-react";
 
+export const DECISION_CARD_PAGE_SIZE = 12;
+
 export const CATEGORIES = [
   "Housing",
   "Transportation",

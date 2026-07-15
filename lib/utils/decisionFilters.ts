@@ -1,9 +1,6 @@
 import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
-import type { Locale } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
-import { formatCompactDisplayDate } from "@/lib/utils/date";
-import { displayMeetingType } from "@/lib/utils/meetingDisplay";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 
 export function categoryFromSlug(slug: string | null | undefined): CategoryName | undefined {
@@ -63,25 +60,16 @@ export function decisionCardSearchFilters(pattern: string, meetingIds: string[])
 export function matchesDecisionFilters(
   card: SummaryCardRow,
   search: string,
-  category?: CategoryName,
-  locale: Locale = "en"
+  category?: CategoryName
 ) {
   if (category && !(card.category_tags || []).includes(category)) return false;
   if (!search) return true;
 
-  const meeting = card.meetings;
   const visibleFields = [
     publicAgendaTitle(card),
     ...normalizeSummaryPoints(card.what_is_happening),
     card.why_it_matters,
-    meeting
-      ? displayMeetingType(
-          meeting,
-          locale === "es" ? "Grupo no indicado" : "Group not listed",
-          locale
-        )
-      : "",
-    formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime)
+    ...(card.who_it_affects || [])
   ].filter(Boolean);
 
   return visibleFields.some((field) => matchesNormalizedDecisionSearchText(String(field), search));
