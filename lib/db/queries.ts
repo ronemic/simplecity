@@ -737,7 +737,7 @@ const getCachedDecisionCardPage = unstable_cache(
 );
 
 const getCachedMeetings = unstable_cache(
-  async (selection: JurisdictionSelection, search: string, status: string, locale: Locale) => {
+  async (selection: JurisdictionSelection, search: string, locale: Locale) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as MeetingRow[];
 
@@ -760,13 +760,13 @@ const getCachedMeetings = unstable_cache(
           withMeetingJurisdictionFallback(row, jurisdiction)
         );
         const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
-        return translatedRows.filter((row) => matchesMeetingFilters(row, search, status, locale));
+        return translatedRows.filter((row) => matchesMeetingFilters(row, search, locale));
       })
     );
 
     return sortMeetings(results.flat());
   },
-  ["public-meetings-rendered-search-v2"],
+  ["public-meetings-rendered-search-v3"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1072,12 +1072,11 @@ export async function getActiveAnnouncements(selection: JurisdictionSelection = 
 }
 
 export async function getMeetings(
-  filters: { search?: string; status?: string; jurisdiction?: JurisdictionSelection; locale?: Locale } = {}
+  filters: { search?: string; jurisdiction?: JurisdictionSelection; locale?: Locale } = {}
 ) {
   return getCachedMeetings(
     filters.jurisdiction || getDefaultJurisdiction().slug,
     normalizeSearch(filters.search),
-    normalizeSearch(filters.status),
     filters.locale || "en"
   );
 }
@@ -1096,7 +1095,7 @@ export async function getAdjacentMeetingsForMeeting(
   locale: Locale = "en"
 ): Promise<AdjacentMeetings> {
   if (!meeting.meeting_datetime) {
-    const meetings = await getCachedMeetings(selection, "", "", locale);
+    const meetings = await getCachedMeetings(selection, "", locale);
     const currentIndex = meetings.findIndex((row) => row.id === meeting.id);
 
     return {

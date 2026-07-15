@@ -145,7 +145,7 @@ function MeetingLine({
     compact &&
     searchMatch &&
     !timeMatchIsVisible &&
-    (searchMatch.field === "date" || searchMatch.field === "status");
+    searchMatch.field === "date";
 
   return (
     <div
@@ -625,8 +625,8 @@ export function MeetingList({
               <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
                 <Search aria-hidden className="h-4 w-4" />
                 {locale === "es"
-                  ? "La búsqueda y los filtros de estado se aplican a esta lista."
-                  : "Search and status filters apply to this list."}
+                  ? "La búsqueda se aplica a esta lista."
+                  : "Search applies to this list."}
               </p>
             </div>
             <div className="divide-y divide-black/10">

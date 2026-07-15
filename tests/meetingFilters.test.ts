@@ -19,20 +19,15 @@ const meeting = {
 } as MeetingRow;
 
 test("meeting date search matches complete numeric tokens", () => {
-  assert.equal(matchesMeetingFilters(meeting, "feb 24", ""), true);
-  assert.equal(matchesMeetingFilters(meeting, "feb. 24", ""), true);
-  assert.equal(matchesMeetingFilters(meeting, "feb 4", ""), false);
-  assert.equal(matchesMeetingFilters(meeting, "feb 2", ""), false);
+  assert.equal(matchesMeetingFilters(meeting, "feb 24"), true);
+  assert.equal(matchesMeetingFilters(meeting, "feb. 24"), true);
+  assert.equal(matchesMeetingFilters(meeting, "feb 4"), false);
+  assert.equal(matchesMeetingFilters(meeting, "feb 2"), false);
 });
 
 test("meeting search checks the same public fields rendered by both views", () => {
   assert.equal(meetingSearchMatch(meeting, "transport")?.field, "title");
   assert.equal(meetingSearchMatch(meeting, "menlo park")?.field, "jurisdiction");
-  assert.equal(meetingSearchMatch(meeting, "upcoming")?.field, "status");
+  assert.equal(meetingSearchMatch(meeting, "upcoming"), null);
   assert.equal(meetingSearchMatch(meeting, "5:30")?.field, "date");
-});
-
-test("meeting status filter and search are applied together", () => {
-  assert.equal(matchesMeetingFilters(meeting, "transport", "Upcoming"), true);
-  assert.equal(matchesMeetingFilters(meeting, "transport", "Past"), false);
 });

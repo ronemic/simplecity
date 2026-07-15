@@ -1,11 +1,11 @@
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
-import { type Locale, statusLabel, t } from "@/lib/i18n";
+import { type Locale, t } from "@/lib/i18n";
 import type { MeetingRow } from "@/lib/types";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { matchesNormalizedDecisionSearchText } from "@/lib/utils/decisionFilters";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 
-export type MeetingSearchField = "title" | "date" | "type" | "jurisdiction" | "status";
+export type MeetingSearchField = "title" | "date" | "type" | "jurisdiction";
 
 export type MeetingSearchMatch = {
   field: MeetingSearchField;
@@ -36,10 +36,6 @@ export function meetingSearchFields(
     {
       field: "jurisdiction",
       text: getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name)
-    },
-    {
-      field: "status",
-      text: statusLabel(locale, meeting.status)
     }
   ];
 
@@ -61,10 +57,8 @@ export function meetingSearchMatch(
 export function matchesMeetingFilters(
   meeting: MeetingRow,
   search: string,
-  status: string,
   locale: Locale = "en"
 ) {
-  if (status && meeting.status !== status) return false;
   if (!search.trim()) return true;
   return meetingSearchMatch(meeting, search, locale) !== null;
 }

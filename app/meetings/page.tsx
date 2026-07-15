@@ -7,7 +7,7 @@ import {
   getJurisdictionLabel,
   normalizeJurisdictionSelection
 } from "@/lib/config/jurisdictions";
-import { statusLabel, t } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import {
   MEETING_VIEW_PREFERENCE_COOKIE,
@@ -29,7 +29,6 @@ export default async function MeetingsPage({
 }: {
   searchParams: Promise<{
     q?: string;
-    status?: string;
     month?: string;
     date?: string;
     view?: string;
@@ -44,17 +43,10 @@ export default async function MeetingsPage({
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = params.q || "";
-  const status = params.status || "";
   const view = normalizeMeetingView(
     params.view || cookieStore.get(MEETING_VIEW_PREFERENCE_COOKIE)?.value
   );
   const meetings = await getMeetings({ jurisdiction, locale });
-  const statusOptions = [
-    { value: "", label: t(locale, "allStatuses") },
-    { value: "Upcoming", label: statusLabel(locale, "Upcoming") },
-    { value: "Past", label: statusLabel(locale, "Past") },
-    { value: "Cancelled", label: statusLabel(locale, "Cancelled") }
-  ];
 
   return (
     <div className="section-shell py-10">
@@ -71,14 +63,11 @@ export default async function MeetingsPage({
       <MeetingsBrowser
         meetings={meetings}
         initialSearch={search}
-        initialStatus={status}
         view={view}
         month={params.month}
         date={params.date}
         jurisdiction={params.jurisdiction}
         searchPlaceholder={t(locale, "searchMeetings")}
-        statusLabel={t(locale, "status")}
-        statusOptions={statusOptions}
         locale={locale}
       />
     </div>
