@@ -110,14 +110,20 @@ async function fetchExistingMeetingTranslations(
   meetingIds: string[]
 ) {
   if (meetingIds.length === 0) return new Map<string, MeetingTranslationRow>();
-  const { data, error } = await supabase
-    .from("meeting_translations")
-    .select("*")
-    .eq("locale", locale)
-    .in("meeting_id", meetingIds);
+  const results = await Promise.all(
+    chunk(meetingIds, 100).map((ids) =>
+      supabase
+        .from("meeting_translations")
+        .select("meeting_id,source_fingerprint")
+        .eq("locale", locale)
+        .in("meeting_id", ids)
+    )
+  );
+  const error = results.find((result) => result.error)?.error;
 
   if (error) throw new Error(`Failed to read meeting translations. Has the migration been applied? ${error.message}`);
-  return new Map(((data || []) as MeetingTranslationRow[]).map((row) => [row.meeting_id, row]));
+  const data = results.flatMap((result) => result.data || []);
+  return new Map((data as MeetingTranslationRow[]).map((row) => [row.meeting_id, row]));
 }
 
 async function fetchExistingCardTranslations(
@@ -126,14 +132,20 @@ async function fetchExistingCardTranslations(
   cardIds: string[]
 ) {
   if (cardIds.length === 0) return new Map<string, SummaryCardTranslationRow>();
-  const { data, error } = await supabase
-    .from("summary_card_translations")
-    .select("*")
-    .eq("locale", locale)
-    .in("summary_card_id", cardIds);
+  const results = await Promise.all(
+    chunk(cardIds, 100).map((ids) =>
+      supabase
+        .from("summary_card_translations")
+        .select("summary_card_id,source_fingerprint")
+        .eq("locale", locale)
+        .in("summary_card_id", ids)
+    )
+  );
+  const error = results.find((result) => result.error)?.error;
 
   if (error) throw new Error(`Failed to read card translations. Has the migration been applied? ${error.message}`);
-  return new Map(((data || []) as SummaryCardTranslationRow[]).map((row) => [row.summary_card_id, row]));
+  const data = results.flatMap((result) => result.data || []);
+  return new Map((data as SummaryCardTranslationRow[]).map((row) => [row.summary_card_id, row]));
 }
 
 async function getMeetingCandidates(

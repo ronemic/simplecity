@@ -73,6 +73,7 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
 const DECISION_RANKING_BUFFER_PER_JURISDICTION = 12;
+const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
 
 type AdjacentMeetings = {
   newerMeeting: MeetingRow | null;
@@ -122,6 +123,16 @@ function toIlikePattern(value: string) {
     .replace(/\s+/g, "%")
     .trim();
   return safeValue ? `%${safeValue}%` : "";
+}
+
+function chunkValues<T>(values: T[], size: number) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
 }
 
 function normalizePositiveInteger(value: number, fallback: number) {
@@ -297,17 +308,22 @@ async function applyMeetingTranslations(
   if (locale === "en" || rows.length === 0) return rows;
 
   const ids = rows.map((row) => row.id);
-  const { data, error } = await supabase
-    .from("meeting_translations")
-    .select("meeting_id,locale,title,meeting_type,source_fingerprint,translation_status")
-    .eq("locale", locale)
-    .in("translation_status", ["machine", "reviewed"])
-    .in("meeting_id", ids);
+  const results = await Promise.all(
+    chunkValues(ids, TRANSLATION_LOOKUP_BATCH_SIZE).map((batchIds) =>
+      supabase
+        .from("meeting_translations")
+        .select("meeting_id,locale,title,meeting_type,source_fingerprint,translation_status")
+        .eq("locale", locale)
+        .in("translation_status", ["machine", "reviewed"])
+        .in("meeting_id", batchIds)
+    )
+  );
 
-  if (error) {
-    logQueryError("Failed to load meeting translations", error);
-    return rows;
+  for (const result of results) {
+    logQueryError("Failed to load meeting translations", result.error);
   }
+
+  const data = results.flatMap((result) => result.data || []);
 
   const translations = new Map(
     ((data || []) as unknown as MeetingTranslationRow[]).map((row) => [row.meeting_id, row])
@@ -337,38 +353,41 @@ async function applyCardTranslations(
   const meetingRows = rows
     .map((row) => row.meetings)
     .filter((meeting): meeting is MeetingRow => Boolean(meeting?.id));
-  const [cardTranslations, translatedMeetings] = await Promise.all([
-    supabase
-      .from("summary_card_translations")
-      .select(
-        [
-          "summary_card_id",
-          "locale",
-          "agenda_item",
-          "what_is_happening",
-          "why_it_matters",
-          "who_it_affects",
-          "status",
-          "comment_window_opens",
-          "comment_window_closes",
-          "how_to_act_attend",
-          "how_to_act_email",
-          "how_to_act_submit_comment",
-          "source_fingerprint",
-          "translation_status"
-        ].join(",")
+  const translationColumns = [
+    "summary_card_id",
+    "locale",
+    "agenda_item",
+    "what_is_happening",
+    "why_it_matters",
+    "who_it_affects",
+    "status",
+    "comment_window_opens",
+    "comment_window_closes",
+    "how_to_act_attend",
+    "how_to_act_email",
+    "how_to_act_submit_comment",
+    "source_fingerprint",
+    "translation_status"
+  ].join(",");
+  const [cardTranslationResults, translatedMeetings] = await Promise.all([
+    Promise.all(
+      chunkValues(cardIds, TRANSLATION_LOOKUP_BATCH_SIZE).map((batchIds) =>
+        supabase
+          .from("summary_card_translations")
+          .select(translationColumns)
+          .eq("locale", locale)
+          .in("translation_status", ["machine", "reviewed"])
+          .in("summary_card_id", batchIds)
       )
-      .eq("locale", locale)
-      .in("translation_status", ["machine", "reviewed"])
-      .in("summary_card_id", cardIds),
+    ),
     applyMeetingTranslations(supabase, meetingRows, locale)
   ]);
-  const { data, error } = cardTranslations;
 
-  if (error) {
-    logQueryError("Failed to load summary card translations", error);
-    return rows;
+  for (const result of cardTranslationResults) {
+    logQueryError("Failed to load summary card translations", result.error);
   }
+
+  const data = cardTranslationResults.flatMap((result) => result.data || []);
 
   const meetingById = new Map(translatedMeetings.map((meeting) => [meeting.id, meeting]));
   const translations = new Map(
