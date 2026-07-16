@@ -107,7 +107,7 @@ function cardInsertRow(
       : {}),
     meeting_id: meetingId,
     agenda_item: card.agendaItem,
-    what_is_happening: card.whatIsHappening,
+    what_is_happening: summaryPointsStorageText(card.whatIsHappening),
     why_it_matters: card.whyItMatters,
     who_it_affects: card.whoItAffects,
     category_tags: card.categoryTags,

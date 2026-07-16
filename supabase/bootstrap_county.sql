@@ -186,8 +186,32 @@ declare
   raw_point text;
   normalized_point text;
   points text[] := '{}';
+  parsed_value jsonb;
 begin
   if value is null or btrim(value) = '' then return null; end if;
+
+  -- Recover string arrays accidentally serialized into this legacy text column.
+  begin
+    parsed_value := value::jsonb;
+    if jsonb_typeof(parsed_value) = 'array'
+      and not exists (
+        select 1
+        from jsonb_array_elements(parsed_value) as element
+        where jsonb_typeof(element) <> 'string'
+      )
+    then
+      foreach raw_point in array array(select jsonb_array_elements_text(parsed_value))
+      loop
+        normalized_point := regexp_replace(btrim(raw_point), '[[:space:]]+', ' ', 'g');
+        if normalized_point <> '' then points := array_append(points, normalized_point); end if;
+      end loop;
+      if cardinality(points) between 1 and 3 then return points; end if;
+    end if;
+  exception when others then
+    null;
+  end;
+
+  points := '{}';
   foreach raw_point in array regexp_split_to_array(replace(value, E'\r\n', E'\n'), E'\n+')
   loop
     normalized_point := regexp_replace(btrim(raw_point), '[[:space:]]+', ' ', 'g');

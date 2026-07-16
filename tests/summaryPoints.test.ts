@@ -40,7 +40,18 @@ test("stores structured points in the compatibility text column one per line", (
   assert.deepEqual(normalizeSummaryPoints(stored), ["First point.", "Second point."]);
 });
 
-test("translation fingerprints are stable across array and compatibility storage forms", () => {
+test("recovers summary points that were accidentally stored as a JSON array string", () => {
+  const stored = '["First point.","Second point."]';
+  assert.deepEqual(normalizeSummaryPoints(stored), ["First point.", "Second point."]);
+  assert.equal(summaryPointsText(stored), "First point. Second point.");
+});
+
+test("does not treat arbitrary bracketed text as serialized summary points", () => {
+  assert.deepEqual(normalizeSummaryPoints("[See attachment]"), ["[See attachment]"]);
+  assert.deepEqual(normalizeSummaryPoints('["Valid point.",42]'), ['["Valid point.",42]']);
+});
+
+test("translation fingerprints survive structured, compatibility, and accidentally serialized storage", () => {
   const base = {
     agenda_item: "Approve contract",
     why_it_matters: "It funds services.",
@@ -63,6 +74,17 @@ test("translation fingerprints are stable across array and compatibility storage
       what_is_happening: "First point.\nSecond point."
     })
   );
+
+  assert.equal(
+    summaryCardTranslationFingerprint({
+      ...base,
+      what_is_happening: ["First point.", "Second point."]
+    }),
+    summaryCardTranslationFingerprint({
+      ...base,
+      what_is_happening: '["First point.","Second point."]'
+    })
+  );
 });
 
 test("migration expands the schema without changing or removing the legacy text column", () => {
@@ -82,6 +104,19 @@ test("migration expands the schema without changing or removing the legacy text 
   assert.doesNotMatch(sql, /drop column what_is_happening/i);
 });
 
+test("repair migration converts serialized arrays in cards and translations", () => {
+  const sql = readFileSync(
+    new URL("../supabase/migrations/20260716000000_repair_serialized_summary_points.sql", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(sql, /jsonb_array_elements_text/);
+  assert.match(sql, /jsonb_typeof\(element\) <> 'string'/);
+  assert.match(sql, /update public\.summary_cards as card/);
+  assert.match(sql, /update public\.summary_card_translations as translation/);
+  assert.match(sql, /what_is_happening = array_to_string\(repaired\.points, E'\\n'\)/g);
+});
+
 test("the first application deploy does not require the expanded database schema", () => {
   const queries = readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
   const decisionFilters = readFileSync(new URL("../lib/utils/decisionFilters.ts", import.meta.url), "utf8");
@@ -91,7 +126,12 @@ test("the first application deploy does not require the expanded database schema
 
   assert.match(decisionSearch, /what_is_happening\.ilike/);
   assert.doesNotMatch(decisionSearch, /what_is_happening_points\.ilike|what_is_happening_search\.ilike/);
-  assert.match(upserts, /what_is_happening: summaryPointsStorageText\(card\.whatIsHappening\)/);
+  const cardInsertRow = upserts.slice(
+    upserts.indexOf("function cardInsertRow("),
+    upserts.indexOf("function meetingDateTimeText(")
+  );
+  assert.match(cardInsertRow, /what_is_happening: summaryPointsStorageText\(card\.whatIsHappening\)/);
+  assert.doesNotMatch(cardInsertRow, /what_is_happening: card\.whatIsHappening/);
   assert.match(adminRoute, /what_is_happening: summaryPointsStorageText\(update\.what_is_happening\)/);
 });
 
