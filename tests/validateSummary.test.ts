@@ -58,6 +58,65 @@ test("drops cards with exact values that are not grounded in the source text", (
   assert.equal(issues[0]?.value, "$250");
 });
 
+test("drops cards containing leaked JSON braces or degenerate repeated text", () => {
+  for (const agendaItem of [
+    "Approve minutes from April 8, {{{{{{{{{{{{",
+    "Approve minutes approve minutes approve minutes approve minutes approve minutes approve minutes"
+  ]) {
+    const issues: Array<{ reason: string }> = [];
+    const result = validateSimpleCitySummary(
+      {
+        ...baseSummary,
+        cards: [groundedCard({ agendaItem })]
+      },
+      {
+        fallbackSource: "https://city.example/agendas/4",
+        allowedSourceUrls: ["https://city.example/agendas/4"],
+        sourceText:
+          "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM.",
+        onIssue: (issue) => issues.push(issue)
+      }
+    );
+
+    assert.equal(result.cards.length, 0);
+    assert.match(issues[0]?.reason || "", /malformed generated text/i);
+  }
+});
+
+test("drops only a corrupted translation and reports a validation issue", () => {
+  const issues: Array<{ reason: string }> = [];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard()],
+      translations: {
+        es: {
+          cards: [
+            {
+              agendaItem: "Aprobar contrato {{{{{{{{{{{{",
+              whatIsHappening: ["El concejo considerará un contrato para mantenimiento."],
+              whyItMatters: "El contrato afecta el mantenimiento del parque.",
+              whoItAffects: ["usuarios del parque"],
+              status: "Upcoming vote"
+            }
+          ]
+        }
+      }
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM for park maintenance.",
+      onIssue: (issue) => issues.push(issue)
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.translations?.es?.cards[0], null);
+  assert.match(issues[0]?.reason || "", /translated agenda item/i);
+});
+
 test("accepts equivalent abbreviated and expanded numeric values", () => {
   const result = validateSimpleCitySummary(
     {

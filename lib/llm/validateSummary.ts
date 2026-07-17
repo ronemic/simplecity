@@ -36,6 +36,7 @@ const NUMERIC_SCALE: Record<string, number> = {
   billion: 1_000_000_000,
   bn: 1_000_000_000
 };
+const REPEATED_PUNCTUATION_PATTERN = /([^\p{L}\p{N}\s])(?:\s*\1){5,}/u;
 
 const CardSchema = z.object({
   agendaItem: z.string().min(1),
@@ -165,6 +166,85 @@ function normalizeUrl(value = "") {
 
 function uniqueValues(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function hasRepeatedTokenSequence(value: string) {
+  const tokens = value.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+
+  for (let sequenceLength = 1; sequenceLength <= 4; sequenceLength += 1) {
+    const minimumRepeats = sequenceLength === 1 ? 6 : 4;
+    for (
+      let start = 0;
+      start + sequenceLength * minimumRepeats <= tokens.length;
+      start += 1
+    ) {
+      const sequence = tokens.slice(start, start + sequenceLength).join(" ");
+      let repeats = 1;
+      while (
+        start + sequenceLength * (repeats + 1) <= tokens.length &&
+        tokens
+          .slice(start + sequenceLength * repeats, start + sequenceLength * (repeats + 1))
+          .join(" ") === sequence
+      ) {
+        repeats += 1;
+      }
+      if (repeats >= minimumRepeats) return true;
+    }
+  }
+
+  return false;
+}
+
+function hasLikelyGeneratedTextCorruption(value: string) {
+  return (
+    /[{}]/.test(value) ||
+    REPEATED_PUNCTUATION_PATTERN.test(value) ||
+    hasRepeatedTokenSequence(value)
+  );
+}
+
+function findCorruptedGeneratedField(fields: Array<[label: string, value: string]>) {
+  return fields.find(([, value]) => hasLikelyGeneratedTextCorruption(value))?.[0] || null;
+}
+
+function findCardTextCorruption(card: z.infer<typeof CardSchema>) {
+  return findCorruptedGeneratedField([
+    ["agenda item", card.agendaItem],
+    ...card.whatIsHappening.map(
+      (point, index) => [`what-is-happening point ${index + 1}`, point] as [string, string]
+    ),
+    ["why-it-matters text", card.whyItMatters],
+    ...card.whoItAffects.map(
+      (audience, index) => [`who-it-affects value ${index + 1}`, audience] as [string, string]
+    ),
+    ["comment-window opening", card.commentWindow.opens],
+    ["comment-window closing", card.commentWindow.closes],
+    ["attendance instructions", card.howToAct.attend],
+    ["email instructions", card.howToAct.email],
+    ["comment-submission instructions", card.howToAct.submitComment]
+  ]);
+}
+
+function findTranslationTextCorruption(
+  translation: z.infer<typeof CardTranslationSchema> | null | undefined
+) {
+  if (!translation) return null;
+
+  return findCorruptedGeneratedField([
+    ["translated agenda item", translation.agendaItem],
+    ...translation.whatIsHappening.map(
+      (point, index) => [`translated what-is-happening point ${index + 1}`, point] as [string, string]
+    ),
+    ["translated why-it-matters text", translation.whyItMatters],
+    ...translation.whoItAffects.map(
+      (audience, index) => [`translated who-it-affects value ${index + 1}`, audience] as [string, string]
+    ),
+    ["translated comment-window opening", translation.commentWindow.opens],
+    ["translated comment-window closing", translation.commentWindow.closes],
+    ["translated attendance instructions", translation.howToAct.attend],
+    ["translated email instructions", translation.howToAct.email],
+    ["translated comment-submission instructions", translation.howToAct.submitComment]
+  ]);
 }
 
 function extractGroundableValues(text: string) {
@@ -420,6 +500,15 @@ export function validateSimpleCitySummary(
 
   const cards = parsed.cards
     .map((card, index) => {
+      const corruptedField = findCardTextCorruption(card);
+      if (corruptedField) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem.slice(0, 120),
+          reason: `Card contained malformed generated text in its ${corruptedField}.`
+        });
+        return null;
+      }
+
       const howToAct = {
         attend: card.howToAct.attend.trim(),
         email: card.howToAct.email.trim(),
@@ -511,6 +600,15 @@ export function validateSimpleCitySummary(
         return null;
       }
 
+      const spanishTranslation = spanishCardTranslations[index];
+      const corruptedTranslationField = findTranslationTextCorruption(spanishTranslation);
+      if (corruptedTranslationField) {
+        options.onIssue?.({
+          agendaItem,
+          reason: `Card contained malformed generated text in its ${corruptedTranslationField}.`
+        });
+      }
+
       return {
         card: {
           ...card,
@@ -528,11 +626,9 @@ export function validateSimpleCitySummary(
           status,
           confidence: capConfidence(card.confidence, maxConfidence)
         },
-        spanishTranslation: cleanCardTranslation(
-          spanishCardTranslations[index],
-          status,
-          whatIsHappening.length
-        )
+        spanishTranslation: corruptedTranslationField
+          ? null
+          : cleanCardTranslation(spanishTranslation, status, whatIsHappening.length)
       };
     })
     .filter((card): card is NonNullable<typeof card> => Boolean(card));

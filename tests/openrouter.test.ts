@@ -188,6 +188,45 @@ test("regenerates when validation drops source-unsupported cards", async (t) => 
   ]);
 });
 
+test("regenerates when a card contains degenerate model text", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let calls = 0;
+  let secondPrompt = "";
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  globalThis.fetch = (async (_url, init) => {
+    calls += 1;
+    const body = JSON.parse(String(init?.body || "{}")) as {
+      messages?: Array<{ content?: string }>;
+    };
+    if (calls === 2) secondPrompt = body.messages?.at(-1)?.content || "";
+
+    return openRouterResponse({
+      meetingSummary,
+      cards: [
+        card({
+          agendaItem:
+            calls === 1
+              ? "Approve meeting minutes {{{{{{{{{{{{"
+              : "Item 4 - Contract approval"
+        })
+      ]
+    });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting());
+
+  assert.equal(calls, 2);
+  assert.match(secondPrompt, /malformed generated text/i);
+  assert.equal(result.summary.cards[0]?.agendaItem, "Item 4 - Contract approval");
+});
+
 test("regenerates an empty summary when agenda source text is usable", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
