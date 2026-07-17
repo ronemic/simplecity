@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { POST as logout } from "@/app/api/admin/logout/route";
 import {
   getConfiguredAppUrl,
   getPublicAppUrlForRequest,
@@ -76,26 +75,5 @@ test("public app URL uses forwarded host when configured URL is local", () => {
   assert.equal(
     getPublicAppUrlForRequest(request, "http://localhost:3000"),
     "https://simplecity.app"
-  );
-});
-
-test("admin logout redirects to public URL instead of Render localhost", async () => {
-  await withEnv(
-    {
-      NEXT_PUBLIC_APP_URL: "https://simplecity.app",
-      CI: undefined,
-      RENDER: undefined,
-      RENDER_EXTERNAL_URL: undefined
-    },
-    async () => {
-      const response = await logout(
-        new Request("https://localhost:10000/api/admin/logout", {
-          method: "POST"
-        }) as never
-      );
-
-      assert.equal(response.status, 303);
-      assert.equal(response.headers.get("location"), "https://simplecity.app/admin");
-    }
   );
 });

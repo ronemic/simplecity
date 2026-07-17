@@ -6,6 +6,17 @@ function queryLocale(value: string | null): Locale | null {
 }
 
 export function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    pathname === "/api/admin" ||
+    pathname.startsWith("/api/admin/") ||
+    pathname === "/api/summarize"
+  ) {
+    return NextResponse.rewrite(new URL("/__simplecity_not_found__", request.url));
+  }
+
   const locale = queryLocale(request.nextUrl.searchParams.get("lang"));
   if (!locale) return NextResponse.next();
 
@@ -30,6 +41,9 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
+    "/admin/:path*",
+    "/api/admin/:path*",
+    "/api/summarize",
     {
       source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
       has: [{ type: "query", key: "lang" }]

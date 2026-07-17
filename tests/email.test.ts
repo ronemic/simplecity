@@ -7,6 +7,7 @@ import {
   confirmEmailSubscription,
   createOrRefreshSubscription,
   EmailSubscriptionInputError,
+  EmailSubscriptionRateLimitError,
   filterSubscribersDueForDigest,
   type EmailSubscriberRow,
   type EmailSubscriberWithSubscriptions,
@@ -388,6 +389,54 @@ test("subscription input errors are safe for public responses", async () => {
         {} as never
       ),
     EmailSubscriptionInputError
+  );
+});
+
+test("recent confirmation emails cannot be resent", async () => {
+  const subscriber: EmailSubscriberRow = {
+    id: "subscriber-1",
+    email: "resident@example.com",
+    email_normalized: "resident@example.com",
+    status: "pending",
+    pending_jurisdiction_slugs: ["san-mateo-city"],
+    confirmation_token_hash: "existing-hash",
+    unsubscribe_token: "unsubscribe-123",
+    confirmation_sent_at: new Date().toISOString(),
+    confirmed_at: null,
+    unsubscribed_at: null,
+    created_at: null,
+    updated_at: null
+  };
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "email_subscribers");
+      return {
+        select() {
+          return {
+            eq(column: string, value: string) {
+              assert.equal(column, "email_normalized");
+              assert.equal(value, subscriber.email_normalized);
+              return {
+                maybeSingle: async () => ({ data: subscriber, error: null })
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  await assert.rejects(
+    () =>
+      createOrRefreshSubscription(
+        {
+          email: subscriber.email,
+          jurisdictions: ["san-mateo-city"]
+        },
+        supabase as never
+      ),
+    (error: unknown) =>
+      error instanceof EmailSubscriptionRateLimitError && error.retryAfterSeconds > 0
   );
 });
 

@@ -121,7 +121,6 @@ test("the first application deploy does not require the expanded database schema
   const queries = readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
   const decisionFilters = readFileSync(new URL("../lib/utils/decisionFilters.ts", import.meta.url), "utf8");
   const upserts = readFileSync(new URL("../lib/db/upsertMeetings.ts", import.meta.url), "utf8");
-  const adminRoute = readFileSync(new URL("../app/api/admin/cards/route.ts", import.meta.url), "utf8");
   const decisionSearch = `${queries}\n${decisionFilters}`;
 
   assert.match(decisionSearch, /what_is_happening\.ilike/);
@@ -132,7 +131,6 @@ test("the first application deploy does not require the expanded database schema
   );
   assert.match(cardInsertRow, /what_is_happening: summaryPointsStorageText\(card\.whatIsHappening\)/);
   assert.doesNotMatch(cardInsertRow, /what_is_happening: card\.whatIsHappening/);
-  assert.match(adminRoute, /what_is_happening: summaryPointsStorageText\(update\.what_is_happening\)/);
 });
 
 test("decision search only caches its bounded page result", () => {

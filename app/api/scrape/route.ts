@@ -1,4 +1,3 @@
-import { getAuthenticatedAdmin } from "@/lib/supabase/admin";
 import { runJurisdictionPipelines, runSimpleCityPipeline } from "@/lib/pipeline";
 import { revalidatePublicContent } from "@/lib/db/revalidatePublicContent";
 import {
@@ -22,10 +21,7 @@ async function isAuthorized(request: Request) {
   const cronSecret = process.env.SUPABASE_CRON_SECRET;
   const authHeader = request.headers.get("authorization");
 
-  if (cronSecret && authHeader === `Bearer ${cronSecret}`) return true;
-
-  const admin = await getAuthenticatedAdmin();
-  return Boolean(admin);
+  return Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);
 }
 
 async function getRequestedJurisdiction(request: Request) {

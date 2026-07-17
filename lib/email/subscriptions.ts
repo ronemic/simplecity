@@ -54,6 +54,7 @@ type SubscriptionClient = Pick<SupabaseClient, "from">;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_BYTES = 32;
+const CONFIRMATION_RESEND_COOLDOWN_MS = 15 * 60 * 1000;
 const DEFAULT_EMAIL_FREQUENCY: EmailFrequency = "weekly";
 const EMAIL_DIGEST_INTERVAL_MS: Record<EmailFrequency, number> = {
   daily: 24 * 60 * 60 * 1000,
@@ -64,6 +65,16 @@ export class EmailSubscriptionInputError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "EmailSubscriptionInputError";
+  }
+}
+
+export class EmailSubscriptionRateLimitError extends Error {
+  retryAfterSeconds: number;
+
+  constructor(retryAfterSeconds: number) {
+    super("A confirmation email was sent recently. Please wait before trying again.");
+    this.name = "EmailSubscriptionRateLimitError";
+    this.retryAfterSeconds = Math.max(1, Math.ceil(retryAfterSeconds));
   }
 }
 
@@ -232,6 +243,14 @@ export async function createOrRefreshSubscription(
   let subscriber: EmailSubscriberRow;
 
   if (existing) {
+    const lastConfirmation = existing.confirmation_sent_at
+      ? new Date(existing.confirmation_sent_at).getTime()
+      : 0;
+    const resendAvailableAt = lastConfirmation + CONFIRMATION_RESEND_COOLDOWN_MS;
+    if (Number.isFinite(lastConfirmation) && resendAvailableAt > Date.now()) {
+      throw new EmailSubscriptionRateLimitError((resendAvailableAt - Date.now()) / 1000);
+    }
+
     const { data, error } = await supabase
       .from("email_subscribers")
       .update({
