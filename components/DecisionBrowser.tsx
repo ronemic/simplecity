@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, useTransition } from "react";
 import { DecisionCategorySelector } from "@/components/DecisionCategorySelector";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { PaginationJumpForm } from "@/components/PaginationJumpForm";
 import { SummaryCard } from "@/components/SummaryCard";
 import { type Locale, t } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
-import { DECISION_CARD_PAGE_SIZE, type CategoryName } from "@/lib/constants";
-import { matchesDecisionFilters } from "@/lib/utils/decisionFilters";
+import { type CategoryName } from "@/lib/constants";
 
 function resultSummary(locale: Locale, start: number, end: number, total: number) {
   if (total === 0) return locale === "es" ? "0 decisiones" : "0 decisions";
@@ -21,7 +22,10 @@ function resultSummary(locale: Locale, start: number, end: number, total: number
 export function DecisionBrowser({
   cards,
   initialSearch,
-  initialPage,
+  currentPage,
+  pageCount,
+  pageSize,
+  totalCount,
   selectedCategory,
   jurisdiction,
   locale,
@@ -29,83 +33,98 @@ export function DecisionBrowser({
 }: {
   cards: SummaryCardRow[];
   initialSearch: string;
-  initialPage: number;
+  currentPage: number;
+  pageCount: number;
+  pageSize: number;
+  totalCount: number;
   selectedCategory?: CategoryName;
   jurisdiction?: string;
   locale: Locale;
   emptyDescription: string;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [search, setSearch] = useState(initialSearch);
-  const [page, setPage] = useState(initialPage);
-
-  const matchingCards = useMemo(
-    () => cards.filter((card) => matchesDecisionFilters(card, search, selectedCategory)),
-    [cards, search, selectedCategory]
-  );
-  const pageCount = Math.ceil(matchingCards.length / DECISION_CARD_PAGE_SIZE);
-  const currentPage = Math.min(page, Math.max(1, pageCount));
-  const offset = (currentPage - 1) * DECISION_CARD_PAGE_SIZE;
-  const visibleCards = matchingCards.slice(offset, offset + DECISION_CARD_PAGE_SIZE);
-  const resultStart = matchingCards.length === 0 ? 0 : offset + 1;
-  const resultEnd = Math.min(offset + DECISION_CARD_PAGE_SIZE, matchingCards.length);
-  const highlight = search.trim();
+  const [pendingPage, setPendingPage] = useState<number | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const resultStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const resultEnd = totalCount === 0 ? 0 : resultStart + cards.length - 1;
+  const highlight = initialSearch.trim();
 
   useEffect(() => {
-    const url = new URL(window.location.href);
     const query = search.trim();
-    if (query) url.searchParams.set("q", query);
-    else url.searchParams.delete("q");
-    if (currentPage > 1) url.searchParams.set("page", String(currentPage));
-    else url.searchParams.delete("page");
-    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-  }, [currentPage, search]);
+    if (query === initialSearch) return;
 
-  useEffect(() => {
-    function syncFromHistory() {
-      const url = new URL(window.location.href);
-      setSearch(url.searchParams.get("q") || "");
-      const requestedPage = Number.parseInt(url.searchParams.get("page") || "1", 10);
-      setPage(Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1);
-    }
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (query) params.set("q", query);
+      else params.delete("q");
+      params.delete("page");
+      const nextUrl = `${pathname}${params.size > 0 ? `?${params.toString()}` : ""}`;
 
-    window.addEventListener("popstate", syncFromHistory);
-    return () => window.removeEventListener("popstate", syncFromHistory);
-  }, []);
+      startTransition(() => {
+        router.replace(nextUrl, { scroll: false });
+      });
+    }, 350);
 
-  function handleSearchChange(nextSearch: string) {
-    setSearch(nextSearch);
-    setPage(1);
+    return () => window.clearTimeout(timer);
+  }, [initialSearch, pathname, router, search, searchParams]);
+
+  function pageUrl(page: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page > 1) params.set("page", String(page));
+    else params.delete("page");
+    return `${pathname}${params.size > 0 ? `?${params.toString()}` : ""}`;
+  }
+
+  function changePage(page: number) {
+    setPendingPage(page);
+    startTransition(() => {
+      router.push(pageUrl(page));
+    });
   }
 
   return (
     <>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-4 flex min-h-8 items-center justify-between gap-3">
+        <span
+          aria-live="polite"
+          className={`inline-flex items-center gap-2 text-sm font-bold text-civic transition-opacity ${
+            isPending ? "opacity-100" : "invisible opacity-0"
+          }`}
+        >
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+          {locale === "es" ? "Actualizando resultados" : "Updating results"}
+        </span>
         <p className="count-badge">
-          {resultSummary(locale, resultStart, resultEnd, matchingCards.length)}
+          {resultSummary(locale, resultStart, resultEnd, totalCount)}
         </p>
       </div>
 
-      <DecisionSearchForm search={search} onSearchChange={handleSearchChange} locale={locale} />
+      <div aria-busy={isPending}>
+        <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
+      </div>
       <DecisionCategorySelector
         selectedCategory={selectedCategory}
-        search={search.trim()}
+        search={initialSearch}
         jurisdiction={jurisdiction}
         locale={locale}
       />
 
       <div className="mt-6 grid gap-3" aria-live="polite">
-        {visibleCards.map((card) => (
+        {cards.map((card) => (
           <SummaryCard key={card.id} card={card} highlight={highlight} locale={locale} />
         ))}
-        {visibleCards.length === 0 ? (
+        {cards.length === 0 ? (
           <div className="quiet-card p-8 text-center">
             <h3 className="text-lg font-semibold text-ink">
-              {highlight || selectedCategory
+              {initialSearch || selectedCategory
                 ? t(locale, "noMatchingDecisions")
                 : t(locale, "noDecisionsYet")}
             </h3>
             <p className="mt-2 text-sm leading-6 text-black/70">
-              {highlight || selectedCategory ? t(locale, "tryChangingFilters") : emptyDescription}
+              {initialSearch || selectedCategory ? t(locale, "tryChangingFilters") : emptyDescription}
             </p>
           </div>
         ) : null}
@@ -118,26 +137,50 @@ export function DecisionBrowser({
         >
           <button
             type="button"
-            onClick={() => setPage(Math.max(1, currentPage - 1))}
+            onClick={() => changePage(Math.max(1, currentPage - 1))}
             disabled={currentPage <= 1}
-            className={currentPage <= 1 ? "action-disabled-sm" : "action-secondary-sm"}
+            aria-busy={isPending && pendingPage === currentPage - 1}
+            className={`min-w-24 ${currentPage <= 1 ? "action-disabled-sm" : "action-secondary-sm"}`}
           >
-            {locale === "es" ? "Anterior" : "Previous"}
+            {isPending && pendingPage === currentPage - 1 ? (
+              <>
+                <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+                <span className="sr-only">
+                  {locale === "es" ? "Cargando página anterior" : "Loading previous page"}
+                </span>
+              </>
+            ) : locale === "es" ? (
+              "Anterior"
+            ) : (
+              "Previous"
+            )}
           </button>
           <PaginationJumpForm
             key={currentPage}
             page={currentPage}
             pageCount={pageCount}
             locale={locale}
-            onPageChange={setPage}
+            onPageChange={changePage}
           />
           <button
             type="button"
-            onClick={() => setPage(Math.min(pageCount, currentPage + 1))}
+            onClick={() => changePage(Math.min(pageCount, currentPage + 1))}
             disabled={currentPage >= pageCount}
-            className={currentPage >= pageCount ? "action-disabled-sm" : "action-secondary-sm"}
+            aria-busy={isPending && pendingPage === currentPage + 1}
+            className={`min-w-24 ${currentPage >= pageCount ? "action-disabled-sm" : "action-secondary-sm"}`}
           >
-            {locale === "es" ? "Siguiente" : "Next"}
+            {isPending && pendingPage === currentPage + 1 ? (
+              <>
+                <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+                <span className="sr-only">
+                  {locale === "es" ? "Cargando página siguiente" : "Loading next page"}
+                </span>
+              </>
+            ) : locale === "es" ? (
+              "Siguiente"
+            ) : (
+              "Next"
+            )}
           </button>
         </nav>
       ) : null}

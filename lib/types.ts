@@ -215,6 +215,7 @@ export type SummaryCardRow = {
   is_published: boolean | null;
   is_featured: boolean | null;
   admin_notes: string | null;
+  decision_sort_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
   meetings?: MeetingRow | null;

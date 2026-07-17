@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
-import { getPublishedDecisionCards } from "@/lib/db/queries";
+import { getDecisionCardPage } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -92,7 +92,13 @@ export default async function DecisionsPage({
   const search = (params.q || "").trim();
   const selectedCategory = categoryFromSlug(params.category);
   const currentPage = parsePage(params.page);
-  const cards = await getPublishedDecisionCards(jurisdiction, locale);
+  const result = await getDecisionCardPage({
+    jurisdiction,
+    locale,
+    search,
+    category: selectedCategory,
+    page: currentPage
+  });
 
   return (
     <div className="section-shell py-10">
@@ -107,9 +113,13 @@ export default async function DecisionsPage({
       </div>
 
       <DecisionBrowser
-        cards={cards}
+        key={`${jurisdiction}-${selectedCategory || "all"}-${search}`}
+        cards={result.cards}
         initialSearch={search}
-        initialPage={currentPage}
+        currentPage={result.page}
+        pageCount={result.pageCount}
+        pageSize={result.pageSize}
+        totalCount={result.totalCount}
         selectedCategory={selectedCategory}
         jurisdiction={params.jurisdiction}
         locale={locale}

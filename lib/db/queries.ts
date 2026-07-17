@@ -26,7 +26,6 @@ import type {
   SummaryCardTranslationRow
 } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
-import { compareCardsByPublicInterest } from "@/lib/utils/civicPriority";
 import {
   decisionCardSearchFilters,
   decisionMeetingSearchFilters,
@@ -35,6 +34,7 @@ import {
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
+import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
@@ -71,8 +71,8 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
   "updated_at"
 ].join(",");
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
+const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
-const DECISION_RANKING_BUFFER_PER_JURISDICTION = 12;
 const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
 
 type AdjacentMeetings = {
@@ -106,6 +106,12 @@ function logQueryError(context: string, error: unknown) {
   const message = error instanceof Error ? error.message : JSON.stringify(error);
   if (message.includes("Could not find the table")) return;
   console.error(`[SimpleCity] ${context}: ${message}`);
+}
+
+function isMissingDecisionSortColumn(error: unknown) {
+  if (!error) return false;
+  const message = error instanceof Error ? error.message : JSON.stringify(error);
+  return message.includes("decision_sort_at") && /PGRST(204|205)|column/i.test(message);
 }
 
 function normalizeSearch(value?: string | null) {
@@ -217,18 +223,7 @@ function withAnnouncementJurisdictionFallback(row: AnnouncementRow): Announcemen
 }
 
 function sortCards(cards: SummaryCardRow[]) {
-  return [...cards].sort((left, right) => {
-    const featuredDelta = Number(Boolean(right.is_featured)) - Number(Boolean(left.is_featured));
-    if (featuredDelta !== 0) return featuredDelta;
-
-    const leftDate = new Date(
-      left.meetings?.meeting_datetime || left.updated_at || left.created_at || 0
-    ).getTime();
-    const rightDate = new Date(
-      right.meetings?.meeting_datetime || right.updated_at || right.created_at || 0
-    ).getTime();
-    return rightDate - leftDate;
-  });
+  return [...cards].sort(compareCardsByDecisionOrder);
 }
 
 function sortMeetings(meetings: MeetingRow[]) {
@@ -636,7 +631,7 @@ async function loadDecisionCardCandidatesForJurisdiction(
     : [];
   let query = supabase
     .from("summary_cards")
-    .select(PUBLIC_SUMMARY_CARD_SELECT, { count: "exact" })
+    .select(PAGED_PUBLIC_SUMMARY_CARD_SELECT, { count: "exact" })
     .eq("jurisdiction_slug", jurisdiction.slug)
     .eq("is_published", true);
 
@@ -650,14 +645,20 @@ async function loadDecisionCardCandidatesForJurisdiction(
 
   const { data, error, count } = await query
     .order("is_featured", { ascending: false })
+    .order("decision_sort_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .range(range.from, range.to);
 
   if (error) {
-    logQueryError(`Failed to load ${jurisdiction.name} decision cards`, error);
+    const paginationSupported = !isMissingDecisionSortColumn(error);
+    if (paginationSupported) {
+      logQueryError(`Failed to load ${jurisdiction.name} decision cards`, error);
+    }
     return {
       cards: [] as SummaryCardRow[],
-      count: 0
+      count: 0,
+      paginationSupported
     };
   }
 
@@ -667,7 +668,33 @@ async function loadDecisionCardCandidatesForJurisdiction(
 
   return {
     cards: await applyCardTranslations(supabase, rows, locale),
-    count: count || 0
+    count: count || 0,
+    paginationSupported: true
+  };
+}
+
+async function loadLegacyDecisionCardPage(
+  selection: JurisdictionSelection,
+  locale: Locale,
+  search: string,
+  category: CategoryName | "",
+  page: number,
+  pageSize: number
+): Promise<DecisionCardPageResult> {
+  const offset = (page - 1) * pageSize;
+  const matchingCards = sortCards(
+    (await loadPublishedCardsForSelection(selection, locale)).filter((card) =>
+      matchesDecisionFilters(card, search, category || undefined)
+    )
+  );
+  const totalCount = matchingCards.length;
+
+  return {
+    cards: matchingCards.slice(offset, offset + pageSize),
+    totalCount,
+    page,
+    pageSize,
+    pageCount: totalCount > 0 ? Math.ceil(totalCount / pageSize) : 0
   };
 }
 
@@ -686,20 +713,14 @@ const getCachedDecisionCardPage = unstable_cache(
     const normalizedSearch = normalizeSearch(search);
 
     if (normalizedSearch) {
-      const matchingCards = (await loadPublishedCardsForSelection(selection, locale))
-        .filter((card) =>
-          matchesDecisionFilters(card, normalizedSearch, category || undefined)
-        )
-        .sort(compareCardsByPublicInterest);
-      const totalCount = matchingCards.length;
-
-      return {
-        cards: matchingCards.slice(offset, offset + normalizedPageSize),
-        totalCount,
-        page: normalizedPage,
-        pageSize: normalizedPageSize,
-        pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
-      };
+      return loadLegacyDecisionCardPage(
+        selection,
+        locale,
+        normalizedSearch,
+        category,
+        normalizedPage,
+        normalizedPageSize
+      );
     }
 
     const clients = getSafePublicClients(selection);
@@ -716,7 +737,7 @@ const getCachedDecisionCardPage = unstable_cache(
 
     const isAggregatePage = selection === ALL_JURISDICTIONS_SLUG && clients.length > 1;
     const candidateCount = isAggregatePage
-      ? normalizedPage * normalizedPageSize + DECISION_RANKING_BUFFER_PER_JURISDICTION
+      ? normalizedPage * normalizedPageSize
       : normalizedPageSize;
     const range = isAggregatePage
       ? { from: 0, to: candidateCount - 1 }
@@ -736,9 +757,19 @@ const getCachedDecisionCardPage = unstable_cache(
         )
       )
     );
+    if (results.some((result) => !result.paginationSupported)) {
+      return loadLegacyDecisionCardPage(
+        selection,
+        locale,
+        "",
+        category,
+        normalizedPage,
+        normalizedPageSize
+      );
+    }
     const totalCount = results.reduce((sum, result) => sum + result.count, 0);
     const candidates = results.flatMap((result) => result.cards);
-    const sortedCards = [...candidates].sort(compareCardsByPublicInterest);
+    const sortedCards = sortCards(candidates);
     const cards = isAggregatePage
       ? sortedCards.slice(offset, offset + normalizedPageSize)
       : sortedCards;
@@ -751,7 +782,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v5"],
+  ["decision-card-page-rendered-search-v6"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
