@@ -9,8 +9,10 @@ import {
   extractResultText,
   extractVoteDetail,
   findGuardedAgendaItemMatch,
+  interpretOfficialAction,
   outcomeHeadline
 } from "@/lib/outcomes/extractDecisionOutcome";
+import { validateDecisionOutcomeExplanation } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 import {
   keepUniqueOutcomeAssignments,
   reconcileDecisionOutcomesForMeeting,
@@ -110,6 +112,92 @@ test("classifies official outcome language and extracts vote details", () => {
   assert.equal(outcomeHeadline("approved", "Approved unanimously"), "Approved unanimously");
   assert.equal(extractVoteDetail("Motion passed on a 5-0 vote"), "5–0");
   assert.equal(extractVoteDetail("The motion carried unanimously"), "Unanimous");
+});
+
+test("interprets Legistar pass flags in the context of their procedural action", () => {
+  const committee = meeting("san-francisco", { title: "Budget and Finance Committee" });
+
+  assert.deepEqual(interpretOfficialAction("RECOMMENDED", "Pass", committee), {
+    kind: "other",
+    canonicalStatus: "recommended",
+    headline: "Recommended for approval",
+    nextStep: "The item advances to the full Board of Supervisors for further action."
+  });
+  assert.deepEqual(interpretOfficialAction("HEARD AND FILED", "Pass", committee), {
+    kind: "other",
+    canonicalStatus: "heard_and_filed",
+    headline: "Heard and filed",
+    nextStep: null
+  });
+  assert.deepEqual(interpretOfficialAction("AMENDED, AN AMENDMENT OF THE WHOLE", "Pass", committee), {
+    kind: "amended",
+    canonicalStatus: "amended",
+    headline: "Amended in committee",
+    nextStep: "This was a committee action, not final approval by the Board of Supervisors."
+  });
+  assert.equal(
+    interpretOfficialAction("ADOPTED", "Pass", meeting("san-francisco")).headline,
+    "Adopted"
+  );
+});
+
+test("never presents a passed committee recommendation as final approval", () => {
+  const result = extractDecisionOutcome(
+    card,
+    meeting("san-francisco", {
+      title: "Budget and Finance Committee",
+      items: [agendaItem({ action: "RECOMMENDED", result: "Pass", sourceUrl: card.source_url || "" })]
+    })
+  );
+
+  assert.ok(result);
+  assert.equal(result.kind, "other");
+  assert.equal(result.canonicalStatus, "recommended");
+  assert.equal(result.headline, "Recommended for approval");
+  assert.match(result.summary, /not final approval/i);
+});
+
+test("validates LLM explanations against canonical finality and source numbers", () => {
+  const input = {
+    id: "card-1",
+    title: "Lease for 125 Bayshore Boulevard",
+    canonicalStatus: "recommended" as const,
+    canonicalHeadline: "Recommended for approval",
+    fallbackSummary:
+      "The committee recommended this item for approval. This was not final approval of the underlying proposal.",
+    fallbackNextStep: "The item advances to the full Board of Supervisors for further action.",
+    sourceContext: "The committee RECOMMENDED the lease for 125 Bayshore Boulevard. Result: Pass."
+  };
+
+  assert.deepEqual(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Recommended for approval",
+      summary:
+        "The committee recommended the lease for approval; this was not final approval of the lease.",
+      nextStep: "The item advances to the full Board of Supervisors for further action."
+    }),
+    {
+      summary:
+        "The committee recommended the lease for approval; this was not final approval of the lease.",
+      nextStep: "The item advances to the full Board of Supervisors for further action."
+    }
+  );
+  assert.equal(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Recommended for approval",
+      summary: "The committee approved and adopted the lease.",
+      nextStep: null
+    }),
+    null
+  );
+  assert.equal(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Recommended for approval",
+      summary: "The committee recommended a $9 million lease for further Board action.",
+      nextStep: null
+    }),
+    null
+  );
 });
 
 test("extracts explicit minute actions but ignores recommendation-only text", () => {

@@ -68,6 +68,27 @@ export type DecisionOutcomeDraft = {
   matchedAgendaNumber: string | null;
   matchMethod: DecisionOutcomeMatchMethod;
   matchScore: number;
+  canonicalStatus: DecisionOutcomeCanonicalStatus;
+  sourceContext: string;
+};
+
+export type DecisionOutcomeCanonicalStatus =
+  | "approved"
+  | "rejected"
+  | "continued"
+  | "amended"
+  | "recommended"
+  | "heard_and_filed"
+  | "committee_action"
+  | "direction"
+  | "no_action"
+  | "recorded";
+
+export type CanonicalDecisionOutcome = {
+  kind: DecisionOutcomeKind;
+  canonicalStatus: DecisionOutcomeCanonicalStatus;
+  headline: string;
+  nextStep: string | null;
 };
 
 function compactOutcomeText(value?: string | null) {
@@ -173,6 +194,87 @@ export function extractNextStep(value: string, kind: DecisionOutcomeKind) {
   );
   if (!continued) return null;
   return `This item returns ${cleanText(continued[1]).replace(/[.;,]+$/, "")}.`;
+}
+
+function isCommitteeMeeting(meeting: Pick<LlmReadyMeeting, "title">) {
+  return /\bcommittee\b/i.test(meeting.title);
+}
+
+export function interpretOfficialAction(
+  action: string | null | undefined,
+  result: string | null | undefined,
+  meeting: Pick<LlmReadyMeeting, "jurisdictionSlug" | "title">
+): CanonicalDecisionOutcome {
+  const actionText = compactOutcomeText(action);
+  const resultText = compactOutcomeText(result);
+  const sourceText = [actionText, resultText].filter(Boolean).join(" | ");
+  const lowerAction = actionText.toLowerCase();
+  const lowerSource = sourceText.toLowerCase();
+  const failed = /\b(?:fail(?:ed)?|denied|rejected|defeated)\b/.test(lowerSource);
+
+  if (/\brecommend(?:ed|ation)?\b/.test(lowerAction)) {
+    return {
+      kind: "other",
+      canonicalStatus: "recommended",
+      headline: failed ? "Recommendation failed" : "Recommended for approval",
+      nextStep: failed
+        ? "The recommendation did not advance."
+        : meeting.jurisdictionSlug === "san-francisco"
+          ? "The item advances to the full Board of Supervisors for further action."
+          : "The item advances to the next legislative body for further action."
+    };
+  }
+
+  if (/\bheard\s+and\s+filed\b/.test(lowerAction)) {
+    return {
+      kind: "other",
+      canonicalStatus: "heard_and_filed",
+      headline: "Heard and filed",
+      nextStep: null
+    };
+  }
+
+  const kind = classifyDecisionOutcome(sourceText);
+  if (isCommitteeMeeting(meeting) && /\bpass(?:ed)?\b/.test(lowerSource)) {
+    if (kind === "amended") {
+      return {
+        kind: "amended",
+        canonicalStatus: "amended",
+        headline: "Amended in committee",
+        nextStep:
+          meeting.jurisdictionSlug === "san-francisco"
+            ? "This was a committee action, not final approval by the Board of Supervisors."
+            : "This was a committee action, not final approval by the next legislative body."
+      };
+    }
+    if (kind === "approved") {
+      return {
+        kind: "other",
+        canonicalStatus: "committee_action",
+        headline: "Committee motion passed",
+        nextStep:
+          meeting.jurisdictionSlug === "san-francisco"
+            ? "This was a committee action, not final approval by the Board of Supervisors."
+            : "This was a committee action, not final approval by the next legislative body."
+      };
+    }
+  }
+
+  const canonicalStatus: DecisionOutcomeCanonicalStatus =
+    kind === "other"
+      ? /\bno action(?: taken)?\b/.test(lowerSource)
+        ? "no_action"
+        : /\b(?:directed|provided direction|gave direction)\b/.test(lowerSource)
+          ? "direction"
+          : "recorded"
+      : kind;
+
+  return {
+    kind,
+    canonicalStatus,
+    headline: outcomeHeadline(kind, sourceText),
+    nextStep: extractNextStep(sourceText, kind)
+  };
 }
 
 export function extractResultText(value: string) {
@@ -575,10 +677,25 @@ function minutesResultForCard(
   return null;
 }
 
-function officialSummary(item: AgendaItem) {
+function officialSummary(item: AgendaItem, outcome: CanonicalDecisionOutcome) {
   const result = sentenceCase(String(item.result || ""));
   const action = sentenceCase(String(item.action || ""));
   const distinctAction = action && action.toLowerCase() !== result.toLowerCase();
+
+  if (outcome.canonicalStatus === "recommended") {
+    return outcome.headline === "Recommendation failed"
+      ? "The official record shows that the recommendation did not pass."
+      : "The committee recommended this item for approval. This was not final approval of the underlying proposal.";
+  }
+  if (outcome.canonicalStatus === "heard_and_filed") {
+    return "The committee heard the item and filed it. The record does not show final approval of the underlying proposal.";
+  }
+  if (outcome.canonicalStatus === "committee_action") {
+    return "The recorded committee motion passed. This was not final approval of the underlying proposal.";
+  }
+  if (outcome.headline === "Amended in committee") {
+    return "The committee amended the item. This was not final approval of the underlying proposal.";
+  }
 
   if (distinctAction && OUTCOME_TERM_PATTERN.test(action)) {
     return `The official meeting record lists the action as ${action} and the result as ${result}.`;
@@ -621,7 +738,7 @@ export function extractDecisionOutcome(
   if (!item?.result) return null;
 
   const sourceText = [item.action, item.result].filter(Boolean).join(" | ");
-  const kind = classifyDecisionOutcome(sourceText);
+  const canonical = interpretOfficialAction(item.action, item.result, meeting);
   const minutesDocument =
     minutesMatch?.document || officialMinutesDocuments(meeting)[0] || null;
   const sourceUrl =
@@ -634,18 +751,20 @@ export function extractDecisionOutcome(
     .digest("hex");
 
   return {
-    kind,
-    headline: outcomeHeadline(kind, sourceText),
-    summary: officialSummary(item),
+    kind: canonical.kind,
+    headline: canonical.headline,
+    summary: officialSummary(item, canonical),
     decidedAt: meetingDecisionDate(meeting),
     vote: extractVoteDetail(sourceText),
-    nextStep: extractNextStep(sourceText, kind),
+    nextStep: canonical.nextStep,
     sourceUrl,
     sourceHash,
     sourceText,
     matchedItemKey: matchedItemKey(item, sourceUrl),
     matchedAgendaNumber: item.agendaNumber || null,
     matchMethod: match?.method || "title",
-    matchScore: match?.score || 0
+    matchScore: match?.score || 0,
+    canonicalStatus: canonical.canonicalStatus,
+    sourceContext: normalizeSourceText(item.rowText || sourceText).slice(0, 6000)
   };
 }

@@ -157,7 +157,8 @@ async function backfillJurisdiction(jurisdiction: JurisdictionConfig, execute: b
           supabase,
           stored.id,
           meeting,
-          jurisdiction
+          jurisdiction,
+          { explainWithLlm: true, log: console.log }
         );
         found += result.outcomesFound;
         upserted += result.outcomesUpserted;

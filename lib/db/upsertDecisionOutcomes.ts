@@ -5,6 +5,10 @@ import {
   extractDecisionOutcome,
   extractMeetingOutcomeItems
 } from "@/lib/outcomes/extractDecisionOutcome";
+import {
+  generateDecisionOutcomeExplanations,
+  hasDecisionOutcomeExplanationProvider
+} from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 
 const OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
 
@@ -114,7 +118,11 @@ export async function reconcileDecisionOutcomesForMeeting(
   supabase: SupabaseClient,
   meetingId: string,
   meeting: LlmReadyMeeting,
-  jurisdiction?: JurisdictionConfig | null
+  jurisdiction?: JurisdictionConfig | null,
+  options: {
+    explainWithLlm?: boolean;
+    log?: (message: string) => void;
+  } = {}
 ): Promise<DecisionOutcomeReconciliation> {
   const { data: cards, error: cardError } = await supabase
     .from("summary_cards")
@@ -138,6 +146,9 @@ export async function reconcileDecisionOutcomesForMeeting(
         matchedItemKey: outcome.matchedItemKey,
         cardCreatedAt: card.created_at,
         cardSourceUrl: card.source_url,
+        cardId: card.id,
+        cardTitle: String(card.agenda_item || ""),
+        outcome,
         row: {
           summary_card_id: card.id,
           meeting_id: meetingId,
@@ -166,7 +177,43 @@ export async function reconcileDecisionOutcomesForMeeting(
       .map((document) => document.url)
   );
   const resolved = resolveCanonicalOutcomeAssignments(proposals, minutesSourceUrls);
-  const rows = resolved.selected.map((proposal) => proposal.row);
+  let explanations = new Map<string, { summary: string; nextStep: string | null }>();
+  if (
+    options.explainWithLlm &&
+    resolved.selected.length > 0 &&
+    hasDecisionOutcomeExplanationProvider()
+  ) {
+    try {
+      explanations = await generateDecisionOutcomeExplanations(
+        resolved.selected.map((proposal) => ({
+          id: proposal.cardId,
+          title: proposal.cardTitle,
+          canonicalStatus: proposal.outcome.canonicalStatus,
+          canonicalHeadline: proposal.outcome.headline,
+          fallbackSummary: proposal.outcome.summary,
+          fallbackNextStep: proposal.outcome.nextStep,
+          sourceContext: proposal.outcome.sourceContext
+        })),
+        { log: options.log }
+      );
+    } catch (error) {
+      options.log?.(
+        `Decision explanation generation failed; using grounded rule-based copy: ${
+          error instanceof Error ? error.message : "Unknown LLM error"
+        }`
+      );
+    }
+  }
+  const rows = resolved.selected.map((proposal) => {
+    const explanation = explanations.get(proposal.cardId);
+    return explanation
+      ? {
+          ...proposal.row,
+          summary: explanation.summary,
+          next_step: explanation.nextStep
+        }
+      : proposal.row;
+  });
   const matchedItemKeys = new Set(
     resolved.selected.map((proposal) => proposal.matchedItemKey)
   );
