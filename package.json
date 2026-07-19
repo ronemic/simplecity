@@ -62,6 +62,7 @@
     "summarize:los-altos": "node --import tsx/esm scripts/generate-simplecity-cards.ts --jurisdiction=los-altos",
     "translations:backfill": "node --import tsx/esm scripts/backfill-translations.ts",
     "backfill:menlo-park-times": "node --import tsx/esm scripts/backfill-menlo-park-times.ts",
+    "repair:menlo-park-meeting-collision": "node --import tsx/esm scripts/repair-menlo-park-meeting-collision.ts",
     "outcomes:backfill": "node --import tsx/esm scripts/backfill-decision-outcomes.ts",
     "reconcile:meetings": "node --import tsx/esm scripts/reconcile-meetings.ts",
     "migrate:jurisdiction": "node --import tsx/esm scripts/migrate-jurisdiction-to-region.ts",

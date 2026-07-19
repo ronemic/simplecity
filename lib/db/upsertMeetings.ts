@@ -152,12 +152,66 @@ function chunks<T>(values: T[], size: number) {
   return result;
 }
 
+type MeetingDetailsIdentityInput = Pick<
+  LlmReadyMeeting,
+  "meetingDetailsUrl" | "sectionUrl"
+>;
+
+type ExistingMeetingDetailsIdentity = {
+  external_id?: string | null;
+  meeting_details_url?: string | null;
+};
+
+function normalizedIdentityUrl(value?: string | null) {
+  return String(value || "").trim().replace(/\/$/, "");
+}
+
+export function uniqueMeetingDetailsIdentityUrls(
+  meetings: MeetingDetailsIdentityInput[]
+) {
+  const counts = new Map<string, number>();
+  const originalUrls = new Map<string, string>();
+
+  for (const meeting of meetings) {
+    const detailsUrl = normalizedIdentityUrl(meeting.meetingDetailsUrl);
+    const sectionUrl = normalizedIdentityUrl(meeting.sectionUrl);
+    if (!detailsUrl || detailsUrl === sectionUrl) continue;
+
+    counts.set(detailsUrl, (counts.get(detailsUrl) || 0) + 1);
+    originalUrls.set(detailsUrl, String(meeting.meetingDetailsUrl).trim());
+  }
+
+  return Array.from(counts.entries()).flatMap(([url, count]) =>
+    count === 1 ? [originalUrls.get(url) || url] : []
+  );
+}
+
+export function uniqueExistingExternalIdsByMeetingDetailsUrl(
+  rows: ExistingMeetingDetailsIdentity[]
+) {
+  const grouped = new Map<string, ExistingMeetingDetailsIdentity[]>();
+
+  for (const row of rows) {
+    const url = normalizedIdentityUrl(row.meeting_details_url);
+    if (!url || !row.external_id) continue;
+    grouped.set(url, [...(grouped.get(url) || []), row]);
+  }
+
+  const externalIds = new Map<string, string>();
+  for (const [url, matches] of grouped) {
+    if (matches.length !== 1) continue;
+    externalIds.set(url, String(matches[0].external_id));
+  }
+
+  return externalIds;
+}
+
 async function loadExistingExternalIdsByMeetingDetailsUrl(
   supabase: SupabaseClient,
   meetings: LlmReadyMeeting[],
   jurisdiction?: JurisdictionConfig
 ) {
-  const urls = [...new Set(meetings.map((meeting) => meeting.meetingDetailsUrl).filter(Boolean))] as string[];
+  const urls = uniqueMeetingDetailsIdentityUrls(meetings);
   const externalIds = new Map<string, string>();
   if (urls.length === 0) return externalIds;
 
@@ -171,14 +225,11 @@ async function loadExistingExternalIdsByMeetingDetailsUrl(
     const { data, error } = await query;
     if (error) throw new Error(`Failed to reconcile official meeting identifiers: ${error.message}`);
 
-    for (const row of data || []) {
-      const existing = row as unknown as {
-        external_id?: string | null;
-        meeting_details_url?: string | null;
-      };
-      if (existing.external_id && existing.meeting_details_url) {
-        externalIds.set(existing.meeting_details_url, existing.external_id);
-      }
+    const uniqueMatches = uniqueExistingExternalIdsByMeetingDetailsUrl(
+      (data || []) as ExistingMeetingDetailsIdentity[]
+    );
+    for (const [url, externalId] of uniqueMatches) {
+      externalIds.set(url, externalId);
     }
   }
 
@@ -329,7 +380,7 @@ export async function upsertMeetings(
     const selectedSourceUrl = meeting.sourceUrl || identitySourceUrl;
     const externalId =
       (meeting.meetingDetailsUrl
-        ? existingExternalIds.get(meeting.meetingDetailsUrl)
+        ? existingExternalIds.get(normalizedIdentityUrl(meeting.meetingDetailsUrl))
         : null) ||
       safeMeeting.externalId ||
       externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
