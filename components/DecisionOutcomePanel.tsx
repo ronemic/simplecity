@@ -86,37 +86,37 @@ export function DecisionOutcomePanel({
   return (
     <section
       aria-label={updateLabel}
-      className={cn("relative border-t px-4 py-5 sm:px-5 sm:py-6", style.container)}
+      className={cn("relative border-t px-4 py-3.5 sm:px-5 sm:py-4", style.container)}
     >
       <div
         aria-hidden
-        className="absolute bottom-0 left-7 top-0 hidden w-px bg-current opacity-20 sm:block"
+        className="absolute bottom-0 left-6 top-0 hidden w-px bg-current opacity-20 sm:block"
       />
-      <div className="relative sm:pl-16">
+      <div className="relative sm:pl-12">
         <span
           aria-hidden
           className={cn(
-            "mb-3 flex h-9 w-9 items-center justify-center rounded-full shadow-sm sm:absolute sm:-left-1 sm:top-0 sm:mb-0",
+            "mb-2 flex h-8 w-8 items-center justify-center rounded-full shadow-sm sm:absolute sm:left-0 sm:top-0 sm:mb-0",
             style.icon
           )}
         >
-          <OutcomeIcon className="h-5 w-5" strokeWidth={2.4} />
+          <OutcomeIcon className="h-4 w-4" strokeWidth={2.5} />
         </span>
 
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-3xl">
             <p className={cn("text-xs font-black uppercase tracking-[0.08em]", style.label)}>
               {updateLabel}
             </p>
-            <h4 className={cn("mt-1 text-xl font-black leading-tight sm:text-2xl", style.label)}>
+            <h4 className={cn("mt-0.5 text-lg font-black leading-tight sm:text-xl", style.label)}>
               {outcome.headline}
             </h4>
-            <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-black/70 sm:text-base sm:leading-7">
+            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-black/70">
               {outcome.summary}
             </p>
           </div>
           {outcome.decided_at ? (
-            <p className="shrink-0 text-xs font-bold text-black/50 sm:pt-1">
+            <p className="shrink-0 text-xs font-bold text-black/50 sm:pt-0.5">
               {locale === "es" ? "Decidido" : "Decided"}{" "}
               {decidedAtLabel(outcome.decided_at, locale)}
               <span className="sr-only">.</span>
@@ -129,7 +129,7 @@ export function DecisionOutcomePanel({
             <button
               type="button"
               onClick={() => setExpanded((value) => !value)}
-              className={cn("mt-3 -ml-2 action-link", style.label)}
+              className={cn("mt-2 -ml-2 action-link text-sm", style.label)}
               aria-expanded={expanded}
             >
               {detailLabel}
@@ -140,12 +140,12 @@ export function DecisionOutcomePanel({
             </button>
 
             {expanded ? (
-              <div className="mt-3">
+              <div className="mt-2">
                 {outcome.vote || outcome.next_step ? (
-                  <dl className="grid overflow-hidden rounded-lg border border-current/15 bg-white/75 sm:grid-cols-[0.8fr_1.6fr]">
+                  <dl className="grid overflow-hidden rounded-md border border-current/15 bg-white/75 sm:grid-cols-[0.8fr_1.6fr]">
                     {outcome.vote ? (
-                      <div className="flex gap-3 px-4 py-3 sm:border-r sm:border-current/15">
-                        <Users aria-hidden className={cn("mt-0.5 h-5 w-5 shrink-0", style.label)} />
+                      <div className="flex gap-2.5 px-3 py-2.5 sm:border-r sm:border-current/15">
+                        <Users aria-hidden className={cn("mt-0.5 h-4 w-4 shrink-0", style.label)} />
                         <div>
                           <dt className="text-xs font-bold uppercase tracking-[0.06em] text-black/45">
                             {locale === "es" ? "Votación" : "Vote"}
@@ -155,10 +155,10 @@ export function DecisionOutcomePanel({
                       </div>
                     ) : null}
                     {outcome.next_step ? (
-                      <div className="flex gap-3 border-t border-current/15 px-4 py-3 sm:border-t-0">
+                      <div className="flex gap-2.5 border-t border-current/15 px-3 py-2.5 sm:border-t-0">
                         <ClipboardCheck
                           aria-hidden
-                          className={cn("mt-0.5 h-5 w-5 shrink-0", style.label)}
+                          className={cn("mt-0.5 h-4 w-4 shrink-0", style.label)}
                         />
                         <div>
                           <dt className="text-xs font-bold uppercase tracking-[0.06em] text-black/45">
@@ -178,7 +178,7 @@ export function DecisionOutcomePanel({
                     href={outcome.source_url}
                     target="_blank"
                     rel="noreferrer"
-                    className={cn("mt-2 action-link", style.label)}
+                    className={cn("mt-2 action-link text-sm", style.label)}
                   >
                     {locale === "es" ? "Ver resultado de la reunión" : "View meeting result"}
                     <ExternalLink aria-hidden className="h-4 w-4" />

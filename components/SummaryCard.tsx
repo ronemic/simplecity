@@ -174,7 +174,7 @@ export function SummaryCard({
   outcome?: DecisionOutcome | null;
   defaultOutcomeExpanded?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(Boolean(outcome));
   const isSharePresentation = presentation === "share";
   const showDetails = open || isSharePresentation;
   const TitleTag = isSharePresentation ? "h1" : "h3";
@@ -304,14 +304,6 @@ export function SummaryCard({
         </div>
       </div>
 
-      {outcome ? (
-        <DecisionOutcomePanel
-          outcome={outcome}
-          locale={locale}
-          defaultExpanded={defaultOutcomeExpanded || isSharePresentation}
-        />
-      ) : null}
-
       {showDetails ? (
         <div
           className={cn(
@@ -432,6 +424,14 @@ export function SummaryCard({
             ) : null}
           </div>
         </div>
+      ) : null}
+
+      {outcome ? (
+        <DecisionOutcomePanel
+          outcome={outcome}
+          locale={locale}
+          defaultExpanded={defaultOutcomeExpanded || isSharePresentation}
+        />
       ) : null}
     </article>
   );

@@ -312,7 +312,6 @@ export default async function MeetingDetailPage({
                     key={card.id}
                     card={card}
                     outcome={previewOutcome}
-                    defaultOutcomeExpanded={Boolean(previewOutcome)}
                     locale={locale}
                   />
                 );
