@@ -2,10 +2,14 @@ import type { AgendaItem, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { agendaItemSimilarity } from "@/lib/utils/agendaItemIdentity";
 
-const ITEM_START = /(?:^|\s)(?:(?:agenda\s+)?item\s+)?(\d{1,2}(?:\.\d{1,3})?)\s*(?:[.):-]\s*|\s+)([A-Z][\s\S]*?)(?=(?:\s(?:(?:agenda\s+)?item\s+)?\d{1,2}(?:\.\d{1,3})?\s*(?:[.):-]\s*|\s+)[A-Z])|$)/gi;
+const AGENDA_NUMBER_SOURCE = "[A-Za-z]?\\d{1,2}(?:\\.\\d{1,3})?";
+const ITEM_START = new RegExp(
+  `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)([A-Z][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)[A-Z])|$)`,
+  "g"
+);
 const RECOMMENDATION = /\b(?:recommendation|recommended action|action requested)\s*:?\s*([\s\S]*)/i;
 const SUBJECT = /\bsubject\s*:?\s*([\s\S]{1,500}?)(?=\s+\b(?:recommendation|recommended action|background|analysis|public notice)\b)/gi;
-const SECTION_TITLE = /^(?:call to order(?: and roll call)?|roll call|opening remarks?|approval of (?:the )?agenda|approval of (?:the )?minutes|approval of (?:the )?consent calendar|public comments?|consent calendar|special presentations?|presentations?|public hearings?|staff(?:\/(?:commission|committee))?(?: oral)? reports?|commission reports?|committee reports?|old business|new business|regular business|business items?|informational (?:items?|reports?)|discussion and action|written communications?|future (?:commission )?agenda item requests?|adjournment)\s*:?\s*$/i;
+const SECTION_TITLE = /^(?:call to order(?: and roll call)?|roll call|opening remarks?|approval of (?:the )?agenda|approval of (?:the )?minutes|approval of (?:the )?consent calendar|public comments?|consent calendar|study sessions?|special presentations?|presentations?|public hearings?|staff(?:\/(?:commission|committee))?(?: oral)? reports?|commission reports?|committee reports?|old business|new business|regular business|business items?|informational (?:items?|reports?)|discussion and action|written communications?|future (?:commission )?agenda item requests?|adjournment)\s*:?\s*$/i;
 const RECOMMENDATION_END = /\s+\b(?:background|analysis|discussion|fiscal impact|financial impact|public notice|attachments?|conclusion)\s*:?/i;
 
 function currentMeetingBoundary(text: string) {
@@ -36,7 +40,11 @@ function currentAgendaSection(text: string) {
 }
 
 function isSectionTitle(value: string) {
-  return SECTION_TITLE.test(value) || /^future\b.{0,80}\bitem requests?\b/i.test(value);
+  const withoutSectionNumber = value.replace(/^[A-Z]\s*[.):-]\s*/i, "");
+  return (
+    SECTION_TITLE.test(withoutSectionNumber) ||
+    /^future\b.{0,80}\bitem requests?\b/i.test(withoutSectionNumber)
+  );
 }
 
 function precedingSectionTitle(lines: string[], lineIndex: number) {
@@ -55,9 +63,11 @@ function sectionTitleAtOffset(text: string, offset: number) {
 function cleanItemTitle(value: string) {
   return cleanText(
     value
+      .split(/\n\s*\n/)[0]
       .split(/\b(?:recommendation|recommended action|action requested)\s*:?/i)[0]
+      .replace(/\s*\(Staff Report\s*#[^)]+\)\s*$/i, "")
       .replace(/\s+Page\s+\d+.*$/i, "")
-  ).slice(0, 500);
+  ).slice(0, 800);
 }
 
 function extractRecommendation(value: string) {
@@ -186,16 +196,17 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
   ITEM_START.lastIndex = 0;
 
   for (const match of agendaText.matchAll(ITEM_START)) {
-    const agendaNumber = match[1];
+    const agendaNumber = match[1].toUpperCase();
     if (!/^[A-Z]/.test(match[2].trimStart())) continue;
-    if (!agendaNumber.includes(".")) {
+    if (/^\d+$/.test(agendaNumber)) {
       if (!hasNumberedOpening) continue;
       const wholeNumber = Number(agendaNumber);
       if (wholeNumber <= lastWholeNumber) continue;
       lastWholeNumber = wholeNumber;
     }
-    const block = cleanText(match[2]);
-    const title = cleanItemTitle(block);
+    const rawBlock = match[2];
+    const block = cleanText(rawBlock);
+    const title = cleanItemTitle(rawBlock);
     if (!title || isSectionTitle(title)) continue;
     const report = bestStaffReport(title, staffReports);
     const action = extractRecommendation(block) || report?.action || null;
@@ -234,6 +245,7 @@ export function mergeAgendaItems(existing: AgendaItem[] = [], extracted: AgendaI
       ...prior,
       title: prior.title || item.title,
       action: prior.action || item.action,
+      result: prior.result || item.result,
       rowText: prior.rowText.length >= item.rowText.length ? prior.rowText : item.rowText,
       attachments: [...(prior.attachments || []), ...(item.attachments || [])]
     });

@@ -19,6 +19,7 @@ import {
 } from "@/lib/db/translationFingerprint";
 import type {
   AnnouncementRow,
+  DecisionOutcome,
   DocumentRow,
   MeetingRow,
   MeetingTranslationRow,
@@ -74,6 +75,24 @@ const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PU
 const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
 const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
+const PUBLIC_DECISION_OUTCOME_COLUMNS = [
+  "id",
+  "summary_card_id",
+  "meeting_id",
+  "jurisdiction_name",
+  "jurisdiction_slug",
+  "platform",
+  "kind",
+  "headline",
+  "summary",
+  "decided_at",
+  "vote",
+  "next_step",
+  "source_url",
+  "source_hash",
+  "created_at",
+  "updated_at"
+].join(",");
 
 type AdjacentMeetings = {
   newerMeeting: MeetingRow | null;
@@ -417,6 +436,51 @@ async function applyCardTranslations(
   });
 }
 
+async function loadDecisionOutcomes(
+  supabase: { from: SupabaseClient["from"] },
+  rows: SummaryCardRow[]
+) {
+  if (rows.length === 0) return new Map<string, DecisionOutcome>();
+
+  const results = await Promise.all(
+    chunkValues(
+      rows.map((row) => row.id),
+      TRANSLATION_LOOKUP_BATCH_SIZE
+    ).map((cardIds) =>
+      supabase
+        .from("decision_outcomes")
+        .select(PUBLIC_DECISION_OUTCOME_COLUMNS)
+        .in("summary_card_id", cardIds)
+    )
+  );
+
+  for (const result of results) {
+    logQueryError("Failed to load decision outcomes", result.error);
+  }
+
+  return new Map(
+    (results.flatMap((result) => result.data || []) as unknown as DecisionOutcome[])
+      .filter((outcome) => Boolean(outcome.summary_card_id))
+      .map((outcome) => [outcome.summary_card_id!, outcome])
+  );
+}
+
+async function enrichPublicCards(
+  supabase: { from: SupabaseClient["from"] },
+  rows: SummaryCardRow[],
+  locale: Locale
+): Promise<SummaryCardRow[]> {
+  const [translatedRows, outcomes] = await Promise.all([
+    applyCardTranslations(supabase, rows, locale),
+    loadDecisionOutcomes(supabase, rows)
+  ]);
+
+  return translatedRows.map((row): SummaryCardRow => ({
+    ...row,
+    outcome: outcomes.get(row.id) || null
+  }));
+}
+
 async function loadPublishedCardsForJurisdiction(
   {
     jurisdiction,
@@ -450,7 +514,7 @@ async function loadPublishedCardsForJurisdiction(
   const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
     withCardJurisdictionFallback(row, jurisdiction)
   );
-  return applyCardTranslations(supabase, rows, locale);
+  return enrichPublicCards(supabase, rows, locale);
 }
 
 async function loadPublishedCardsForSelection(
@@ -534,7 +598,7 @@ const getCachedPublishedCard = unstable_cache(
         }
         if (!data) return null;
 
-        const [translated] = await applyCardTranslations(
+        const [translated] = await enrichPublicCards(
           supabase,
           [withCardJurisdictionFallback(data as unknown as SummaryCardRow, jurisdiction)],
           locale
@@ -667,7 +731,7 @@ async function loadDecisionCardCandidatesForJurisdiction(
   );
 
   return {
-    cards: await applyCardTranslations(supabase, rows, locale),
+    cards: await enrichPublicCards(supabase, rows, locale),
     count: count || 0,
     paginationSupported: true
   };
@@ -872,7 +936,7 @@ const getCachedMeetingDetail = unstable_cache(
         const cardRows = ((cards || []) as unknown as SummaryCardRow[]).map((row) =>
             withCardJurisdictionFallback(row, jurisdiction)
           );
-        const translatedCards = await applyCardTranslations(supabase, cardRows, locale);
+        const translatedCards = await enrichPublicCards(supabase, cardRows, locale);
 
         return {
           meeting: translatedMeetings[0] || meetingRow,
@@ -989,7 +1053,7 @@ const getCachedCategoryCards = unstable_cache(
         const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
           withCardJurisdictionFallback(row, jurisdiction)
         );
-        return applyCardTranslations(supabase, rows, locale);
+        return enrichPublicCards(supabase, rows, locale);
       })
     );
 

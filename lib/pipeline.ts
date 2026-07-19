@@ -17,9 +17,11 @@ import {
 import {
   appendSummaryCardsForMeeting,
   replaceSummaryCardsForMeeting,
+  setMeetingSummarizedSourceHash,
   upsertMeetings
 } from "@/lib/db/upsertMeetings";
 import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
+import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
 import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
@@ -120,6 +122,20 @@ function getMaxConsecutiveRateLimitFailures() {
 
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2;
+}
+
+export function shouldReconcileMinutesWithoutGeneratingCards(
+  meeting: LlmReadyMeeting,
+  existingCardCount: number
+) {
+  return (
+    existingCardCount > 0 &&
+    meeting.documents.some(
+      (document) =>
+        ["Minutes", "Accessible Minutes"].includes(document.type) &&
+        Boolean(document.extractedText)
+    )
+  );
 }
 
 export async function runSimpleCityPipeline(
@@ -381,6 +397,23 @@ export async function runSimpleCityPipeline(
             const shouldAppendToExisting =
               Boolean(persistSummaries && supabase && item.id && item.existingCardCount > 0);
 
+            if (
+              shouldAppendToExisting &&
+              supabase &&
+              shouldReconcileMinutesWithoutGeneratingCards(
+                item.meeting,
+                item.existingCardCount
+              )
+            ) {
+              if (item.sourceHash) {
+                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
+              }
+              log(
+                `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; official minutes will update those cards without generating duplicates.`
+              );
+              continue;
+            }
+
             if (shouldAppendToExisting && item.summarizedSourceHash === item.sourceHash) {
               log(`Skipping ${item.meeting.title}; source unchanged and cards already exist.`);
               continue;
@@ -443,6 +476,63 @@ export async function runSimpleCityPipeline(
             }
           }
         }
+      }
+    }
+
+    if (canPersist && supabase && upserted.length > 0 && !recordDeadline("decision outcome reconciliation")) {
+      let outcomesUpserted = 0;
+      let outcomesRejectedAmbiguous = 0;
+      let resultItemsFound = 0;
+      let resultItemsMatched = 0;
+      let resultItemsUnmatched = 0;
+      let duplicateCardsDetected = 0;
+      let duplicateCardsResolved = 0;
+      for (const item of upserted) {
+        if (recordDeadline("decision outcome reconciliation")) break;
+
+        try {
+          const reconciliation = await reconcileDecisionOutcomesForMeeting(
+            supabase,
+            item.id,
+            item.meeting,
+            jurisdiction
+          );
+          outcomesUpserted += reconciliation.outcomesUpserted;
+          outcomesRejectedAmbiguous += reconciliation.outcomesRejectedAmbiguous;
+          resultItemsFound += reconciliation.resultItemsFound;
+          resultItemsMatched += reconciliation.resultItemsMatched;
+          resultItemsUnmatched += reconciliation.resultItemsUnmatched;
+          duplicateCardsDetected += reconciliation.duplicateCardsDetected;
+          duplicateCardsResolved += reconciliation.duplicateCardsResolved;
+          if (!reconciliation.complete && reconciliation.resultItemsFound > 0) {
+            const coverageError =
+              `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultItemsMatched} of ${reconciliation.resultItemsFound} result-bearing agenda item(s); ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
+            errors.push(coverageError);
+            log(coverageError);
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Unknown decision outcome error";
+          errors.push(`${item.meeting.title}: ${message}`);
+          log(`Decision outcome reconciliation failed for ${item.meeting.title}: ${message}`);
+        }
+      }
+      if (outcomesUpserted > 0) {
+        log(`Published ${outcomesUpserted} verified decision outcome update(s) from official meeting records.`);
+      }
+      if (outcomesRejectedAmbiguous > 0) {
+        log(
+          `Withheld ${outcomesRejectedAmbiguous} decision outcome match(es) because one official item matched multiple cards.`
+        );
+      }
+      if (resultItemsFound > 0) {
+        log(
+          `Decision outcome coverage: matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s); ${resultItemsUnmatched} unmatched.`
+        );
+      }
+      if (duplicateCardsDetected > 0) {
+        log(
+          `Detected ${duplicateCardsDetected} duplicate decision card(s); resolved ${duplicateCardsResolved} using official-source or creation-time evidence.`
+        );
       }
     }
 

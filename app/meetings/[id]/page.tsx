@@ -26,15 +26,115 @@ import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { serializeJsonLd } from "@/lib/seo";
+import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 
 export const revalidate = 300;
+
+const MENLO_PARK_MAY_12_MINUTES_URL =
+  "https://www.menlopark.gov/files/sharedassets/public/v/1/agendas-and-minutes/city-council/2026-meetings/minutes/20260512-city-council-regular-minutes-approved.pdf";
+const MENLO_PARK_MAY_12_DECIDED_AT = "2026-05-12T18:00:00-07:00";
+
+const MENLO_PARK_MAY_12_OUTCOME_PREVIEW = {
+  queryValue: "menlo-park-may-12-2026",
+  meetingId: "f14bb7d0-b975-490d-9d97-44591819e383",
+  outcomesByOriginalCardId: {
+    "d1a3ee43-85f4-41f1-a2c4-ef1d1dcf6125": {
+      kind: "approved",
+      headline: "Passed unanimously",
+      summary: "The City Council approved this item as part of the consent calendar.",
+      vote: "Unanimous"
+    },
+    "e0546e83-becf-431b-9235-76d9ea6a155c": {
+      kind: "approved",
+      headline: "Passed unanimously",
+      summary: "The City Council approved this item as part of the consent calendar.",
+      vote: "Unanimous"
+    },
+    "8e619b41-c520-47e1-a788-1261f64a2e37": {
+      kind: "approved",
+      headline: "Passed unanimously",
+      summary: "The City Council approved this item as part of the consent calendar.",
+      vote: "Unanimous"
+    },
+    "1cdbecbc-a4e4-4f87-afe8-f3d1ed7c2ce2": {
+      kind: "approved",
+      headline: "Passed unanimously",
+      summary: "The City Council approved this item as part of the consent calendar.",
+      vote: "Unanimous"
+    },
+    "7a6e4a3b-8f47-4f6b-9910-71dc859c00e5": {
+      kind: "other",
+      headline: "Direction provided",
+      summary:
+        "The City Council directed staff to assess staffing and deployment, strengthen recruitment and field training, continue data-driven crime prevention, and make targeted technology and accountability improvements.",
+      next_step: "Staff will use the direction to shape the fiscal year 2026-27 public safety priority."
+    },
+    "d5b7b717-1245-4b30-9e27-15b42f4b61bc": {
+      kind: "other",
+      headline: "Direction provided",
+      summary:
+        "The City Council directed staff on capital-plan funding, project delays and cancellation, budget reductions, quiet-zone funding, and adding the Sharon Park Pond Pump Station replacement.",
+      next_step: "Staff will incorporate the direction into the five-year capital improvement plan."
+    },
+    "43cddd16-b096-407d-b9d2-72aceef86e54": {
+      kind: "continued",
+      headline: "Continued to June 9",
+      summary:
+        "The City Council continued the solid-waste rate public hearing by acclamation to June 9, 2026, at 6 p.m. No final rate decision was made at this meeting.",
+      vote: "By acclamation",
+      next_step: "The public hearing resumes June 9, 2026, at 6 p.m."
+    },
+    "b311b88a-123f-40b1-bc31-3023f703ad35": {
+      kind: "continued",
+      headline: "Continued to June 9",
+      summary:
+        "The City Council continued the municipal-water rate public hearing by acclamation to June 9, 2026, at 6 p.m. No final rate decision was made at this meeting.",
+      vote: "By acclamation",
+      next_step: "The public hearing resumes June 9, 2026, at 6 p.m."
+    },
+    "3b29c0d9-2796-4996-b4e7-e1356082220b": {
+      kind: "other",
+      headline: "No action taken",
+      summary:
+        "The City Council took no action on the temporary Senate Bill 79 zoning-map exclusion and directed staff to keep the council advised of applications submitted under SB 79.",
+      next_step: "Staff will keep the City Council advised of SB 79 applications."
+    }
+  } satisfies Record<string, Omit<DecisionOutcome, "decided_at" | "source_url">>
+} as const;
+
+function outcomeForLocalPreview(
+  card: SummaryCardRow,
+  meetingId: string,
+  requestedPreview: string | undefined
+) {
+  if (card.outcome) return card.outcome;
+  if (
+    process.env.NODE_ENV !== "development" ||
+    requestedPreview !== MENLO_PARK_MAY_12_OUTCOME_PREVIEW.queryValue ||
+    meetingId !== MENLO_PARK_MAY_12_OUTCOME_PREVIEW.meetingId
+  ) {
+    return null;
+  }
+
+  const outcome =
+    MENLO_PARK_MAY_12_OUTCOME_PREVIEW.outcomesByOriginalCardId[
+      card.id as keyof typeof MENLO_PARK_MAY_12_OUTCOME_PREVIEW.outcomesByOriginalCardId
+    ];
+  if (!outcome) return null;
+
+  return {
+    ...outcome,
+    decided_at: MENLO_PARK_MAY_12_DECIDED_AT,
+    source_url: MENLO_PARK_MAY_12_MINUTES_URL
+  } satisfies DecisionOutcome;
+}
 
 export async function generateMetadata({
   params,
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ jurisdiction?: string }>;
+  searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string }>;
 }): Promise<Metadata> {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
@@ -76,7 +176,7 @@ export default async function MeetingDetailPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ jurisdiction?: string }>;
+  searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string }>;
 }) {
   const [{ id }, query, locale, cookieStore] = await Promise.all([
     params,
@@ -205,9 +305,18 @@ export default async function MeetingDetailPage({
           </div>
           {cards.length > 0 ? (
             <div className="grid gap-4">
-              {cards.map((card) => (
-                <SummaryCard key={card.id} card={card} locale={locale} />
-              ))}
+              {cards.map((card) => {
+                const previewOutcome = outcomeForLocalPreview(card, id, query.previewOutcome);
+                return (
+                  <SummaryCard
+                    key={card.id}
+                    card={card}
+                    outcome={previewOutcome}
+                    defaultOutcomeExpanded={Boolean(previewOutcome)}
+                    locale={locale}
+                  />
+                );
+              })}
             </div>
           ) : (
             <div className="quiet-card p-8">

@@ -219,6 +219,33 @@ export type SummaryCardRow = {
   created_at: string | null;
   updated_at: string | null;
   meetings?: MeetingRow | null;
+  outcome?: DecisionOutcome | null;
+};
+
+export type DecisionOutcomeKind =
+  | "approved"
+  | "rejected"
+  | "continued"
+  | "amended"
+  | "other";
+
+export type DecisionOutcome = {
+  id?: string;
+  summary_card_id?: string;
+  meeting_id?: string;
+  jurisdiction_name?: string | null;
+  jurisdiction_slug?: string | null;
+  platform?: string | null;
+  kind: DecisionOutcomeKind;
+  headline: string;
+  summary: string;
+  decided_at?: string | null;
+  vote?: string | null;
+  next_step?: string | null;
+  source_url?: string | null;
+  source_hash?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type SummaryCardTranslationRow = {

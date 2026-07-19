@@ -3,10 +3,11 @@
 import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
+import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
 import { PendingLink } from "@/components/PendingLink";
 import { HighlightedText } from "@/components/HighlightedText";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
-import type { SummaryCardRow } from "@/lib/types";
+import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
@@ -162,12 +163,16 @@ export function SummaryCard({
   card,
   highlight,
   locale = "en",
-  presentation = "list"
+  presentation = "list",
+  outcome = card.outcome,
+  defaultOutcomeExpanded = false
 }: {
   card: SummaryCardRow;
   highlight?: string;
   locale?: Locale;
   presentation?: "list" | "share";
+  outcome?: DecisionOutcome | null;
+  defaultOutcomeExpanded?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const isSharePresentation = presentation === "share";
@@ -298,6 +303,14 @@ export function SummaryCard({
           ) : null}
         </div>
       </div>
+
+      {outcome ? (
+        <DecisionOutcomePanel
+          outcome={outcome}
+          locale={locale}
+          defaultExpanded={defaultOutcomeExpanded || isSharePresentation}
+        />
+      ) : null}
 
       {showDetails ? (
         <div

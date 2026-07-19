@@ -8,6 +8,10 @@ function normalizeAgendaItemText(value: string) {
     .replace(/\bpublic works\s*(?:and|&)\s*transportation commission\b/g, "pwtc")
     .replace(/\beast palo alto sanitary district\s*\(\s*epasd\s*\)/g, "epasd")
     .replace(/\beast palo alto sanitary district\b/g, "epasd")
+    .replace(/\bsenate bill\b/g, "sb")
+    .replace(/\brates?\b/g, "rate")
+    .replace(/\bincreases?\b/g, "increase")
+    .replace(/\btemporar(?:y|ily)\b/g, " ")
     .replace(/\bwork[\s-]+plan\b/g, "workplan")
     .replace(/&/g, " and ")
     .replace(/[^a-z0-9.]+/g, " ")
@@ -20,15 +24,30 @@ const NON_IDENTITY_WORDS = new Set([
   "advisory",
   "an",
   "and",
+  "adoption",
+  "annual",
+  "approving",
+  "change",
+  "compliance",
+  "conduct",
+  "consider",
   "for",
   "get",
   "hoc",
+  "hearing",
+  "maximum",
+  "near",
   "of",
   "on",
+  "public",
   "receive",
+  "resolution",
   "review",
   "the",
   "to",
+  "vote",
+  "with",
+  "adjustments",
   "informational",
   "presentation",
   "discussion"

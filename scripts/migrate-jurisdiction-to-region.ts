@@ -191,6 +191,12 @@ async function main() {
   const documents = await readRows(source, "documents", filter);
   const cards = await readRows(source, "summary_cards", filter);
   const cardIds = cards.map((row) => String(row.id));
+  const outcomes = await readRelatedRows(
+    source,
+    "decision_outcomes",
+    "summary_card_id",
+    cardIds
+  );
   const meetingTranslations = await readRelatedRows(
     source,
     "meeting_translations",
@@ -207,6 +213,7 @@ async function main() {
   await writeRows(destination, "meetings", meetings, execute);
   await writeRows(destination, "documents", documents, execute);
   await writeRows(destination, "summary_cards", cards, execute);
+  await writeRows(destination, "decision_outcomes", outcomes, execute);
   await writeRows(destination, "meeting_translations", meetingTranslations, execute);
   await writeRows(destination, "summary_card_translations", cardTranslations, execute);
   await writeRows(destination, "announcements", await readRows(source, "announcements", filter), execute);
