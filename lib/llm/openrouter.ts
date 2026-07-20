@@ -2,6 +2,7 @@ import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { formatAgendaItemContexts } from "@/lib/scraper/agendaItemContext";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
+import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import {
   parseAndValidateSummary,
@@ -356,9 +357,12 @@ async function requestSummary(
   if (!content) throw new Error(`${provider.name} response did not include message content.`);
 
   const validationIssues: SummaryValidationIssue[] = [];
-  const summary = parseAndValidateSummary(
-    content,
-    validationOptionsForMeeting(meeting, (issue) => validationIssues.push(issue))
+  const summary = attachSourceItemIds(
+    meeting,
+    parseAndValidateSummary(
+      content,
+      validationOptionsForMeeting(meeting, (issue) => validationIssues.push(issue))
+    )
   );
 
   for (const issue of validationIssues) {
@@ -635,8 +639,9 @@ function combineBatchSummaries(
     for (const [index, card] of result.summary.cards.entries()) {
       const duplicate = cards.some(
         (existing) =>
-          existing.source === card.source &&
-          areLikelySameAgendaItem(existing.agendaItem, card.agendaItem)
+          (existing.sourceItemId && existing.sourceItemId === card.sourceItemId) ||
+          (existing.source === card.source &&
+            areLikelySameAgendaItem(existing.agendaItem, card.agendaItem))
       );
       if (duplicate) continue;
       cards.push(card);

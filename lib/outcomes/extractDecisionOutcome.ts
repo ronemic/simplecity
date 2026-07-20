@@ -14,13 +14,10 @@ import {
   agendaItemSimilarity
 } from "@/lib/utils/agendaItemIdentity";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { KNOWN_JURISDICTION_SLUGS } from "@/lib/config/jurisdictions";
+import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
-export const DECISION_OUTCOME_JURISDICTIONS = new Set([
-  "san-francisco",
-  "san-mateo-county",
-  "menlo-park",
-  "mountain-view"
-]);
+export const DECISION_OUTCOME_JURISDICTIONS = new Set<string>(KNOWN_JURISDICTION_SLUGS);
 
 const OUTCOME_TERMS =
   "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?";
@@ -46,7 +43,11 @@ const MIN_FUZZY_MATCH_SCORE = 0.72;
 const MIN_FUZZY_MATCH_MARGIN = 0.15;
 const MIN_SHARED_IDENTITY_TOKENS = 3;
 
-export type DecisionOutcomeMatchMethod = "source_url" | "agenda_number" | "title";
+export type DecisionOutcomeMatchMethod =
+  | "source_item_id"
+  | "source_url"
+  | "agenda_number"
+  | "title";
 
 export type GuardedAgendaItemMatch = {
   item: AgendaItem;
@@ -423,9 +424,26 @@ export function findGuardedAgendaItemMatch(
 }
 
 function structuredResultMatch(
-  card: Pick<SummaryCardRow, "agenda_item" | "source_url">,
+  card: Pick<SummaryCardRow, "source_item_id" | "agenda_item" | "source_url">,
   items: AgendaItem[]
 ) {
+  const sourceItemId = String(card.source_item_id || "").trim();
+  if (sourceItemId && uniqueSourceItemIds(items).has(sourceItemId)) {
+    const match = items.find(
+      (item) =>
+        item.externalId === sourceItemId &&
+        Boolean(item.result) &&
+        OUTCOME_TERM_PATTERN.test([item.action, item.result].filter(Boolean).join(" "))
+    );
+    if (match) {
+      return {
+        item: match,
+        method: "source_item_id" as const,
+        score: 1,
+        runnerUpScore: null
+      };
+    }
+  }
   const sourceUrl = String(card.source_url || "").trim();
   const sourceUrlIsItemSpecific =
     Boolean(sourceUrl) &&
@@ -607,14 +625,20 @@ function guardedResultWindow(cardTitle: string, text: string) {
 }
 
 function minutesResultForCard(
-  card: Pick<SummaryCardRow, "agenda_item" | "source_url">,
+  card: Pick<SummaryCardRow, "source_item_id" | "agenda_item" | "source_url">,
   meeting: LlmReadyMeeting
 ) {
   const title = String(card.agenda_item || "").trim();
   if (!title) return null;
-  const agendaMatch = findGuardedAgendaItemMatch(title, meeting.items || [], {
-    sourceUrl: card.source_url
-  });
+  const sourceItem =
+    card.source_item_id && uniqueSourceItemIds(meeting.items || []).has(card.source_item_id)
+      ? (meeting.items || []).find((item) => item.externalId === card.source_item_id)
+      : null;
+  const agendaMatch = sourceItem
+    ? { item: sourceItem }
+    : findGuardedAgendaItemMatch(title, meeting.items || [], {
+        sourceUrl: card.source_url
+      });
   const agendaNumber = String(agendaMatch?.item.agendaNumber || "").trim();
   const inventory = extractMeetingOutcomeItems(meeting);
   const inventoryMatch = findGuardedAgendaItemMatch(title, inventory.items, {
@@ -726,7 +750,7 @@ function meetingDecisionDate(meeting: LlmReadyMeeting) {
 }
 
 export function extractDecisionOutcome(
-  card: Pick<SummaryCardRow, "id" | "agenda_item" | "source_url">,
+  card: Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url">,
   meeting: LlmReadyMeeting
 ): DecisionOutcomeDraft | null {
   if (!DECISION_OUTCOME_JURISDICTIONS.has(String(meeting.jurisdictionSlug || ""))) return null;

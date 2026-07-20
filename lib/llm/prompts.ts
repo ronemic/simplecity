@@ -41,6 +41,7 @@ JSON schema:
   },
   "cards": [
     {
+      "sourceItemId": "exact Source item ID from the matching agenda-item block, or null",
       "agendaItem": "string",
       "whatIsHappening": ["plain-English point 1", "plain-English point 2"],
       "whyItMatters": "string",
@@ -89,6 +90,7 @@ JSON schema:
 }
 
 Rules:
+- “sourceItemId” is machine-readable identity, not public copy. Copy it exactly from the matching “Source item ID” agenda block. Never invent, translate, shorten, or combine it. Use null when that block says “Not available” or the source contains no item blocks.
 - “agendaItem” is the public-facing card title, not a raw agenda title.
 - Write “agendaItem” as 6-12 plain-English words when possible.
 - Lead “agendaItem” with the concrete thing residents would recognize: a project, address, department budget, service, fee, tax, contract, plan, program, or rule change.

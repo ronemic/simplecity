@@ -12,7 +12,8 @@ import {
 import { translateAndUpsertDecisionOutcomes } from "@/lib/db/upsertDecisionOutcomeTranslations";
 import { hasTranslationProvider } from "@/lib/llm/translate";
 
-const OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
+const OUTCOME_CARD_COLUMNS = "id,source_item_id,agenda_item,source_url,created_at";
+const LEGACY_OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
 
 export type DecisionOutcomeReconciliation = {
   cardsChecked: number;
@@ -116,6 +117,10 @@ function isMissingOutcomeTable(error: { code?: string; message?: string } | null
   );
 }
 
+function isMissingSourceItemIdColumn(error: { code?: string; message?: string } | null) {
+  return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
+}
+
 export async function reconcileDecisionOutcomesForMeeting(
   supabase: SupabaseClient,
   meetingId: string,
@@ -124,20 +129,32 @@ export async function reconcileDecisionOutcomesForMeeting(
   options: {
     explainWithLlm?: boolean;
     translateWithLlm?: boolean;
+    persist?: boolean;
     log?: (message: string) => void;
   } = {}
 ): Promise<DecisionOutcomeReconciliation> {
-  const { data: cards, error: cardError } = await supabase
+  const initialCards = await supabase
     .from("summary_cards")
     .select(OUTCOME_CARD_COLUMNS)
     .eq("meeting_id", meetingId);
+  let cards: unknown = initialCards.data;
+  let cardError = initialCards.error;
+
+  if (isMissingSourceItemIdColumn(cardError)) {
+    const legacy = await supabase
+      .from("summary_cards")
+      .select(LEGACY_OUTCOME_CARD_COLUMNS)
+      .eq("meeting_id", meetingId);
+    cards = legacy.data;
+    cardError = legacy.error;
+  }
 
   if (cardError) {
     throw new Error(`Failed to load cards for decision outcomes: ${cardError.message}`);
   }
 
-  const cardRows = (cards || []) as unknown as Array<
-    Pick<SummaryCardRow, "id" | "agenda_item" | "source_url" | "created_at">
+  const cardRows = (Array.isArray(cards) ? cards : []) as Array<
+    Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url" | "created_at">
   >;
   const inventory = extractMeetingOutcomeItems(meeting);
   const proposals = cardRows.flatMap((card) => {
@@ -220,18 +237,21 @@ export async function reconcileDecisionOutcomesForMeeting(
   const matchedItemKeys = new Set(
     resolved.selected.map((proposal) => proposal.matchedItemKey)
   );
+  // A few platforms expose results only in a guarded minutes-text window,
+  // outside the structured result inventory.
+  const knownResultItemCount = Math.max(inventory.items.length, matchedItemKeys.size);
   const report = {
     cardsChecked: cardRows.length,
     outcomesFound: proposals.length,
     outcomesRejectedAmbiguous: resolved.rejectedAmbiguous,
-    resultItemsFound: inventory.items.length,
+    resultItemsFound: knownResultItemCount,
     resultItemsMatched: matchedItemKeys.size,
-    resultItemsUnmatched: Math.max(0, inventory.items.length - matchedItemKeys.size),
+    resultItemsUnmatched: knownResultItemCount - matchedItemKeys.size,
     informationalItemsFound: inventory.informationalItemsFound,
     duplicateCardsDetected: resolved.duplicateCardsDetected,
     duplicateCardsResolved: resolved.duplicateCardsResolved,
     complete:
-      inventory.items.length === matchedItemKeys.size &&
+      knownResultItemCount === matchedItemKeys.size &&
       resolved.rejectedAmbiguous === 0
   };
 
@@ -239,6 +259,13 @@ export async function reconcileDecisionOutcomesForMeeting(
     return {
       ...report,
       outcomesUpserted: 0,
+    };
+  }
+
+  if (options.persist === false) {
+    return {
+      ...report,
+      outcomesUpserted: 0
     };
   }
 

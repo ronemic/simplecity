@@ -33,12 +33,44 @@ type InsertedCardIdentity = {
   id: string;
   agenda_item: string | null;
   source_url: string | null;
+  source_item_id?: string | null;
 };
 
 type CardWithSummaryIndex = {
   card: SimpleCityCard;
   summaryIndex: number;
 };
+
+type ExistingAppendCard = InsertedCardIdentity & PreservedCardAdminState;
+
+const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
+
+function isMissingSourceItemIdColumn(error: { message?: string } | null) {
+  return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
+}
+
+function supportsSourceItemId(supabase: SupabaseClient) {
+  const existing = sourceItemIdSupport.get(supabase);
+  if (existing) return existing;
+
+  const check = Promise.resolve(
+    supabase.from("summary_cards").select("source_item_id").limit(1)
+  )
+    .then(({ error }) => {
+      if (!error) return true;
+      if (isMissingSourceItemIdColumn(error)) {
+        sourceItemIdSupport.delete(supabase);
+        return false;
+      }
+      throw new Error(`Failed to inspect summary card identity support: ${error.message}`);
+    })
+    .catch((error) => {
+      sourceItemIdSupport.delete(supabase);
+      throw error;
+    });
+  sourceItemIdSupport.set(supabase, check);
+  return check;
+}
 
 function sanitizeDatabaseString(value: string) {
   return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, " ");
@@ -92,6 +124,7 @@ function cardInsertRow(
   rawLlmJson: unknown,
   options: {
     jurisdiction?: JurisdictionConfig | null;
+    includeSourceItemId?: boolean;
     isPublished: boolean;
     isFeatured: boolean;
     adminNotes: string | null;
@@ -106,6 +139,9 @@ function cardInsertRow(
         }
       : {}),
     meeting_id: meetingId,
+    ...(options.includeSourceItemId === false
+      ? {}
+      : { source_item_id: card.sourceItemId || null }),
     agenda_item: card.agendaItem,
     what_is_happening: summaryPointsStorageText(card.whatIsHappening),
     why_it_matters: card.whyItMatters,
@@ -477,6 +513,7 @@ export async function replaceSummaryCardsForMeeting(
     jurisdiction?: JurisdictionConfig | null;
   } = {}
 ) {
+  const sourceItemIdAvailable = await supportsSourceItemId(supabase);
   const { data: existingCards, error: existingError } = await supabase
     .from("summary_cards")
     .select("agenda_item,source_url,is_published,is_featured,admin_notes")
@@ -531,6 +568,7 @@ export async function replaceSummaryCardsForMeeting(
 
     return cardInsertRow(meetingId, card, rawLlmJson, {
       jurisdiction: options.jurisdiction,
+      includeSourceItemId: sourceItemIdAvailable,
       isPublished:
         typeof preserved?.is_published === "boolean" ? preserved.is_published : true,
       isFeatured:
@@ -542,7 +580,11 @@ export async function replaceSummaryCardsForMeeting(
   const { data, error } = await supabase
     .from("summary_cards")
     .insert(rows)
-    .select("id,agenda_item,source_url");
+    .select(
+      sourceItemIdAvailable
+        ? "id,source_item_id,agenda_item,source_url"
+        : "id,agenda_item,source_url"
+    );
 
   if (error) throw new Error(`Failed to insert summary cards: ${error.message}`);
 
@@ -570,26 +612,42 @@ export async function appendSummaryCardsForMeeting(
     jurisdiction?: JurisdictionConfig | null;
   } = {}
 ) {
+  const sourceItemIdAvailable = await supportsSourceItemId(supabase);
+  const existingColumns: string = sourceItemIdAvailable
+    ? "id,source_item_id,agenda_item,source_url,is_published,is_featured,admin_notes"
+    : "id,agenda_item,source_url,is_published,is_featured,admin_notes";
   const { data: existingCards, error: existingError } = await supabase
     .from("summary_cards")
-    .select("agenda_item,source_url")
+    .select(existingColumns)
     .eq("meeting_id", meetingId);
 
   if (existingError) throw new Error(`Failed to read existing cards: ${existingError.message}`);
 
+  const existingCardRows = (existingCards || []) as unknown as ExistingAppendCard[];
   const existingExactKeys = new Set<string>();
   const existingAgendaKeys = new Set<string>();
   const existingAgendaItems: string[] = [];
+  const existingBySourceItemId = new Map(
+    existingCardRows
+      .filter((card) => Boolean(card.source_item_id))
+      .map((card) => [card.source_item_id as string, card])
+  );
 
-  for (const card of existingCards || []) {
+  for (const card of existingCardRows) {
     existingExactKeys.add(exactCardKey(card.agenda_item, card.source_url));
     existingAgendaKeys.add(normalizeCardKey(card.agenda_item));
     if (card.agenda_item) existingAgendaItems.push(card.agenda_item);
   }
 
-  const newCards = summary.cards
+  const seenSourceItemIds = new Set<string>();
+  const cardsToPersist = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
     .filter(({ card }) => {
+      if (sourceItemIdAvailable && card.sourceItemId) {
+        if (seenSourceItemIds.has(card.sourceItemId)) return false;
+        seenSourceItemIds.add(card.sourceItemId);
+        return true;
+      }
       const exactKey = exactCardKey(card.agendaItem, card.source);
       const agendaKey = normalizeCardKey(card.agendaItem);
       return (
@@ -601,40 +659,77 @@ export async function appendSummaryCardsForMeeting(
       );
     });
 
-  if (newCards.length === 0) {
+  if (cardsToPersist.length === 0) {
     await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
     await markMeetingSummarized(supabase, meetingId, options.sourceHash);
     return [];
   }
 
-  const rows = newCards.map(({ card }) =>
-    cardInsertRow(meetingId, card, rawLlmJson, {
+  const updatedCards: InsertedCardIdentity[] = [];
+  const cardsToInsert: CardWithSummaryIndex[] = [];
+  for (const entry of cardsToPersist) {
+    const existing = entry.card.sourceItemId
+      ? existingBySourceItemId.get(entry.card.sourceItemId)
+      : null;
+    if (!existing) {
+      cardsToInsert.push(entry);
+      continue;
+    }
+
+    const row = cardInsertRow(meetingId, entry.card, rawLlmJson, {
       jurisdiction: options.jurisdiction,
-      isPublished: true,
-      isFeatured: false,
-      adminNotes: null
-    })
-  );
+      includeSourceItemId: sourceItemIdAvailable,
+      isPublished: existing.is_published ?? true,
+      isFeatured: existing.is_featured ?? false,
+      adminNotes: existing.admin_notes || null
+    });
+    const { data, error } = await supabase
+      .from("summary_cards")
+      .update(row)
+      .eq("id", existing.id)
+      .select("id,source_item_id,agenda_item,source_url")
+      .single();
+    if (error) throw new Error(`Failed to update summary card by source item: ${error.message}`);
+    if (data) updatedCards.push(data as InsertedCardIdentity);
+  }
 
-  const { data, error } = await supabase
-    .from("summary_cards")
-    .insert(rows)
-    .select("id,agenda_item,source_url");
+  let insertedCards: InsertedCardIdentity[] = [];
+  if (cardsToInsert.length > 0) {
+    const rows = cardsToInsert.map(({ card }) =>
+      cardInsertRow(meetingId, card, rawLlmJson, {
+        jurisdiction: options.jurisdiction,
+        includeSourceItemId: sourceItemIdAvailable,
+        isPublished: true,
+        isFeatured: false,
+        adminNotes: null
+      })
+    );
+    const { data, error } = await supabase
+      .from("summary_cards")
+      .insert(rows)
+      .select(
+        sourceItemIdAvailable
+          ? "id,source_item_id,agenda_item,source_url"
+          : "id,agenda_item,source_url"
+      );
+    if (error) throw new Error(`Failed to append summary cards: ${error.message}`);
+    insertedCards = (data || []) as unknown as InsertedCardIdentity[];
+  }
 
-  if (error) throw new Error(`Failed to append summary cards: ${error.message}`);
+  const persistedCards = [...updatedCards, ...insertedCards];
 
   await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
   await writeSpanishCardTranslations(
     supabase,
-    ((data || []) as unknown as InsertedCardIdentity[]),
-    newCards,
+    persistedCards,
+    cardsToPersist,
     summary,
     rawLlmJson
   );
 
   await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
-  return data || [];
+  return persistedCards;
 }
 
 export async function writeAuditLog(

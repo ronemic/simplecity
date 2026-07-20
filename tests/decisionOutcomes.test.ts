@@ -309,6 +309,39 @@ test("uses a unique official item URL even when the minutes wording changes", ()
   assert.equal(match.score, 1);
 });
 
+test("uses a stable source item id before ambiguous title matching", () => {
+  const result = extractDecisionOutcome(
+    {
+      id: "card-west",
+      source_item_id: "library-west",
+      agenda_item: "Library renovation contract",
+      source_url: "https://example.com/meeting"
+    },
+    meeting("san-francisco", {
+      items: [
+        agendaItem({
+          externalId: "library-east",
+          title: "Approve library renovation contract for East Avenue",
+          action: "ADOPTED",
+          result: "Pass",
+          sourceUrl: "https://example.com/meeting"
+        }),
+        agendaItem({
+          externalId: "library-west",
+          title: "Approve library renovation contract for West Avenue",
+          action: "ADOPTED",
+          result: "Pass",
+          sourceUrl: "https://example.com/meeting"
+        })
+      ]
+    })
+  );
+
+  assert.ok(result);
+  assert.equal(result.matchMethod, "source_item_id");
+  assert.equal(result.matchScore, 1);
+});
+
 test("does not treat a meeting-level duplicate URL as an item identifier", () => {
   const sharedUrl = "https://example.com/meeting";
   const match = findGuardedAgendaItemMatch(
@@ -505,6 +538,30 @@ test("uses structured Legistar results for all supported Legistar jurisdictions"
     assert.equal(result.vote, "5–0");
     assert.equal(result.matchMethod, "source_url");
     assert.equal(result.sourceUrl, `https://example.com/${jurisdictionSlug}/minutes.pdf`);
+  }
+});
+
+test("supports grounded structured results for every configured jurisdiction", () => {
+  for (const jurisdictionSlug of [
+    "foster-city",
+    "san-mateo-city",
+    "san-mateo-county",
+    "mountain-view",
+    "santa-clara-county",
+    "los-altos",
+    "san-francisco",
+    "menlo-park",
+    "east-palo-alto",
+    "redwood-city"
+  ]) {
+    const result = extractDecisionOutcome(
+      card,
+      meeting(jurisdictionSlug, {
+        items: [agendaItem({ action: "Approved", result: "Passed 5-0" })]
+      })
+    );
+    assert.ok(result, jurisdictionSlug);
+    assert.equal(result.vote, "5–0", jurisdictionSlug);
   }
 });
 

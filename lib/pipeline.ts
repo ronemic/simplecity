@@ -444,7 +444,7 @@ export async function runSimpleCityPipeline(
                     }
                   );
               if (shouldAppendToExisting) {
-                log(`Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; appended ${inserted.length} new cards.`);
+                log(`Reconciled ${inserted.length} source-identified card(s) while retaining unmatched existing cards for ${item.meeting.title}.`);
               }
               cardsGenerated += inserted.length;
             } else {

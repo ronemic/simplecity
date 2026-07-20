@@ -137,6 +137,7 @@ export type LlmReadyMeeting = PrimeGovMeeting & {
 };
 
 export type SimpleCityCard = {
+  sourceItemId?: string | null;
   agendaItem: string;
   whatIsHappening: string[];
   whyItMatters: string;
@@ -198,6 +199,7 @@ export type SummaryCardRow = {
   jurisdiction_name: string | null;
   jurisdiction_slug: string | null;
   platform: string | null;
+  source_item_id?: string | null;
   agenda_item: string | null;
   what_is_happening: string[] | string | null;
   what_is_happening_points?: string[] | null;

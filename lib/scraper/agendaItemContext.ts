@@ -1,6 +1,7 @@
 import type { AgendaItem, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { agendaItemSimilarity } from "@/lib/utils/agendaItemIdentity";
+import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const AGENDA_NUMBER_SOURCE = "[A-Za-z]?\\d{1,2}(?:\\.\\d{1,3})?";
 const ITEM_START = new RegExp(
@@ -255,6 +256,7 @@ export function mergeAgendaItems(existing: AgendaItem[] = [], extracted: AgendaI
 
 export function formatAgendaItemContexts(items: AgendaItem[]) {
   if (!items.length) return "";
+  const safeSourceItemIds = uniqueSourceItemIds(items);
   return [
     "Current meeting agenda items (use each block only for its named item):",
     ...items.map((item) => {
@@ -268,6 +270,7 @@ export function formatAgendaItemContexts(items: AgendaItem[]) {
           .join(" ")
       ).slice(0, 2500);
       return [
+        `Source item ID: ${safeSourceItemIds.has(item.externalId) ? item.externalId : "Not available"}`,
         `Agenda item ${item.agendaNumber || "Unnumbered"}`,
         `Agenda section: ${item.itemType || "Not listed in the source document."}`,
         `Official title: ${title || "Not listed in the source document."}`,

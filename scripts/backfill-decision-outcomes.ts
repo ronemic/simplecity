@@ -169,35 +169,33 @@ async function backfillJurisdiction(
       );
       if (!meeting) continue;
 
-      if (execute) {
-        const result = await reconcileDecisionOutcomesForMeeting(
-          supabase,
-          stored.id,
-          meeting,
-          jurisdiction,
-          {
-            explainWithLlm: options.explainWithLlm,
-            translateWithLlm: options.translateWithLlm,
-            log: console.log
-          }
-        );
-        found += result.outcomesFound;
-        upserted += result.outcomesUpserted;
-        rejectedAmbiguous += result.outcomesRejectedAmbiguous;
-        resultItemsFound += result.resultItemsFound;
-        resultItemsMatched += result.resultItemsMatched;
-        resultItemsUnmatched += result.resultItemsUnmatched;
-        duplicateCardsDetected += result.duplicateCardsDetected;
-        duplicateCardsResolved += result.duplicateCardsResolved;
-      }
+      const result = await reconcileDecisionOutcomesForMeeting(
+        supabase,
+        stored.id,
+        meeting,
+        jurisdiction,
+        {
+          explainWithLlm: execute && options.explainWithLlm,
+          translateWithLlm: execute && options.translateWithLlm,
+          persist: execute,
+          log: console.log
+        }
+      );
+      found += result.outcomesFound;
+      upserted += result.outcomesUpserted;
+      rejectedAmbiguous += result.outcomesRejectedAmbiguous;
+      resultItemsFound += result.resultItemsFound;
+      resultItemsMatched += result.resultItemsMatched;
+      resultItemsUnmatched += result.resultItemsUnmatched;
+      duplicateCardsDetected += result.duplicateCardsDetected;
+      duplicateCardsResolved += result.duplicateCardsResolved;
     }
   }
 
   console.log(
-    `${jurisdiction.name}: checked ${meetings.length} past meeting(s)` +
-      (execute
-        ? `, found ${found} card outcome proposal(s), matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s), upserted ${upserted}, left ${resultItemsUnmatched} unmatched, withheld ${rejectedAmbiguous} ambiguous assignment(s), and resolved ${duplicateCardsResolved} of ${duplicateCardsDetected} duplicate card(s).`
-        : ".")
+    `${jurisdiction.name}: checked ${meetings.length} past meeting(s), found ${found} card outcome proposal(s), matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s), ${
+      execute ? `upserted ${upserted}` : "would write after review"
+    }, left ${resultItemsUnmatched} unmatched, withheld ${rejectedAmbiguous} ambiguous assignment(s), and resolved ${duplicateCardsResolved} of ${duplicateCardsDetected} duplicate card(s).`
   );
 }
 

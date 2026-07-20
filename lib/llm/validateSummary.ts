@@ -5,6 +5,7 @@ import { CARD_STATUSES } from "@/lib/cardStatus";
 import type { LlmReadyMeeting, MeetingStatus, SimpleCityCardTranslation, SimpleCitySummary } from "@/lib/types";
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
+import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const allowedCategories = new Set<string>(CATEGORIES);
 const allowedStatuses = new Set<string>(CARD_STATUSES);
@@ -39,6 +40,7 @@ const NUMERIC_SCALE: Record<string, number> = {
 const REPEATED_PUNCTUATION_PATTERN = /([^\p{L}\p{N}\s])(?:\s*\1){5,}/u;
 
 const CardSchema = z.object({
+  sourceItemId: z.string().trim().min(1).nullable().default(null),
   agendaItem: z.string().min(1),
   whatIsHappening: z.array(z.string().trim().min(1)).min(1).max(3),
   whyItMatters: z.string().min(1),
@@ -134,6 +136,7 @@ export type SummaryValidationOptions = {
   sourceText?: string;
   maxConfidence?: "high" | "medium" | "low";
   meetingStatus?: MeetingStatus;
+  allowedSourceItemIds?: string[];
   onIssue?: (issue: SummaryValidationIssue) => void;
 };
 
@@ -457,6 +460,7 @@ export function validationOptionsForMeeting(
     sourceText: buildMeetingSourceText(meeting),
     maxConfidence: maxConfidenceForMeeting(meeting),
     meetingStatus: meeting.status,
+    allowedSourceItemIds: Array.from(uniqueSourceItemIds(meeting.items || [])),
     onIssue
   };
 }
@@ -524,6 +528,7 @@ export function validateSimpleCitySummary(
       });
       const status = cleanStatus(card.status);
       const source = resolveOfficialSource(card.source, options);
+      const sourceItemId = card.sourceItemId?.trim() || null;
       const unsupportedValues = sourceText
         ? extractGroundableValues(cardGroundingText(card)).filter(
             (value) => !isGroundedValue(value, sourceText)
@@ -534,6 +539,18 @@ export function validateSimpleCitySummary(
         options.onIssue?.({
           agendaItem: card.agendaItem,
           reason: "Card did not include an official source URL."
+        });
+        return null;
+      }
+
+      if (
+        sourceItemId &&
+        !(options.allowedSourceItemIds || []).includes(sourceItemId)
+      ) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem,
+          reason: "Card returned an unknown source item ID.",
+          value: sourceItemId
         });
         return null;
       }
@@ -612,6 +629,7 @@ export function validateSimpleCitySummary(
       return {
         card: {
           ...card,
+          sourceItemId,
           agendaItem,
           whatIsHappening,
           whyItMatters,

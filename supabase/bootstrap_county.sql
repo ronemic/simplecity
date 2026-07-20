@@ -64,6 +64,7 @@ create table if not exists public.documents (
 create table if not exists public.summary_cards (
   id uuid primary key default gen_random_uuid(),
   meeting_id uuid references public.meetings(id) on delete cascade,
+  source_item_id text,
   jurisdiction_name text,
   jurisdiction_slug text,
   platform text,
@@ -109,7 +110,7 @@ create table if not exists public.decision_outcomes (
   source_hash text not null,
   source_text text not null,
   matched_item_key text not null,
-  match_method text not null check (match_method in ('source_url', 'agenda_number', 'title')),
+  match_method text not null check (match_method in ('source_item_id', 'source_url', 'agenda_number', 'title')),
   match_score double precision not null check (match_score >= 0 and match_score <= 1),
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -184,6 +185,9 @@ create index if not exists summary_cards_published_created_idx
 on public.summary_cards(is_published, created_at desc);
 create unique index if not exists summary_cards_regeneration_idx
 on public.summary_cards(meeting_id, agenda_item, source_url);
+create unique index if not exists summary_cards_source_item_idx
+on public.summary_cards(meeting_id, source_item_id)
+where source_item_id is not null;
 
 create index if not exists documents_meeting_id_idx on public.documents(meeting_id);
 create index if not exists documents_jurisdiction_slug_idx on public.documents(jurisdiction_slug);
