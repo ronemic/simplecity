@@ -1,6 +1,8 @@
 # SimpleCity
 
-SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed admin portal, PrimeGov, IQM2, Legistar, official-site, and CivicClerk scrapers, PDF extraction, and an OpenRouter/Cerebras summarization pipeline for Foster City, San Mateo, San Mateo County, Santa Clara County, Mountain View, Los Altos, San Francisco, and Menlo Park.
+SimpleCity turns public meeting agendas into plain-English civic action cards. It includes a Next.js public app, Supabase-backed data pipeline, PrimeGov, IQM2, Legistar, Agenda Online, official-site, and CivicClerk scrapers, PDF extraction, and an OpenRouter/Cerebras summarization pipeline for local jurisdictions across the San Francisco Bay Area.
+
+Visit [simplecity.app](https://simplecity.app).
 
 ## Setup
 
@@ -146,7 +148,7 @@ The production scrapers run from the `Nightly scrapers` GitHub Actions workflow.
 
 Keep the jobs separate so one jurisdiction can fail or run long without blocking another.
 
-If you stop using GitHub Actions, the older Supabase `nightly-scraper` Edge Function can still be scheduled with Supabase cron jobs that call it one jurisdiction at a time:
+If you stop using GitHub Actions, the older Supabase `nightly-scraper` Edge Function can still be scheduled with Supabase cron jobs that call it one jurisdiction at a time. Substitute your own project URL and keep the bearer credential in a protected database secret:
 
 ```sql
 select cron.schedule(
@@ -154,7 +156,7 @@ select cron.schedule(
   '0 10 * * *',
   $$
   select net.http_post(
-    url := 'https://depmismpaqqxefynaoaw.supabase.co/functions/v1/nightly-scraper?jurisdiction=san-mateo'
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/nightly-scraper?jurisdiction=san-mateo'
   );
   $$
 );
@@ -164,7 +166,7 @@ select cron.schedule(
   '30 10 * * *',
   $$
   select net.http_post(
-    url := 'https://bdlxkdejlhrxbiribqyo.supabase.co/functions/v1/nightly-scraper?jurisdiction=foster-city'
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/nightly-scraper?jurisdiction=foster-city'
   );
   $$
 );
@@ -200,3 +202,7 @@ npm run email:digests -- --dry-run
 ## Source Transparency
 
 Every generated SimpleCity card stores and displays an official source link. SimpleCity summarizes official public meeting documents; always check the original source before making formal decisions.
+
+## Contributing and security
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Report vulnerabilities privately using [SECURITY.md](SECURITY.md).

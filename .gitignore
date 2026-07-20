@@ -1,10 +1,15 @@
+.DS_Store
 .next
+.vercel
 node_modules
 dist
 coverage
-.env
-.env.local
-.env.*.local
+*.log
+
+# Never commit local or deployment credentials. Keep only the empty template.
+.env*
+!.env.example
+
 scraped-primegov
 playwright-report
 test-results
