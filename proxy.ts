@@ -5,7 +5,7 @@ function queryLocale(value: string | null): Locale | null {
   return LOCALES.includes(value as Locale) ? (value as Locale) : null;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   if (
     pathname === "/admin" ||

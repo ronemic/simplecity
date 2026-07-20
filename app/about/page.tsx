@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import {
+  ExternalLink,
   FileSearch,
   Landmark,
   Layers3,
@@ -24,6 +25,9 @@ export const metadata: Metadata = {
 };
 
 export const revalidate = 300;
+
+const FEATURE_ARTICLE_URL =
+  "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 
 function formatStat(value: number, locale: "en" | "es") {
   return new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(value);
@@ -77,7 +81,6 @@ export default async function AboutPage() {
               ? "SimpleCity ayuda a residentes a entender agendas de reuniones del gobierno local sin tener que descifrar lenguaje gubernamental ni revisar paquetes o avisos extensos."
               : "SimpleCity helps residents understand local government meeting agendas without needing to decode government language or dig through long agenda packets and notices."}
           </p>
-
           <section className="mt-10">
             <p className="label-eyebrow !text-civic">
               {locale === "es" ? "Por qué construimos SimpleCity" : "Why we built SimpleCity"}
@@ -122,6 +125,40 @@ export default async function AboutPage() {
           </div>
         </section>
       </div>
+
+      <section className="quiet-card mt-12 max-w-3xl overflow-hidden">
+        <div className="border-b border-black/10 bg-[#f8fafc] px-5 py-4">
+          <p className="label-eyebrow !text-civic">{locale === "es" ? "Destacado" : "Featured"}</p>
+          <h2 className="mt-1 text-xl font-black text-ink">
+            {locale === "es" ? "SimpleCity en las noticias" : "SimpleCity in the news"}
+          </h2>
+        </div>
+
+        <a
+          href={FEATURE_ARTICLE_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="grid gap-4 px-5 py-5 focus-visible:focus-ring sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
+        >
+          <div className="border-l-2 border-civic pl-4">
+            <p className="text-xs font-black uppercase text-black/55">Los Altos Town Crier</p>
+            <h3 className="mt-1 text-base font-black leading-snug text-ink sm:text-lg">
+              {locale === "es"
+                ? "Using AI, students create website that summarizes local government agendas"
+                : "Using AI, students create website that summarizes local government agendas"}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-black/65">
+              {locale === "es"
+                ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity."
+                : "Local coverage of the student team behind SimpleCity."}
+            </p>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-2 text-sm font-black text-civic">
+            {locale === "es" ? "Leer artículo" : "Read article"}
+            <ExternalLink aria-hidden className="h-4 w-4" />
+          </span>
+        </a>
+      </section>
 
       <section className="mt-10">
         <p className="label-eyebrow !text-civic">

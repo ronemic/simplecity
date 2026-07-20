@@ -81,6 +81,7 @@ const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PU
 const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
 const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
+const PUBLIC_STATS_QUERY_TIMEOUT_MS = 4_000;
 const PUBLIC_DECISION_OUTCOME_COLUMNS = [
   "id",
   "summary_card_id",
@@ -164,6 +165,31 @@ function chunkValues<T>(values: T[], size: number) {
   }
 
   return chunks;
+}
+
+async function withFallbackTimeout<T>(
+  operation: PromiseLike<T>,
+  timeoutMs: number,
+  fallback: T,
+  context: string
+) {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      Promise.resolve(operation),
+      new Promise<T>((resolve) => {
+        timeout = setTimeout(() => {
+          console.warn(`[SimpleCity] ${context} timed out after ${timeoutMs}ms.`);
+          resolve(fallback);
+        }, timeoutMs);
+      })
+    ]);
+  } catch (error) {
+    logQueryError(context, error);
+    return fallback;
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 function normalizePositiveInteger(value: number, fallback: number) {
@@ -1152,37 +1178,43 @@ const getCachedPublicStats = unstable_cache(
           };
         }
 
-        const [cards, meetings, legacyMeetingsWithCards] = await Promise.all([
-          supabase
-            .from("summary_cards")
-            .select("id", { count: "exact", head: true })
-            .eq("jurisdiction_slug", jurisdiction.slug)
-            .eq("is_published", true)
-            .not("meeting_id", "is", null),
-          supabase
-            .from("meetings")
-            .select("id", { count: "exact", head: true })
-            .eq("jurisdiction_slug", jurisdiction.slug)
-            .not("cards_generated_at", "is", null),
-          supabase
-            .from("meetings")
-            .select("id,summary_cards!inner(id)", { count: "exact", head: true })
-            .eq("jurisdiction_slug", jurisdiction.slug)
-            .is("cards_generated_at", null)
-            .eq("summary_cards.is_published", true)
-        ]);
+        const emptyStats = { agendaItemsAnalyzed: 0, meetingsAnalyzed: 0 };
+        return withFallbackTimeout(
+          Promise.all([
+            supabase
+              .from("summary_cards")
+              .select("id", { count: "exact", head: true })
+              .eq("jurisdiction_slug", jurisdiction.slug)
+              .eq("is_published", true)
+              .not("meeting_id", "is", null),
+            supabase
+              .from("meetings")
+              .select("id", { count: "exact", head: true })
+              .eq("jurisdiction_slug", jurisdiction.slug)
+              .not("cards_generated_at", "is", null),
+            supabase
+              .from("meetings")
+              .select("id,summary_cards!inner(id)", { count: "exact", head: true })
+              .eq("jurisdiction_slug", jurisdiction.slug)
+              .is("cards_generated_at", null)
+              .eq("summary_cards.is_published", true)
+          ]).then(([cards, meetings, legacyMeetingsWithCards]) => {
+            logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, cards.error);
+            logQueryError(`Failed to count ${jurisdiction.name} analyzed meetings`, meetings.error);
+            logQueryError(
+              `Failed to count ${jurisdiction.name} legacy meetings with published cards`,
+              legacyMeetingsWithCards.error
+            );
 
-        logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, cards.error);
-        logQueryError(`Failed to count ${jurisdiction.name} analyzed meetings`, meetings.error);
-        logQueryError(
-          `Failed to count ${jurisdiction.name} legacy meetings with published cards`,
-          legacyMeetingsWithCards.error
+            return {
+              agendaItemsAnalyzed: cards.count || 0,
+              meetingsAnalyzed: (meetings.count || 0) + (legacyMeetingsWithCards.count || 0)
+            };
+          }),
+          PUBLIC_STATS_QUERY_TIMEOUT_MS,
+          emptyStats,
+          `Public stats for ${jurisdiction.name}`
         );
-
-        return {
-          agendaItemsAnalyzed: cards.count || 0,
-          meetingsAnalyzed: (meetings.count || 0) + (legacyMeetingsWithCards.count || 0)
-        };
       })
     );
 
