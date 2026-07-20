@@ -12,6 +12,10 @@ function asUrl(value: string | null | undefined) {
   }
 }
 
+function isHostOrSubdomain(host: string, domain: string) {
+  return host === domain || host.endsWith(`.${domain}`);
+}
+
 function youtubeEmbedUrl(url: URL) {
   const host = url.hostname.replace(/^www\./, "");
 
@@ -75,7 +79,7 @@ function vimeoEmbedUrl(url: URL) {
 
 function swagitEmbedUrl(url: URL) {
   const host = url.hostname.replace(/^www\./, "");
-  if (!host.endsWith("swagit.com")) return null;
+  if (!isHostOrSubdomain(host, "swagit.com")) return null;
 
   const pathParts = url.pathname.split("/").filter(Boolean);
   const videoIndex = pathParts.findIndex((part) => part.toLowerCase() === "videos");
@@ -91,7 +95,7 @@ function swagitEmbedUrl(url: URL) {
 function granicusEmbedUrl(url: URL) {
   const host = url.hostname.replace(/^www\./, "");
   const lowerPath = url.pathname.toLowerCase();
-  if (!host.endsWith("granicus.com")) return null;
+  if (!isHostOrSubdomain(host, "granicus.com")) return null;
 
   if (lowerPath.includes("/player/clip/")) {
     return url.toString();
@@ -107,8 +111,11 @@ function granicusEmbedUrl(url: URL) {
 }
 
 function legistarEmbedUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./, "");
   const lowerUrl = url.toString().toLowerCase();
   const lowerPath = url.pathname.toLowerCase();
+
+  if (!isHostOrSubdomain(host, "legistar.com")) return null;
 
   if (
     lowerPath.includes("/video.aspx") ||
@@ -122,11 +129,12 @@ function legistarEmbedUrl(url: URL) {
 }
 
 function iqm2EmbedUrl(url: URL) {
+  const host = url.hostname.replace(/^www\./, "");
   const lowerUrl = url.toString().toLowerCase();
   const lowerPath = url.pathname.toLowerCase();
 
   if (
-    url.hostname.toLowerCase().includes("iqm2.com") &&
+    isHostOrSubdomain(host, "iqm2.com") &&
     lowerPath.includes("/citizens/splitview.aspx") &&
     lowerUrl.includes("mode=video")
   ) {

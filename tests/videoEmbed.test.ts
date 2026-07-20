@@ -105,6 +105,25 @@ test("converts Swagit and Granicus recording links to embed URLs", () => {
   );
 });
 
+test("does not trust civic-video-shaped embed paths on look-alike hosts", () => {
+  assert.equal(
+    getVideoEmbedUrl("https://fakelegistar.com/Video.aspx?Mode=Video"),
+    null
+  );
+  assert.equal(
+    getVideoEmbedUrl("https://fakeswagit.com/videos/123/embed"),
+    null
+  );
+  assert.equal(
+    getVideoEmbedUrl("https://fakegranicus.com/player/clip/123"),
+    null
+  );
+  assert.equal(
+    getVideoEmbedUrl("https://fakeiqm2.com/Citizens/SplitView.aspx?Mode=Video"),
+    null
+  );
+});
+
 test("prefers a full Legistar video over clips and legacy audio players", () => {
   const videos = getEmbeddableVideoDocuments([
     document({

@@ -18,6 +18,7 @@ test("rate-limit responses include a retry delay", async () => {
 
   assert.equal(response.status, 429);
   assert.equal(response.headers.get("Retry-After"), "43");
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
   assert.deepEqual(await response.json(), {
     error: "Too many requests. Please try again later.",
     retryAfterSeconds: 43

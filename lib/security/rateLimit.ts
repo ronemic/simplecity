@@ -147,8 +147,10 @@ export function rateLimitedResponse(
   message = "Too many requests. Please try again later."
 ) {
   const retryAfter = Math.max(1, Math.ceil(retryAfterSeconds));
-  return Response.json(
+  const response = Response.json(
     { error: message, retryAfterSeconds: retryAfter },
     { status: 429, headers: { "Retry-After": String(retryAfter) } }
   );
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }

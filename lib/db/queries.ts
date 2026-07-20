@@ -6,8 +6,8 @@ import {
   getDefaultJurisdiction,
   getJurisdictions,
   getJurisdictionSlugFromRow,
-  getPublicSupabaseClientForJurisdiction,
   getPublicSupabaseClientsForSelection,
+  getServiceSupabaseClientForJurisdiction,
   getServiceSupabaseClientsForSelection,
   type JurisdictionConfig,
   type JurisdictionSelection
@@ -30,8 +30,6 @@ import type {
 import type { Locale } from "@/lib/i18n";
 import {
   applyDecisionOutcomeTranslation,
-  readEmbeddedDecisionOutcomeTranslation,
-  type PublicDecisionOutcomeTranslation
 } from "@/lib/i18n/decisionOutcome";
 import {
   decisionCardSearchFilters,
@@ -96,7 +94,6 @@ const PUBLIC_DECISION_OUTCOME_COLUMNS = [
   "vote",
   "next_step",
   "source_url",
-  "source_hash",
   "created_at",
   "updated_at"
 ].join(",");
@@ -497,63 +494,33 @@ async function loadDecisionOutcomes(
     return new Map(outcomes.map((outcome) => [outcome.summary_card_id!, outcome]));
   }
 
-  const [translationResults, embeddedTranslationResults] = await Promise.all([
-    Promise.all(
-      chunkValues(
-        outcomes.flatMap((outcome) => (outcome.id ? [outcome.id] : [])),
-        TRANSLATION_LOOKUP_BATCH_SIZE
-      ).map((outcomeIds) =>
-        supabase
-          .from("decision_outcome_translations")
-          .select(
-            "decision_outcome_id,locale,headline,summary,vote,next_step,source_fingerprint,translation_status"
-          )
-          .eq("locale", locale)
-          .in("translation_status", ["machine", "reviewed"])
-          .in("decision_outcome_id", outcomeIds)
-      )
-    ),
-    Promise.all(
-      chunkValues(
-        outcomes.flatMap((outcome) =>
-          outcome.summary_card_id ? [outcome.summary_card_id] : []
-        ),
-        TRANSLATION_LOOKUP_BATCH_SIZE
-      ).map((cardIds) =>
-        supabase
-          .from("summary_card_translations")
-          .select("summary_card_id,raw_llm_json")
-          .eq("locale", locale)
-          .in("translation_status", ["machine", "reviewed"])
-          .in("summary_card_id", cardIds)
-      )
+  const translationResults = await Promise.all(
+    chunkValues(
+      outcomes.flatMap((outcome) => (outcome.id ? [outcome.id] : [])),
+      TRANSLATION_LOOKUP_BATCH_SIZE
+    ).map((outcomeIds) =>
+      supabase
+        .from("decision_outcome_translations")
+        .select(
+          "decision_outcome_id,locale,headline,summary,vote,next_step,source_fingerprint,translation_status"
+        )
+        .eq("locale", locale)
+        .in("translation_status", ["machine", "reviewed"])
+        .in("decision_outcome_id", outcomeIds)
     )
-  ]);
+  );
 
   for (const result of translationResults) {
     logQueryError("Failed to load decision outcome translations", result.error);
   }
-  for (const result of embeddedTranslationResults) {
-    logQueryError("Failed to load embedded decision outcome translations", result.error);
-  }
-
   const translations = new Map(
     (translationResults.flatMap((result) => result.data || []) as unknown as DecisionOutcomeTranslationRow[])
       .map((translation) => [translation.decision_outcome_id, translation])
   );
-  const embeddedTranslations = new Map<string, PublicDecisionOutcomeTranslation>();
-  for (const row of embeddedTranslationResults.flatMap((result) => result.data || [])) {
-    const translation = readEmbeddedDecisionOutcomeTranslation(row.raw_llm_json);
-    if (translation) embeddedTranslations.set(row.summary_card_id, translation);
-  }
 
   return new Map(
     outcomes.map((outcome) => {
-      const translation =
-        (outcome.id ? translations.get(outcome.id) : null) ||
-        (outcome.summary_card_id
-          ? embeddedTranslations.get(outcome.summary_card_id)
-          : null);
+      const translation = outcome.id ? translations.get(outcome.id) : null;
       return [
         outcome.summary_card_id!,
         applyDecisionOutcomeTranslation(outcome, translation)
@@ -1169,9 +1136,9 @@ const getCachedPublicStats = unstable_cache(
       jurisdictions.map(async (jurisdiction) => {
         let supabase;
         try {
-          supabase = getPublicSupabaseClientForJurisdiction(jurisdiction.slug);
+          supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
         } catch (error) {
-          logQueryError(`Failed to create ${jurisdiction.name} public Supabase client`, error);
+          logQueryError(`Failed to create ${jurisdiction.name} service Supabase client`, error);
           return {
             agendaItemsAnalyzed: 0,
             meetingsAnalyzed: 0
@@ -1331,7 +1298,7 @@ export async function getMeetingRawVideoDocuments(
   id: string,
   selection: JurisdictionSelection = getDefaultJurisdiction().slug
 ) {
-  const clients = getSafePublicClients(selection);
+  const clients = getSafeServiceClients(selection);
   if (clients.length === 0) return [] as DocumentRow[];
 
   const results = await Promise.all(

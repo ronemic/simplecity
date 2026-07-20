@@ -6,6 +6,8 @@ import {
   requireValidJurisdictionSlug,
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
+import { consumeRateLimit, rateLimitedResponse } from "@/lib/security/rateLimit";
+import { isValidScrapeRequestSignature } from "@/lib/security/scrapeRequest";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -17,11 +19,24 @@ const globalForScrapers = globalThis as typeof globalThis & {
 const activeScrapers = globalForScrapers.simpleCityActiveScrapers ?? new Set<string>();
 globalForScrapers.simpleCityActiveScrapers = activeScrapers;
 
-async function isAuthorized(request: Request) {
-  const cronSecret = process.env.SUPABASE_CRON_SECRET;
-  const authHeader = request.headers.get("authorization");
+function scrapeApiEnabled() {
+  return process.env.SCRAPE_API_ENABLED === "true";
+}
 
-  return Boolean(cronSecret && authHeader === `Bearer ${cronSecret}`);
+function isAuthorized(request: Request) {
+  return isValidScrapeRequestSignature({
+    secret: process.env.SUPABASE_CRON_SECRET,
+    timestamp: request.headers.get("x-simplecity-timestamp"),
+    signature: request.headers.get("x-simplecity-signature"),
+    requestUrl: request.url,
+    method: request.method
+  });
+}
+
+function jsonResponse(body: unknown, init?: ResponseInit) {
+  const response = Response.json(body, init);
+  response.headers.set("Cache-Control", "no-store");
+  return response;
 }
 
 async function getRequestedJurisdiction(request: Request) {
@@ -37,15 +52,30 @@ async function getRequestedJurisdiction(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await isAuthorized(request))) {
-    return Response.json({ error: "Not authorized." }, { status: 401 });
+  if (!scrapeApiEnabled()) {
+    return jsonResponse({ error: "Not found." }, { status: 404 });
+  }
+
+  if (!isAuthorized(request)) {
+    return jsonResponse({ error: "Not authorized." }, { status: 401 });
+  }
+
+  const rateLimit = await consumeRateLimit({
+    scope: "scrape-api-global",
+    identifier: "authorized",
+    limit: 12,
+    windowSeconds: 60 * 60,
+    blockSeconds: 60 * 60
+  });
+  if (!rateLimit.allowed) {
+    return rateLimitedResponse(rateLimit.retryAfterSeconds);
   }
 
   let jurisdiction;
   try {
     jurisdiction = await getRequestedJurisdiction(request);
   } catch (error) {
-    return Response.json(
+    return jsonResponse(
       { error: error instanceof Error ? error.message : "Invalid jurisdiction." },
       { status: 400 }
     );
@@ -77,7 +107,7 @@ export async function POST(request: Request) {
     revalidatePublicContent();
   }
 
-  return Response.json(result, { status: result.status === "failed" ? 500 : 200 });
+  return jsonResponse(result, { status: result.status === "failed" ? 500 : 200 });
 }
 
 function startBackgroundScraper(
@@ -92,7 +122,7 @@ function startBackgroundScraper(
   const key = jurisdiction;
 
   if (activeScrapers.has(key)) {
-    return Response.json(
+    return jsonResponse(
       { status: "already_running", jurisdiction },
       { status: 202 }
     );
@@ -120,7 +150,7 @@ function startBackgroundScraper(
     }
   })();
 
-  return Response.json(
+  return jsonResponse(
     { status: "started", jurisdiction },
     { status: 202 }
   );
