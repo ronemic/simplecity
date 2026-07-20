@@ -8,7 +8,19 @@ const duplicatePairs = [
   ["General Capital Improvement Program (CIP) project updates", "Get general CIP project updates"],
   ["Draft PWTC Work Plan framework presentation", "Review Draft PWTC Work Plan framework"],
   ["Award design services contract for EPASD CIP 1.1 & 1.2", "Award contract for EPASD design services CIP 1.1 & 1.2"],
-  ["Draft Workplan for EPASD Advisory Committee", "Ad Hoc Committee Draft Workplan discussion"]
+  ["Draft Workplan for EPASD Advisory Committee", "Ad Hoc Committee Draft Workplan discussion"],
+  [
+    "Adopt policy on remote access disruption during public meetings",
+    "Adopt policy for remote-access disruptions in meetings"
+  ],
+  [
+    "Accept City Council minutes for April 28, 2026",
+    "Approve April 28, 2026 City Council minutes"
+  ],
+  [
+    "Replace Accessory Dwelling Units ordinance for consistency with state law",
+    "Update to Accessory Dwelling Units ordinance"
+  ]
 ] as const;
 
 for (const [older, newer] of duplicatePairs) {
@@ -32,6 +44,16 @@ test("does not merge presentations from different organizations", () => {
     areLikelySameAgendaItem(
       "Receive Canopy informational presentation",
       "Receive Recology informational presentation"
+    ),
+    false
+  );
+});
+
+test("does not merge distinct subcommittee reports", () => {
+  assert.equal(
+    areLikelySameAgendaItem(
+      "Report from District 1 library outreach subcommittee",
+      "Report from Library of the Future subcommittee"
     ),
     false
   );

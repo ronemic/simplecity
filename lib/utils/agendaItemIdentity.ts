@@ -11,6 +11,7 @@ function normalizeAgendaItemText(value: string) {
     .replace(/\bsenate bill\b/g, "sb")
     .replace(/\brates?\b/g, "rate")
     .replace(/\bincreases?\b/g, "increase")
+    .replace(/\bdisruptions?\b/g, "disruption")
     .replace(/\btemporar(?:y|ily)\b/g, " ")
     .replace(/\bwork[\s-]+plan\b/g, "workplan")
     .replace(/&/g, " and ")
@@ -48,9 +49,21 @@ const NON_IDENTITY_WORDS = new Set([
   "vote",
   "with",
   "adjustments",
+  "during",
+  "in",
   "informational",
   "presentation",
   "discussion"
+]);
+
+const REWORDING_ONLY_WORDS = new Set([
+  "accept",
+  "approve",
+  "consistency",
+  "law",
+  "replace",
+  "state",
+  "update"
 ]);
 
 export function agendaItemIdentityTokens(value: string) {
@@ -97,6 +110,18 @@ export function areLikelySameAgendaItem(left: string, right: string) {
     leftTokens.length < rightTokens.length
       ? [leftTokens, rightTokens]
       : [rightTokens, leftTokens];
+  const sharedIdentityTokens = shorter.filter((token) => longer.includes(token)).length;
+  const differingTokens = [
+    ...leftTokens.filter((token) => !rightTokens.includes(token)),
+    ...rightTokens.filter((token) => !leftTokens.includes(token))
+  ];
+  if (
+    shorter.length >= 5 &&
+    sharedIdentityTokens / shorter.length >= 0.8 &&
+    differingTokens.every((token) => REWORDING_ONLY_WORDS.has(token))
+  ) {
+    return true;
+  }
   if (shorter.length === longer.length || shorter.length < 3) return false;
   return shorter.every((token) => longer.includes(token));
 }

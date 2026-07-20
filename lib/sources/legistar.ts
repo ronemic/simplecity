@@ -1104,23 +1104,22 @@ async function extractVisibleLegistarMeetings(
         const type = classifyLink(label, url);
         if (!acceptedDocumentType(type)) continue;
 
-        floatingLinks.push({
-          elementY: yPos(anchor),
-          type,
-          label: label || type,
-          url
-        });
-
         const container =
           anchor.closest("tr") ||
           anchor.closest("li") ||
           anchor.closest("[role='row']") ||
           anchor.closest("div");
 
-        if (!container) continue;
-
-        const entry = getOrCreateRow(rowMap, container);
-        if (!entry) continue;
+        const entry = container ? getOrCreateRow(rowMap, container) : null;
+        if (!entry) {
+          floatingLinks.push({
+            elementY: yPos(anchor),
+            type,
+            label: label || type,
+            url
+          });
+          continue;
+        }
 
         if (type === "Meeting Details") {
           entry.meetingDetailsUrl = url;
