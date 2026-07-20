@@ -20,6 +20,7 @@ import {
 import type {
   AnnouncementRow,
   DecisionOutcome,
+  DecisionOutcomeTranslationRow,
   DocumentRow,
   MeetingRow,
   MeetingTranslationRow,
@@ -27,6 +28,11 @@ import type {
   SummaryCardTranslationRow
 } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
+import {
+  applyDecisionOutcomeTranslation,
+  readEmbeddedDecisionOutcomeTranslation,
+  type PublicDecisionOutcomeTranslation
+} from "@/lib/i18n/decisionOutcome";
 import {
   decisionCardSearchFilters,
   decisionMeetingSearchFilters,
@@ -438,7 +444,8 @@ async function applyCardTranslations(
 
 async function loadDecisionOutcomes(
   supabase: { from: SupabaseClient["from"] },
-  rows: SummaryCardRow[]
+  rows: SummaryCardRow[],
+  locale: Locale
 ) {
   if (rows.length === 0) return new Map<string, DecisionOutcome>();
 
@@ -458,10 +465,74 @@ async function loadDecisionOutcomes(
     logQueryError("Failed to load decision outcomes", result.error);
   }
 
+  const outcomes = (results.flatMap((result) => result.data || []) as unknown as DecisionOutcome[])
+    .filter((outcome) => Boolean(outcome.summary_card_id));
+  if (locale === "en" || outcomes.length === 0) {
+    return new Map(outcomes.map((outcome) => [outcome.summary_card_id!, outcome]));
+  }
+
+  const [translationResults, embeddedTranslationResults] = await Promise.all([
+    Promise.all(
+      chunkValues(
+        outcomes.flatMap((outcome) => (outcome.id ? [outcome.id] : [])),
+        TRANSLATION_LOOKUP_BATCH_SIZE
+      ).map((outcomeIds) =>
+        supabase
+          .from("decision_outcome_translations")
+          .select(
+            "decision_outcome_id,locale,headline,summary,vote,next_step,source_fingerprint,translation_status"
+          )
+          .eq("locale", locale)
+          .in("translation_status", ["machine", "reviewed"])
+          .in("decision_outcome_id", outcomeIds)
+      )
+    ),
+    Promise.all(
+      chunkValues(
+        outcomes.flatMap((outcome) =>
+          outcome.summary_card_id ? [outcome.summary_card_id] : []
+        ),
+        TRANSLATION_LOOKUP_BATCH_SIZE
+      ).map((cardIds) =>
+        supabase
+          .from("summary_card_translations")
+          .select("summary_card_id,raw_llm_json")
+          .eq("locale", locale)
+          .in("translation_status", ["machine", "reviewed"])
+          .in("summary_card_id", cardIds)
+      )
+    )
+  ]);
+
+  for (const result of translationResults) {
+    logQueryError("Failed to load decision outcome translations", result.error);
+  }
+  for (const result of embeddedTranslationResults) {
+    logQueryError("Failed to load embedded decision outcome translations", result.error);
+  }
+
+  const translations = new Map(
+    (translationResults.flatMap((result) => result.data || []) as unknown as DecisionOutcomeTranslationRow[])
+      .map((translation) => [translation.decision_outcome_id, translation])
+  );
+  const embeddedTranslations = new Map<string, PublicDecisionOutcomeTranslation>();
+  for (const row of embeddedTranslationResults.flatMap((result) => result.data || [])) {
+    const translation = readEmbeddedDecisionOutcomeTranslation(row.raw_llm_json);
+    if (translation) embeddedTranslations.set(row.summary_card_id, translation);
+  }
+
   return new Map(
-    (results.flatMap((result) => result.data || []) as unknown as DecisionOutcome[])
-      .filter((outcome) => Boolean(outcome.summary_card_id))
-      .map((outcome) => [outcome.summary_card_id!, outcome])
+    outcomes.map((outcome) => {
+      const translation =
+        (outcome.id ? translations.get(outcome.id) : null) ||
+        (outcome.summary_card_id
+          ? embeddedTranslations.get(outcome.summary_card_id)
+          : null);
+      return [
+        outcome.summary_card_id!,
+        applyDecisionOutcomeTranslation(outcome, translation)
+      ];
+    })
   );
 }
 
@@ -472,7 +543,7 @@ async function enrichPublicCards(
 ): Promise<SummaryCardRow[]> {
   const [translatedRows, outcomes] = await Promise.all([
     applyCardTranslations(supabase, rows, locale),
-    loadDecisionOutcomes(supabase, rows)
+    loadDecisionOutcomes(supabase, rows, locale)
   ]);
 
   return translatedRows.map((row): SummaryCardRow => ({

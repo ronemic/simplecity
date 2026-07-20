@@ -248,6 +248,23 @@ export type DecisionOutcome = {
   updated_at?: string | null;
 };
 
+export type DecisionOutcomeTranslationRow = {
+  id: string;
+  decision_outcome_id: string;
+  locale: string;
+  headline: string;
+  summary: string;
+  vote: string | null;
+  next_step: string | null;
+  source_fingerprint: string | null;
+  translation_status: string | null;
+  raw_llm_json: unknown;
+  translated_at: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
 export type SummaryCardTranslationRow = {
   id: string;
   summary_card_id: string;

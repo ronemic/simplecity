@@ -1,5 +1,5 @@
 import crypto from "node:crypto";
-import type { MeetingRow, SummaryCardRow } from "@/lib/types";
+import type { DecisionOutcome, MeetingRow, SummaryCardRow } from "@/lib/types";
 import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 
 function normalize(value: unknown): unknown {
@@ -54,5 +54,16 @@ export function summaryCardTranslationFingerprint(
     how_to_act_attend: card.how_to_act_attend,
     how_to_act_email: card.how_to_act_email,
     how_to_act_submit_comment: card.how_to_act_submit_comment
+  });
+}
+
+export function decisionOutcomeTranslationFingerprint(
+  outcome: Pick<DecisionOutcome, "headline" | "summary" | "vote" | "next_step">
+) {
+  return fingerprint({
+    headline: outcome.headline,
+    summary: outcome.summary,
+    vote: outcome.vote,
+    next_step: outcome.next_step
   });
 }

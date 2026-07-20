@@ -9,11 +9,16 @@ import {
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import {
+  getDecisionOutcomesNeedingTranslation,
+  translateAndUpsertDecisionOutcomes
+} from "@/lib/db/upsertDecisionOutcomeTranslations";
+import {
   meetingTranslationFingerprint,
   summaryCardTranslationFingerprint
 } from "@/lib/db/translationFingerprint";
 import { generateTranslations } from "@/lib/llm/translate";
 import type {
+  DecisionOutcome,
   MeetingRow,
   MeetingTranslationRow,
   SummaryCardRow,
@@ -29,6 +34,7 @@ type BackfillOptions = {
   dryRun: boolean;
   meetingsOnly: boolean;
   cardsOnly: boolean;
+  outcomesOnly: boolean;
 };
 
 type MeetingCandidate = Pick<MeetingRow, "id" | "title" | "meeting_type" | "jurisdiction_slug"> & {
@@ -53,6 +59,8 @@ type CardCandidate = Pick<
   what_is_happening: string[];
   source_fingerprint: string;
 };
+
+type OutcomeCandidate = DecisionOutcome & { id: string; summary_card_id: string };
 
 function getArgValue(name: string) {
   const prefix = `--${name}=`;
@@ -86,7 +94,8 @@ function getOptions(): BackfillOptions {
     batchSize: getPositiveIntArg("batch-size", 10),
     dryRun: hasFlag("dry-run"),
     meetingsOnly: hasFlag("meetings-only"),
-    cardsOnly: hasFlag("cards-only")
+    cardsOnly: hasFlag("cards-only"),
+    outcomesOnly: hasFlag("outcomes-only")
   };
 }
 
@@ -243,6 +252,25 @@ async function getCardCandidates(
     .slice(0, limit);
 }
 
+async function getOutcomeCandidates(
+  supabase: SupabaseClient,
+  jurisdiction: JurisdictionConfig,
+  locale: "es",
+  limit: number
+): Promise<OutcomeCandidate[]> {
+  const { data, error } = await supabase
+    .from("decision_outcomes")
+    .select("id,summary_card_id,headline,summary,vote,next_step,jurisdiction_slug,updated_at")
+    .or(jurisdictionFilter(jurisdiction))
+    .order("updated_at", { ascending: false })
+    .limit(Math.max(limit * 3, limit));
+
+  if (error) throw new Error(`Failed to read decision outcomes: ${error.message}`);
+  const outcomes = (data || []) as unknown as OutcomeCandidate[];
+  const candidates = await getDecisionOutcomesNeedingTranslation(supabase, outcomes, locale);
+  return candidates.slice(0, limit);
+}
+
 async function writeMeetingTranslations(
   supabase: SupabaseClient,
   locale: string,
@@ -379,6 +407,33 @@ async function translateCards(
   return candidates.length;
 }
 
+async function translateOutcomes(
+  supabase: SupabaseClient,
+  options: BackfillOptions,
+  jurisdiction: JurisdictionConfig
+) {
+  const candidates = await getOutcomeCandidates(
+    supabase,
+    jurisdiction,
+    options.locale,
+    options.limit
+  );
+  console.log(`Decision outcome translations needed: ${candidates.length}`);
+  if (options.dryRun || candidates.length === 0) return candidates.length;
+
+  for (const group of chunk(candidates, options.batchSize)) {
+    const translated = await translateAndUpsertDecisionOutcomes(
+      supabase,
+      group,
+      options.locale,
+      { log: console.log }
+    );
+    console.log(`Wrote ${translated} decision outcome translations.`);
+  }
+
+  return candidates.length;
+}
+
 async function main() {
   const options = getOptions();
   const jurisdiction = getJurisdictionBySlug(options.jurisdiction) || getDefaultJurisdiction();
@@ -390,16 +445,24 @@ async function main() {
 
   let meetings = 0;
   let cards = 0;
+  let outcomes = 0;
+  const hasExclusiveTarget = options.meetingsOnly || options.cardsOnly || options.outcomesOnly;
 
-  if (!options.cardsOnly) {
+  if (!hasExclusiveTarget || options.meetingsOnly) {
     meetings = await translateMeetings(supabase, options, jurisdiction);
   }
 
-  if (!options.meetingsOnly) {
+  if (!hasExclusiveTarget || options.cardsOnly) {
     cards = await translateCards(supabase, options, jurisdiction);
   }
 
-  console.log(`Done. Processed candidates: ${meetings} meetings, ${cards} cards.`);
+  if (!hasExclusiveTarget || options.outcomesOnly) {
+    outcomes = await translateOutcomes(supabase, options, jurisdiction);
+  }
+
+  console.log(
+    `Done. Processed candidates: ${meetings} meetings, ${cards} cards, ${outcomes} decision outcomes.`
+  );
 }
 
 main().catch((error) => {

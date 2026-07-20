@@ -25,8 +25,9 @@ export const DECISION_OUTCOME_JURISDICTIONS = new Set([
 const OUTCOME_TERMS =
   "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?";
 const OUTCOME_TERM_PATTERN = new RegExp(`\\b(?:${OUTCOME_TERMS})\\b`, "i");
+const RESULT_PARAGRAPH_FRAGMENT = "(?:(?!\\n\\n)[\\s\\S])";
 const RESULT_MARKER_PATTERN = new RegExp(
-  `\\b(?:action|result|decision|motion)\\s*[:\\-]\\s*[^\\n]{0,700}?(?:${OUTCOME_TERMS})[^\\n]{0,350}`,
+  `\\b(?:action|result|decision|motion)\\s*[:\\-]\\s*${RESULT_PARAGRAPH_FRAGMENT}{0,700}?(?:${OUTCOME_TERMS})${RESULT_PARAGRAPH_FRAGMENT}{0,350}`,
   "i"
 );
 const ITEM_RESULT_PATTERN = new RegExp(

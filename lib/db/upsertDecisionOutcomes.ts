@@ -9,6 +9,8 @@ import {
   generateDecisionOutcomeExplanations,
   hasDecisionOutcomeExplanationProvider
 } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
+import { translateAndUpsertDecisionOutcomes } from "@/lib/db/upsertDecisionOutcomeTranslations";
+import { hasTranslationProvider } from "@/lib/llm/translate";
 
 const OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
 
@@ -121,6 +123,7 @@ export async function reconcileDecisionOutcomesForMeeting(
   jurisdiction?: JurisdictionConfig | null,
   options: {
     explainWithLlm?: boolean;
+    translateWithLlm?: boolean;
     log?: (message: string) => void;
   } = {}
 ): Promise<DecisionOutcomeReconciliation> {
@@ -242,7 +245,7 @@ export async function reconcileDecisionOutcomesForMeeting(
   const { data, error } = await supabase
     .from("decision_outcomes")
     .upsert(rows, { onConflict: "summary_card_id" })
-    .select("id");
+    .select("id,summary_card_id");
 
   if (isMissingOutcomeTable(error)) {
     return {
@@ -252,6 +255,31 @@ export async function reconcileDecisionOutcomesForMeeting(
   }
   if (error) {
     throw new Error(`Failed to upsert decision outcomes: ${error.message}`);
+  }
+
+  if (options.translateWithLlm && hasTranslationProvider()) {
+    const rowByCardId = new Map(rows.map((row) => [row.summary_card_id, row]));
+    const persistedOutcomes = (data || []).flatMap((persisted) => {
+      const row = rowByCardId.get(persisted.summary_card_id);
+      return row ? [{ ...row, id: persisted.id }] : [];
+    });
+    try {
+      const translated = await translateAndUpsertDecisionOutcomes(
+        supabase,
+        persistedOutcomes,
+        "es",
+        { log: options.log }
+      );
+      if (translated > 0) {
+        options.log?.(`Wrote ${translated} Spanish decision outcome translation(s).`);
+      }
+    } catch (translationError) {
+      options.log?.(
+        `Decision outcome translation failed; English outcome remains available: ${
+          translationError instanceof Error ? translationError.message : "Unknown translation error"
+        }`
+      );
+    }
   }
 
   return {

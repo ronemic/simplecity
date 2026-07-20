@@ -496,7 +496,7 @@ export async function runSimpleCityPipeline(
             item.id,
             item.meeting,
             jurisdiction,
-            { explainWithLlm: true, log }
+            { explainWithLlm: true, translateWithLlm: true, log }
           );
           outcomesUpserted += reconciliation.outcomesUpserted;
           outcomesRejectedAmbiguous += reconciliation.outcomesRejectedAmbiguous;

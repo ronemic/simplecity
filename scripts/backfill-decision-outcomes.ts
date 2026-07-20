@@ -1,3 +1,4 @@
+import "@/lib/env/bootstrap";
 import type { LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
 import {
   getJurisdictionBySlug,
@@ -93,16 +94,21 @@ function toLlmReadyMeeting(
   };
 }
 
-async function loadPastMeetings(jurisdiction: JurisdictionConfig) {
+async function loadPastMeetings(
+  jurisdiction: JurisdictionConfig,
+  meetingId: string | null
+) {
   const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
   const meetings: StoredMeeting[] = [];
 
   for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
+    let query = supabase
       .from("meetings")
       .select("id,jurisdiction_name,jurisdiction_slug,platform,date_text,time_text,status,source_url,raw")
       .eq("jurisdiction_slug", jurisdiction.slug)
-      .eq("status", "Past")
+      .eq("status", "Past");
+    if (meetingId) query = query.eq("id", meetingId);
+    const { data, error } = await query
       .order("meeting_datetime", { ascending: false, nullsFirst: false })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`Failed to load ${jurisdiction.name} meetings: ${error.message}`);
@@ -114,8 +120,19 @@ async function loadPastMeetings(jurisdiction: JurisdictionConfig) {
   return { supabase, meetings };
 }
 
-async function backfillJurisdiction(jurisdiction: JurisdictionConfig, execute: boolean) {
-  const { supabase, meetings } = await loadPastMeetings(jurisdiction);
+async function backfillJurisdiction(
+  jurisdiction: JurisdictionConfig,
+  execute: boolean,
+  options: {
+    meetingId: string | null;
+    explainWithLlm: boolean;
+    translateWithLlm: boolean;
+  }
+) {
+  const { supabase, meetings } = await loadPastMeetings(
+    jurisdiction,
+    options.meetingId
+  );
   let found = 0;
   let upserted = 0;
   let rejectedAmbiguous = 0;
@@ -158,7 +175,11 @@ async function backfillJurisdiction(jurisdiction: JurisdictionConfig, execute: b
           stored.id,
           meeting,
           jurisdiction,
-          { explainWithLlm: true, log: console.log }
+          {
+            explainWithLlm: options.explainWithLlm,
+            translateWithLlm: options.translateWithLlm,
+            log: console.log
+          }
         );
         found += result.outcomesFound;
         upserted += result.outcomesUpserted;
@@ -182,12 +203,17 @@ async function backfillJurisdiction(jurisdiction: JurisdictionConfig, execute: b
 
 async function main() {
   const execute = process.argv.includes("--execute");
+  const options = {
+    meetingId: argument("meeting-id"),
+    explainWithLlm: !process.argv.includes("--no-explain"),
+    translateWithLlm: process.argv.includes("--translate")
+  };
   if (!execute) {
     console.log("Dry run only. Pass --execute after applying the decision_outcomes migration.");
   }
 
   for (const jurisdiction of requestedJurisdictions()) {
-    await backfillJurisdiction(jurisdiction, execute);
+    await backfillJurisdiction(jurisdiction, execute, options);
   }
 }
 

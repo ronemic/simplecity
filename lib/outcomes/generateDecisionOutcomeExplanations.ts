@@ -39,7 +39,7 @@ const ExplanationResponseSchema = z.object({
   )
 });
 
-const SYSTEM_PROMPT = `You write concise, source-grounded civic decision explanations.
+export const DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT = `You write concise, source-grounded civic decision explanations.
 
 The supplied canonical status and headline are authoritative and must never be changed or reinterpreted. In particular, a Legistar PassedFlag only says that the recorded procedural action succeeded. A recommendation that passed is not final approval of the underlying proposal.
 
@@ -49,7 +49,17 @@ For each input, return exactly one JSON object in outcomes with:
 - summary: one or two plain-English sentences explaining what the body actually did and whether the action was final
 - nextStep: a short source-supported next step, or null
 
+Rewrite the official context instead of quoting it. Lead with the substantive decision in plain language.
+- Remove document boilerplate such as meeting titles, headers, footers, page numbers, and labels like "ACTION:".
+- Rewrite procedural phrases such as "Motion and second (Name/Name), to ..." as a direct statement of what the body voted to do. Omit mover and seconder names unless they are necessary to understand the outcome.
+- Repair obvious OCR word splits, but do not otherwise alter names or factual details.
+- When a motion to recommend something passed, say that the body voted to recommend it; do not imply that the underlying proposal received final approval.
+- Use a plain-language verb consistent with the canonical headline. For a passed motion, explicitly say that the body passed the motion or voted to take the stated action.
+
 Use only facts present in the official context. Do not invent vote counts, dates, people, money, destinations, implementation details, or legal effect. Do not call an item approved, adopted, enacted, or finally passed unless its canonical status is approved. Return JSON only.`;
+
+const OUTCOME_BOILERPLATE_PATTERN =
+  /(?:\bpage\s+\d+\s+of\s+\d+\b|\b(?:action|result|decision)\s*:)/i;
 
 function configuredProviders() {
   const providers: ExplanationProvider[] = [];
@@ -147,6 +157,7 @@ export function validateDecisionOutcomeExplanation(
     summary: candidate.summary.trim(),
     nextStep: candidate.nextStep?.trim() || input.fallbackNextStep
   };
+  if (OUTCOME_BOILERPLATE_PATTERN.test(explanation.summary)) return null;
   const groundingSource = [
     input.title,
     input.canonicalHeadline,
@@ -198,7 +209,7 @@ async function requestExplanations(
     body: JSON.stringify({
       model: provider.model,
       messages: [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT },
         { role: "user", content: promptForInputs(inputs) }
       ],
       temperature: 0,
@@ -226,24 +237,28 @@ export async function generateDecisionOutcomeExplanations(
   if (providers.length === 0) throw new Error("No LLM provider is configured for decision explanations.");
 
   let lastError: unknown;
+  const validated = new Map<string, DecisionOutcomeExplanation>();
+  let pending = inputs;
   for (const provider of providers) {
     try {
-      options.log?.(`Writing ${inputs.length} grounded decision explanation(s) with ${provider.label}.`);
-      const response = await requestExplanations(provider, inputs);
+      options.log?.(`Writing ${pending.length} grounded decision explanation(s) with ${provider.label}.`);
+      const response = await requestExplanations(provider, pending);
       const candidates = new Map(response.outcomes.map((outcome) => [outcome.id, outcome]));
-      const validated = new Map<string, DecisionOutcomeExplanation>();
-      for (const input of inputs) {
+      for (const input of pending) {
         const candidate = candidates.get(input.id);
         if (!candidate) continue;
         const explanation = validateDecisionOutcomeExplanation(input, candidate);
         if (explanation) validated.set(input.id, explanation);
       }
       options.log?.(`Accepted ${validated.size} of ${inputs.length} grounded decision explanation(s).`);
-      return validated;
+      pending = inputs.filter((input) => !validated.has(input.id));
+      if (pending.length === 0) return validated;
+      lastError = new Error(`${provider.label} did not produce valid explanations for ${pending.length} outcome(s).`);
     } catch (error) {
       lastError = error;
       options.log?.(`${provider.label} decision explanation failed; trying the next provider.`);
     }
   }
+  if (validated.size > 0) return validated;
   throw lastError instanceof Error ? lastError : new Error("Decision explanation generation failed.");
 }

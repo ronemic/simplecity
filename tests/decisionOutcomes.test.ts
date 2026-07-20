@@ -12,12 +12,22 @@ import {
   interpretOfficialAction,
   outcomeHeadline
 } from "@/lib/outcomes/extractDecisionOutcome";
-import { validateDecisionOutcomeExplanation } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
+import {
+  DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT,
+  validateDecisionOutcomeExplanation
+} from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 import {
   keepUniqueOutcomeAssignments,
   reconcileDecisionOutcomesForMeeting,
   resolveCanonicalOutcomeAssignments
 } from "@/lib/db/upsertDecisionOutcomes";
+import { getDecisionOutcomesNeedingTranslation } from "@/lib/db/upsertDecisionOutcomeTranslations";
+import { decisionOutcomeTranslationFingerprint } from "@/lib/db/translationFingerprint";
+import {
+  applyDecisionOutcomeTranslation,
+  decisionOutcomeTranslationIssues,
+  withEmbeddedDecisionOutcomeTranslation
+} from "@/lib/i18n/decisionOutcome";
 import { extractAgendaItemsFromText } from "@/lib/scraper/agendaItemContext";
 import { shouldReconcileMinutesWithoutGeneratingCards } from "@/lib/pipeline";
 
@@ -200,6 +210,45 @@ test("validates LLM explanations against canonical finality and source numbers",
   );
 });
 
+test("requires decision explanations to rewrite minutes boilerplate as plain language", () => {
+  const input = {
+    id: "card-nealon-park",
+    title: "Nealon Park Parking Pilot Project",
+    canonicalStatus: "approved" as const,
+    canonicalHeadline: "Passed unanimously",
+    fallbackSummary:
+      "The official minutes record this item as Commission Regular Meeting Minutes March 11, 2026 Page 2 of 2 ACTION: Motion and second (Herscher/Cole), to recommend the conclusion of the Nealon Park Parking Pilot Project, passed unanimously.",
+    fallbackNextStep: null,
+    sourceContext:
+      "Commission Regular Meeting Minutes March 11, 2026 Page 2 of 2 ACTION: Motion and second (Herscher/Cole), to recommend the conclusion of the Nealon Park Parking Pilot Project with the existing back-in angled parking configuration, passed unanimously."
+  };
+
+  assert.equal(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Passed unanimously",
+      summary:
+        "Commission Regular Meeting Minutes Page 2 of 2 ACTION: The motion passed unanimously.",
+      nextStep: null
+    }),
+    null
+  );
+  assert.deepEqual(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Passed unanimously",
+      summary:
+        "The commission unanimously passed a recommendation to conclude the Nealon Park Parking Pilot Project while keeping the existing back-in angled parking configuration.",
+      nextStep: null
+    }),
+    {
+      summary:
+        "The commission unanimously passed a recommendation to conclude the Nealon Park Parking Pilot Project while keeping the existing back-in angled parking configuration.",
+      nextStep: null
+    }
+  );
+  assert.match(DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT, /Remove document boilerplate/i);
+  assert.match(DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT, /Motion and second/i);
+});
+
 test("extracts explicit minute actions but ignores recommendation-only text", () => {
   assert.equal(
     extractResultText("ACTION: Councilmember Lee moved to approve the contract. Motion passed 5-0."),
@@ -223,6 +272,24 @@ test("extracts explicit minute actions but ignores recommendation-only text", ()
     "Direction provided"
   );
   assert.equal(outcomeHeadline("other", "No action."), "No action taken");
+});
+
+test("keeps a wrapped absence parenthetical in the extracted vote result", () => {
+  assert.equal(
+    extractResultText(
+      "ACTION\n: Motion and second (Taylor/ Combs), to approve the consent calendar, passed 4-0-1 (Wise \nabsent).\n\nG. Study Session"
+    ),
+    "Motion and second (Taylor/ Combs), to approve the consent calendar, passed 4-0-1 (Wise absent)."
+  );
+});
+
+test("keeps ordinary PDF line wraps inside an action paragraph", () => {
+  assert.equal(
+    extractResultText(
+      "ACTION: Commissioners voted to approve the item; passed 5-0 with Commissioners Ferrick and\nDoe absent.\n\nH. Informational Items"
+    ),
+    "Commissioners voted to approve the item; passed 5-0 with Commissioners Ferrick and Doe absent."
+  );
 });
 
 test("uses a unique official item URL even when the minutes wording changes", () => {
@@ -746,17 +813,272 @@ test("decision outcome migration enforces one verified outcome per card with pub
   assert.match(migration, /unique index[\s\S]+meeting_id, matched_item_key/);
 });
 
+test("decision outcome translations refresh when source copy changes or Spanish is incomplete", async () => {
+  const current = {
+    id: "outcome-current",
+    summary_card_id: "card-current",
+    kind: "approved" as const,
+    headline: "Passed",
+    summary: "The Board passed the ordinance.",
+    vote: "Unanimous",
+    next_step: null
+  };
+  const changed = {
+    ...current,
+    id: "outcome-changed",
+    summary_card_id: "card-changed",
+    summary: "The Board finally passed the ordinance."
+  };
+  const partial = {
+    ...current,
+    id: "outcome-partial",
+    summary_card_id: "card-partial"
+  };
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "decision_outcome_translations");
+      return {
+        select() {
+          return {
+            eq(_column: string, locale: string) {
+              assert.equal(locale, "es");
+              return {
+                async in() {
+                  return {
+                    data: [
+                      {
+                        decision_outcome_id: current.id,
+                        headline: "Aprobado",
+                        summary: "La Junta aprobó la ordenanza.",
+                        vote: "Unánime",
+                        next_step: null,
+                        source_fingerprint: decisionOutcomeTranslationFingerprint(current)
+                      },
+                      {
+                        decision_outcome_id: changed.id,
+                        headline: "Aprobado",
+                        summary: "La Junta finalmente aprobó la ordenanza.",
+                        vote: "Unánime",
+                        next_step: null,
+                        source_fingerprint: "stale"
+                      },
+                      {
+                        decision_outcome_id: partial.id,
+                        headline: "Aprobado",
+                        summary: "La Junta record this item as passed.",
+                        vote: "Unánime",
+                        next_step: null,
+                        source_fingerprint: decisionOutcomeTranslationFingerprint(partial)
+                      }
+                    ],
+                    error: null
+                  };
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const candidates = await getDecisionOutcomesNeedingTranslation(
+    supabase as never,
+    [current, changed, partial],
+    "es"
+  );
+  assert.deepEqual(candidates, [changed, partial]);
+});
+
+test("decision outcome translation quality rejects English and partial-English copy", () => {
+  const source = {
+    headline: "Passed",
+    summary:
+      "The official minutes record this item as Motion and second (Taylor/Combs), to approve the consent calendar, passed 4-0-1.",
+    vote: "4–0–1",
+    next_step: null
+  };
+
+  assert.deepEqual(
+    decisionOutcomeTranslationIssues(source, {
+      headline: "Aprobado",
+      summary:
+        "El acta oficial registra que Taylor y Combs presentaron una moción para aprobar el calendario de consentimiento, que fue aprobada por 4–0–1.",
+      vote: "4–0–1",
+      next_step: null
+    }),
+    []
+  );
+  assert.match(
+    decisionOutcomeTranslationIssues(source, {
+      headline: "Aprobado",
+      summary:
+        "El acta oficial registra este punto como Motion and second (Taylor/Combs), to approve the consent calendar, passed 4-0-1.",
+      vote: "4–0–1",
+      next_step: null
+    }).join(" "),
+    /summary contains untranslated English/
+  );
+  assert.match(
+    decisionOutcomeTranslationIssues(source, {
+      headline: "Passed",
+      summary: source.summary,
+      vote: "4–0–1",
+      next_step: null
+    }).join(" "),
+    /headline was left in English/
+  );
+});
+
+test("standardizes the no-action outcome in natural Spanish", () => {
+  const outcome = {
+    kind: "other" as const,
+    headline: "No action taken",
+    summary: "The official minutes record this item as No action.",
+    vote: null,
+    next_step: null
+  };
+  const translation = {
+    headline: "No se tomó acción",
+    summary: "El acta oficial registra este punto como No acción.",
+    vote: null,
+    next_step: null,
+    source_fingerprint: decisionOutcomeTranslationFingerprint(outcome)
+  };
+
+  assert.deepEqual(applyDecisionOutcomeTranslation(outcome, translation), {
+    ...outcome,
+    headline: "No se tomó ninguna medida",
+    summary: "El acta oficial registra que no se tomó ninguna medida sobre este punto."
+  });
+});
+
+test("decision outcome freshness falls back to embedded card translation metadata", async () => {
+  const outcome = {
+    id: "outcome-embedded",
+    summary_card_id: "card-embedded",
+    kind: "other" as const,
+    headline: "No action taken",
+    summary: "The official minutes record this item as No action.",
+    vote: null,
+    next_step: null
+  };
+  const rawLlmJson = withEmbeddedDecisionOutcomeTranslation({}, {
+    headline: "No se tomó ninguna medida",
+    summary: "Las actas oficiales registran que no se tomó ninguna medida sobre este tema.",
+    vote: null,
+    next_step: null,
+    source_fingerprint: decisionOutcomeTranslationFingerprint(outcome)
+  });
+  const supabase = {
+    from(table: string) {
+      return {
+        select() {
+          return {
+            eq() {
+              return {
+                async in() {
+                  if (table === "decision_outcome_translations") {
+                    return {
+                      data: null,
+                      error: {
+                        code: "PGRST205",
+                        message: "Could not find decision_outcome_translations"
+                      }
+                    };
+                  }
+                  assert.equal(table, "summary_card_translations");
+                  return {
+                    data: [{
+                      summary_card_id: outcome.summary_card_id,
+                      source_fingerprint: "card-fingerprint",
+                      raw_llm_json: rawLlmJson
+                    }],
+                    error: null
+                  };
+                }
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  assert.deepEqual(
+    await getDecisionOutcomesNeedingTranslation(supabase as never, [outcome], "es"),
+    []
+  );
+});
+
+test("Spanish decision outcome copy replaces English only while its fingerprint is current", () => {
+  const outcome = {
+    id: "outcome-1",
+    kind: "approved" as const,
+    headline: "Passed",
+    summary: "The Board passed the ordinance.",
+    vote: "Unanimous",
+    next_step: "The ordinance takes effect in 30 days."
+  };
+  const spanish = {
+    headline: "Aprobada",
+    summary: "La Junta aprobó la ordenanza.",
+    vote: "Unánime",
+    next_step: "La ordenanza entra en vigor en 30 días.",
+    source_fingerprint: decisionOutcomeTranslationFingerprint(outcome)
+  };
+
+  assert.deepEqual(applyDecisionOutcomeTranslation(outcome, spanish), {
+    ...outcome,
+    headline: spanish.headline,
+    summary: spanish.summary,
+    vote: spanish.vote,
+    next_step: spanish.next_step
+  });
+  assert.equal(
+    applyDecisionOutcomeTranslation(
+      { ...outcome, summary: "The Board finally passed the ordinance." },
+      spanish
+    ).summary,
+    "The Board finally passed the ordinance."
+  );
+});
+
+test("decision outcome translation migration uses fingerprinted locale rows and published-card RLS", () => {
+  const migration = fs.readFileSync(
+    new URL(
+      "../supabase/migrations/20260720000000_add_decision_outcome_translations.sql",
+      import.meta.url
+    ),
+    "utf8"
+  );
+  assert.match(migration, /decision_outcome_id uuid not null references public\.decision_outcomes/);
+  assert.match(migration, /source_fingerprint text not null/);
+  assert.match(migration, /vote text/);
+  assert.match(migration, /unique \(decision_outcome_id, locale\)/);
+  assert.match(migration, /Public can read published outcome translations/);
+  assert.match(migration, /card\.is_published = true/);
+  for (const filename of ["bootstrap_full.sql", "bootstrap_county.sql"]) {
+    const bootstrap = fs.readFileSync(new URL(`../supabase/${filename}`, import.meta.url), "utf8");
+    assert.match(bootstrap, /create table if not exists public\.decision_outcome_translations/);
+  }
+});
+
 test("official card queries and pipeline runs attach verified outcomes outside the preview route", () => {
   const queries = fs.readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
   const pipeline = fs.readFileSync(new URL("../lib/pipeline.ts", import.meta.url), "utf8");
+  const translator = fs.readFileSync(new URL("../lib/llm/translate.ts", import.meta.url), "utf8");
   const summaryCard = fs.readFileSync(
     new URL("../components/SummaryCard.tsx", import.meta.url),
     "utf8"
   );
 
   assert.match(queries, /\.from\("decision_outcomes"\)/);
+  assert.match(queries, /\.from\("decision_outcome_translations"\)/);
+  assert.match(queries, /applyDecisionOutcomeTranslation\(outcome, translation\)/);
   assert.match(queries, /outcome: outcomes\.get\(row\.id\) \|\| null/);
-  assert.match(pipeline, /reconcileDecisionOutcomesForMeeting\(/);
+  assert.match(pipeline, /translateWithLlm: true/);
+  assert.match(translator, /Translate every non-null public field in outcomes\[\]/);
   assert.match(summaryCard, /outcome = card\.outcome/);
   assert.match(summaryCard, /<DecisionOutcomePanel/);
 });

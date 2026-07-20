@@ -1,5 +1,6 @@
 import { jsonrepair } from "jsonrepair";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
+import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
 
 export type TranslationLocale = "es";
 
@@ -23,23 +24,86 @@ export type SummaryCardTranslationInput = {
   how_to_act_submit_comment: string | null;
 };
 
+export type DecisionOutcomeTranslationInput = {
+  id: string;
+  headline: string;
+  summary: string;
+  vote: string | null;
+  next_step: string | null;
+};
+
 export type MeetingTranslationOutput = MeetingTranslationInput;
 export type SummaryCardTranslationOutput = SummaryCardTranslationInput;
+export type DecisionOutcomeTranslationOutput = DecisionOutcomeTranslationInput;
 
 type TranslationPayload = {
   locale: TranslationLocale;
   meetings?: MeetingTranslationInput[];
   cards?: SummaryCardTranslationInput[];
+  outcomes?: DecisionOutcomeTranslationInput[];
 };
 
 type TranslationResult = {
   meetings?: MeetingTranslationOutput[];
   cards?: SummaryCardTranslationOutput[];
+  outcomes?: DecisionOutcomeTranslationOutput[];
 };
 
 export type GenerateTranslationsOptions = {
   log?: (message: string) => void;
 };
+
+type TranslationProvider = {
+  label: string;
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  headers?: Record<string, string>;
+};
+
+function configuredTranslationProviders() {
+  const providers: TranslationProvider[] = [];
+  const referer = getConfiguredAppUrl();
+  const openRouterKeys = [
+    process.env.OPENROUTER_API_KEY,
+    process.env.OPENROUTER_API_KEY_2,
+    process.env.OPENROUTER_API_KEY_3
+  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+  const cerebrasKeys = [
+    process.env.CEREBRAS_API_KEY,
+    process.env.CEREBRAS_API_KEY_2,
+    process.env.CEREBRAS_API_KEY_3
+  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+
+  openRouterKeys.forEach((apiKey, index) => {
+    providers.push({
+      label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
+      apiKey,
+      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
+      model:
+        process.env.OPENROUTER_TRANSLATION_MODEL ||
+        process.env.OPENROUTER_MODEL ||
+        "google/gemma-4-31b-it:free",
+      headers: {
+        "HTTP-Referer": referer,
+        "X-OpenRouter-Title": "SimpleCity Translation"
+      }
+    });
+  });
+  cerebrasKeys.forEach((apiKey, index) => {
+    providers.push({
+      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
+      apiKey,
+      baseUrl: "https://api.cerebras.ai/v1/chat/completions",
+      model: process.env.CEREBRAS_MODEL || "gpt-oss-120b"
+    });
+  });
+  return providers;
+}
+
+export function hasTranslationProvider() {
+  return configuredTranslationProviders().length > 0;
+}
 
 const TRANSLATION_SYSTEM_PROMPT = `You translate SimpleCity public-facing civic text from English into Spanish.
 
@@ -48,9 +112,13 @@ Rules:
 - Return the same JSON shape with the same ids.
 - Do not add facts, remove facts, summarize, interpret, or explain.
 - Preserve URLs, email addresses, phone numbers, addresses, proper names, agency names, dates, times, dollar amounts, percentages, ordinance numbers, resolution numbers, agenda item numbers, decimals, and source-specific identifiers exactly as written.
-- Preserve card status values exactly as written. Do not translate values like "Upcoming vote", "Routine approval", "Information only", "Under discussion", "Passed", or "Cancelled".
+- Preserve only cards[].status values exactly as written. Do not translate card status values like "Upcoming vote", "Routine approval", "Information only", "Under discussion", "Passed", or "Cancelled".
+- Translate every non-null public field in outcomes[], including status-like headlines such as "Passed", vote descriptions such as "Unanimous", summaries, and next steps. Preserve numeric vote counts exactly.
+- Every outcomes[] field must be fully Spanish. Never leave English clauses or labels such as "Motion and second", "to approve", "passed", "No action taken", "City Council", "Commission Regular Meeting", "Approved Minutes", "ACTION", "staff report", or "Informational Items" in the translation. Translate generic civic body names and document labels; preserve only people's names, street/place names, formal program names, identifiers, and numbers.
+- A Spanish introductory phrase followed by the original English text is invalid. Translate the complete outcome sentence from beginning to end.
 - Preserve null values as null and arrays as arrays.
 - Translate "Not listed in the source document." consistently as "No indicado en el documento fuente."
+- Translate the outcome headline "No action taken" as "No se tomó ninguna medida" and the exact summary "The official minutes record this item as No action." as "El acta oficial registra que no se tomó ninguna medida sobre este punto."
 - Use clear, neutral Spanish for public civic information.
 - Return ONLY valid JSON. No markdown. No commentary.`;
 
@@ -118,6 +186,17 @@ function parseCard(value: unknown): SummaryCardTranslationOutput {
   };
 }
 
+function parseOutcome(value: unknown): DecisionOutcomeTranslationOutput {
+  const row = requireObject(value, "Decision outcome translation");
+  return {
+    id: requireString(row.id, "Decision outcome translation id"),
+    headline: requireString(row.headline, "Decision outcome translation headline"),
+    summary: requireString(row.summary, "Decision outcome translation summary"),
+    vote: optionalString(row.vote, "Decision outcome translation vote"),
+    next_step: optionalString(row.next_step, "Decision outcome translation next_step")
+  };
+}
+
 function parseTranslationResult(content: string): TranslationResult {
   const parsed = requireObject(parseJsonObject(content), "Translation response");
   const result: TranslationResult = {};
@@ -132,6 +211,13 @@ function parseTranslationResult(content: string): TranslationResult {
     result.cards = parsed.cards.map(parseCard);
   }
 
+  if (parsed.outcomes !== undefined) {
+    if (!Array.isArray(parsed.outcomes)) {
+      throw new Error("Translation response outcomes was not an array.");
+    }
+    result.outcomes = parsed.outcomes.map(parseOutcome);
+  }
+
   return result;
 }
 
@@ -140,6 +226,8 @@ function validateIds(input: TranslationPayload, result: TranslationResult) {
   const actualMeetingIds = new Set((result.meetings || []).map((row) => row.id));
   const expectedCardIds = new Set((input.cards || []).map((row) => row.id));
   const actualCardIds = new Set((result.cards || []).map((row) => row.id));
+  const expectedOutcomeIds = new Set((input.outcomes || []).map((row) => row.id));
+  const actualOutcomeIds = new Set((result.outcomes || []).map((row) => row.id));
 
   for (const id of expectedMeetingIds) {
     if (!actualMeetingIds.has(id)) throw new Error(`Translation response omitted meeting ${id}.`);
@@ -148,52 +236,54 @@ function validateIds(input: TranslationPayload, result: TranslationResult) {
   for (const id of expectedCardIds) {
     if (!actualCardIds.has(id)) throw new Error(`Translation response omitted card ${id}.`);
   }
+
+  for (const id of expectedOutcomeIds) {
+    if (!actualOutcomeIds.has(id)) throw new Error(`Translation response omitted outcome ${id}.`);
+  }
+
+  const outcomeResults = new Map((result.outcomes || []).map((row) => [row.id, row]));
+  for (const source of input.outcomes || []) {
+    const translation = outcomeResults.get(source.id);
+    if (!translation) continue;
+    const issues = decisionOutcomeTranslationIssues(source, translation);
+    if (issues.length > 0) {
+      throw new Error(
+        `Translation response left outcome ${source.id} incomplete: ${issues.join(", ")}.`
+      );
+    }
+  }
 }
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function shouldRetryOpenRouterError(status: number, text: string) {
+function shouldRetryProviderError(status: number, text: string) {
   return status === 429 || status >= 500 || text.toLowerCase().includes("rate-limited");
 }
 
-export async function generateTranslations(
+async function requestTranslations(
+  provider: TranslationProvider,
   input: TranslationPayload,
-  options: GenerateTranslationsOptions = {}
+  options: GenerateTranslationsOptions
 ): Promise<{ translations: TranslationResult; raw: unknown }> {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) throw new Error("Missing OPENROUTER_API_KEY.");
-
-  const model =
-    process.env.OPENROUTER_TRANSLATION_MODEL ||
-    process.env.OPENROUTER_MODEL ||
-    "google/gemma-4-31b-it:free";
-  const referer = getConfiguredAppUrl();
-
-  options.log?.(
-    `Requesting ${input.locale} translations for ${(input.meetings || []).length} meetings and ${(input.cards || []).length} cards.`
-  );
-
   let lastErrorText = "";
-
   const maxAttempts = 8;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch(provider.baseUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${provider.apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity Translation"
+        ...(provider.headers || {})
       },
       signal: controller.signal,
       body: JSON.stringify({
-        model,
+        model: provider.model,
         messages: [
           {
             role: "system",
@@ -218,7 +308,7 @@ export async function generateTranslations(
       const content = raw.choices?.[0]?.message?.content;
 
       try {
-        if (!content) throw new Error("OpenRouter translation response did not include message content.");
+        if (!content) throw new Error(`${provider.label} returned no translation content.`);
         const translations = parseTranslationResult(content);
         validateIds(input, translations);
 
@@ -230,12 +320,12 @@ export async function generateTranslations(
         const message = error instanceof Error ? error.message : "Unknown translation parse error";
         lastErrorText = `${message}${content ? `: ${content.slice(0, 300)}` : ""}`;
         if (attempt === maxAttempts) {
-          throw new Error(`OpenRouter translation response could not be parsed: ${lastErrorText}`);
+          throw new Error(`${provider.label} translation response could not be parsed: ${lastErrorText}`);
         }
 
         const delayMs = attempt * 5_000;
         options.log?.(
-          `OpenRouter returned invalid translation JSON; retrying in ${Math.round(delayMs / 1000)}s.`
+          `${provider.label} returned invalid translation JSON; retrying in ${Math.round(delayMs / 1000)}s.`
         );
         await sleep(delayMs);
         continue;
@@ -243,18 +333,43 @@ export async function generateTranslations(
     }
 
     lastErrorText = await response.text();
-    if (attempt === maxAttempts || !shouldRetryOpenRouterError(response.status, lastErrorText)) {
+    if (attempt === maxAttempts || !shouldRetryProviderError(response.status, lastErrorText)) {
       throw new Error(
-        `OpenRouter translation request failed with ${response.status}: ${lastErrorText.slice(0, 500)}`
+        `${provider.label} translation request failed with ${response.status}: ${lastErrorText.slice(0, 500)}`
       );
     }
 
     const delayMs = attempt * 15_000;
     options.log?.(
-      `OpenRouter translation request was rate-limited or unavailable; retrying in ${Math.round(delayMs / 1000)}s.`
+      `${provider.label} translation request was rate-limited or unavailable; retrying in ${Math.round(delayMs / 1000)}s.`
     );
     await sleep(delayMs);
   }
 
-  throw new Error(`OpenRouter translation request failed: ${lastErrorText.slice(0, 500)}`);
+  throw new Error(`${provider.label} translation request failed: ${lastErrorText.slice(0, 500)}`);
+}
+
+export async function generateTranslations(
+  input: TranslationPayload,
+  options: GenerateTranslationsOptions = {}
+): Promise<{ translations: TranslationResult; raw: unknown }> {
+  const providers = configuredTranslationProviders();
+  if (providers.length === 0) throw new Error("No translation provider is configured.");
+
+  options.log?.(
+    `Requesting ${input.locale} translations for ${(input.meetings || []).length} meetings, ${(input.cards || []).length} cards, and ${(input.outcomes || []).length} decision outcomes.`
+  );
+
+  let lastError: unknown;
+  for (const provider of providers) {
+    try {
+      options.log?.(`Translating with ${provider.label}.`);
+      return await requestTranslations(provider, input, options);
+    } catch (error) {
+      lastError = error;
+      options.log?.(`${provider.label} translation failed; trying the next provider.`);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Translation generation failed.");
 }
