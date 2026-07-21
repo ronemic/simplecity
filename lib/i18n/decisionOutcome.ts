@@ -19,59 +19,6 @@ type DecisionOutcomeTranslatedCopy = Pick<
 const UNTRANSLATED_ENGLISH_PHRASE_PATTERN =
   /\b(?:the official|this item|motion and second|to approve|passed(?: unanimously)?|no action(?: taken)?|city council|public hearing|informational items?|regular meeting|approved minutes|staff report|commissioners voted|council directed staff|linked staff report context|subject to the provisions)\b/i;
 
-const ENGLISH_OUTCOME_WORDS = new Set([
-  "the",
-  "this",
-  "that",
-  "these",
-  "those",
-  "as",
-  "and",
-  "of",
-  "for",
-  "with",
-  "was",
-  "were",
-  "is",
-  "are",
-  "item",
-  "motion",
-  "second",
-  "passed",
-  "approve",
-  "approved",
-  "action",
-  "council",
-  "staff",
-  "hearing",
-  "years",
-  "proceed",
-  "directed",
-  "calendar",
-  "commission",
-  "commissioners",
-  "regular",
-  "meeting",
-  "minutes",
-  "page",
-  "city",
-  "adopt",
-  "authorize",
-  "initiation",
-  "process",
-  "preparation",
-  "next",
-  "fiscal",
-  "absent",
-  "informational",
-  "report",
-  "context",
-  "subject",
-  "provisions",
-  "environmental",
-  "quality"
-]);
-
 function normalizeComparableText(value: string) {
   return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("en-US");
 }
@@ -81,13 +28,7 @@ function isNumericVote(value: string) {
 }
 
 function hasSubstantialUntranslatedEnglish(value: string) {
-  if (UNTRANSLATED_ENGLISH_PHRASE_PATTERN.test(value)) return true;
-  const words = value.toLocaleLowerCase("en-US").match(/[a-z]+/g) || [];
-  let englishWords = 0;
-  for (const word of words) {
-    if (ENGLISH_OUTCOME_WORDS.has(word)) englishWords += 1;
-  }
-  return englishWords >= 3;
+  return UNTRANSLATED_ENGLISH_PHRASE_PATTERN.test(value);
 }
 
 export function canonicalizeDecisionOutcomeTranslation<

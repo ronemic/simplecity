@@ -987,6 +987,26 @@ test("decision outcome translation quality rejects English and partial-English c
   );
 });
 
+test("decision outcome translation quality allows official English proper names", () => {
+  const source = {
+    headline: "Approved",
+    summary: "The Board approved an agreement with the City of Redwood City.",
+    vote: null,
+    next_step: null
+  };
+
+  assert.deepEqual(
+    decisionOutcomeTranslationIssues(source, {
+      headline: "Aprobado",
+      summary:
+        "La Junta aprobó un acuerdo con la City of Redwood City y Social and Environmental Entrepreneurs.",
+      vote: null,
+      next_step: null
+    }),
+    []
+  );
+});
+
 test("standardizes the no-action outcome in natural Spanish", () => {
   const outcome = {
     kind: "other" as const,
