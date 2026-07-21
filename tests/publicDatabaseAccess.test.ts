@@ -17,6 +17,13 @@ const countyBootstrap = readFileSync(
   new URL("../supabase/bootstrap_county.sql", import.meta.url),
   "utf8"
 );
+const jurisdictionsSecurityMigration = readFileSync(
+  new URL(
+    "../supabase/migrations/20260721010000_secure_jurisdictions_table.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
 
 function grantedColumns(table: string) {
   const match = migration.match(
@@ -106,4 +113,28 @@ test("public rendering reads internal meeting raw data only through a service cl
   assert.match(functionSource, /getSafeServiceClients/);
   assert.doesNotMatch(functionSource, /getSafePublicClients/);
   assert.doesNotMatch(source, /\.select\("summary_card_id,raw_llm_json"\)/);
+});
+
+test("jurisdictions lookup data is protected by RLS and narrow public grants", () => {
+  assert.match(
+    jurisdictionsSecurityMigration,
+    /alter table public\.jurisdictions enable row level security;/i
+  );
+  assert.match(
+    jurisdictionsSecurityMigration,
+    /create policy "Jurisdictions are publicly readable"[\s\S]*for select[\s\S]*to anon, authenticated[\s\S]*using \(true\);/i
+  );
+  assert.match(
+    jurisdictionsSecurityMigration,
+    /revoke all privileges on table public\.jurisdictions[\s\S]*from anon, authenticated;/i
+  );
+
+  const grant = jurisdictionsSecurityMigration.match(
+    /grant select \(([\s\S]*?)\)\s*on table public\.jurisdictions\s*to anon, authenticated;/i
+  );
+  assert.ok(grant);
+  assert.deepEqual(
+    grant[1].split(",").map((column) => column.trim()),
+    ["slug", "name", "region_slug"]
+  );
 });

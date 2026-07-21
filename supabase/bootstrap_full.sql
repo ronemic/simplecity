@@ -1496,4 +1496,33 @@ grant select (
 on table public.decision_outcome_translations
 to anon, authenticated;
 
+-- -----------------------------------------------------------------------------
+-- Source: supabase/migrations/20260721010000_secure_jurisdictions_table.sql
+-- -----------------------------------------------------------------------------
+
+alter table public.jurisdictions enable row level security;
+
+drop policy if exists "Jurisdictions are publicly readable"
+on public.jurisdictions;
+
+create policy "Jurisdictions are publicly readable"
+on public.jurisdictions
+for select
+to anon, authenticated
+using (true);
+
+revoke all privileges on table public.jurisdictions
+from anon, authenticated;
+
+grant select (
+  slug,
+  name,
+  region_slug
+)
+on table public.jurisdictions
+to anon, authenticated;
+
+grant all privileges on table public.jurisdictions
+to service_role;
+
 commit;
