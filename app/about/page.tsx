@@ -71,7 +71,7 @@ export default async function AboutPage() {
           <p className="label-eyebrow !text-civic">
             {locale === "es" ? "Acerca de SimpleCity" : "About SimpleCity"}
           </p>
-          <h1 className="page-title mt-2">
+          <h1 className="page-title mt-2 !font-bold sm:!text-[2.5rem]">
             {locale === "es"
               ? "Acceso en lenguaje claro a decisiones locales"
               : "Plain-English access to local decisions"}
@@ -126,38 +126,37 @@ export default async function AboutPage() {
         </section>
       </div>
 
-      <section className="quiet-card mt-12 max-w-3xl overflow-hidden">
-        <div className="border-b border-black/10 bg-[#f8fafc] px-5 py-4">
-          <p className="label-eyebrow !text-civic">{locale === "es" ? "Destacado" : "Featured"}</p>
-          <h2 className="mt-1 text-xl font-black text-ink">
-            {locale === "es" ? "SimpleCity en las noticias" : "SimpleCity in the news"}
-          </h2>
-        </div>
-
-        <a
-          href={FEATURE_ARTICLE_URL}
-          target="_blank"
-          rel="noreferrer"
-          className="grid gap-4 px-5 py-5 focus-visible:focus-ring sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center"
-        >
-          <div className="border-l-2 border-civic pl-4">
-            <p className="text-xs font-black uppercase text-black/55">Los Altos Town Crier</p>
-            <h3 className="mt-1 text-base font-black leading-snug text-ink sm:text-lg">
-              {locale === "es"
-                ? "Using AI, students create website that summarizes local government agendas"
-                : "Using AI, students create website that summarizes local government agendas"}
-            </h3>
-            <p className="mt-2 text-sm leading-6 text-black/65">
-              {locale === "es"
-                ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity."
-                : "Local coverage of the student team behind SimpleCity."}
+      <section className="mt-12 max-w-4xl">
+        <div className="grid gap-5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-8">
+          <div>
+            <p className="label-eyebrow !text-civic">
+              {locale === "es" ? "En las noticias" : "In the news"}
             </p>
+            <p className="mt-2 text-sm font-semibold text-black/60">Los Altos Town Crier</p>
           </div>
-          <span className="inline-flex shrink-0 items-center gap-2 text-sm font-black text-civic">
-            {locale === "es" ? "Leer artículo" : "Read article"}
-            <ExternalLink aria-hidden className="h-4 w-4" />
-          </span>
-        </a>
+
+          <a
+            href={FEATURE_ARTICLE_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="group rounded-sm focus-visible:focus-ring"
+          >
+            <h2 className="max-w-2xl text-lg font-semibold leading-7 text-ink transition group-hover:text-civic">
+              Using AI, students create website that summarizes local government agendas
+            </h2>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+              <p className="text-sm leading-6 text-black/65">
+                {locale === "es"
+                  ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity."
+                  : "Local coverage of the student team behind SimpleCity."}
+              </p>
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-civic">
+                {locale === "es" ? "Leer artículo" : "Read article"}
+                <ExternalLink aria-hidden className="h-4 w-4" />
+              </span>
+            </div>
+          </a>
+        </div>
       </section>
 
       <section className="mt-10">
@@ -165,7 +164,7 @@ export default async function AboutPage() {
           {locale === "es" ? "Cómo funciona SimpleCity" : "How SimpleCity works"}
         </p>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-3">
+        <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {[
             {
               icon: FileSearch,
@@ -190,6 +189,17 @@ export default async function AboutPage() {
                 locale === "es"
                   ? "Cada tarjeta pública y página de reunión enlaza a la agenda, paquete o aviso original."
                   : "Every public card and meeting page links back to the original agenda, packet, or notice."
+            },
+            {
+              icon: Landmark,
+              title:
+                locale === "es"
+                  ? "Los registros oficiales son la fuente principal"
+                  : "Official records stay primary",
+              body:
+                locale === "es"
+                  ? "SimpleCity es una capa de lectura, no un reemplazo de registros oficiales, avisos legales, informes del personal ni instrucciones formales de la agencia."
+                  : "SimpleCity is a reading layer, not a replacement for official records, legal notices, staff reports, or formal agency instructions."
             }
           ].map((item) => (
             <section key={item.title} className="quiet-card p-6">
@@ -201,17 +211,6 @@ export default async function AboutPage() {
             </section>
           ))}
         </div>
-      </section>
-
-      <section className="quiet-card mt-10 p-6">
-        <h2 className="section-title">
-          {locale === "es" ? "Lo que SimpleCity no hace" : "What SimpleCity does not do"}
-        </h2>
-        <p className="mt-3 text-base leading-7 text-black/75">
-          {locale === "es"
-            ? "SimpleCity no reemplaza registros oficiales del gobierno local, avisos legales, informes del personal ni instrucciones formales de la agencia pública. Es una capa de lectura que ayuda a las personas a entender qué está pasando y dónde verificarlo."
-            : "SimpleCity does not replace official local government records, legal notices, staff reports, or formal instructions from the public agency. It is a reading layer that helps people understand what is happening and where to verify it."}
-        </p>
       </section>
     </div>
   );

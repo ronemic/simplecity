@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, Newspaper } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
@@ -213,21 +213,12 @@ export default async function Home({
                 href={FEATURE_ARTICLE_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="group mb-7 inline-flex max-w-full items-center gap-3 rounded-lg border border-white/20 bg-white/[0.08] px-3 py-2.5 text-left shadow-[0_10px_35px_rgba(0,0,0,0.15)] backdrop-blur transition hover:border-white/35 hover:bg-white/[0.13] focus-visible:focus-ring"
+                className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-sm text-sm font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
               >
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[#fffaf0] text-[#173b68]">
-                  <Newspaper aria-hidden className="h-[18px] w-[18px]" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-[10px] font-black uppercase tracking-[0.14em] text-[#9fc4f4]">
-                    {locale === "es" ? "En los medios" : "As featured in"}
-                  </span>
-                  <span className="block truncate font-serif text-base font-bold leading-5 text-[#fffaf0] sm:text-lg">
-                    Los Altos Town Crier
-                  </span>
-                </span>
-                <span className="hidden border-l border-white/15 pl-3 text-xs font-medium leading-5 text-[#d9e2ec] sm:block">
-                  {locale === "es" ? "Leer el artículo" : "Read our story"}
+                <span>
+                  {locale === "es"
+                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
+                    : "Read about SimpleCity in the Los Altos Town Crier"}
                 </span>
                 <ArrowRight
                   aria-hidden
