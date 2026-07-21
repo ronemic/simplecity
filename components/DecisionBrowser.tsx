@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { DecisionCategorySelector } from "@/components/DecisionCategorySelector";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { PaginationJumpForm } from "@/components/PaginationJumpForm";
@@ -29,7 +29,8 @@ export function DecisionBrowser({
   selectedCategory,
   jurisdiction,
   locale,
-  emptyDescription
+  emptyDescription,
+  resultsCoverage
 }: {
   cards: SummaryCardRow[];
   initialSearch: string;
@@ -41,6 +42,7 @@ export function DecisionBrowser({
   jurisdiction?: string;
   locale: Locale;
   emptyDescription: string;
+  resultsCoverage?: ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -87,19 +89,22 @@ export function DecisionBrowser({
 
   return (
     <>
-      <div className="mb-4 flex min-h-8 items-center justify-between gap-3">
-        <span
-          aria-live="polite"
-          className={`inline-flex items-center gap-2 text-sm font-bold text-civic transition-opacity ${
-            isPending ? "opacity-100" : "invisible opacity-0"
-          }`}
-        >
-          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-          {locale === "es" ? "Actualizando resultados" : "Updating results"}
-        </span>
-        <p className="count-badge">
-          {resultSummary(locale, resultStart, resultEnd, totalCount)}
-        </p>
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 flex-1">{resultsCoverage}</div>
+        <div className="relative flex shrink-0 justify-end">
+          <span
+            aria-live="polite"
+            className={`absolute bottom-full right-0 mb-1 inline-flex items-center gap-2 whitespace-nowrap text-xs font-bold text-civic transition-opacity ${
+              isPending ? "opacity-100" : "invisible opacity-0"
+            }`}
+          >
+            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+            {locale === "es" ? "Actualizando resultados" : "Updating results"}
+          </span>
+          <p className="count-badge">
+            {resultSummary(locale, resultStart, resultEnd, totalCount)}
+          </p>
+        </div>
       </div>
 
       <div aria-busy={isPending}>

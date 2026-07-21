@@ -1,13 +1,21 @@
 import type { Metadata } from "next";
+import { CalendarCheck2 } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
-import { getDecisionCardPage } from "@/lib/db/queries";
+import {
+  getDecisionCardPage,
+  getDecisionResultFreshness,
+  type DecisionResultFreshness
+} from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
+  getPublicJurisdictionOptions,
   getJurisdictionLabel,
   normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  toInternalJurisdictionSlug,
+  toPublicJurisdictionSlug,
+  type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { categoryFromSlug } from "@/lib/utils/decisionFilters";
@@ -70,6 +78,81 @@ function parsePage(value: string | undefined) {
   return Number.isFinite(page) && page > 0 ? page : 1;
 }
 
+function freshnessLabel(
+  freshness: DecisionResultFreshness,
+  slug: string,
+  locale: "en" | "es"
+) {
+  const internalSlug = toInternalJurisdictionSlug(slug);
+  if (!internalSlug || !Object.prototype.hasOwnProperty.call(freshness, internalSlug)) {
+    return locale === "es" ? "Fecha no disponible" : "Date unavailable";
+  }
+
+  const value = freshness[internalSlug as keyof DecisionResultFreshness];
+  if (!value) return locale === "es" ? "Aún no hay resultados" : "No results yet";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return locale === "es" ? "Fecha no disponible" : "Date unavailable";
+  }
+
+  const formattedDate = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(parsed);
+
+  return locale === "es"
+    ? `Resultados hasta el ${formattedDate}`
+    : `Results through ${formattedDate}`;
+}
+
+function DecisionResultsCoverage({
+  jurisdiction,
+  jurisdictionLabel,
+  freshness,
+  locale
+}: {
+  jurisdiction: JurisdictionSelection;
+  jurisdictionLabel: string;
+  freshness: DecisionResultFreshness;
+  locale: "en" | "es";
+}) {
+  const isAll = jurisdiction === ALL_JURISDICTIONS_SLUG;
+  const jurisdictions = isAll
+    ? getPublicJurisdictionOptions().filter((option) => option.slug !== ALL_JURISDICTIONS_SLUG)
+    : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
+
+  return (
+    <section className="rounded-lg border border-civic/30 border-l-4 border-l-civic bg-[#eaf3ff] px-3 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
+      <div className="flex items-center gap-2">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-civic text-white shadow-sm">
+          <CalendarCheck2 aria-hidden className="h-4 w-4" />
+        </span>
+        <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-civic">
+          {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
+        </h2>
+      </div>
+      <p className="mt-1 text-xs font-medium leading-4 text-black/70">
+        {locale === "es"
+          ? "Los resultados siguen a las actas oficiales, que pueden tardar días o semanas en publicarse después de una reunión."
+          : "Results follow official minutes, which may take days or weeks to appear after a meeting."}
+      </p>
+      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {jurisdictions.map((option) => (
+          <div key={option.slug} className="inline-flex min-w-0 items-center gap-1.5">
+            <dt className="font-black text-ink">{option.name}</dt>
+            <dd className="rounded-md bg-civic px-2 py-1 font-black text-white shadow-sm">
+              {freshnessLabel(freshness, option.slug, locale)}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
 export default async function DecisionsPage({
   searchParams
 }: {
@@ -92,13 +175,16 @@ export default async function DecisionsPage({
   const search = (params.q || "").trim();
   const selectedCategory = categoryFromSlug(params.category);
   const currentPage = parsePage(params.page);
-  const result = await getDecisionCardPage({
-    jurisdiction,
-    locale,
-    search,
-    category: selectedCategory,
-    page: currentPage
-  });
+  const [result, decisionResultFreshness] = await Promise.all([
+    getDecisionCardPage({
+      jurisdiction,
+      locale,
+      search,
+      category: selectedCategory,
+      page: currentPage
+    }),
+    getDecisionResultFreshness()
+  ]);
 
   return (
     <div className="section-shell py-10">
@@ -124,6 +210,14 @@ export default async function DecisionsPage({
         jurisdiction={params.jurisdiction}
         locale={locale}
         emptyDescription={noCardsDescription(locale, jurisdiction, jurisdictionLabel)}
+        resultsCoverage={
+          <DecisionResultsCoverage
+            jurisdiction={jurisdiction}
+            jurisdictionLabel={jurisdictionLabel}
+            freshness={decisionResultFreshness}
+            locale={locale}
+          />
+        }
       />
     </div>
   );

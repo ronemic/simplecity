@@ -10,7 +10,8 @@ import {
   getServiceSupabaseClientForJurisdiction,
   getServiceSupabaseClientsForSelection,
   type JurisdictionConfig,
-  type JurisdictionSelection
+  type JurisdictionSelection,
+  type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { PUBLIC_CACHE_REVALIDATE_SECONDS, PUBLIC_CONTENT_CACHE_TAG } from "@/lib/db/publicCache";
 import {
@@ -119,6 +120,8 @@ export type DecisionCardPageResult = {
   pageSize: number;
   pageCount: number;
 };
+
+export type DecisionResultFreshness = Partial<Record<JurisdictionSlug, string | null>>;
 
 function logQueryError(context: string, error: unknown) {
   if (!error) return;
@@ -639,6 +642,38 @@ const getCachedPublishedCardCount = unstable_cache(
     return results.reduce((sum, count) => sum + count, 0);
   },
   ["published-summary-card-count"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
+const getCachedDecisionResultFreshness = unstable_cache(
+  async (): Promise<DecisionResultFreshness> => {
+    const clients = getSafePublicClients(ALL_JURISDICTIONS_SLUG);
+    if (clients.length === 0) return {};
+
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        const { data, error } = await supabase
+          .from("decision_outcomes")
+          .select("decided_at")
+          .eq("jurisdiction_slug", jurisdiction.slug)
+          .not("decided_at", "is", null)
+          .order("decided_at", { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          logQueryError(`Failed to load ${jurisdiction.name} decision-result freshness`, error);
+          return null;
+        }
+
+        const decidedAt = (data as { decided_at?: string | null } | null)?.decided_at || null;
+        return [jurisdiction.slug, decidedAt] as const;
+      })
+    );
+
+    return Object.fromEntries(results.filter((result) => result !== null));
+  },
+  ["decision-result-freshness"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1213,6 +1248,10 @@ export async function getPublishedCardCount(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug
 ) {
   return getCachedPublishedCardCount(selection);
+}
+
+export async function getDecisionResultFreshness() {
+  return getCachedDecisionResultFreshness();
 }
 
 export async function getPublishedDecisionCards(
