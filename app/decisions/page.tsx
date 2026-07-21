@@ -125,7 +125,7 @@ function DecisionResultsCoverage({
     : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
 
   return (
-    <section className="rounded-lg border border-civic/20 bg-gradient-to-r from-[#eef5fc] to-white px-3.5 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
+    <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
       <div className="flex items-center gap-2">
         <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
         <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
