@@ -46,6 +46,27 @@ type ExistingAppendCard = InsertedCardIdentity & PreservedCardAdminState;
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
 const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
+export const SUMMARY_CARD_WRITE_BATCH_SIZE = 20;
+
+export function summaryCardWriteBatches<T>(rows: T[], batchSize = SUMMARY_CARD_WRITE_BATCH_SIZE) {
+  if (!Number.isInteger(batchSize) || batchSize <= 0) {
+    throw new Error("Summary card write batch size must be a positive integer.");
+  }
+
+  const batches: T[][] = [];
+  for (let index = 0; index < rows.length; index += batchSize) {
+    batches.push(rows.slice(index, index + batchSize));
+  }
+  return batches;
+}
+
+export function rawLlmJsonForBulkRow(rawLlmJson: unknown, rowIndex: number) {
+  // A batched summary response can be hundreds of kilobytes. Repeating the
+  // complete payload on every card makes a large agenda insert many times
+  // larger than the source response and can exceed Postgres statement limits.
+  // Keep one audit copy while the parsed card fields remain on every row.
+  return rowIndex === 0 ? rawLlmJson : null;
+}
 
 function isMissingSourceItemIdColumn(error: { message?: string } | null) {
   return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
@@ -175,6 +196,32 @@ function cardInsertRow(
   });
 }
 
+async function insertSummaryCardRowsInBatches(
+  supabase: SupabaseClient,
+  rows: Array<ReturnType<typeof cardInsertRow>>,
+  sourceItemIdAvailable: boolean,
+  errorAction: "insert" | "append"
+) {
+  const inserted: InsertedCardIdentity[] = [];
+  const selectColumns = sourceItemIdAvailable
+    ? "id,source_item_id,agenda_item,source_url"
+    : "id,agenda_item,source_url";
+
+  for (const batch of summaryCardWriteBatches(rows)) {
+    const { data, error } = await supabase
+      .from("summary_cards")
+      .insert(batch)
+      .select(selectColumns);
+
+    if (error) {
+      throw new Error(`Failed to ${errorAction} summary cards: ${error.message}`);
+    }
+    inserted.push(...((data || []) as unknown as InsertedCardIdentity[]));
+  }
+
+  return inserted;
+}
+
 function meetingDateTimeText(meeting: LlmReadyMeeting) {
   const dateText = meeting.dateText || "";
   const timeText = meeting.timeText || "";
@@ -194,11 +241,7 @@ function canonicalMeetingSourceUrl(meeting: LlmReadyMeeting) {
 }
 
 function chunks<T>(values: T[], size: number) {
-  const result: T[][] = [];
-  for (let index = 0; index < values.length; index += size) {
-    result.push(values.slice(index, index + size));
-  }
-  return result;
+  return summaryCardWriteBatches(values, size);
 }
 
 type MeetingDetailsIdentityInput = Pick<
@@ -361,13 +404,13 @@ async function writeSpanishCardTranslations(
     insertedCards.map((card) => [exactCardKey(card.agenda_item, card.source_url), card])
   );
   const now = new Date().toISOString();
-  const rows = cards
+  const translationRows = cards
     .map(({ card, summaryIndex }) => {
       const translation = translations[summaryIndex];
       const inserted = insertedByKey.get(exactCardKey(card.agendaItem, card.source));
       if (!translation || !inserted?.id) return null;
 
-      return sanitizeForDatabase({
+      return {
         summary_card_id: inserted.id,
         locale: "es",
         agenda_item: translation.agendaItem,
@@ -382,19 +425,27 @@ async function writeSpanishCardTranslations(
         how_to_act_submit_comment: translation.howToAct.submitComment,
         source_fingerprint: summaryCardTranslationFingerprint(summaryCardFingerprintInput(card)),
         translation_status: "machine",
-        raw_llm_json: rawLlmJson,
         translated_at: now
-      });
+      };
     })
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
-  if (rows.length === 0) return;
+  if (translationRows.length === 0) return;
 
-  const { error } = await supabase
-    .from("summary_card_translations")
-    .upsert(rows, { onConflict: "summary_card_id,locale" });
+  const rows = translationRows.map((row, rowIndex) =>
+    sanitizeForDatabase({
+      ...row,
+      raw_llm_json: rawLlmJsonForBulkRow(rawLlmJson, rowIndex)
+    })
+  );
 
-  if (error) throw new Error(`Failed to write summary card translations: ${error.message}`);
+  for (const batch of summaryCardWriteBatches(rows)) {
+    const { error } = await supabase
+      .from("summary_card_translations")
+      .upsert(batch, { onConflict: "summary_card_id,locale" });
+
+    if (error) throw new Error(`Failed to write summary card translations: ${error.message}`);
+  }
 }
 
 export async function markMeetingSummarized(
@@ -591,12 +642,12 @@ export async function replaceSummaryCardsForMeeting(
   if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
   const cardsToInsert = summary.cards.map((card, summaryIndex) => ({ card, summaryIndex }));
-  const rows = cardsToInsert.map(({ card }) => {
+  const rows = cardsToInsert.map(({ card }, rowIndex) => {
     const preserved =
       preservedByExactKey.get(exactCardKey(card.agendaItem, card.source)) ||
       preservedByAgendaKey.get(normalizeCardKey(card.agendaItem));
 
-    return cardInsertRow(meetingId, card, rawLlmJson, {
+    return cardInsertRow(meetingId, card, rawLlmJsonForBulkRow(rawLlmJson, rowIndex), {
       jurisdiction: options.jurisdiction,
       includeSourceItemId: sourceItemIdAvailable,
       isPublished:
@@ -607,21 +658,17 @@ export async function replaceSummaryCardsForMeeting(
     });
   });
 
-  const { data, error } = await supabase
-    .from("summary_cards")
-    .insert(rows)
-    .select(
-      sourceItemIdAvailable
-        ? "id,source_item_id,agenda_item,source_url"
-        : "id,agenda_item,source_url"
-    );
-
-  if (error) throw new Error(`Failed to insert summary cards: ${error.message}`);
+  const data = await insertSummaryCardRowsInBatches(
+    supabase,
+    rows,
+    sourceItemIdAvailable,
+    "insert"
+  );
 
   await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
   await writeSpanishCardTranslations(
     supabase,
-    ((data || []) as unknown as InsertedCardIdentity[]),
+    data,
     cardsToInsert,
     summary,
     rawLlmJson
@@ -629,7 +676,7 @@ export async function replaceSummaryCardsForMeeting(
 
   await markMeetingSummarized(supabase, meetingId, options.sourceHash);
 
-  return data || [];
+  return data;
 }
 
 export async function appendSummaryCardsForMeeting(
@@ -697,6 +744,7 @@ export async function appendSummaryCardsForMeeting(
 
   const updatedCards: InsertedCardIdentity[] = [];
   const cardsToInsert: CardWithSummaryIndex[] = [];
+  let rawPayloadAssigned = false;
   for (const entry of cardsToPersist) {
     const existing = entry.card.sourceItemId
       ? existingBySourceItemId.get(entry.card.sourceItemId)
@@ -706,13 +754,19 @@ export async function appendSummaryCardsForMeeting(
       continue;
     }
 
-    const row = cardInsertRow(meetingId, entry.card, rawLlmJson, {
-      jurisdiction: options.jurisdiction,
-      includeSourceItemId: sourceItemIdAvailable,
-      isPublished: existing.is_published ?? true,
-      isFeatured: existing.is_featured ?? false,
-      adminNotes: existing.admin_notes || null
-    });
+    const row = cardInsertRow(
+      meetingId,
+      entry.card,
+      rawPayloadAssigned ? null : rawLlmJson,
+      {
+        jurisdiction: options.jurisdiction,
+        includeSourceItemId: sourceItemIdAvailable,
+        isPublished: existing.is_published ?? true,
+        isFeatured: existing.is_featured ?? false,
+        adminNotes: existing.admin_notes || null
+      }
+    );
+    rawPayloadAssigned = true;
     const { data, error } = await supabase
       .from("summary_cards")
       .update(row)
@@ -725,25 +779,28 @@ export async function appendSummaryCardsForMeeting(
 
   let insertedCards: InsertedCardIdentity[] = [];
   if (cardsToInsert.length > 0) {
-    const rows = cardsToInsert.map(({ card }) =>
-      cardInsertRow(meetingId, card, rawLlmJson, {
-        jurisdiction: options.jurisdiction,
-        includeSourceItemId: sourceItemIdAvailable,
-        isPublished: true,
-        isFeatured: false,
-        adminNotes: null
-      })
+    const rows = cardsToInsert.map(({ card }, rowIndex) =>
+      cardInsertRow(
+        meetingId,
+        card,
+        rawPayloadAssigned
+          ? null
+          : rawLlmJsonForBulkRow(rawLlmJson, rowIndex),
+        {
+          jurisdiction: options.jurisdiction,
+          includeSourceItemId: sourceItemIdAvailable,
+          isPublished: true,
+          isFeatured: false,
+          adminNotes: null
+        }
+      )
     );
-    const { data, error } = await supabase
-      .from("summary_cards")
-      .insert(rows)
-      .select(
-        sourceItemIdAvailable
-          ? "id,source_item_id,agenda_item,source_url"
-          : "id,agenda_item,source_url"
-      );
-    if (error) throw new Error(`Failed to append summary cards: ${error.message}`);
-    insertedCards = (data || []) as unknown as InsertedCardIdentity[];
+    insertedCards = await insertSummaryCardRowsInBatches(
+      supabase,
+      rows,
+      sourceItemIdAvailable,
+      "append"
+    );
   }
 
   const persistedCards = [...updatedCards, ...insertedCards];

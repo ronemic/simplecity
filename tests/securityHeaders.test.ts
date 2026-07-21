@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import nextConfig from "@/next.config.mjs";
+import nextConfig, { buildContentSecurityPolicy } from "@/next.config.mjs";
 
 test("all application routes receive baseline browser security headers", async () => {
   assert.equal(typeof nextConfig.headers, "function");
@@ -14,4 +14,17 @@ test("all application routes receive baseline browser security headers", async (
   assert.equal(headers.get("X-Frame-Options"), "DENY");
   assert.equal(headers.get("Referrer-Policy"), "strict-origin-when-cross-origin");
   assert.match(headers.get("Strict-Transport-Security") || "", /max-age=31536000/);
+});
+
+test("development CSP supports React debugging without weakening production", () => {
+  const development = buildContentSecurityPolicy("development");
+  const production = buildContentSecurityPolicy("production");
+
+  assert.match(development, /script-src[^;]*'unsafe-eval'/);
+  assert.match(development, /connect-src[^;]*ws:/);
+  assert.doesNotMatch(development, /upgrade-insecure-requests/);
+
+  assert.doesNotMatch(production, /script-src[^;]*'unsafe-eval'/);
+  assert.doesNotMatch(production, /connect-src[^;]*ws:/);
+  assert.match(production, /upgrade-insecure-requests/);
 });
