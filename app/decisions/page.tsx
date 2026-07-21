@@ -125,12 +125,10 @@ function DecisionResultsCoverage({
     : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
 
   return (
-    <section className="rounded-lg border border-civic/30 border-l-4 border-l-civic bg-[#eaf3ff] px-3 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
+    <section className="rounded-lg border border-civic/20 bg-gradient-to-r from-[#eef5fc] to-white px-3.5 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
       <div className="flex items-center gap-2">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-civic text-white shadow-sm">
-          <CalendarCheck2 aria-hidden className="h-4 w-4" />
-        </span>
-        <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-civic">
+        <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
+        <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
           {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
         </h2>
       </div>
@@ -141,9 +139,9 @@ function DecisionResultsCoverage({
       </p>
       <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {jurisdictions.map((option) => (
-          <div key={option.slug} className="inline-flex min-w-0 items-center gap-1.5">
-            <dt className="font-black text-ink">{option.name}</dt>
-            <dd className="rounded-md bg-civic px-2 py-1 font-black text-white shadow-sm">
+          <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
+            <dt className="font-bold text-black/60">{option.name}</dt>
+            <dd className="font-black text-civic">
               {freshnessLabel(freshness, option.slug, locale)}
             </dd>
           </div>
