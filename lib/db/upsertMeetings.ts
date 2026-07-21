@@ -44,6 +44,8 @@ type CardWithSummaryIndex = {
 type ExistingAppendCard = InsertedCardIdentity & PreservedCardAdminState;
 
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
+const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
+const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
 
 function isMissingSourceItemIdColumn(error: { message?: string } | null) {
   return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
@@ -90,6 +92,17 @@ function sanitizeForDatabase<T>(value: T): T {
   }
 
   return value;
+}
+
+export function documentExtractedTextForStorage(
+  type: string,
+  extractedText?: string | null
+) {
+  if (!extractedText) return null;
+  const limit = /minutes/i.test(type)
+    ? MAX_STORED_MINUTES_CHARACTERS
+    : MAX_STORED_DOCUMENT_CHARACTERS;
+  return extractedText.slice(0, limit);
 }
 
 function normalizeCardKey(value?: string | null) {
@@ -240,6 +253,21 @@ export function uniqueExistingExternalIdsByMeetingDetailsUrl(
   }
 
   return externalIds;
+}
+
+export function compactMeetingRawForStorage(meeting: LlmReadyMeeting): LlmReadyMeeting {
+  return {
+    ...meeting,
+    // These potentially large fields already live in dedicated meeting/document
+    // columns. Keeping a second copy in raw can make historical refreshes exceed
+    // the database statement timeout.
+    llmInputText: "",
+    publicCommentsInputText: null,
+    documents: meeting.documents.map((document) => ({
+      ...document,
+      extractedText: null
+    }))
+  };
 }
 
 async function loadExistingExternalIdsByMeetingDetailsUrl(
@@ -429,6 +457,7 @@ export async function upsertMeetings(
         }
       : {};
     const regionalDatabase = Boolean(jurisdiction && usesRegionalSupabase(jurisdiction));
+    const compactRaw = compactMeetingRawForStorage(safeMeeting);
 
     const { data, error } = await supabase
       .from("meetings")
@@ -452,7 +481,7 @@ export async function upsertMeetings(
           public_comments_input_text: safeMeeting.publicCommentsInputText,
           source_hash: sourceHash,
           extraction_notes: safeMeeting.extractionNotes,
-          raw: safeMeeting,
+          raw: compactRaw,
           scraped_at: scrapedAt || new Date().toISOString()
         },
         { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
@@ -464,6 +493,7 @@ export async function upsertMeetings(
     if (!data?.id) throw new Error(`Failed to read meeting id for ${meeting.title}.`);
 
     for (const doc of safeMeeting.documents) {
+      const storedExtractedText = documentExtractedTextForStorage(doc.type, doc.extractedText);
       const { error: docError } = await supabase.from("documents").upsert(
         {
           ...jurisdictionColumns,
@@ -475,8 +505,8 @@ export async function upsertMeetings(
           storage_path: doc.storagePath || null,
           bytes: doc.bytes || null,
           download_error: doc.downloadError || null,
-          extracted_text: doc.extractedText || null,
-          extraction_character_count: doc.extractionCharacterCount || null,
+          extracted_text: storedExtractedText,
+          extraction_character_count: storedExtractedText?.length || null,
           is_scanned: doc.isScanned || false
         },
         { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }

@@ -33,13 +33,14 @@ async function main() {
   for (const jurisdiction of jurisdictions) {
     if (!jurisdiction) continue;
     const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
-    const [{ count: cardCount, error: cardError }, { data: outcomes, error: outcomeError }] =
+    const [{ count: pastCardCount, error: cardError }, { data: outcomes, error: outcomeError }] =
       await Promise.all([
         supabase
           .from("summary_cards")
-          .select("id", { count: "exact", head: true })
+          .select("id,meetings!inner(status)", { count: "exact", head: true })
           .eq("jurisdiction_slug", jurisdiction.slug)
-          .eq("is_published", true),
+          .eq("is_published", true)
+          .eq("meetings.status", "Past"),
         supabase
           .from("decision_outcomes")
           .select("id,summary,source_text")
@@ -55,7 +56,11 @@ async function main() {
     const nearVerbatim = rows.filter((outcome) => {
       const summary = normalized(outcome.summary);
       const source = normalized(outcome.source_text);
-      return summary.length > 20 && (source.includes(summary) || summary.includes(source));
+      return (
+        summary.length > 20 &&
+        source.length > 20 &&
+        (source.includes(summary) || summary.includes(source))
+      );
     }).length;
 
     let spanishTranslations = 0;
@@ -78,9 +83,11 @@ async function main() {
 
     reports.push({
       jurisdiction: jurisdiction.slug,
-      publishedCards: cardCount || 0,
+      publishedPastCards: pastCardCount || 0,
       outcomes: rows.length,
-      visibleCoveragePercent: cardCount ? Math.round((rows.length / cardCount) * 1000) / 10 : 0,
+      visibleCoveragePercent: pastCardCount
+        ? Math.round((rows.length / pastCardCount) * 1000) / 10
+        : 0,
       boilerplateSummaries: boilerplate,
       nearVerbatimSummaries: nearVerbatim,
       spanishTranslations,

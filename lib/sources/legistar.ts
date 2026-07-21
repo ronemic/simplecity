@@ -392,7 +392,12 @@ function buildLegistarDocumentFilename(meeting: PrimeGovMeeting, docType: string
 async function downloadLegistarDocuments(
   context: BrowserContext,
   meetings: PrimeGovMeeting[],
-  options: { outputDir?: string; log?: (message: string) => void; shouldStop?: () => boolean } = {}
+  options: {
+    outputDir?: string;
+    log?: (message: string) => void;
+    shouldStop?: () => boolean;
+    monthsBack?: number;
+  } = {}
 ) {
   const docsDir = options.outputDir || path.join(process.cwd(), "scraped-primegov");
   const log = options.log || (() => undefined);
@@ -402,7 +407,11 @@ async function downloadLegistarDocuments(
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const docs = meeting.documents.filter(shouldDownloadLegistarDocument);
+    const docs = meeting.documents.filter(
+      (document) =>
+        shouldDownloadLegistarDocument(document) &&
+        shouldDownloadLegistarDocumentForWindow(document, options.monthsBack)
+    );
 
     for (const doc of docs) {
       if (options.shouldStop?.()) {
@@ -478,6 +487,18 @@ async function downloadLegistarDocuments(
   }
 
   return { downloaded, failed };
+}
+
+export function shouldDownloadLegistarDocumentForWindow(
+  document: PrimeGovDocument,
+  monthsBack = 1
+) {
+  return (
+    monthsBack <= 1 ||
+    ["Agenda", "Accessible Agenda", "Minutes", "Accessible Minutes", "Notice of Cancellation"].includes(
+      document.type
+    )
+  );
 }
 
 async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarMeeting, log: (message: string) => void) {
@@ -1329,6 +1350,26 @@ export async function scrapeLegistarMeetings(
     log("Opening Legistar portal...");
     await waitForLegistarPortal(page, portalUrl);
 
+    if ((options.monthsBack ?? 1) > 1 || options.allVisible) {
+      const arrow = page.locator("#ctl00_ContentPlaceHolder1_lstYears_Arrow");
+      if (await arrow.count()) {
+        await arrow.click();
+        const thisYear = page.locator("#ctl00_ContentPlaceHolder1_lstYears_DropDown li", {
+          hasText: /^This Year$/
+        });
+        if (await thisYear.count()) {
+          await thisYear.click();
+          const search = page.locator("#ctl00_ContentPlaceHolder1_btnSearch");
+          if (await search.count()) {
+            await search.click();
+          }
+          await page.waitForLoadState("networkidle", { timeout: 30_000 }).catch(() => undefined);
+          await page.waitForTimeout(1000);
+          log("Expanded Legistar from This Month to This Year before applying the date window.");
+        }
+      }
+    }
+
     log("Scraping Legistar meeting rows...");
     let meetings = await extractVisibleLegistarMeetings(page, jurisdiction);
 
@@ -1400,10 +1441,14 @@ export async function scrapeLegistarMeetings(
 
     if (options.downloadDocuments) {
       log("Downloading Legistar documents where available...");
+      if ((options.monthsBack ?? 1) > 1) {
+        log("Deep Legistar refresh: skipping packets and item attachments.");
+      }
       await downloadLegistarDocuments(context, meetings, {
         log,
         outputDir: options.documentOutputDir,
-        shouldStop: options.shouldStop
+        shouldStop: options.shouldStop,
+        monthsBack: options.monthsBack
       });
     }
 

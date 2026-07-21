@@ -320,6 +320,39 @@ export async function scrapeHtmlAgendaText(context: BrowserContext, meeting: Pri
   }
 }
 
+async function extractPaginatedPortalMeetings(page: Page) {
+  const pageSize = page.locator('select[name="archivedMeetingsTable_length"]');
+  if (await pageSize.count()) {
+    await pageSize.selectOption("15").catch(() => undefined);
+    await page.waitForTimeout(500);
+  }
+
+  const meetings: PrimeGovMeeting[] = [];
+  for (let pageNumber = 0; pageNumber < 12; pageNumber += 1) {
+    meetings.push(...await extractVisibleMeetings(page));
+    const next = page.locator('a[aria-controls="archivedMeetingsTable"]', { hasText: /^Next$/ });
+    if ((await next.count()) !== 1) break;
+    const disabled = await next.evaluate((element) =>
+      element.parentElement?.classList.contains("disabled") ||
+      element.getAttribute("aria-disabled") === "true"
+    );
+    if (disabled) break;
+    const firstArchivedRow = await page
+      .locator("#archivedMeetingsTable tbody tr")
+      .first()
+      .innerText()
+      .catch(() => "");
+    await next.click();
+    await page.waitForFunction(
+      (previous) =>
+        (document.querySelector("#archivedMeetingsTable tbody tr")?.textContent || "").trim() !== previous.trim(),
+      firstArchivedRow,
+      { timeout: 10_000 }
+    ).catch(() => page.waitForTimeout(500));
+  }
+  return dedupeMeetings(meetings);
+}
+
 export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<ScrapePortalResult> {
   const log = options.log || (() => undefined);
   const portalUrl = options.portalUrl || DEFAULT_PORTAL_URL;
@@ -348,7 +381,7 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
     await page.waitForTimeout(1500);
 
     log("Scraping current and upcoming meetings...");
-    const visibleMeetings = await extractVisibleMeetings(page);
+    const visibleMeetings = await extractPaginatedPortalMeetings(page);
 
     const currentMeetings = visibleMeetings.filter(
       (meeting) => meeting.section === "Current And Upcoming Meetings"

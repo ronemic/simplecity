@@ -42,7 +42,7 @@ async function repairJurisdiction(jurisdiction: JurisdictionConfig, meetingId: s
 
     const cardColumns = [
       "id",
-      ...(execute ? ["source_item_id"] : []),
+      "source_item_id",
       "agenda_item",
       "source_url",
       "what_is_happening",

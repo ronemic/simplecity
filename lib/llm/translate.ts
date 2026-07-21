@@ -75,6 +75,14 @@ function configuredTranslationProviders() {
     process.env.CEREBRAS_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
 
+  cerebrasKeys.forEach((apiKey, index) => {
+    providers.push({
+      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
+      apiKey,
+      baseUrl: "https://api.cerebras.ai/v1/chat/completions",
+      model: process.env.CEREBRAS_MODEL || "gpt-oss-120b"
+    });
+  });
   openRouterKeys.forEach((apiKey, index) => {
     providers.push({
       label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
@@ -88,14 +96,6 @@ function configuredTranslationProviders() {
         "HTTP-Referer": referer,
         "X-OpenRouter-Title": "SimpleCity Translation"
       }
-    });
-  });
-  cerebrasKeys.forEach((apiKey, index) => {
-    providers.push({
-      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
-      apiKey,
-      baseUrl: "https://api.cerebras.ai/v1/chat/completions",
-      model: process.env.CEREBRAS_MODEL || "gpt-oss-120b"
     });
   });
   return providers;
@@ -268,7 +268,10 @@ async function requestTranslations(
   options: GenerateTranslationsOptions
 ): Promise<{ translations: TranslationResult; raw: unknown }> {
   let lastErrorText = "";
-  const maxAttempts = 8;
+  // Translation is best-effort and has multiple configured providers. Fail
+  // over quickly so a rate-limited key cannot hold an entire scraper run for
+  // several minutes.
+  const maxAttempts = 3;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
@@ -325,7 +328,7 @@ async function requestTranslations(
 
         const delayMs = attempt * 5_000;
         options.log?.(
-          `${provider.label} returned invalid translation JSON; retrying in ${Math.round(delayMs / 1000)}s.`
+          `${provider.label} returned invalid translation JSON (${message.slice(0, 240)}); retrying in ${Math.round(delayMs / 1000)}s.`
         );
         await sleep(delayMs);
         continue;
@@ -339,7 +342,7 @@ async function requestTranslations(
       );
     }
 
-    const delayMs = attempt * 15_000;
+    const delayMs = Math.min(attempt * 5_000, 15_000);
     options.log?.(
       `${provider.label} translation request was rate-limited or unavailable; retrying in ${Math.round(delayMs / 1000)}s.`
     );

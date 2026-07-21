@@ -63,6 +63,27 @@ test("supports common whole-number and Item-prefixed agenda formats", () => {
   assert.match(items[1].action || "", /Receive the update/);
 });
 
+test("does not split legal chapter numbers out of numbered agenda-item titles", () => {
+  const items = extractAgendaItemsFromText(
+    meeting,
+    "1. CALL TO ORDER 2. CONSENT CALENDAR 2.1 Amend Chapter 11.87 of the City Code to update permits Recommendation: Adopt the ordinance. 2.2 Amend Chapter 17.78 governing accessory dwelling units Recommendation: Adopt the ordinance. 3. ADJOURNMENT"
+  );
+
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["2.1", "2.2"]);
+  assert.match(items[0].title, /Chapter 11\.87/);
+  assert.match(items[1].title, /Chapter 17\.78/);
+});
+
+test("keeps numbered items whose official title starts with a lettered action", () => {
+  const items = extractAgendaItemsFromText(
+    meeting,
+    "1. CALL TO ORDER 2. CONSENT CALENDAR 2.1 First contract Recommendation: Approve. 2.2. a) A Resolution approving the second contract b) Adopt Resolution 3. ADJOURNMENT"
+  );
+
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["2.1", "2.2"]);
+  assert.match(items[1].title, /^a\) A Resolution approving/);
+});
+
 test("extracts unnumbered agenda items without treating legal references as item numbers", () => {
   const items = extractAgendaItemsFromText(
     meeting,

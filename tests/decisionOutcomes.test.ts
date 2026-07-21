@@ -17,6 +17,7 @@ import {
   validateDecisionOutcomeExplanation
 } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 import {
+  fallbackDecisionOutcomeSummary,
   keepUniqueOutcomeAssignments,
   reconcileDecisionOutcomesForMeeting,
   resolveCanonicalOutcomeAssignments
@@ -453,6 +454,21 @@ test("enforces one official item assignment per decision card set", () => {
   assert.deepEqual(unique, [{ matchedItemKey: "unique-item", cardId: "card-3" }]);
 });
 
+test("uses the card title for concise grounded copy when LLM explanation is unavailable", () => {
+  assert.equal(
+    fallbackDecisionOutcomeSummary(
+      "Approve the animal-control agreement",
+      "Passed unanimously",
+      "5–0"
+    ),
+    "The item “Approve the animal-control agreement” passed unanimously (5–0)."
+  );
+  assert.equal(
+    fallbackDecisionOutcomeSummary("Continue the housing appeal", "No action taken"),
+    "No action was taken on “Continue the housing appeal”."
+  );
+});
+
 test("reconciliation withholds both cards when they resolve to the same official item", async () => {
   let outcomeTableTouched = false;
   const supabase = {
@@ -601,6 +617,65 @@ test("extracts a Menlo Park agenda-item result from official minutes text", () =
   assert.equal(result.matchMethod, "agenda_number");
   assert.equal(result.sourceUrl, "https://example.com/menlo-park/minutes.pdf");
   assert.match(result.summary, /official minutes/i);
+});
+
+test("does not use prior-meeting minutes attached to a current agenda item", () => {
+  const result = extractDecisionOutcome(
+    {
+      id: "card-current-item",
+      source_item_id: null,
+      agenda_item: "Approve a new library construction contract",
+      source_url: "https://example.com/current-meeting"
+    },
+    meeting("los-altos", {
+      dateText: "July 14, 2026",
+      items: [
+        agendaItem({
+          title: "Approve a new library construction contract",
+          action: null,
+          result: null,
+          sourceUrl: "https://example.com/current-meeting"
+        })
+      ],
+      documents: [
+        {
+          type: "Minutes",
+          label: "June 3, 2026 meeting minutes",
+          url: "https://example.com/prior-minutes.pdf",
+          isAgendaItemAttachment: true,
+          extractedText:
+            "1. Approve a new library construction contract. ACTION: The Council approved the contract 5-0."
+        }
+      ]
+    })
+  );
+
+  assert.equal(result, null);
+});
+
+test("does not attribute dated minutes to a different meeting", () => {
+  const result = extractDecisionOutcome(
+    {
+      id: "card-current-item",
+      source_item_id: null,
+      agenda_item: "Approve a new library construction contract",
+      source_url: "https://example.com/current-meeting"
+    },
+    meeting("santa-clara-county", {
+      dateText: "July 14, 2026",
+      documents: [
+        {
+          type: "Minutes",
+          label: "Minutes of March 10, 2026",
+          url: "https://example.com/prior-minutes.pdf",
+          extractedText:
+            "1. Approve a new library construction contract. ACTION: The Board approved the contract 5-0."
+        }
+      ]
+    })
+  );
+
+  assert.equal(result, null);
 });
 
 test("audits the complete Menlo Park May 12 meeting into ten result-bearing agenda items", () => {
@@ -787,6 +862,49 @@ test("does not publish a structured result when two same-meeting items are equal
   );
 
   assert.equal(result, null);
+});
+
+test("falls back to a guarded minutes window when another item populated the structured inventory", () => {
+  const result = extractDecisionOutcome(
+    {
+      id: "parks-card",
+      source_item_id: null,
+      agenda_item: "Authorize playground equipment replacement at Central Park",
+      source_url: "https://example.com/meeting"
+    },
+    meeting("foster-city", {
+      items: [
+        agendaItem({
+          externalId: "unrelated-result",
+          title: "Adopt the annual records retention schedule",
+          action: "Approved",
+          result: "Passed 5-0",
+          sourceUrl: "https://example.com/meeting"
+        }),
+        agendaItem({
+          externalId: "parks",
+          title: "Authorize playground equipment replacement at Central Park",
+          action: null,
+          result: null,
+          sourceUrl: "https://example.com/meeting"
+        })
+      ],
+      documents: [
+        {
+          type: "Minutes",
+          label: "Minutes",
+          url: "https://example.com/minutes.pdf",
+          extractedText:
+            "Motion by Councilmember Lee to authorize playground equipment replacement at Central Park, seconded by Councilmember Patel, carried unanimously 5-0."
+        }
+      ]
+    })
+  );
+
+  assert.ok(result);
+  assert.equal(result.headline, "Passed unanimously");
+  assert.equal(result.vote, "5–0");
+  assert.equal(result.sourceUrl, "https://example.com/minutes.pdf");
 });
 
 test("does not mistake a shared meeting URL for an item-specific result URL", () => {

@@ -29,6 +29,23 @@ export type DecisionOutcomeReconciliation = {
   complete: boolean;
 };
 
+export function fallbackDecisionOutcomeSummary(
+  cardTitle: string,
+  headline: string,
+  vote?: string | null
+) {
+  const title = cardTitle.trim().replace(/[.!?]+$/, "");
+  const status = headline.trim().replace(/[.!?]+$/, "").toLowerCase();
+  const voteText = vote ? ` (${vote})` : "";
+  if (/^no action taken$/.test(status)) {
+    return `No action was taken on “${title}”.`;
+  }
+  if (/^(?:passed|committee motion passed)/.test(status)) {
+    return `The item “${title}” ${status}${voteText}.`;
+  }
+  return `The item “${title}” was ${status}${voteText}.`;
+}
+
 export function keepUniqueOutcomeAssignments<T extends { matchedItemKey: string }>(
   proposals: T[]
 ) {
@@ -226,13 +243,17 @@ export async function reconcileDecisionOutcomesForMeeting(
   }
   const rows = resolved.selected.map((proposal) => {
     const explanation = explanations.get(proposal.cardId);
-    return explanation
-      ? {
-          ...proposal.row,
-          summary: explanation.summary,
-          next_step: explanation.nextStep
-        }
-      : proposal.row;
+    return {
+      ...proposal.row,
+      summary:
+        explanation?.summary ||
+        fallbackDecisionOutcomeSummary(
+          proposal.cardTitle,
+          proposal.outcome.headline,
+          proposal.outcome.vote
+        ),
+      next_step: explanation?.nextStep ?? proposal.row.next_step
+    };
   });
   const matchedItemKeys = new Set(
     resolved.selected.map((proposal) => proposal.matchedItemKey)

@@ -288,7 +288,11 @@ export async function downloadIqm2Documents(
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const iqm2Docs = meeting.documents.filter(isIqm2DownloadCandidate);
+    const iqm2Docs = meeting.documents.filter(
+      (doc) =>
+        isIqm2DownloadCandidate(doc) &&
+        (options.documentFilter?.(doc) ?? true)
+    );
 
     for (const doc of iqm2Docs) {
       if (options.shouldStop?.()) {

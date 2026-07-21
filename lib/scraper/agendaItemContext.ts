@@ -5,7 +5,7 @@ import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const AGENDA_NUMBER_SOURCE = "[A-Za-z]?\\d{1,2}(?:\\.\\d{1,3})?";
 const ITEM_START = new RegExp(
-  `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)([A-Z][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)[A-Z])|$)`,
+  `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)((?:[a-z]\\)\\s*)?[A-Z][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)(?:[a-z]\\)\\s*)?[A-Z])|$)`,
   "g"
 );
 const RECOMMENDATION = /\b(?:recommendation|recommended action|action requested)\s*:?\s*([\s\S]*)/i;
@@ -196,16 +196,44 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
   let lastWholeNumber = 0;
   ITEM_START.lastIndex = 0;
 
-  for (const match of agendaText.matchAll(ITEM_START)) {
+  const matches = Array.from(agendaText.matchAll(ITEM_START));
+  const acceptedMatches: Array<{ match: RegExpMatchArray; rawBlock: string }> = [];
+  for (const match of matches) {
     const agendaNumber = match[1].toUpperCase();
-    if (!/^[A-Z]/.test(match[2].trimStart())) continue;
+    if (!/^(?:[a-z]\)\s*)?[A-Z]/.test(match[2].trimStart())) continue;
+    const numericParts = agendaNumber.match(/^(\d{1,2})(?:\.(\d{1,3}))?$/);
+    if (numericParts?.[2]) {
+      const sectionNumber = Number(numericParts[1]);
+      // A decimal agenda item belongs to the current or immediately following
+      // section. This prevents legal citations such as Chapter 11.87 or 17.78
+      // inside an item title from being mistaken for new agenda items.
+      if (lastWholeNumber > 0 && (
+        sectionNumber < lastWholeNumber || sectionNumber > lastWholeNumber + 1
+      )) {
+        const previous = acceptedMatches.at(-1);
+        if (previous) previous.rawBlock += ` ${agendaNumber} ${match[2]}`;
+        continue;
+      }
+      lastWholeNumber = Math.max(lastWholeNumber, sectionNumber);
+    }
     if (/^\d+$/.test(agendaNumber)) {
-      if (!hasNumberedOpening) continue;
       const wholeNumber = Number(agendaNumber);
+      if (!hasNumberedOpening) {
+        // Even when whole-number items are too ambiguous to emit, numbered
+        // section headings provide sequence context for their decimal children.
+        if (isSectionTitle(cleanItemTitle(match[2])) && wholeNumber > lastWholeNumber) {
+          lastWholeNumber = wholeNumber;
+        }
+        continue;
+      }
       if (wholeNumber <= lastWholeNumber) continue;
       lastWholeNumber = wholeNumber;
     }
-    const rawBlock = match[2];
+    acceptedMatches.push({ match, rawBlock: match[2] });
+  }
+
+  for (const { match, rawBlock } of acceptedMatches) {
+    const agendaNumber = match[1].toUpperCase();
     const block = cleanText(rawBlock);
     const title = cleanItemTitle(rawBlock);
     if (!title || isSectionTitle(title)) continue;

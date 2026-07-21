@@ -9,6 +9,31 @@ test("classifies East Palo Alto table links by label and column", () => {
   assert.equal(classifyEastPaloAltoLink("View Details", "Event Link", "", "https://example.test/event/4"), "Meeting Details");
   assert.equal(classifyEastPaloAltoLink("Video", "Event Link", "", "https://youtube.com/watch?v=x"), "Video");
   assert.equal(classifyEastPaloAltoLink("Notice", "Agenda", "Meeting Cancelled", "https://example.test/c.pdf"), "Notice of Cancellation");
+  assert.equal(classifyEastPaloAltoLink("", "Agendas", "", "https://example.test/a.pdf"), "Agenda");
+  assert.equal(classifyEastPaloAltoLink("", "Minutes", "", "https://example.test/m.pdf"), "Minutes");
+});
+
+test("does not collapse dated meetings that share one committee landing page", () => {
+  const jurisdiction = getJurisdictionBySlug("east-palo-alto");
+  assert.ok(jurisdiction);
+  const shared = "https://www.cityofepa.org/city-council";
+  const meetings = normalizeEastPaloAltoRows([
+    {
+      bodyName: "City Council",
+      dateTimeText: "Jul 7, 2026 - 06:00 PM",
+      rowText: "City Council Jul 7, 2026",
+      links: [{ label: "View Details", column: "View", url: shared }]
+    },
+    {
+      bodyName: "City Council",
+      dateTimeText: "Jul 21, 2026 - 06:00 PM",
+      rowText: "City Council Jul 21, 2026",
+      links: [{ label: "View Details", column: "View", url: shared }]
+    }
+  ], jurisdiction);
+
+  assert.equal(meetings.length, 2);
+  assert.notEqual(meetings[0].externalId, meetings[1].externalId);
 });
 
 test("resolves East Palo Alto protocol-relative Agenda links against Granicus", () => {

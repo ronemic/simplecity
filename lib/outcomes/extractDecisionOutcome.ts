@@ -305,8 +305,21 @@ export function extractResultText(value: string) {
 
 function officialMinutesDocuments(meeting: LlmReadyMeeting) {
   return meeting.documents.filter(
-    (document) => ["Minutes", "Accessible Minutes"].includes(document.type)
+    (document) =>
+      ["Minutes", "Accessible Minutes"].includes(document.type) &&
+      !document.isAgendaItemAttachment &&
+      minutesLabelMatchesMeeting(document.label, meeting.dateText)
   );
+}
+
+function minutesLabelMatchesMeeting(
+  label: string | null | undefined,
+  meetingDateText: string | null | undefined
+) {
+  const labelDate = parseMeetingDate(String(label || ""));
+  const meetingDate = parseMeetingDate(String(meetingDateText || ""));
+  if (!labelDate || !meetingDate) return true;
+  return labelDate.slice(0, 10) === meetingDate.slice(0, 10);
 }
 
 function minutesDocuments(meeting: LlmReadyMeeting) {
@@ -484,12 +497,14 @@ function majorSectionBlock(title: string, text: string) {
     "i"
   );
   const sectionPattern = /^[A-Z]\s*[.):-]\s*[A-Z][\s\S]{1,100}$/;
+  const uppercaseSectionPattern = /^[A-Z][A-Z0-9/&,'’() -]{3,100}[.:]?$/;
   const start = lines.findIndex((line) => titlePattern.test(line.trim()));
   if (start < 0) return null;
 
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
-    if (sectionPattern.test(lines[index].trim())) {
+    const line = lines[index].trim();
+    if (sectionPattern.test(line) || uppercaseSectionPattern.test(line)) {
       end = index;
       break;
     }
@@ -517,12 +532,25 @@ function consentCalendarOutcomeItems(
   const result = section ? extractResultText(section) : null;
   if (!section || !result) return [];
 
+  const consentSectionNumbers = items.flatMap((item) => {
+    const number = String(item.agendaNumber || "").trim();
+    return number && /consent calendar/i.test(`${item.itemType || ""} ${item.title || ""}`)
+      ? [number]
+      : [];
+  });
+
   return items.flatMap((item) => {
     const agendaNumber = String(item.agendaNumber || "").trim();
+    const belongsToNumberedConsentSection = consentSectionNumbers.some(
+      (sectionNumber) => agendaNumber.startsWith(`${sectionNumber}.`)
+    );
+    const explicitlyConsent = /consent calendar/i.test(String(item.itemType || ""));
+    const itemAppearsInConsentRecord =
+      agendaItemSimilarity(String(item.title || item.rowText), section) >= MIN_FUZZY_MATCH_SCORE;
     if (
       !agendaNumber ||
-      !/^F\d/i.test(agendaNumber) ||
-      !/consent calendar/i.test(String(item.itemType || "")) ||
+      (!belongsToNumberedConsentSection && !explicitlyConsent) ||
+      !itemAppearsInConsentRecord ||
       consentItemWasSeparated(agendaNumber, section)
     ) {
       return [];
@@ -559,7 +587,10 @@ export function extractMeetingOutcomeItems(meeting: LlmReadyMeeting) {
   for (const document of minutesDocuments(meeting)) {
     const parsed = parsedMinuteItems(meeting, document);
     agendaItemsFound = Math.max(agendaItemsFound, parsed.length);
-    const consentItems = consentCalendarOutcomeItems(document, parsed);
+    const consentItems = consentCalendarOutcomeItems(
+      document,
+      (meeting.items || []).length > 0 ? meeting.items || [] : parsed
+    );
     for (const item of [...parsed.filter((candidate) => Boolean(candidate.result)), ...consentItems]) {
       outcomes.set(outcomeItemIdentity(item), item);
     }
@@ -653,7 +684,6 @@ function minutesResultForCard(
       return { item: inventoryMatch.item, document, match: inventoryMatch };
     }
   }
-  if (inventory.items.length > 0) return null;
 
   for (const document of minutesDocuments(meeting)) {
     const text = normalizeSourceText(document.extractedText || "");

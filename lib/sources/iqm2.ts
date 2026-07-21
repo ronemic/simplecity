@@ -153,6 +153,13 @@ export function shouldIgnoreIqm2Link(label = "", href = "") {
   );
 }
 
+export function shouldDownloadIqm2DocumentForWindow(
+  document: PrimeGovDocument,
+  monthsBack = 1
+) {
+  return monthsBack <= 1 || ["Agenda", "Minutes"].includes(document.type);
+}
+
 async function waitForIqm2Portal(page: Page, portalUrl: string) {
   await page.goto(portalUrl, {
     waitUntil: "networkidle",
@@ -714,7 +721,7 @@ export async function scrapeIqm2Meetings(
     log("Opening IQM2 portal...");
     await waitForIqm2Portal(page, portalUrl);
 
-    if (options.clickSeeMore) {
+    if (options.clickSeeMore || (options.monthsBack ?? 1) > 1 || options.allVisible) {
       await clickVisibleSeeMoreLinks(page, log);
     }
 
@@ -751,6 +758,9 @@ export async function scrapeIqm2Meetings(
           log("Stopping IQM2 detail enrichment early because the pipeline deadline is near.");
           break;
         }
+        if ((options.monthsBack ?? 1) > 1 && meeting.status === "Cancelled") {
+          continue;
+        }
 
         await enrichIqm2MeetingDetails(context, meeting, log);
       }
@@ -758,11 +768,19 @@ export async function scrapeIqm2Meetings(
 
     if (options.downloadDocuments) {
       const { downloadIqm2Documents } = await import("@/lib/scraper/downloadDocuments");
+      const isDeepRefresh = (options.monthsBack ?? 1) > 1;
       log("Downloading IQM2 documents where available...");
+      if (isDeepRefresh) {
+        log("Deep IQM2 refresh: downloading meeting agendas and minutes only.");
+      }
       await downloadIqm2Documents(context, meetings, {
         log,
         outputDir: options.documentOutputDir,
-        shouldStop: options.shouldStop
+        shouldStop: options.shouldStop,
+        documentFilter: isDeepRefresh
+          ? (document) =>
+              shouldDownloadIqm2DocumentForWindow(document, options.monthsBack)
+          : undefined
       });
     }
 

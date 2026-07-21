@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyLegistarLink } from "@/lib/sources/legistar";
+import {
+  classifyLegistarLink,
+  shouldDownloadLegistarDocumentForWindow
+} from "@/lib/sources/legistar";
+import type { DocumentType } from "@/lib/types";
+
+function document(type: DocumentType) {
+  return { type, label: type, url: `https://example.test/${type}` };
+}
+
+test("deep Legistar refreshes skip packets and item attachments", () => {
+  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda"), 3), true);
+  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Minutes"), 3), true);
+  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 3), false);
+  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Document"), 3), false);
+  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 1), true);
+});
 
 test("classifies Mountain View Legistar document labels by visible text first", () => {
   assert.equal(

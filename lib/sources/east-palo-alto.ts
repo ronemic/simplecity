@@ -40,14 +40,16 @@ export function classifyEastPaloAltoLink(
   const href = url.toLowerCase();
   if (/cancellation|cancelled|canceled/.test(`${text} ${context}`)) return "Notice of Cancellation";
   if (column.includes("agenda packet") || text.includes("agenda packet")) return "Agenda Packet";
-  if (column === "agenda" || normalized(label) === "agenda") return "Agenda";
+  if (column === "agenda" || column === "agendas" || normalized(label) === "agenda") return "Agenda";
   if (text.includes("minutes")) return "Minutes";
   if (/video|youtube\.com|youtu\.be|granicus|iqm2|swagit/.test(`${text} ${href}`)) return "Video";
   if (text.includes("zoom") || href.includes("zoom.us")) return "Zoom";
   if (text.includes("public comment")) return "Public Comment";
   if (text.includes("staff report")) return "Staff Report";
   if (text.includes("attachment")) return "Attachment";
-  if (column.includes("event link")) return "Meeting Details";
+  if (column.includes("event link") || column === "view" || normalized(label).includes("view details")) {
+    return "Meeting Details";
+  }
   if (href.includes(".pdf") || text.includes("document")) return "Document";
   return "Other";
 }
@@ -92,7 +94,9 @@ export function normalizeEastPaloAltoRows(
       documents.push({ type, label: link.label || type, url: link.url });
     }
     const details = documents.find((doc) => doc.type === "Meeting Details");
-    const identity = details?.url || `${bodyName}|${dateText}|${timeText || ""}`;
+    // Committee landing-page links are reused across many dates, so they are
+    // supporting documents, not meeting identities.
+    const identity = `${bodyName}|${dateText}|${timeText || ""}`;
     if (seen.has(identity)) continue;
     seen.add(identity);
     const hash = crypto.createHash("sha256").update(identity).digest("hex").slice(0, 10);
@@ -162,6 +166,65 @@ async function extractRows(
   }, baseUrl);
 }
 
+async function extractHistoricalRows(
+  page: Page,
+  baseUrl: string
+): Promise<{ headers: string[]; rows: EastPaloAltoExtractedRow[] }> {
+  await page.evaluate("globalThis.__name = (value) => value");
+  return page.evaluate((sourceBaseUrl) => {
+    const clean = (value = "") => value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+    const norm = (value = "") => clean(value).toLowerCase();
+    const tables = Array.from(document.querySelectorAll("table"));
+    const table = tables.find((candidate) => {
+      const headers = Array.from(candidate.querySelectorAll("th")).map((cell) => norm(cell.textContent || ""));
+      return headers.includes("date") && headers.includes("meeting") && headers.includes("minutes");
+    });
+    if (!table) return { headers: [], rows: [] };
+    const headerRow = Array.from(table.querySelectorAll("tr")).find((row) => row.querySelector("th"));
+    const headers = Array.from(headerRow?.querySelectorAll("th,td") || []).map((cell) => clean(cell.textContent || ""));
+    const headerMap = new Map(headers.map((header, index) => [norm(header), index]));
+    const absolute = (href: string) => {
+      try { return new URL(href, sourceBaseUrl).toString(); } catch { return ""; }
+    };
+    const rows = Array.from(table.querySelectorAll("tr")).filter((row) => row !== headerRow).flatMap((row) => {
+      const cells = Array.from(row.querySelectorAll(":scope > th, :scope > td"));
+      const bodyName = clean(cells[headerMap.get("meeting") ?? -1]?.textContent || "");
+      const dateTimeText = clean(cells[headerMap.get("date") ?? -1]?.textContent || "");
+      if (!bodyName || !dateTimeText) return [];
+      const links = cells.flatMap((cell, index) => Array.from(cell.querySelectorAll("a[href]")).map((anchor) => ({
+        label: clean(anchor.textContent || anchor.getAttribute("aria-label") || anchor.getAttribute("title") || headers[index] || ""),
+        url: absolute(anchor.getAttribute("href") || ""),
+        column: headers[index] || ""
+      }))).filter((link) => /^https?:/.test(link.url));
+      return [{ bodyName, dateTimeText, rowText: clean(row.textContent || ""), links }];
+    });
+    return { headers, rows };
+  }, baseUrl);
+}
+
+function mergeExtractedRows(rows: EastPaloAltoExtractedRow[]) {
+  const merged = new Map<string, EastPaloAltoExtractedRow>();
+  for (const row of rows) {
+    const { dateText, timeText } = splitDateTime(row.dateTimeText);
+    const parsed = parseMeetingDate([dateText, timeText].filter(Boolean).join(" "));
+    const key = `${normalized(row.bodyName)}|${parsed || normalized(row.dateTimeText)}`;
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, row);
+      continue;
+    }
+    const links = new Map(
+      [...existing.links, ...row.links].map((link) => [`${link.column}|${link.url}`, link])
+    );
+    merged.set(key, {
+      ...existing,
+      rowText: cleanText(`${existing.rowText} ${row.rowText}`),
+      links: Array.from(links.values())
+    });
+  }
+  return Array.from(merged.values());
+}
+
 async function fetchOfficialPage(url: string) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -218,7 +281,22 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
     const extracted = await extractRows(page, tableUrl);
     log(`East Palo Alto table headers: ${extracted.headers.join(", ")}.`);
     log(`East Palo Alto Upcoming Events rows found: ${extracted.rows.length}.`);
-    let meetings = normalizeEastPaloAltoRows(extracted.rows, jurisdiction);
+    let historicalRows: EastPaloAltoExtractedRow[] = [];
+    if (jurisdiction.meetingsUrl) {
+      try {
+        await page.goto(jurisdiction.meetingsUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      } catch {
+        await page.setContent(await fetchOfficialPage(jurisdiction.meetingsUrl), {
+          waitUntil: "domcontentloaded",
+          timeout: 60000
+        });
+      }
+      const historical = await extractHistoricalRows(page, jurisdiction.meetingsUrl);
+      historicalRows = historical.rows;
+      log(`East Palo Alto historical meeting rows found: ${historicalRows.length}.`);
+    }
+    const combinedRows = mergeExtractedRows([...extracted.rows, ...historicalRows]);
+    let meetings = normalizeEastPaloAltoRows(combinedRows, jurisdiction);
     if (options.body) meetings = meetings.filter((meeting) => slugify(meeting.bodyName || "") === slugify(options.body || ""));
     if (!options.allVisible) {
       meetings = filterMeetingsToWindow(meetings, options);
