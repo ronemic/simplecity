@@ -43,6 +43,11 @@ type CardWithSummaryIndex = {
 
 type ExistingAppendCard = InsertedCardIdentity & PreservedCardAdminState;
 
+type AgendaAvailabilityCard = {
+  agendaItem?: string | null;
+  sourceItemId?: string | null;
+};
+
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
 const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
@@ -135,6 +140,25 @@ function normalizeCardKey(value?: string | null) {
 
 function exactCardKey(agendaItem?: string | null, sourceUrl?: string | null) {
   return `${normalizeCardKey(agendaItem)}|${normalizeCardKey(sourceUrl)}`;
+}
+
+export function isAgendaUnavailablePlaceholderCard(card: AgendaAvailabilityCard) {
+  if (card.sourceItemId?.trim()) return false;
+
+  const text = String(card.agendaItem || "")
+    .toLowerCase()
+    .replace(/[’`]/g, "'")
+    .replace(/\b(is|was|has|have|had)n['’]?t\b/g, "$1 not")
+    .replace(/\s+/g, " ");
+
+  return [
+    /\bagenda\b.{0,120}\b(?:is|was|has|have|had)?\s*not\s+(?:yet\s+)?(?:been\s+)?(?:posted|published|available|provided|released|uploaded)\b/,
+    /\bagenda\b.{0,120}\b(?:has|have|had)\s+yet\s+to\s+be\s+(?:posted|published|provided|released|uploaded)\b/,
+    /\bno\s+(?:meeting\s+)?agenda\b.{0,80}\b(?:posted|published|available|provided|released|uploaded)\b/,
+    /\bagenda\b.{0,60}\b(?:unavailable|pending|forthcoming)\b/,
+    /\bagenda\b.{0,80}\bwill\s+be\s+(?:posted|published|available|provided|released|uploaded)\s+(?:later|soon|closer\s+to\s+the\s+meeting)\b/,
+    /\bcheck\s+back\s+later\b.{0,80}\bagenda\b/
+  ].some((pattern) => pattern.test(text));
 }
 
 function summaryCardFingerprintInput(card: SimpleCityCard) {
@@ -701,16 +725,35 @@ export async function appendSummaryCardsForMeeting(
   if (existingError) throw new Error(`Failed to read existing cards: ${existingError.message}`);
 
   const existingCardRows = (existingCards || []) as unknown as ExistingAppendCard[];
+  const summaryContainsSubstantiveCards = summary.cards.some(
+    (card) => !isAgendaUnavailablePlaceholderCard(card)
+  );
+  const placeholderIdsToDelete = summaryContainsSubstantiveCards
+    ? existingCardRows
+        .filter((card) =>
+          !card.source_item_id &&
+          card.is_featured !== true &&
+          !card.admin_notes?.trim() &&
+          isAgendaUnavailablePlaceholderCard({
+            agendaItem: card.agenda_item,
+            sourceItemId: card.source_item_id
+          })
+        )
+        .map((card) => card.id)
+    : [];
+  const retainedExistingCards = existingCardRows.filter(
+    (card) => !placeholderIdsToDelete.includes(card.id)
+  );
   const existingExactKeys = new Set<string>();
   const existingAgendaKeys = new Set<string>();
   const existingAgendaItems: string[] = [];
   const existingBySourceItemId = new Map(
-    existingCardRows
+    retainedExistingCards
       .filter((card) => Boolean(card.source_item_id))
       .map((card) => [card.source_item_id as string, card])
   );
 
-  for (const card of existingCardRows) {
+  for (const card of retainedExistingCards) {
     existingExactKeys.add(exactCardKey(card.agenda_item, card.source_url));
     existingAgendaKeys.add(normalizeCardKey(card.agenda_item));
     if (card.agenda_item) existingAgendaItems.push(card.agenda_item);
@@ -719,6 +762,10 @@ export async function appendSummaryCardsForMeeting(
   const seenSourceItemIds = new Set<string>();
   const cardsToPersist = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(
+      ({ card }) =>
+        !summaryContainsSubstantiveCards || !isAgendaUnavailablePlaceholderCard(card)
+    )
     .filter(({ card }) => {
       if (sourceItemIdAvailable && card.sourceItemId) {
         if (seenSourceItemIds.has(card.sourceItemId)) return false;
@@ -735,6 +782,17 @@ export async function appendSummaryCardsForMeeting(
         )
       );
     });
+
+  if (placeholderIdsToDelete.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("summary_cards")
+      .delete()
+      .in("id", placeholderIdsToDelete);
+
+    if (deleteError) {
+      throw new Error(`Failed to delete obsolete agenda placeholders: ${deleteError.message}`);
+    }
+  }
 
   if (cardsToPersist.length === 0) {
     await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
