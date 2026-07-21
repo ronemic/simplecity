@@ -140,7 +140,7 @@ function setLlmTestEnv() {
   process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS = "0";
 }
 
-test("regenerates when validation drops source-unsupported cards", async (t) => {
+test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   let calls = 0;
@@ -181,14 +181,44 @@ test("regenerates when validation drops source-unsupported cards", async (t) => 
   const result = await generateSummaryForMeeting(meeting());
 
   assert.equal(calls, 2);
-  assert.match(secondPrompt, /previous response could not be fully used/i);
+  assert.match(secondPrompt, /repair only the rejected simplecity cards/i);
+  assert.doesNotMatch(secondPrompt, /include every non-routine/i);
   assert.equal(result.summary.cards.length, 1);
   assert.deepEqual(result.summary.cards[0].whatIsHappening, [
     "The council will consider a $100 contract for park maintenance."
   ]);
 });
 
-test("regenerates when a card contains degenerate model text", async (t) => {
+test("rejects a failed targeted repair without regenerating the meeting", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let calls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  globalThis.fetch = (async () => {
+    calls += 1;
+    return openRouterResponse({
+      meetingSummary,
+      cards: [
+        card({
+          whatIsHappening: ["The council will consider a $250 contract for park maintenance."]
+        })
+      ]
+    });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting());
+
+  assert.equal(calls, 2);
+  assert.equal(result.summary.cards.length, 0);
+});
+
+test("repairs only a card containing degenerate model text", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   let calls = 0;
@@ -224,6 +254,7 @@ test("regenerates when a card contains degenerate model text", async (t) => {
 
   assert.equal(calls, 2);
   assert.match(secondPrompt, /malformed generated text/i);
+  assert.match(secondPrompt, /repair only the rejected simplecity cards/i);
   assert.equal(result.summary.cards[0]?.agendaItem, "Item 4 - Contract approval");
 });
 

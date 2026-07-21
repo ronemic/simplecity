@@ -6,6 +6,7 @@ import type { LlmReadyMeeting, MeetingStatus, SimpleCityCardTranslation, SimpleC
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
+import { findAgendaItemForCard } from "@/lib/scraper/agendaItemContext";
 
 const allowedCategories = new Set<string>(CATEGORIES);
 const allowedStatuses = new Set<string>(CARD_STATUSES);
@@ -19,16 +20,20 @@ const GROUNDABLE_VALUE_PATTERNS = [
   /https?:\/\/[^\s)"']+/gi,
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
   /\b(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]\d{4}\b/g,
+  /\b\d{1,4}:\d{2}-[A-Z]{1,6}-\d{3,}(?:-[A-Z]+)?\b/gi,
+  /\b\d{1,6}\s+(?:[A-Z0-9.'-]+\s+){1,6}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl)\b/gi,
   /\$\s?\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?/gi,
   /\b\d+(?:\.\d+)?\s?%/gi,
   /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}\b/gi,
   /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
   /\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi,
   /\b(?:agenda\s+item|item|resolution|ordinance)\s+(?:no\.?\s*)?[A-Z]?\d[\w.-]*/gi,
-  /\b\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand)(?:\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?))?|\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?|percent))\b/gi
+  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?(?:\s*(?:%|percent))?/gi
 ];
 const NUMERIC_VALUE_PATTERN =
-  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?(?:\s*%|\s*(?:units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?|percent))?/gi;
+  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?(?:\s*(?:%|percent))?/gi;
+const DATE_VALUE_PATTERN =
+  /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4})\b/gi;
 const NUMERIC_SCALE: Record<string, number> = {
   thousand: 1_000,
   k: 1_000,
@@ -128,6 +133,9 @@ export type SummaryValidationIssue = {
   agendaItem?: string;
   reason: string;
   value?: string;
+  cardIndex?: number;
+  repairable?: boolean;
+  outcome?: "warning" | "reject";
 };
 
 export type SummaryValidationOptions = {
@@ -137,6 +145,7 @@ export type SummaryValidationOptions = {
   maxConfidence?: "high" | "medium" | "low";
   meetingStatus?: MeetingStatus;
   allowedSourceItemIds?: string[];
+  sourceTextForCard?: (sourceItemId: string | null, agendaItem: string) => string | null;
   onIssue?: (issue: SummaryValidationIssue) => void;
 };
 
@@ -280,26 +289,11 @@ function extractGroundableValues(text: string) {
 type ComparableNumericValue = {
   amount: number;
   kind: "currency" | "percent" | "number";
-  unit: string | null;
 };
-
-function normalizeNumericUnit(value: string) {
-  const normalized = value.toLowerCase().replace(/\s+/g, " ").replace(/\.$/, "");
-  if (/^units?$/.test(normalized)) return "unit";
-  if (/^homes?$/.test(normalized)) return "home";
-  if (normalized === "feet" || normalized === "ft") return "foot";
-  if (normalized === "sq ft" || normalized === "square feet") return "square-foot";
-  if (/^days?$/.test(normalized)) return "day";
-  if (/^months?$/.test(normalized)) return "month";
-  if (/^years?$/.test(normalized)) return "year";
-  if (/^hours?$/.test(normalized)) return "hour";
-  if (/^acres?$/.test(normalized)) return "acre";
-  return null;
-}
 
 function parseComparableNumericValue(value: string): ComparableNumericValue | null {
   const match = value.trim().match(
-    /^(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*(million|billion|thousand|m|bn|k))?(?:\s*(%|percent|units?|homes?|acres?|feet|ft|sq\.?\s*ft|square\s+feet|days?|months?|years?|hours?))?$/i
+    /^(\$)?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*(million|billion|thousand|m|bn|k))?(?:\s*(%|percent))?$/i
   );
   if (!match) return null;
 
@@ -312,8 +306,7 @@ function parseComparableNumericValue(value: string): ComparableNumericValue | nu
   const isPercent = suffix === "%" || suffix === "percent";
   return {
     amount,
-    kind: match[1] ? "currency" : isPercent ? "percent" : "number",
-    unit: isPercent ? null : normalizeNumericUnit(suffix)
+    kind: match[1] ? "currency" : isPercent ? "percent" : "number"
   };
 }
 
@@ -324,7 +317,7 @@ function hasEquivalentNumericValue(value: string, sourceText: string) {
   NUMERIC_VALUE_PATTERN.lastIndex = 0;
   for (const match of sourceText.matchAll(NUMERIC_VALUE_PATTERN)) {
     const candidate = parseComparableNumericValue(match[0]);
-    if (!candidate || candidate.kind !== expected.kind || candidate.unit !== expected.unit) continue;
+    if (!candidate || candidate.kind !== expected.kind) continue;
     if (Math.abs(candidate.amount - expected.amount) <= Math.max(1, Math.abs(expected.amount)) * 1e-12) {
       return true;
     }
@@ -333,11 +326,74 @@ function hasEquivalentNumericValue(value: string, sourceText: string) {
   return false;
 }
 
+const MONTH_INDEX: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12
+};
+
+function parseComparableDateValue(value: string) {
+  const normalized = value.trim();
+  const namedMatch = normalized.match(/^([a-z]+)\.?\s+(\d{1,2}),?\s+(\d{4})$/i);
+  const numericMatch = normalized.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!namedMatch && !numericMatch) return null;
+
+  const month = namedMatch
+    ? MONTH_INDEX[namedMatch[1].toLowerCase()]
+    : Number(numericMatch?.[1]);
+  const day = Number(namedMatch?.[2] || numericMatch?.[2]);
+  const year = Number(namedMatch?.[3] || numericMatch?.[3]);
+  if (!month || day < 1 || day > 31) return null;
+
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null;
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function hasEquivalentDateValue(value: string, sourceText: string) {
+  const expected = parseComparableDateValue(value);
+  if (!expected) return false;
+
+  DATE_VALUE_PATTERN.lastIndex = 0;
+  return Array.from(sourceText.matchAll(DATE_VALUE_PATTERN)).some(
+    (match) => parseComparableDateValue(match[0]) === expected
+  );
+}
+
 function isGroundedValue(value: string, sourceText: string) {
   const normalizedValue = normalizeEvidenceText(value);
   if (!normalizedValue) return true;
   if (normalizeEvidenceText(sourceText).includes(normalizedValue)) return true;
-  return hasEquivalentNumericValue(value, sourceText);
+  return (
+    hasEquivalentNumericValue(value, sourceText) ||
+    hasEquivalentDateValue(value, sourceText)
+  );
 }
 
 function capConfidence(
@@ -413,7 +469,7 @@ function cleanCardTranslation(
   };
 }
 
-function buildMeetingSourceText(meeting: LlmReadyMeeting) {
+function buildMeetingMetadataText(meeting: LlmReadyMeeting) {
   return [
     meeting.title,
     meeting.meetingType,
@@ -424,9 +480,38 @@ function buildMeetingSourceText(meeting: LlmReadyMeeting) {
     meeting.sourceUrl,
     meeting.source,
     meeting.meetingDetailsUrl,
-    meeting.llmInputText,
     meeting.publicCommentsInputText,
     ...meeting.documents.flatMap((doc) => [doc.url, doc.label])
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildMeetingSourceText(meeting: LlmReadyMeeting) {
+  return [buildMeetingMetadataText(meeting), meeting.llmInputText]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function buildAgendaItemSourceText(item: NonNullable<LlmReadyMeeting["items"]>[number]) {
+  return [
+    item.externalId,
+    item.fileNumber,
+    item.agendaNumber,
+    item.itemType,
+    item.title,
+    item.action,
+    item.result,
+    item.rowText,
+    item.status,
+    item.recommendedAction,
+    item.legislationText,
+    item.sourceUrl,
+    ...(item.attachments || []).flatMap((attachment) => [
+      attachment.label,
+      attachment.url,
+      attachment.extractedText
+    ])
   ]
     .filter(Boolean)
     .join("\n");
@@ -449,6 +534,9 @@ export function validationOptionsForMeeting(
   meeting: LlmReadyMeeting,
   onIssue?: (issue: SummaryValidationIssue) => void
 ): SummaryValidationOptions {
+  const items = meeting.items || [];
+  const uniqueIds = uniqueSourceItemIds(items);
+  const meetingMetadataText = buildMeetingMetadataText(meeting);
   return {
     fallbackSource: meeting.sourceUrl || "",
     allowedSourceUrls: [
@@ -460,7 +548,16 @@ export function validationOptionsForMeeting(
     sourceText: buildMeetingSourceText(meeting),
     maxConfidence: maxConfidenceForMeeting(meeting),
     meetingStatus: meeting.status,
-    allowedSourceItemIds: Array.from(uniqueSourceItemIds(meeting.items || [])),
+    allowedSourceItemIds: Array.from(uniqueIds),
+    sourceTextForCard: (sourceItemId, agendaItem) => {
+      const exactItem = sourceItemId && uniqueIds.has(sourceItemId)
+        ? items.find((item) => item.externalId === sourceItemId)
+        : null;
+      const matchedItem = exactItem || findAgendaItemForCard(agendaItem, items);
+      return matchedItem
+        ? [meetingMetadataText, buildAgendaItemSourceText(matchedItem)].join("\n")
+        : null;
+    },
     onIssue
   };
 }
@@ -508,7 +605,10 @@ export function validateSimpleCitySummary(
       if (corruptedField) {
         options.onIssue?.({
           agendaItem: card.agendaItem.slice(0, 120),
-          reason: `Card contained malformed generated text in its ${corruptedField}.`
+          reason: `Card contained malformed generated text in its ${corruptedField}.`,
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -529,16 +629,21 @@ export function validateSimpleCitySummary(
       const status = cleanStatus(card.status);
       const source = resolveOfficialSource(card.source, options);
       const sourceItemId = card.sourceItemId?.trim() || null;
-      const unsupportedValues = sourceText
+      const groundingSourceText =
+        options.sourceTextForCard?.(sourceItemId, card.agendaItem) || sourceText;
+      const unsupportedValues = groundingSourceText
         ? extractGroundableValues(cardGroundingText(card)).filter(
-            (value) => !isGroundedValue(value, sourceText)
+            (value) => !isGroundedValue(value, groundingSourceText)
           )
         : [];
 
       if (!source) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
-          reason: "Card did not include an official source URL."
+          reason: "Card did not include an official source URL.",
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -550,7 +655,10 @@ export function validateSimpleCitySummary(
         options.onIssue?.({
           agendaItem: card.agendaItem,
           reason: "Card returned an unknown source item ID.",
-          value: sourceItemId
+          value: sourceItemId,
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -558,7 +666,10 @@ export function validateSimpleCitySummary(
       if (!allowedStatuses.has(status)) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
-          reason: `Unsupported card status: ${status}`
+          reason: `Unsupported card status: ${status}`,
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -569,7 +680,10 @@ export function validateSimpleCitySummary(
       ) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
-          reason: `Upcoming meeting card cannot use historical outcome status: ${status}`
+          reason: `Upcoming meeting card cannot use historical outcome status: ${status}`,
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -578,7 +692,10 @@ export function validateSimpleCitySummary(
         options.onIssue?.({
           agendaItem: card.agendaItem,
           reason: "Card contains exact values that were not found in the source text.",
-          value: unsupportedValues.join(", ")
+          value: unsupportedValues.join(", "),
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -596,7 +713,10 @@ export function validateSimpleCitySummary(
       if (!agendaItem || whatIsHappening.length === 0 || !whyItMatters) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
-          reason: "Card was missing required summary text."
+          reason: "Card was missing required summary text.",
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -604,7 +724,10 @@ export function validateSimpleCitySummary(
       if (new Set(normalizedSummaryPoints).size !== normalizedSummaryPoints.length) {
         options.onIssue?.({
           agendaItem,
-          reason: "Card included duplicate what-is-happening points."
+          reason: "Card included duplicate what-is-happening points.",
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -612,7 +735,10 @@ export function validateSimpleCitySummary(
       if (categoryTags.length === 0) {
         options.onIssue?.({
           agendaItem,
-          reason: "Card did not include a supported category tag."
+          reason: "Card did not include a supported category tag.",
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
         });
         return null;
       }
@@ -622,7 +748,8 @@ export function validateSimpleCitySummary(
       if (corruptedTranslationField) {
         options.onIssue?.({
           agendaItem,
-          reason: `Card contained malformed generated text in its ${corruptedTranslationField}.`
+          reason: `Card contained malformed generated text in its ${corruptedTranslationField}.`,
+          outcome: "warning"
         });
       }
 
@@ -660,7 +787,8 @@ export function validateSimpleCitySummary(
     if (duplicate) {
       options.onIssue?.({
         agendaItem: card.card.agendaItem,
-        reason: "Duplicate card for the same agenda item and source was dropped."
+        reason: "Duplicate card for the same agenda item and source was dropped.",
+        outcome: "reject"
       });
       return false;
     }

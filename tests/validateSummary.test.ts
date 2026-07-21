@@ -138,6 +138,91 @@ test("accepts equivalent abbreviated and expanded numeric values", () => {
   assert.equal(result.cards.length, 1);
 });
 
+test("accepts equivalent abbreviated and expanded month names", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: ["The lawsuit was filed on Jan 31, 2023."]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4. The lawsuit was filed on January 31, 2023. The meeting begins at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("accepts equivalent named and numeric dates", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: ["The lawsuit was filed on Jan 31, 2023."]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4. The lawsuit was filed on 1/31/2023. The meeting begins at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("accepts equivalent area units with a source qualifier", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: [
+            "The lease begins Aug 1, 2026 and covers 8,646 sq ft."
+          ]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4. The lease begins August 1, 2026 and covers approximately 8,646 rentable square feet. The meeting begins at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("does not ground a different abbreviated date", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          whatIsHappening: ["The lawsuit was filed on Jan 30, 2023."]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4. The lawsuit was filed on January 31, 2023. The meeting begins at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+});
+
 for (const scenario of [
   {
     name: "decimal billions",
@@ -186,7 +271,7 @@ for (const scenario of [
   });
 }
 
-test("does not ground equivalent numbers across incompatible units", () => {
+test("grounds matching ordinary numbers without comparing unit wording", () => {
   const result = validateSimpleCitySummary(
     {
       ...baseSummary,
@@ -200,6 +285,33 @@ test("does not ground equivalent numbers across incompatible units", () => {
       fallbackSource: "https://city.example/agendas/4",
       allowedSourceUrls: ["https://city.example/agendas/4"],
       sourceText: "Item 4. The project would use 200,000,000 units at 7:00 PM."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("grounds values only against the matched agenda item when item context is available", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          sourceItemId: "item-parks",
+          whatIsHappening: ["The parks contract would cost $250."]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      allowedSourceItemIds: ["item-parks", "item-roads"],
+      sourceText:
+        "Item 4 parks contract for $100. Item 5 roads contract for $250. Meeting at 7:00 PM.",
+      sourceTextForCard: (sourceItemId) =>
+        sourceItemId === "item-parks"
+          ? "Item 4 parks contract for $100. Meeting at 7:00 PM."
+          : "Item 5 roads contract for $250. Meeting at 7:00 PM."
     }
   );
 
@@ -225,6 +337,39 @@ test("does not ground a currency amount from a plain number", () => {
 
   assert.equal(result.cards.length, 0);
 });
+
+for (const scenario of [
+  {
+    name: "case number",
+    summaryValue: "3:23-cv-000456-VC",
+    sourceValue: "3:23-cv-000457-VC"
+  },
+  {
+    name: "street address",
+    summaryValue: "601 Van Ness Avenue",
+    sourceValue: "601 Van Ness Road"
+  }
+]) {
+  test(`keeps ${scenario.name} matching strict`, () => {
+    const result = validateSimpleCitySummary(
+      {
+        ...baseSummary,
+        cards: [
+          groundedCard({
+            whatIsHappening: [`The item concerns ${scenario.summaryValue}.`]
+          })
+        ]
+      },
+      {
+        fallbackSource: "https://city.example/agendas/4",
+        allowedSourceUrls: ["https://city.example/agendas/4"],
+        sourceText: `Item 4 concerns ${scenario.sourceValue}. The meeting begins at 7:00 PM.`
+      }
+    );
+
+    assert.equal(result.cards.length, 0);
+  });
+}
 
 test("falls back to the official source URL and caps confidence", () => {
   const result = validateSimpleCitySummary(

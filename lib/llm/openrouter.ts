@@ -6,6 +6,7 @@ import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import {
   parseAndValidateSummary,
+  parsePossiblyWrappedJson,
   validationOptionsForMeeting,
   type SummaryValidationIssue
 } from "./validateSummary";
@@ -266,7 +267,7 @@ function summarizeValidationIssues(issues: SummaryValidationIssue[]) {
 }
 
 function shouldRegenerateSummary(meeting: LlmReadyMeeting, result: SummaryRequestResult) {
-  if (result.validationIssues.length > 0) return true;
+  if (result.validationIssues.length > 0) return false;
   return result.summary.cards.length === 0 && hasUsableSourceText(meeting);
 }
 
@@ -291,6 +292,147 @@ function isBetterSummaryResult(candidate: SummaryRequestResult, current: Summary
   }
 
   return candidate.validationIssues.length < current.validationIssues.length;
+}
+
+function mergeValidatedSummaries(
+  accepted: SimpleCitySummary,
+  repaired: SimpleCitySummary
+): SimpleCitySummary {
+  const cards = [...accepted.cards];
+  const spanishCards = [...(accepted.translations?.es?.cards || [])];
+  const repairedSpanishCards = repaired.translations?.es?.cards || [];
+
+  for (const [index, card] of repaired.cards.entries()) {
+    const duplicate = cards.some(
+      (existing) =>
+        (existing.sourceItemId && existing.sourceItemId === card.sourceItemId) ||
+        areLikelySameAgendaItem(existing.agendaItem, card.agendaItem)
+    );
+    if (duplicate) continue;
+    cards.push(card);
+    spanishCards.push(repairedSpanishCards[index] || null);
+  }
+
+  const spanishMeeting =
+    accepted.translations?.es?.meeting || repaired.translations?.es?.meeting;
+  const hasSpanish = Boolean(
+    accepted.translations?.es || repaired.translations?.es
+  );
+
+  return {
+    ...accepted,
+    cards,
+    translations: hasSpanish
+      ? {
+          es: {
+            meeting: spanishMeeting,
+            cards: spanishCards
+          }
+        }
+      : undefined
+  };
+}
+
+function repairableCardsFromResponse(content: string, issues: SummaryValidationIssue[]) {
+  const parsed = parsePossiblyWrappedJson(content) as { cards?: unknown[] };
+  const cards = Array.isArray(parsed.cards) ? parsed.cards : [];
+  const indexes = Array.from(
+    new Set(
+      issues
+        .filter((issue) => issue.repairable && Number.isInteger(issue.cardIndex))
+        .map((issue) => issue.cardIndex as number)
+    )
+  );
+  return indexes.flatMap((index) =>
+    index >= 0 && index < cards.length ? [{ index, card: cards[index] }] : []
+  );
+}
+
+async function requestTargetedCardRepairs(
+  meeting: LlmReadyMeeting,
+  provider: SummaryProvider,
+  rejectedCards: Array<{ index: number; card: unknown }>,
+  issues: SummaryValidationIssue[],
+  options: GenerateSummaryOptions
+): Promise<SummaryRequestResult> {
+  const rejectedIds = new Set(
+    rejectedCards.flatMap(({ card }) => {
+      if (!card || typeof card !== "object") return [];
+      const sourceItemId = (card as { sourceItemId?: unknown }).sourceItemId;
+      return typeof sourceItemId === "string" && sourceItemId.trim()
+        ? [sourceItemId.trim()]
+        : [];
+    })
+  );
+  const matchedItems = (meeting.items || []).filter((item) =>
+    rejectedIds.has(item.externalId)
+  );
+  const sourceContext = matchedItems.length
+    ? formatAgendaItemContexts(matchedItems)
+    : meeting.llmInputText.slice(0, MAX_AGENDA_ITEM_BATCH_CHARS);
+  const relevantIssues = issues.filter((issue) =>
+    rejectedCards.some(({ index }) => index === issue.cardIndex)
+  );
+  const repairPrompt = `Repair only the rejected SimpleCity cards below. Return a complete SimpleCity JSON object containing only the corrected cards; do not repeat accepted cards and do not add new agenda items. Preserve the meeting summary. Correct or remove unsupported values using only the matched agenda-item source. Do not add evidence fields.
+
+Validation issues:
+${summarizeValidationIssues(relevantIssues)}
+
+Rejected cards:
+${JSON.stringify(rejectedCards.map(({ card }) => card))}
+
+Matched agenda-item source:
+${sourceContext}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120_000);
+  await waitForProviderSlot(provider, options);
+
+  const response = await fetch(provider.baseUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${provider.apiKey}`,
+      "Content-Type": "application/json",
+      ...(provider.headers || {})
+    },
+    signal: controller.signal,
+    body: JSON.stringify({
+      model: provider.model,
+      messages: [
+        { role: "system", content: SIMPLECITY_SYSTEM_PROMPT },
+        { role: "user", content: repairPrompt }
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" }
+    })
+  }).finally(() => clearTimeout(timeout));
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new SummaryProviderRequestError(
+      provider.name,
+      response.status,
+      text,
+      parseRetryAfterMs(response.headers)
+    );
+  }
+
+  const raw = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+  const content = raw.choices?.[0]?.message?.content;
+  if (!content) throw new Error(`${provider.name} repair response did not include message content.`);
+
+  const validationIssues: SummaryValidationIssue[] = [];
+  const summary = attachSourceItemIds(
+    meeting,
+    parseAndValidateSummary(
+      content,
+      validationOptionsForMeeting(meeting, (issue) => validationIssues.push(issue))
+    )
+  );
+
+  return { summary, raw, validationIssues };
 }
 
 async function requestSummary(
@@ -357,7 +499,7 @@ async function requestSummary(
   if (!content) throw new Error(`${provider.name} response did not include message content.`);
 
   const validationIssues: SummaryValidationIssue[] = [];
-  const summary = attachSourceItemIds(
+  let summary = attachSourceItemIds(
     meeting,
     parseAndValidateSummary(
       content,
@@ -373,6 +515,29 @@ async function requestSummary(
     );
   }
 
+  const rejectedCards = repairableCardsFromResponse(content, validationIssues);
+  let repairResult: SummaryRequestResult | null = null;
+  if (rejectedCards.length > 0 && !regenerationGuidance) {
+    options.log?.(
+      `Repairing ${rejectedCards.length} rejected card(s) for ${meeting.title} without regenerating the meeting.`
+    );
+    try {
+      repairResult = await requestTargetedCardRepairs(
+        meeting,
+        provider,
+        rejectedCards,
+        validationIssues,
+        options
+      );
+      summary = mergeValidatedSummaries(summary, repairResult.summary);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown repair error";
+      options.log?.(
+        `Targeted card repair failed for ${meeting.title}; keeping accepted cards: ${message}`
+      );
+    }
+  }
+
   return {
     summary,
     raw: {
@@ -383,10 +548,15 @@ async function requestSummary(
       },
       simplecityValidation: {
         issues: validationIssues,
-        regenerated: Boolean(regenerationGuidance)
+        regenerated: Boolean(regenerationGuidance),
+        targetedRepair: rejectedCards.length > 0,
+        repairIssues: repairResult?.validationIssues || []
       }
     },
-    validationIssues
+    validationIssues:
+      repairResult && repairResult.summary.cards.length > 0
+        ? repairResult.validationIssues
+        : validationIssues
   };
 }
 
