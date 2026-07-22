@@ -17,6 +17,7 @@ import {
   validateDecisionOutcomeExplanation
 } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 import {
+  decisionOutcomeCoverageComplete,
   fallbackDecisionOutcomeSummary,
   keepUniqueOutcomeAssignments,
   reconcileDecisionOutcomesForMeeting,
@@ -493,6 +494,11 @@ test("enforces one official item assignment per decision card set", () => {
   assert.deepEqual(unique, [{ matchedItemKey: "unique-item", cardId: "card-3" }]);
 });
 
+test("coverage completeness follows canonical result cards, not unrelated legacy ambiguity", () => {
+  assert.equal(decisionOutcomeCoverageComplete(6, 6), true);
+  assert.equal(decisionOutcomeCoverageComplete(6, 5), false);
+});
+
 test("uses the card title for concise grounded copy when LLM explanation is unavailable", () => {
   assert.equal(
     fallbackDecisionOutcomeSummary(
@@ -859,6 +865,33 @@ test("resolves a clearly later minutes-generated duplicate to the original card"
 
   assert.deepEqual(resolved.selected, [original]);
   assert.equal(resolved.duplicateCardsDetected, 1);
+  assert.equal(resolved.duplicateCardsResolved, 1);
+  assert.equal(resolved.rejectedAmbiguous, 0);
+});
+
+test("prefers an exact source-item outcome over a fuzzy legacy duplicate", () => {
+  const exact = {
+    matchedItemKey: "H1",
+    cardId: "identified",
+    matchMethod: "source_item_id" as const,
+    matchScore: 1,
+    cardCreatedAt: "2026-07-20T12:00:00.000Z",
+    cardSourceUrl: "https://example.com/agenda.pdf"
+  };
+  const legacy = {
+    matchedItemKey: "H1",
+    cardId: "legacy",
+    matchMethod: "title" as const,
+    matchScore: 0.92,
+    cardCreatedAt: "2026-07-20T12:00:00.000Z",
+    cardSourceUrl: "https://example.com/agenda.pdf"
+  };
+  const resolved = resolveCanonicalOutcomeAssignments(
+    [legacy, exact],
+    new Set<string>()
+  );
+
+  assert.deepEqual(resolved.selected, [exact]);
   assert.equal(resolved.duplicateCardsResolved, 1);
   assert.equal(resolved.rejectedAmbiguous, 0);
 });

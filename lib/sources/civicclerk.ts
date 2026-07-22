@@ -81,6 +81,19 @@ export function buildCivicClerkFileUrl(portalUrl: string, fileId: string) {
   return `${portal.protocol}//${apiHost}/v1/Meetings/GetMeetingFileStream(fileId=${encodeURIComponent(fileId)},plainText=false)`;
 }
 
+export function civicClerkPlainTextFileUrl(fileUrl: string) {
+  try {
+    const url = new URL(fileUrl);
+    if (!url.pathname.includes("/Meetings/GetMeetingFileStream")) return null;
+    if (/plainText=false/i.test(fileUrl)) {
+      return fileUrl.replace(/plainText=false/i, "plainText=true");
+    }
+    return fileUrl.replace(/\)$/, ",plainText=true)");
+  } catch {
+    return null;
+  }
+}
+
 export function civicClerkFileIdFromControlId(value?: string | null) {
   return value?.match(/-(\d+)$/)?.[1] || null;
 }
@@ -548,7 +561,8 @@ export async function scrapeCivicClerkMeetings(
           isOfficialCivicClerkUrl(document.url, portalUrl) &&
           document.url.includes("/Meetings/GetMeetingFileStream"),
         validateFinalUrl: (url) => isOfficialCivicClerkUrl(url, portalUrl),
-        userAgent: "Mozilla/5.0 SimpleCity CivicClerk agenda scraper"
+        userAgent: "Mozilla/5.0 SimpleCity CivicClerk agenda scraper",
+        plainTextFallbackUrl: civicClerkPlainTextFileUrl
       });
       log(`CivicClerk document downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
     }

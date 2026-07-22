@@ -10,6 +10,8 @@ import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 import { mergeDiscoveredAgendaItemAttachments } from "@/lib/scraper/itemAttachments";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
+export const LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES = 50 * 1024 * 1024;
+const LEGISTAR_OPTIONAL_DOCUMENT_TIMEOUT_MS = 20_000;
 
 const DOWNLOADABLE_DOCUMENT_TYPES = new Set([
   "Agenda",
@@ -306,6 +308,24 @@ function shouldDownloadLegistarDocument(doc: LegistarDocument) {
   return doc.type === "Media" && isLegistarViewUrl(doc.url);
 }
 
+function isEssentialLegistarDocument(doc: LegistarDocument) {
+  return [
+    "Minutes",
+    "Accessible Minutes",
+    "Agenda",
+    "Accessible Agenda",
+    "Notice of Cancellation"
+  ].includes(doc.type);
+}
+
+export function legistarDocumentDownloadPriority(doc: PrimeGovDocument) {
+  if (["Minutes", "Accessible Minutes"].includes(doc.type)) return 0;
+  if (["Agenda", "Accessible Agenda", "Notice of Cancellation"].includes(doc.type)) return 1;
+  if (doc.type === "Agenda Packet") return 2;
+  if (doc.isAgendaItemAttachment) return 4;
+  return 3;
+}
+
 export function classifyLegistarLink(label = "", href = ""): LegistarDocument["type"] {
   const text = cleanText(label).toLowerCase();
   const url = href.toLowerCase();
@@ -414,14 +434,23 @@ async function downloadLegistarDocuments(
 
   await fs.mkdir(docsDir, { recursive: true });
 
-  for (const meeting of meetings) {
-    const docs = meeting.documents.filter(
-      (document) =>
-        shouldDownloadLegistarDocument(document) &&
-        shouldDownloadLegistarDocumentForWindow(document, options.monthsBack)
+  const downloadQueue = meetings
+    .flatMap((meeting) =>
+      meeting.documents
+        .filter(
+          (document) =>
+            shouldDownloadLegistarDocument(document) &&
+            shouldDownloadLegistarDocumentForWindow(document, options.monthsBack)
+        )
+        .map((doc) => ({ meeting, doc }))
+    )
+    .sort(
+      (left, right) =>
+        legistarDocumentDownloadPriority(left.doc) -
+        legistarDocumentDownloadPriority(right.doc)
     );
 
-    for (const doc of docs) {
+  for (const { meeting, doc } of downloadQueue) {
       if (options.shouldStop?.()) {
         log("Stopping Legistar document downloads early because the pipeline deadline is near.");
         return { downloaded, failed };
@@ -430,12 +459,34 @@ async function downloadLegistarDocuments(
       const filename = buildLegistarDocumentFilename(meeting, doc.type, doc.url);
 
       try {
+        const headers = {
+          "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
+          Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
+        };
+        if (!isEssentialLegistarDocument(doc)) {
+          const preflight = await context.request
+            .head(doc.url, { headers, timeout: 10_000 })
+            .catch(() => null);
+          const contentLength = Number(preflight?.headers()["content-length"] || 0);
+          if (
+            Number.isFinite(contentLength) &&
+            contentLength > LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES
+          ) {
+            failed += 1;
+            doc.localPath = null;
+            doc.bytes = contentLength;
+            doc.downloadError =
+              `Document exceeded the ${LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES}-byte optional-document limit.`;
+            log(`Skipped oversized optional Legistar document (${contentLength} bytes): ${doc.url}`);
+            continue;
+          }
+        }
+
         const response = await context.request.get(doc.url, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
-            Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
-          },
-          timeout: 60000
+          headers,
+          timeout: isEssentialLegistarDocument(doc)
+            ? 60_000
+            : LEGISTAR_OPTIONAL_DOCUMENT_TIMEOUT_MS
         });
 
         if (!response.ok()) {
@@ -491,7 +542,6 @@ async function downloadLegistarDocuments(
         doc.downloadError = error instanceof Error ? error.message : "Unknown download error";
         log(`Download error for ${doc.url}: ${doc.downloadError}`);
       }
-    }
   }
 
   return { downloaded, failed };

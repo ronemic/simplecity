@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   classifyLegistarLink,
+  legistarDocumentDownloadPriority,
   shouldDownloadLegistarDocumentForWindow,
   shouldEnrichLegistarAgendaAttachments
 } from "@/lib/sources/legistar";
@@ -17,6 +18,24 @@ test("deep Legistar refreshes skip packets and item attachments", () => {
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 3), false);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Document"), 3), false);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 1), true);
+});
+
+test("prioritizes minutes and agendas ahead of optional Legistar attachments", () => {
+  const agenda = document("Agenda");
+  const minutes = document("Minutes");
+  const packet = document("Agenda Packet");
+  const attachment = { ...document("Attachment"), isAgendaItemAttachment: true };
+  const ordered = [attachment, packet, agenda, minutes].sort(
+    (left, right) =>
+      legistarDocumentDownloadPriority(left) - legistarDocumentDownloadPriority(right)
+  );
+
+  assert.deepEqual(ordered.map((item) => item.type), [
+    "Minutes",
+    "Agenda",
+    "Agenda Packet",
+    "Attachment"
+  ]);
 });
 
 test("Legistar attachment enrichment defaults on and honors the universal switch", () => {

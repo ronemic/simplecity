@@ -4,6 +4,7 @@ import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import {
   buildCivicClerkFileUrl,
   civicClerkFileIdFromControlId,
+  civicClerkPlainTextFileUrl,
   classifyCivicClerkFile,
   normalizeCivicClerkEventCards,
   type CivicClerkEventCard
@@ -42,6 +43,13 @@ test("builds CivicClerk file URLs from dynamically discovered control IDs", () =
     buildCivicClerkFileUrl("https://losaltosca.portal.civicclerk.com/", "8872"),
     "https://losaltosca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=8872,plainText=false)"
   );
+  assert.equal(
+    civicClerkPlainTextFileUrl(
+      "https://losaltosca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=8872,plainText=false)"
+    ),
+    "https://losaltosca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=8872,plainText=true)"
+  );
+  assert.equal(civicClerkPlainTextFileUrl("https://example.com/file.pdf"), null);
 });
 
 test("normalizes separate CivicClerk event IDs without merging same-day meetings", () => {

@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { LlmReadyMeeting, SummaryCardRow } from "@/lib/types";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import {
+  type DecisionOutcomeMatchMethod,
   extractDecisionOutcome,
   extractMeetingOutcomeItems
 } from "@/lib/outcomes/extractDecisionOutcome";
@@ -51,6 +52,13 @@ export function fallbackDecisionOutcomeSummary(
   return `The item “${title}” was ${status}${voteText}.`;
 }
 
+export function decisionOutcomeCoverageComplete(
+  resultCardsFound: number,
+  resultCardsMatched: number
+) {
+  return resultCardsFound === resultCardsMatched;
+}
+
 export function keepUniqueOutcomeAssignments<T extends { matchedItemKey: string }>(
   proposals: T[]
 ) {
@@ -69,6 +77,8 @@ export function keepUniqueOutcomeAssignments<T extends { matchedItemKey: string 
 export function resolveCanonicalOutcomeAssignments<
   T extends {
     matchedItemKey: string;
+    matchMethod?: DecisionOutcomeMatchMethod;
+    matchScore?: number;
     cardCreatedAt?: string | null;
     cardSourceUrl?: string | null;
   }
@@ -98,6 +108,28 @@ export function resolveCanonicalOutcomeAssignments<
     );
     if (nonMinutesCards.length === 1) {
       selected.push(nonMinutesCards[0]);
+      duplicateCardsResolved += group.length - 1;
+      continue;
+    }
+
+    const methodPriority: Record<DecisionOutcomeMatchMethod, number> = {
+      source_item_id: 4,
+      agenda_number: 3,
+      source_url: 2,
+      title: 1
+    };
+    const rankedByIdentity = group
+      .map((proposal) => ({
+        proposal,
+        rank: proposal.matchMethod ? methodPriority[proposal.matchMethod] : 0,
+        score: proposal.matchScore ?? 0
+      }))
+      .sort((left, right) => right.rank - left.rank || right.score - left.score);
+    if (
+      rankedByIdentity[0].rank >= methodPriority.source_url &&
+      (rankedByIdentity[1]?.rank ?? -1) < rankedByIdentity[0].rank
+    ) {
+      selected.push(rankedByIdentity[0].proposal);
       duplicateCardsResolved += group.length - 1;
       continue;
     }
@@ -210,6 +242,8 @@ export async function reconcileDecisionOutcomesForMeeting(
     return [
       {
         matchedItemKey: outcome.matchedItemKey,
+        matchMethod: outcome.matchMethod,
+        matchScore: outcome.matchScore,
         cardCreatedAt: card.created_at,
         cardSourceUrl: card.source_url,
         cardId: card.id,
@@ -248,6 +282,15 @@ export async function reconcileDecisionOutcomesForMeeting(
       .filter((card) => cardHasOfficialResult(card, meeting, inventory.items))
       .map((card) => card.id)
   );
+  const selectedCardByItem = new Map(
+    resolved.selected.map((proposal) => [proposal.matchedItemKey, proposal.cardId])
+  );
+  for (const proposal of proposals) {
+    const selectedCardId = selectedCardByItem.get(proposal.matchedItemKey);
+    if (selectedCardId && selectedCardId !== proposal.cardId) {
+      resultCardIds.delete(proposal.cardId);
+    }
+  }
   let explanations = new Map<string, { summary: string; nextStep: string | null }>();
   if (
     options.explainWithLlm &&
@@ -313,9 +356,10 @@ export async function reconcileDecisionOutcomesForMeeting(
     informationalItemsFound: inventory.informationalItemsFound,
     duplicateCardsDetected: resolved.duplicateCardsDetected,
     duplicateCardsResolved: resolved.duplicateCardsResolved,
-    complete:
-      resultCardIds.size === matchedResultCardIds.size &&
-      resolved.rejectedAmbiguous === 0
+    complete: decisionOutcomeCoverageComplete(
+      resultCardIds.size,
+      matchedResultCardIds.size
+    )
   };
 
   if (rows.length === 0) {

@@ -11,6 +11,8 @@ import { slugify } from "@/lib/utils/slug";
 
 export const SCRAPED_DIR = path.join(process.cwd(), "scraped-primegov");
 export const DOCUMENTS_DIR = path.join(SCRAPED_DIR, "documents");
+export const EMPTY_OFFICIAL_DOCUMENT_ERROR =
+  "Official document endpoint returned an empty unpublished placeholder.";
 
 export function getJurisdictionScrapedDir(jurisdictionSlug: string) {
   return path.join(SCRAPED_DIR, jurisdictionSlug);
@@ -30,6 +32,7 @@ export type DownloadDocumentsOptions = {
   validateFinalUrl?: (url: string) => boolean;
   documentFilter?: (document: PrimeGovDocument) => boolean;
   userAgent?: string;
+  plainTextFallbackUrl?: (documentUrl: string) => string | null;
 };
 
 function decodeBasicHtmlEntities(text: string) {
@@ -56,6 +59,24 @@ function htmlToText(html: string) {
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function decodedPlainText(buffer: Buffer) {
+  const raw = buffer.toString("utf8").trim();
+  if (!raw || raw.includes("\u0000")) return "";
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed === "string") return parsed.trim();
+    if (parsed && typeof parsed === "object") {
+      const candidate = (parsed as Record<string, unknown>).plainText;
+      if (typeof candidate === "string") return candidate.trim();
+    }
+  } catch {
+    // The fallback commonly returns text/plain rather than JSON.
+  }
+
+  return raw;
 }
 
 function isIqm2ErrorHtml(text: string) {
@@ -480,6 +501,14 @@ export async function downloadOfficialSiteDocuments(
         }
 
         const buffer = await response.body();
+        if (buffer.length === 0) {
+          failed += 1;
+          doc.localPath = null;
+          doc.bytes = 0;
+          doc.downloadError = EMPTY_OFFICIAL_DOCUMENT_ERROR;
+          log(`Ignored empty official-document placeholder: ${doc.url}`);
+          continue;
+        }
         if (options.maxBytes && buffer.length > options.maxBytes) {
           failed += 1;
           doc.localPath = null;
@@ -525,6 +554,44 @@ export async function downloadOfficialSiteDocuments(
 
           log(`Saved HTML document text: ${filePath}`);
           continue;
+        }
+
+        const plainTextFallbackUrl = options.plainTextFallbackUrl?.(doc.url);
+        if (plainTextFallbackUrl) {
+          try {
+            const fallbackResponse = await requestOfficialSiteDocument(
+              context,
+              plainTextFallbackUrl,
+              options,
+              {
+                "User-Agent":
+                  options.userAgent || "Mozilla/5.0 SimpleCity official-site agenda scraper",
+                Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
+              }
+            );
+            const fallbackText = fallbackResponse.ok()
+              ? decodedPlainText(await fallbackResponse.body())
+              : "";
+            if (fallbackText) {
+              const filePath = path.join(docsDir, `${baseFilename}.txt`);
+              await fs.writeFile(filePath, fallbackText, "utf8");
+
+              downloaded += 1;
+              doc.localPath = filePath;
+              doc.bytes = Buffer.byteLength(fallbackText);
+              doc.extractedText = fallbackText;
+              doc.extractionCharacterCount = fallbackText.length;
+              doc.downloadError = null;
+              log(`Saved official plain-text fallback: ${filePath}`);
+              continue;
+            }
+          } catch (error) {
+            log(
+              `Plain-text fallback failed for ${doc.url}: ${
+                error instanceof Error ? error.message : "Unknown fallback error"
+              }`
+            );
+          }
         }
 
         const errorPath = path.join(docsDir, `${baseFilename}.download`);

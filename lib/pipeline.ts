@@ -111,6 +111,10 @@ export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
       new Map(
         meeting.documents
           .filter((document) => ["Minutes", "Accessible Minutes"].includes(document.type))
+          .filter(
+            (document) =>
+              !/empty unpublished placeholder/i.test(String(document.downloadError || ""))
+          )
           .map((document) => [document.url, document])
       ).values()
     );
@@ -120,6 +124,13 @@ export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
         !document.downloadError &&
         String(document.extractedText || "").trim().length < 40
     );
+
+    const hasUsableMinutes = minutes.some(
+      (document) =>
+        !document.downloadError &&
+        String(document.extractedText || "").trim().length >= 40
+    );
+    if (hasUsableMinutes) continue;
 
     if (failed.length > 0) {
       errors.push(
@@ -170,6 +181,13 @@ export function shouldReconcileMinutesWithoutGeneratingCards(
         Boolean(document.extractedText)
     )
   );
+}
+
+export function shouldSkipUnchangedSummary(
+  sourceHash: string | null,
+  summarizedSourceHash: string | null
+) {
+  return Boolean(sourceHash && summarizedSourceHash === sourceHash);
 }
 
 export async function runSimpleCityPipeline(
@@ -454,8 +472,12 @@ export async function runSimpleCityPipeline(
               continue;
             }
 
-            if (shouldAppendToExisting && item.summarizedSourceHash === item.sourceHash) {
-              log(`Skipping ${item.meeting.title}; source unchanged and cards already exist.`);
+            if (shouldSkipUnchangedSummary(item.sourceHash, item.summarizedSourceHash)) {
+              log(
+                item.existingCardCount > 0
+                  ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.`
+                  : `Skipping ${item.meeting.title}; source unchanged and the prior summary produced no cards.`
+              );
               continue;
             }
 
