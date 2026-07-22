@@ -100,12 +100,6 @@ function hasFlag(name: string) {
   return process.argv.includes(`--${name}`);
 }
 
-function maskEmail(email: string) {
-  const [localPart = "", domain = ""] = email.split("@");
-  if (!localPart || !domain) return "[redacted email]";
-  return `${localPart[0]}***@${domain}`;
-}
-
 function getOptions(): DigestOptions {
   const rawLimit = getArgValue("limit-subscribers");
   const limitSubscribers = rawLimit ? Number(rawLimit) : null;
@@ -309,12 +303,12 @@ async function sendDigestForSubscriber(
   );
 
   if (cards.length === 0) {
-    console.log(`No new cards for ${maskEmail(subscriber.email)}.`);
+    console.log("No new cards for a due subscriber.");
     return { sent: false, cardCount: 0 };
   }
 
   if (options.dryRun) {
-    console.log(`[dry-run] Would send ${cards.length} cards to ${maskEmail(subscriber.email)}.`);
+    console.log(`[dry-run] Would send ${cards.length} cards to a subscriber.`);
     return { sent: false, cardCount: cards.length };
   }
 
@@ -336,7 +330,7 @@ async function sendDigestForSubscriber(
     providerMessageId: result.id,
     sentAt
   });
-  console.log(`Sent ${cards.length} cards to ${maskEmail(subscriber.email)}.`);
+  console.log(`Sent ${cards.length} cards to a subscriber.`);
   return { sent: true, cardCount: cards.length };
 }
 
@@ -373,7 +367,7 @@ async function main() {
       cardCount += result.cardCount;
     } catch (error) {
       failureCount += 1;
-      console.error(`Failed to send digest to ${maskEmail(subscriber.email)}:`, error);
+      console.error("Failed to send a subscriber digest. Details were omitted from public logs.");
       await recordDigestDelivery({
         subscriberId: subscriber.id,
         jurisdictionSlugs: (subscriber.email_subscriptions || []).map(
@@ -382,8 +376,8 @@ async function main() {
         cardIds: [],
         status: "failed",
         error: error instanceof Error ? error.message : "Unknown digest error."
-      }).catch((recordError) => {
-        console.error("Failed to record digest failure:", recordError);
+      }).catch(() => {
+        console.error("Failed to record a digest failure. Details were omitted from public logs.");
       });
     }
   }

@@ -35,6 +35,7 @@ import {
   scrapeMenloParkMeetings
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
+import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -180,9 +181,10 @@ export async function runSimpleCityPipeline(
   const logs: string[] = [];
   const errors: string[] = [];
   const log = (message: string) => {
-    const line = `${new Date().toISOString()} [${jurisdiction.slug}] ${message}`;
+    const publicMessage = redactPublicLogMessage(message);
+    const line = `${new Date().toISOString()} [${jurisdiction.slug}] ${publicMessage}`;
     logs.push(line);
-    options.log?.(message);
+    options.log?.(publicMessage);
   };
   const deadlineExceeded = () => Boolean(deadline?.exceeded() || options.shouldStop?.());
   const recordDeadline = (phase: string) => {
@@ -687,10 +689,11 @@ export async function runJurisdictionPipelines(
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown jurisdiction pipeline error";
       errors.push(`${jurisdiction.name}: ${message}`);
+      const publicMessage = redactPublicLogMessage(message);
       const failed: PipelineResult = {
         runId: null,
         status: "failed",
-        logs: [`${new Date().toISOString()} [${jurisdiction.slug}] ${message}`],
+        logs: [`${new Date().toISOString()} [${jurisdiction.slug}] ${publicMessage}`],
         errors: [message],
         meetingsFound: 0,
         documentsDownloaded: 0,

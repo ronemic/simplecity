@@ -9,6 +9,7 @@ import {
   requireValidJurisdictionSlug,
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
+import { publicErrorMessage, redactPublicLogMessage } from "@/lib/logging/publicLog";
 
 function getArgValue(name: string) {
   const prefix = `--${name}=`;
@@ -95,7 +96,7 @@ async function main() {
         });
 
   await fs.writeFile(outputJson, JSON.stringify(result, null, 2));
-  console.log(`Saved pipeline result to ${outputJson}`);
+  console.log(redactPublicLogMessage(`Saved pipeline result to ${outputJson}`));
 
   if (result.status === "failed") process.exit(1);
   if (process.argv.includes("--require-results-coverage")) {
@@ -112,6 +113,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(publicErrorMessage(error, "Unknown pipeline error."));
   process.exit(1);
 });

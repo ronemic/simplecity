@@ -8,6 +8,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { consumeRateLimit, rateLimitedResponse } from "@/lib/security/rateLimit";
 import { isValidScrapeRequestSignature } from "@/lib/security/scrapeRequest";
+import { publicErrorMessage } from "@/lib/logging/publicLog";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -144,7 +145,10 @@ function startBackgroundScraper(
         revalidatePublicContent();
       }
     } catch (error) {
-      console.error("Background scraper failed", error);
+      console.error(
+        "Background scraper failed:",
+        publicErrorMessage(error, "Unknown background scraper error.")
+      );
     } finally {
       activeScrapers.delete(key);
     }
