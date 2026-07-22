@@ -5,6 +5,7 @@ import {
   Landmark,
   Layers3,
   Link as LinkIcon,
+  Newspaper,
   ShieldCheck,
   WalletCards
 } from "lucide-react";
@@ -126,36 +127,53 @@ export default async function AboutPage() {
         </section>
       </div>
 
-      <section className="mt-12 max-w-4xl">
-        <div className="grid gap-5 sm:grid-cols-[10rem_minmax(0,1fr)] sm:gap-8">
-          <div>
-            <p className="label-eyebrow !text-civic">
-              {locale === "es" ? "En las noticias" : "In the news"}
-            </p>
-            <p className="mt-2 text-sm font-semibold text-black/60">Los Altos Town Crier</p>
-          </div>
+      <section className="mt-5 max-w-5xl">
+        <div className="flex items-center gap-2.5 text-civic">
+          <Newspaper aria-hidden className="h-5 w-5" />
+          <p className="label-eyebrow !text-civic">
+            {locale === "es" ? "En las noticias" : "In the news"}
+          </p>
+        </div>
 
-          <a
-            href={FEATURE_ARTICLE_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="group rounded-sm focus-visible:focus-ring"
-          >
-            <h2 className="max-w-2xl text-lg font-semibold leading-7 text-ink transition group-hover:text-civic">
-              Using AI, students create website that summarizes local government agendas
-            </h2>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-              <p className="text-sm leading-6 text-black/65">
-                {locale === "es"
-                  ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity."
-                  : "Local coverage of the student team behind SimpleCity."}
-              </p>
-              <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-civic">
-                {locale === "es" ? "Leer artículo" : "Read article"}
-                <ExternalLink aria-hidden className="h-4 w-4" />
+        <div className="quiet-card mt-2 overflow-hidden">
+          <div className="grid sm:grid-cols-[12rem_minmax(0,1fr)]">
+            <div className="flex items-center gap-3 border-b border-black/10 px-4 py-2.5 sm:block sm:border-b-0 sm:border-r sm:px-5 sm:py-3">
+              <span className="icon-tile-sm">
+                <Landmark aria-hidden className="h-5 w-5" />
               </span>
+              <div className="sm:mt-1.5">
+                <p className="text-base font-bold leading-6 text-ink">Los Altos Town Crier</p>
+                <div aria-hidden className="mt-1.5 hidden h-0.5 w-8 rounded-full bg-civic sm:block" />
+              </div>
             </div>
-          </a>
+
+            <div className="px-4 py-2.5 sm:px-5 sm:py-3">
+              <p className="inline-flex rounded-full bg-civic/10 px-2.5 text-xs font-bold uppercase leading-5 text-civic">
+                {locale === "es" ? "Cobertura destacada" : "Featured coverage"}
+              </p>
+              <h2 className="mt-1 max-w-2xl text-lg font-semibold leading-6 text-ink">
+                {locale === "es"
+                  ? "Estudiantes usan IA para crear un sitio web que resume las agendas de gobiernos locales"
+                  : "Using AI, students create website that summarizes local government agendas"}
+              </h2>
+              <div className="mt-1.5 flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm leading-5 text-black/65">
+                  {locale === "es"
+                    ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity."
+                    : "Local coverage of the student team behind SimpleCity."}
+                </p>
+                <a
+                  href={FEATURE_ARTICLE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="action-secondary-xs shrink-0"
+                >
+                  {locale === "es" ? "Leer artículo" : "Read article"}
+                  <ExternalLink aria-hidden className="h-4 w-4" />
+                </a>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

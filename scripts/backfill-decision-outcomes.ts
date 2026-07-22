@@ -17,6 +17,7 @@ type StoredMeeting = {
   platform: string | null;
   date_text: string | null;
   time_text: string | null;
+  meeting_datetime: string | null;
   status: string | null;
   source_url: string | null;
   raw: unknown;
@@ -96,7 +97,8 @@ function toLlmReadyMeeting(
 
 async function loadPastMeetings(
   jurisdiction: JurisdictionConfig,
-  meetingId: string | null
+  meetingId: string | null,
+  since: string | null
 ) {
   const supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
   const meetings: StoredMeeting[] = [];
@@ -104,10 +106,11 @@ async function loadPastMeetings(
   for (let from = 0; ; from += PAGE_SIZE) {
     let query = supabase
       .from("meetings")
-      .select("id,jurisdiction_name,jurisdiction_slug,platform,date_text,time_text,status,source_url,raw")
+      .select("id,jurisdiction_name,jurisdiction_slug,platform,date_text,time_text,meeting_datetime,status,source_url,raw")
       .eq("jurisdiction_slug", jurisdiction.slug)
       .eq("status", "Past");
     if (meetingId) query = query.eq("id", meetingId);
+    if (since) query = query.gte("meeting_datetime", since);
     const { data, error } = await query
       .order("meeting_datetime", { ascending: false, nullsFirst: false })
       .range(from, from + PAGE_SIZE - 1);
@@ -125,13 +128,15 @@ async function backfillJurisdiction(
   execute: boolean,
   options: {
     meetingId: string | null;
+    since: string | null;
     explainWithLlm: boolean;
     translateWithLlm: boolean;
   }
 ) {
   const { supabase, meetings } = await loadPastMeetings(
     jurisdiction,
-    options.meetingId
+    options.meetingId,
+    options.since
   );
   let found = 0;
   let upserted = 0;
@@ -193,7 +198,7 @@ async function backfillJurisdiction(
   }
 
   console.log(
-    `${jurisdiction.name}: checked ${meetings.length} past meeting(s), found ${found} card outcome proposal(s), matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s), ${
+    `${jurisdiction.name}: checked ${meetings.length} past meeting(s)${options.since ? ` since ${options.since}` : ""}, found ${found} card outcome proposal(s), matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s)${resultItemsFound > 0 ? ` (${Math.round((resultItemsMatched / resultItemsFound) * 1000) / 10}%)` : ""}, ${
       execute ? `upserted ${upserted}` : "would write after review"
     }, left ${resultItemsUnmatched} unmatched, withheld ${rejectedAmbiguous} ambiguous assignment(s), and resolved ${duplicateCardsResolved} of ${duplicateCardsDetected} duplicate card(s).`
   );
@@ -201,8 +206,13 @@ async function backfillJurisdiction(
 
 async function main() {
   const execute = process.argv.includes("--execute");
+  const since = argument("since");
+  if (since && Number.isNaN(Date.parse(since))) {
+    throw new Error(`Invalid --since date: ${since}`);
+  }
   const options = {
     meetingId: argument("meeting-id"),
+    since,
     explainWithLlm: !process.argv.includes("--no-explain"),
     translateWithLlm: process.argv.includes("--translate")
   };

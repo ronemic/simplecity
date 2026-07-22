@@ -343,6 +343,45 @@ test("uses a stable source item id before ambiguous title matching", () => {
   assert.equal(result.matchScore, 1);
 });
 
+test("stable source item ids match future results across every configured jurisdiction", () => {
+  for (const jurisdictionSlug of [
+    "foster-city",
+    "san-mateo-city",
+    "san-mateo-county",
+    "mountain-view",
+    "santa-clara-county",
+    "los-altos",
+    "san-francisco",
+    "menlo-park",
+    "east-palo-alto",
+    "redwood-city"
+  ]) {
+    const result = extractDecisionOutcome(
+      {
+        id: `${jurisdictionSlug}-card`,
+        source_item_id: "official-item-42",
+        agenda_item: "Resident-friendly title with completely different wording",
+        source_url: "https://example.com/meeting"
+      },
+      meeting(jurisdictionSlug, {
+        items: [
+          agendaItem({
+            externalId: "official-item-42",
+            title: "Official legislative title that does not resemble the card",
+            action: "Approved",
+            result: "Passed 5-0",
+            sourceUrl: "https://example.com/meeting"
+          })
+        ]
+      })
+    );
+
+    assert.ok(result, jurisdictionSlug);
+    assert.equal(result.matchMethod, "source_item_id", jurisdictionSlug);
+    assert.equal(result.matchScore, 1, jurisdictionSlug);
+  }
+});
+
 test("does not treat a meeting-level duplicate URL as an item identifier", () => {
   const sharedUrl = "https://example.com/meeting";
   const match = findGuardedAgendaItemMatch(
