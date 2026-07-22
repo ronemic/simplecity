@@ -20,7 +20,7 @@ export function cardShareDescription(card: SummaryCardRow, locale: Locale = "en"
 
   return summary || (locale === "es"
     ? "Un resumen en lenguaje claro de una decisión del gobierno local."
-    : "A plain-language summary of a local government decision.");
+    : "An easy-to-understand, source-linked summary of a local government decision.");
 }
 
 export function cardSummaryPoints(card: SummaryCardRow, locale: Locale = "en") {

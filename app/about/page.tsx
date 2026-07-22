@@ -13,12 +13,12 @@ import { getPublicStats } from "@/lib/db/queries";
 import { getRequestLocale } from "@/lib/i18n/server";
 
 export const metadata: Metadata = {
-  title: "About SimpleCity | Plain-English local government decisions",
-  description: "Learn how SimpleCity turns official Bay Area public meeting agendas into source-linked, plain-English civic decision summaries.",
+  title: "About SimpleCity | Easy-to-understand local decisions",
+  description: "Learn how SimpleCity helps residents follow Bay Area decisions, upcoming votes, participation options, and official outcomes.",
   alternates: { canonical: "/about" },
   openGraph: {
     title: "About SimpleCity",
-    description: "Official local government agendas, translated into source-linked plain-English summaries.",
+    description: "Track local decisions, participation opportunities, and outcomes with direct links to official records.",
     type: "website",
     url: "/about",
     siteName: "SimpleCity"
@@ -72,15 +72,15 @@ export default async function AboutPage() {
           <p className="label-eyebrow !text-civic">
             {locale === "es" ? "Acerca de SimpleCity" : "About SimpleCity"}
           </p>
-          <h1 className="page-title mt-2 !font-bold sm:!text-[2.5rem]">
+          <h1 className="page-title mt-2">
             {locale === "es"
               ? "Acceso en lenguaje claro a decisiones locales"
-              : "Plain-English access to local decisions"}
+              : "Easy-to-understand local decisions"}
           </h1>
           <p className="page-copy mt-4">
             {locale === "es"
               ? "SimpleCity ayuda a residentes a entender agendas de reuniones del gobierno local sin tener que descifrar lenguaje gubernamental ni revisar paquetes o avisos extensos."
-              : "SimpleCity helps residents understand local government meeting agendas without needing to decode government language or dig through long agenda packets and notices."}
+              : "SimpleCity helps residents understand what local governments are deciding, why it matters, when they can participate, and what happens afterward."}
           </p>
           <section className="mt-10">
             <p className="label-eyebrow !text-civic">
@@ -127,54 +127,44 @@ export default async function AboutPage() {
         </section>
       </div>
 
-      <section className="mt-5 max-w-5xl">
-        <div className="flex items-center gap-2.5 text-civic">
-          <Newspaper aria-hidden className="h-5 w-5" />
-          <p className="label-eyebrow !text-civic">
-            {locale === "es" ? "En las noticias" : "In the news"}
-          </p>
-        </div>
+      <section className="mt-10 max-w-5xl">
+        <p className="label-eyebrow !text-civic">
+          {locale === "es" ? "En las noticias" : "In the news"}
+        </p>
 
-        <div className="quiet-card mt-2 overflow-hidden">
-          <div className="grid sm:grid-cols-[12rem_minmax(0,1fr)]">
-            <div className="flex items-center gap-3 border-b border-black/10 px-4 py-2.5 sm:block sm:border-b-0 sm:border-r sm:px-5 sm:py-3">
-              <span className="icon-tile-sm">
-                <Landmark aria-hidden className="h-5 w-5" />
-              </span>
-              <div className="sm:mt-1.5">
-                <p className="text-base font-bold leading-6 text-ink">Los Altos Town Crier</p>
-                <div aria-hidden className="mt-1.5 hidden h-0.5 w-8 rounded-full bg-civic sm:block" />
-              </div>
-            </div>
-
-            <div className="px-4 py-2.5 sm:px-5 sm:py-3">
-              <p className="inline-flex rounded-full bg-civic/10 px-2.5 text-xs font-bold uppercase leading-5 text-civic">
+        <article className="quiet-card mt-4 p-5 sm:p-6">
+          <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
+            <span className="icon-tile-sm">
+              <Newspaper aria-hidden className="h-5 w-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="label-eyebrow !text-civic">
                 {locale === "es" ? "Cobertura destacada" : "Featured coverage"}
               </p>
-              <h2 className="mt-1 max-w-2xl text-lg font-semibold leading-6 text-ink">
+              <h2 className="mt-1 max-w-3xl text-lg font-bold leading-7 text-ink sm:text-xl">
                 {locale === "es"
                   ? "Estudiantes usan IA para crear un sitio web que resume las agendas de gobiernos locales"
                   : "Using AI, students create website that summarizes local government agendas"}
               </h2>
-              <div className="mt-1.5 flex flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm leading-5 text-black/65">
-                  {locale === "es"
-                    ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity."
-                    : "Local coverage of the student team behind SimpleCity."}
-                </p>
-                <a
-                  href={FEATURE_ARTICLE_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="action-secondary-xs shrink-0"
-                >
-                  {locale === "es" ? "Leer artículo" : "Read article"}
-                  <ExternalLink aria-hidden className="h-4 w-4" />
-                </a>
-              </div>
+              <p className="mt-1 text-sm font-semibold leading-6 text-black/60">
+                Los Altos Town Crier
+                <span aria-hidden className="mx-2 text-black/25">·</span>
+                {locale === "es"
+                  ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity"
+                  : "Local coverage of the student team behind SimpleCity"}
+              </p>
             </div>
+            <a
+              href={FEATURE_ARTICLE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="action-secondary-sm w-fit shrink-0"
+            >
+              {locale === "es" ? "Leer artículo" : "Read article"}
+              <ExternalLink aria-hidden className="h-4 w-4" />
+            </a>
           </div>
-        </div>
+        </article>
       </section>
 
       <section className="mt-10">

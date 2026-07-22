@@ -36,7 +36,7 @@ export async function generateMetadata({
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
   const title = `${label} decisions | SimpleCity`;
-  const description = `Plain-English summaries of ${label.toLowerCase()} decisions, upcoming votes, public meetings, and ways residents can participate.`;
+  const description = `Track ${label.toLowerCase()} decisions, upcoming votes, public meetings, outcomes, and ways residents can participate.`;
   const canonicalUrl = new URL("/decisions", getConfiguredAppUrl());
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));

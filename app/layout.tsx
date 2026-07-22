@@ -11,17 +11,17 @@ export const metadata: Metadata = {
   metadataBase: new URL(getConfiguredAppUrl()),
   applicationName: "SimpleCity",
   title: "SimpleCity",
-  description: "Local decisions, translated into plain-English civic action cards.",
+  description: "Easy-to-understand, source-linked summaries of local decisions, upcoming votes, and outcomes.",
   openGraph: {
     title: "SimpleCity",
-    description: "Local decisions, translated into plain-English civic action cards.",
+    description: "Easy-to-understand, source-linked summaries of local decisions, upcoming votes, and outcomes.",
     type: "website",
     siteName: "SimpleCity"
   },
   twitter: {
     card: "summary",
     title: "SimpleCity",
-    description: "Local decisions, translated into plain-English civic action cards."
+    description: "Easy-to-understand, source-linked summaries of local decisions, upcoming votes, and outcomes."
   },
   manifest: "/manifest.webmanifest",
   icons: {

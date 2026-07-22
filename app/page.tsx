@@ -38,11 +38,11 @@ const FEATURE_ARTICLE_URL =
 export const revalidate = 300;
 
 export const metadata: Metadata = {
-  title: "SimpleCity | Plain-English local government decisions",
+  title: "SimpleCity | Easy-to-understand local decisions",
   description: "Find upcoming local government decisions, public meetings, official sources, and ways to participate across Bay Area communities.",
   alternates: { canonical: "/" },
   openGraph: {
-    title: "SimpleCity | Plain-English local government decisions",
+    title: "SimpleCity | Easy-to-understand local decisions",
     description: "Find upcoming local decisions, public meetings, official sources, and ways to participate.",
     type: "website",
     url: "/",
@@ -50,7 +50,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary",
-    title: "SimpleCity | Plain-English local government decisions",
+    title: "SimpleCity | Easy-to-understand local decisions",
     description: "Find upcoming local decisions, public meetings, official sources, and ways to participate."
   }
 };
@@ -237,7 +237,7 @@ export default async function Home({
             <p className="mt-4 max-w-2xl text-balance text-base font-medium leading-7 text-[#d9e2ec] sm:mt-5 sm:text-xl sm:leading-8">
               {locale === "es"
                 ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
-                : "Read plain-language summaries, check upcoming meetings and votes, and find ways to share your input."}
+                : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
             <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>
           </div>

@@ -148,7 +148,7 @@ export async function generateMetadata({
   const meetingTitle = displayMeetingTitle(meeting, "Public meeting", "en");
   const date = formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text);
   const title = `${meetingTitle} - ${jurisdictionLabel} | SimpleCity`;
-  const description = `${meetingTitle} on ${date}. View the agenda, official documents, and plain-English decision summaries from ${jurisdictionLabel}.`;
+  const description = `${meetingTitle} on ${date}. View the agenda, official documents, and decision briefings from ${jurisdictionLabel}.`;
   const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
   canonicalUrl.searchParams.set("jurisdiction", jurisdictionSlug);
 
@@ -300,7 +300,7 @@ export default async function MeetingDetailPage({
           <div>
             <p className="label-eyebrow text-civic">{t(locale, "summaryCards")}</p>
             <h2 className="section-title mt-1">
-              {locale === "es" ? "Puntos de agenda en lenguaje claro" : "Plain-English agenda items"}
+              {locale === "es" ? "Puntos de agenda en lenguaje claro" : "Easy-to-understand decision summaries"}
             </h2>
           </div>
           {cards.length > 0 ? (

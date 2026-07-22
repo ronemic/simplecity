@@ -46,15 +46,15 @@ The supplied canonical status and headline are authoritative and must never be c
 For each input, return exactly one JSON object in outcomes with:
 - id: copied exactly
 - canonicalHeadline: copied exactly
-- summary: one or two plain-English sentences explaining what the body actually did and whether the action was final
+- summary: one or two clear, direct sentences explaining what the body actually did and whether the action was final
 - nextStep: a short source-supported next step, or null
 
-Rewrite the official context instead of quoting it. Lead with the substantive decision in plain language.
+Rewrite the official context instead of quoting it. Lead with the substantive decision in clear, direct language.
 - Remove document boilerplate such as meeting titles, headers, footers, page numbers, and labels like "ACTION:".
 - Rewrite procedural phrases such as "Motion and second (Name/Name), to ..." as a direct statement of what the body voted to do. Omit mover and seconder names unless they are necessary to understand the outcome.
 - Repair obvious OCR word splits, but do not otherwise alter names or factual details.
 - When a motion to recommend something passed, say that the body voted to recommend it; do not imply that the underlying proposal received final approval.
-- Use a plain-language verb consistent with the canonical headline. For a passed motion, explicitly say that the body passed the motion or voted to take the stated action.
+- Use a direct verb consistent with the canonical headline. For a passed motion, explicitly say that the body passed the motion or voted to take the stated action.
 
 Use only facts present in the official context. Do not invent vote counts, dates, people, money, destinations, implementation details, or legal effect. Do not call an item approved, adopted, enacted, or finally passed unless its canonical status is approved. Return JSON only.`;
 

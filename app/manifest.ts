@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "SimpleCity",
     short_name: "SimpleCity",
-    description: "Local decisions, translated into plain-English civic action cards.",
+    description: "Easy-to-understand, source-linked summaries of local decisions, upcoming votes, and outcomes.",
     start_url: "/",
     scope: "/",
     display: "standalone",

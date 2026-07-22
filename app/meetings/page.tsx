@@ -37,7 +37,7 @@ export async function generateMetadata({
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
   const title = `${label} public meetings | SimpleCity`;
-  const description = `Browse ${label.toLowerCase()} public meetings, dates, agendas, official documents, and plain-English agenda summaries.`;
+  const description = `Browse ${label.toLowerCase()} public meetings, dates, agendas, official documents, and decision briefings.`;
   const canonicalUrl = new URL("/meetings", getConfiguredAppUrl());
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));

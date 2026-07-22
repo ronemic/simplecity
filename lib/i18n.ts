@@ -142,7 +142,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     dayView: "Day view",
     decisions: "Decisions",
     decisionsDescription:
-      "Read plain-language summaries of decisions being made by local government, ranked to show upcoming decisions first and then by recency and community impact.",
+      "Read easy-to-understand, source-linked summaries of decisions being made by local government, ranked to show upcoming decisions first and then by recency and community impact.",
     everydayImpactTitle: "Find decisions by everyday impact",
     filter: "Filter",
     filterByTopic: "Filter by topic",
