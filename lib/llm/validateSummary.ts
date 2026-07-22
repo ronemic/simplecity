@@ -393,7 +393,15 @@ function hasEquivalentDateValue(value: string, sourceText: string) {
 function isGroundedValue(value: string, sourceText: string) {
   const normalizedValue = normalizeEvidenceText(value);
   if (!normalizedValue) return true;
-  if (normalizeEvidenceText(sourceText).includes(normalizedValue)) return true;
+  const normalizedSourceText = normalizeEvidenceText(sourceText);
+  if (normalizedSourceText.includes(normalizedValue)) return true;
+  const compactNumericSpacing = (text: string) =>
+    text.replace(/(?<=\d)\s+(?=\d)/g, "");
+  if (
+    compactNumericSpacing(normalizedSourceText).includes(
+      compactNumericSpacing(normalizedValue)
+    )
+  ) return true;
   return (
     hasEquivalentNumericValue(value, sourceText) ||
     hasEquivalentDateValue(value, sourceText)

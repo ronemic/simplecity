@@ -36,7 +36,7 @@ function currentMeetingBoundary(text: string) {
   );
   const packetAttachment = text.search(/\bATTACHMENTS?\s+\d*\s+(?:EAST PALO ALTO|CITY OF|COUNTY OF)\b/);
   const adjournment = text.search(
-    /(?:^|\n)\s*(?:\d{1,2}\s*[.):-]\s*)?ADJOURNMENT\b/im
+    /(?:^|\n)\s*(?:(?:[A-Z]|\d{1,2})\s*[.):-]\s*)?ADJOURNMENT\b/im
   );
   const boundary = [staffReport, packetAttachment, adjournment]
     .filter((index) => index > 0)
@@ -51,7 +51,7 @@ export function currentMeetingSourceText(text: string) {
 function currentAgendaSection(text: string) {
   const currentSource = currentMeetingSourceText(text);
   const openingItem = currentSource.search(
-    /(?:^|\n)\s*(?:1\s*[.):-]\s*)?(?:call to order|roll call|opening remarks?)\b/im
+    /(?:^|\n)\s*(?:(?:[A-Z]|1)\s*[.):-]\s*)?(?:call to order|roll call|opening remarks?)\b/im
   );
   const start = openingItem >= 0 ? openingItem : 0;
   return currentSource.slice(start);

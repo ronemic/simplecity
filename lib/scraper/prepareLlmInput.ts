@@ -489,9 +489,9 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   if (structuredItemContext) {
     const currentSourceContext = currentMeetingSourceText(selectedText);
     selectedText = [
-      structuredItemContext,
       MEETING_WIDE_CONTEXT_HEADING,
-      currentSourceContext
+      currentSourceContext,
+      structuredItemContext
     ].join("\n\n");
     extractionNotes.push(
       `Prepared item-specific context for ${meeting.items.length} current agenda item(s) and excluded packet text after the current agenda boundary.`

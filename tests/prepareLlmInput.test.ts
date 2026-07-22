@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildLlmReadyMeeting } from "@/lib/scraper/prepareLlmInput";
+import {
+  buildLlmReadyMeeting,
+  MAX_CHARS_FOR_LLM
+} from "@/lib/scraper/prepareLlmInput";
+import { extractMeetingWideParticipationContext } from "@/lib/scraper/agendaItemContext";
 import type { PrimeGovMeeting } from "@/lib/types";
 
 function repeatSentence(sentence: string, count: number) {
@@ -149,6 +153,59 @@ ${repeatSentence("Historical supporting material.", 20)}
   assert.match(prepared.llmInputText, /clerk@city\.example/);
   assert.doesNotMatch(prepared.llmInputText, /Historical contract award/);
   assert.doesNotMatch(prepared.llmInputText, /72 hours before/);
+});
+
+test("keeps meeting-wide participation context ahead of oversized item inventories", async () => {
+  const agendaText = `
+CITY COMMISSION REGULAR MEETING AGENDA
+Join online with meeting ID 846 9472 6242.
+Email comments to planning.commission@menlopark.gov.
+1. CALL TO ORDER
+2. Contract approval
+Recommendation: Approve the contract.
+3. ADJOURNMENT
+${repeatSentence("Agenda source context.", 20)}
+`;
+  const meeting: PrimeGovMeeting = {
+    externalId: "large-commission-2026-07-13",
+    section: "Upcoming Meetings",
+    title: "Large Commission",
+    dateText: "July 13, 2026",
+    meetingType: "Commission",
+    rowText: "Large Commission July 13, 2026 Agenda Packet",
+    status: "Upcoming",
+    sourceUrl: "https://city.example/agenda.pdf",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda Packet",
+        label: "Agenda Packet",
+        url: "https://city.example/agenda.pdf",
+        extractedText: agendaText
+      }
+    ],
+    items: Array.from({ length: 20 }, (_, index) => ({
+      externalId: `large-item-${index + 1}`,
+      fileNumber: null,
+      agendaNumber: String(index + 10),
+      itemType: "Business",
+      title: `Large item ${index + 1}`,
+      action: "Review the item.",
+      result: null,
+      sourceUrl: "https://city.example/agenda.pdf",
+      rowText: repeatSentence(`UNIQUE_LARGE_ITEM_${index + 1}`, 400)
+    }))
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+  const participationContext = extractMeetingWideParticipationContext(
+    prepared.llmInputText
+  );
+
+  assert.ok(prepared.llmInputText.length >= MAX_CHARS_FOR_LLM);
+  assert.match(participationContext, /846 9472 6242/);
+  assert.match(participationContext, /planning\.commission@menlopark\.gov/);
 });
 
 test("builds agenda items before enriching their attachments for any jurisdiction", async () => {

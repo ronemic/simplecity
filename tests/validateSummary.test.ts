@@ -320,6 +320,31 @@ test("grounds participation details against shared meeting-wide context", () => 
   assert.equal(result.cards.length, 1);
 });
 
+test("grounds an address when PDF extraction splits adjacent address digits", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          howToAct: {
+            attend: "Attend at 751 Laurel St.",
+            email: "Not listed in the source document.",
+            submitComment: "Not listed in the source document."
+          }
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM for park maintenance. Attend at 75 1 Laurel St."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
 test("does not use shared participation context to ground item-specific facts", () => {
   const result = validateSimpleCitySummary(
     {

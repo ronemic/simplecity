@@ -82,6 +82,27 @@ test("supports common whole-number and Item-prefixed agenda formats", () => {
   assert.match(items[1].action || "", /Receive the update/);
 });
 
+test("uses lettered call-to-order and adjournment sections as current-agenda boundaries", () => {
+  const items = extractAgendaItemsFromText(
+    meeting,
+    `
+Prior packet cover material
+A. CALL TO ORDER
+F. PUBLIC HEARINGS
+F1. Current contract
+Recommendation: Approve the current contract.
+H. ADJOURNMENT
+1. Call To Order from attached historical minutes
+2. Historical contract
+Recommendation: Approve the historical contract.
+`
+  );
+
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["F1"]);
+  assert.match(items[0].title, /Current contract/);
+  assert.doesNotMatch(items[0].rowText, /Historical contract/);
+});
+
 test("does not split legal chapter numbers out of numbered agenda-item titles", () => {
   const items = extractAgendaItemsFromText(
     meeting,
