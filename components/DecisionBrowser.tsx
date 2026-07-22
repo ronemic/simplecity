@@ -93,13 +93,13 @@ export function DecisionBrowser({
         <div className="min-w-0 flex-1 rounded-lg border border-black/10 bg-transparent p-4">
           {resultsCoverage}
         </div>
-        <div className="flex shrink-0 flex-col items-center justify-start gap-1 rounded-lg border border-black/10 bg-transparent p-4 text-center md:w-64">
+        <div className="relative min-h-20 shrink-0 rounded-lg border border-black/10 bg-transparent p-4 text-left md:w-64">
           <p className="whitespace-nowrap text-sm font-semibold leading-5 text-black/55">
             {resultSummary(locale, resultStart, resultEnd, totalCount)}
           </p>
           <span
             aria-live="polite"
-            className={`inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-civic transition-opacity ${
+            className={`absolute bottom-3 left-4 inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-civic transition-opacity ${
               isPending ? "opacity-100" : "invisible opacity-0"
             }`}
           >
