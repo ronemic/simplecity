@@ -6,7 +6,11 @@ import {
   type JurisdictionConfig
 } from "@/lib/config/jurisdictions";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
-import { DECISION_OUTCOME_JURISDICTIONS } from "@/lib/outcomes/extractDecisionOutcome";
+import {
+  DECISION_OUTCOME_JURISDICTIONS,
+  extractDecisionOutcome,
+  extractMeetingOutcomeItems
+} from "@/lib/outcomes/extractDecisionOutcome";
 
 const PAGE_SIZE = 100;
 
@@ -144,6 +148,9 @@ async function backfillJurisdiction(
   let resultItemsFound = 0;
   let resultItemsMatched = 0;
   let resultItemsUnmatched = 0;
+  let resultCardsFound = 0;
+  let resultCardsMatched = 0;
+  let resultCardsUnmatched = 0;
   let duplicateCardsDetected = 0;
   let duplicateCardsResolved = 0;
 
@@ -192,15 +199,67 @@ async function backfillJurisdiction(
       resultItemsFound += result.resultItemsFound;
       resultItemsMatched += result.resultItemsMatched;
       resultItemsUnmatched += result.resultItemsUnmatched;
+      resultCardsFound += result.resultCardsFound;
+      resultCardsMatched += result.resultCardsMatched;
+      resultCardsUnmatched += result.resultCardsUnmatched;
       duplicateCardsDetected += result.duplicateCardsDetected;
       duplicateCardsResolved += result.duplicateCardsResolved;
+      if (!result.complete && result.resultItemsFound > 0) {
+        console.log(
+          `${jurisdiction.name} coverage gap — ${meeting.title}: matched ${result.resultCardsMatched} of ${result.resultCardsFound} result-bearing decision card(s); official inventory matched ${result.resultItemsMatched} of ${result.resultItemsFound}; withheld ${result.outcomesRejectedAmbiguous} ambiguous assignment(s). Meeting ID: ${stored.id}`
+        );
+        if (process.argv.includes("--verbose")) {
+          const { data: cards, error: cardError } = await supabase
+            .from("summary_cards")
+            .select("id,source_item_id,agenda_item,source_url,created_at")
+            .eq("meeting_id", stored.id);
+          if (cardError) throw new Error(`Failed to inspect coverage gap: ${cardError.message}`);
+          const proposals = (cards || []).flatMap((card) => {
+            const outcome = extractDecisionOutcome(card, meeting);
+            return outcome
+              ? [{
+                  cardId: card.id,
+                  cardTitle: card.agenda_item,
+                  sourceItemId: card.source_item_id,
+                  agendaNumber: outcome.matchedAgendaNumber,
+                  method: outcome.matchMethod,
+                  score: outcome.matchScore,
+                  matchedItemKey: outcome.matchedItemKey
+                }]
+              : [];
+          });
+          const proposalSourceIds = new Set(
+            proposals.map((proposal) => proposal.sourceItemId).filter(Boolean)
+          );
+          const unmatchedResultItems = extractMeetingOutcomeItems(meeting).items
+            .filter((item) => !proposalSourceIds.has(item.externalId))
+            .map((item) => ({
+              sourceItemId: item.externalId,
+              agendaNumber: item.agendaNumber,
+              title: item.title,
+              action: item.action,
+              result: item.result
+            }));
+          const proposalCounts = new Map<string, number>();
+          for (const proposal of proposals) {
+            const key = proposal.matchedItemKey;
+            proposalCounts.set(key, (proposalCounts.get(key) || 0) + 1);
+          }
+          console.log(JSON.stringify({
+            unmatchedResultItems,
+            duplicateProposals: proposals.filter((proposal) =>
+              (proposalCounts.get(proposal.matchedItemKey) || 0) > 1
+            )
+          }, null, 2));
+        }
+      }
     }
   }
 
   console.log(
-    `${jurisdiction.name}: checked ${meetings.length} past meeting(s)${options.since ? ` since ${options.since}` : ""}, found ${found} card outcome proposal(s), matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s)${resultItemsFound > 0 ? ` (${Math.round((resultItemsMatched / resultItemsFound) * 1000) / 10}%)` : ""}, ${
+    `${jurisdiction.name}: checked ${meetings.length} past meeting(s)${options.since ? ` since ${options.since}` : ""}, found ${found} card outcome proposal(s), matched ${resultCardsMatched} of ${resultCardsFound} decision card(s) with official results${resultCardsFound > 0 ? ` (${Math.round((resultCardsMatched / resultCardsFound) * 1000) / 10}%)` : ""}; official inventory coverage was ${resultItemsMatched} of ${resultItemsFound}, ${
       execute ? `upserted ${upserted}` : "would write after review"
-    }, left ${resultItemsUnmatched} unmatched, withheld ${rejectedAmbiguous} ambiguous assignment(s), and resolved ${duplicateCardsResolved} of ${duplicateCardsDetected} duplicate card(s).`
+    }, left ${resultCardsUnmatched} result-bearing card(s) unmatched and ${resultItemsUnmatched} inventory item(s) without cards, withheld ${rejectedAmbiguous} ambiguous assignment(s), and resolved ${duplicateCardsResolved} of ${duplicateCardsDetected} duplicate card(s).`
   );
 }
 

@@ -102,6 +102,39 @@ function applyJurisdictionMetadata(meetings: PrimeGovMeeting[], jurisdiction: Ju
   }
 }
 
+export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
+  const errors: string[] = [];
+
+  for (const meeting of meetings) {
+    const minutes = Array.from(
+      new Map(
+        meeting.documents
+          .filter((document) => ["Minutes", "Accessible Minutes"].includes(document.type))
+          .map((document) => [document.url, document])
+      ).values()
+    );
+    const failed = minutes.filter((document) => Boolean(document.downloadError));
+    const unreadable = minutes.filter(
+      (document) =>
+        !document.downloadError &&
+        String(document.extractedText || "").trim().length < 40
+    );
+
+    if (failed.length > 0) {
+      errors.push(
+        `Minutes ingestion incomplete for ${meeting.title}: ${failed.length} published minutes document(s) failed to download.`
+      );
+    }
+    if (unreadable.length > 0) {
+      errors.push(
+        `Minutes ingestion incomplete for ${meeting.title}: ${unreadable.length} published minutes document(s) had no usable extracted text.`
+      );
+    }
+  }
+
+  return errors;
+}
+
 function createDeadline(maxRuntimeMinutes?: number) {
   if (!maxRuntimeMinutes || maxRuntimeMinutes <= 0) return null;
 
@@ -326,6 +359,11 @@ export async function runSimpleCityPipeline(
       }
     }
 
+    for (const minutesError of minutesIngestionErrors(scrapeResult.meetings)) {
+      errors.push(minutesError);
+      log(minutesError);
+    }
+
     log("Preparing LLM input.");
     const llmReadyMeetings = await prepareLlmInput(scrapeResult.meetings);
 
@@ -485,6 +523,9 @@ export async function runSimpleCityPipeline(
       let resultItemsFound = 0;
       let resultItemsMatched = 0;
       let resultItemsUnmatched = 0;
+      let resultCardsFound = 0;
+      let resultCardsMatched = 0;
+      let resultCardsUnmatched = 0;
       let duplicateCardsDetected = 0;
       let duplicateCardsResolved = 0;
       for (const item of upserted) {
@@ -503,11 +544,14 @@ export async function runSimpleCityPipeline(
           resultItemsFound += reconciliation.resultItemsFound;
           resultItemsMatched += reconciliation.resultItemsMatched;
           resultItemsUnmatched += reconciliation.resultItemsUnmatched;
+          resultCardsFound += reconciliation.resultCardsFound;
+          resultCardsMatched += reconciliation.resultCardsMatched;
+          resultCardsUnmatched += reconciliation.resultCardsUnmatched;
           duplicateCardsDetected += reconciliation.duplicateCardsDetected;
           duplicateCardsResolved += reconciliation.duplicateCardsResolved;
-          if (!reconciliation.complete && reconciliation.resultItemsFound > 0) {
+          if (!reconciliation.complete && reconciliation.resultCardsFound > 0) {
             const coverageError =
-              `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultItemsMatched} of ${reconciliation.resultItemsFound} result-bearing agenda item(s); ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
+              `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultCardsMatched} of ${reconciliation.resultCardsFound} decision card(s) with official results; ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
             errors.push(coverageError);
             log(coverageError);
           }
@@ -528,6 +572,11 @@ export async function runSimpleCityPipeline(
       if (resultItemsFound > 0) {
         log(
           `Decision outcome coverage: matched ${resultItemsMatched} of ${resultItemsFound} result-bearing agenda item(s); ${resultItemsUnmatched} unmatched.`
+        );
+      }
+      if (resultCardsFound > 0) {
+        log(
+          `Decision-card result coverage: matched ${resultCardsMatched} of ${resultCardsFound} card(s) with official results; ${resultCardsUnmatched} unmatched.`
         );
       }
       if (duplicateCardsDetected > 0) {

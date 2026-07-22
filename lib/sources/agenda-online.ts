@@ -1,4 +1,6 @@
-import { chromium, type BrowserContext } from "playwright";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { chromium, type BrowserContext, type Page } from "playwright";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { DocumentType, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
@@ -16,6 +18,14 @@ type AgendaOnlineRow = {
   detailsUrl: string | null;
   documents: Array<{ label: string; url: string }>;
 };
+
+export type LaserficheMinutesEntry = {
+  label: string;
+  url: string;
+};
+
+const REDWOOD_CITY_MINUTES_FOLDER_URL =
+  "https://documents.redwoodcity.org/PublicWeblink/0/fol/527821/Row1.aspx";
 
 export type ScrapeAgendaOnlineOptions = ScrapePortalOptions & {
   jurisdiction: JurisdictionConfig;
@@ -35,6 +45,139 @@ function documentType(label: string, url: string): DocumentType {
   if (value.includes("minutes")) return "Minutes";
   if (value.includes("agenda")) return "Agenda";
   return "Document";
+}
+
+export function attachLaserficheMinutes(
+  meetings: PrimeGovMeeting[],
+  entries: LaserficheMinutesEntry[]
+) {
+  const meetingsByDate = new Map<string, PrimeGovMeeting[]>();
+  for (const meeting of meetings) {
+    const date = parseMeetingDate(meeting.dateText || "")?.slice(0, 10);
+    if (!date) continue;
+    meetingsByDate.set(date, [...(meetingsByDate.get(date) || []), meeting]);
+  }
+
+  let attached = 0;
+  for (const entry of entries) {
+    const archiveDate = entry.label.match(/\b(20\d{2})[.-](\d{2})[.-](\d{2})\b/);
+    const date = archiveDate
+      ? `${archiveDate[1]}-${archiveDate[2]}-${archiveDate[3]}`
+      : parseMeetingDate(entry.label)?.slice(0, 10);
+    if (!date) continue;
+    const candidates = meetingsByDate.get(date) || [];
+    const cityCouncilCandidates = candidates.filter((meeting) =>
+      /city council/i.test(`${meeting.bodyName || ""} ${meeting.title}`)
+    );
+    const meeting = cityCouncilCandidates.length === 1
+      ? cityCouncilCandidates[0]
+      : candidates.length === 1
+        ? candidates[0]
+        : null;
+    if (!meeting || meeting.documents.some((document) => document.url === entry.url)) continue;
+    meeting.documents.push({
+      type: "Minutes",
+      label: cleanText(entry.label),
+      url: entry.url,
+      parentDocumentUrl: REDWOOD_CITY_MINUTES_FOLDER_URL
+    });
+    meeting.hasPdf = true;
+    attached += 1;
+  }
+  return attached;
+}
+
+async function discoverRedwoodCityMinutes(page: Page) {
+  await page.goto(REDWOOD_CITY_MINUTES_FOLDER_URL, {
+    waitUntil: "domcontentloaded",
+    timeout: 60_000
+  });
+  await page.waitForSelector("a.DocumentBrowserNameLink", { timeout: 60_000 });
+  return page.locator("a.DocumentBrowserNameLink").evaluateAll<LaserficheMinutesEntry[]>(
+    (anchors) => anchors.map((anchor) => ({
+      label: String(anchor.textContent || "").replace(/\s+/g, " ").replace(/\[Icon\]/gi, "").trim(),
+      url: (anchor as HTMLAnchorElement).href
+    })).filter((entry) => /approved minutes/i.test(entry.label))
+  );
+}
+
+export async function downloadLaserficheMinutes(
+  context: BrowserContext,
+  meetings: PrimeGovMeeting[],
+  outputDir: string,
+  log: (message: string) => void,
+  shouldStop?: () => boolean
+) {
+  await fs.mkdir(outputDir, { recursive: true });
+  const page = await context.newPage();
+  let downloaded = 0;
+  let failed = 0;
+  try {
+    for (const meeting of meetings) {
+      for (const document of meeting.documents.filter((candidate) =>
+        candidate.type === "Minutes" &&
+        new URL(candidate.url).hostname === "documents.redwoodcity.org"
+      )) {
+        if (shouldStop?.()) return { downloaded, failed };
+        try {
+          await page.goto(document.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+          await page.locator("#PdfDialog_PdfDownloadLink").click();
+          const generatedPdf = Promise.race([
+            page.waitForEvent("download", { timeout: 120_000 })
+              .then((download) => ({ kind: "download" as const, download })),
+            context.waitForEvent("page", { timeout: 120_000 })
+              .then(async (popup) => ({
+                kind: "popup" as const,
+                popup,
+                response: await popup.waitForResponse(
+                  (candidate) => /application\/pdf/i.test(candidate.headers()["content-type"] || ""),
+                  { timeout: 120_000 }
+                )
+              }))
+          ]);
+          await page.locator("#PdfDialog_download").click();
+          const generated = await generatedPdf;
+          const filename = `${slugify(meeting.externalId || meeting.title)}__minutes__${slugify(document.label)}.pdf`;
+          const filePath = path.join(outputDir, filename);
+          if (generated.kind === "download") {
+            await generated.download.saveAs(filePath);
+          } else {
+            const response = generated.response;
+            if (!response.ok()) throw new Error(`Laserfiche PDF returned HTTP ${response.status()}.`);
+            const buffer = await response.body().catch(async () => {
+              const replay = await context.request.get(response.url(), {
+                headers: { Referer: document.url },
+                timeout: 120_000
+              });
+              if (!replay.ok()) {
+                throw new Error(`Laserfiche PDF replay returned HTTP ${replay.status()}.`);
+              }
+              return replay.body();
+            });
+            if (buffer.subarray(0, 5).toString() !== "%PDF-") {
+              throw new Error("Laserfiche generated response was not a PDF.");
+            }
+            await fs.writeFile(filePath, buffer);
+            await generated.popup.close();
+          }
+          const stat = await fs.stat(filePath);
+          document.localPath = filePath;
+          document.bytes = stat.size;
+          document.downloadError = null;
+          downloaded += 1;
+          log(`Downloaded Redwood City approved minutes: ${filePath}`);
+        } catch (error) {
+          document.localPath = null;
+          document.downloadError = error instanceof Error ? error.message : "Unknown Laserfiche download error";
+          failed += 1;
+          log(`Redwood City minutes download failed for ${document.url}: ${document.downloadError}`);
+        }
+      }
+    }
+  } finally {
+    await page.close();
+  }
+  return { downloaded, failed };
 }
 
 async function resolveDocumentStreams(context: BrowserContext, meetings: PrimeGovMeeting[]) {
@@ -179,17 +322,39 @@ export async function scrapeAgendaOnlineMeetings(
     if (options.limit) meetings = meetings.slice(0, options.limit);
     if (meetings.length === 0) throw new Error("Agenda Online scraper found zero valid meetings.");
 
+    if (options.jurisdiction.slug === "redwood-city") {
+      const archivePage = await context.newPage();
+      try {
+        const entries = await discoverRedwoodCityMinutes(archivePage);
+        const attached = attachLaserficheMinutes(meetings, entries);
+        log(`Redwood City Laserfiche archive exposed ${entries.length} approved minutes document(s); attached ${attached} to scraped meetings.`);
+      } finally {
+        await archivePage.close();
+      }
+    }
+
     if (options.downloadDocuments ?? true) {
       await resolveDocumentStreams(context, meetings);
       const result = await downloadOfficialSiteDocuments(context, meetings, {
         outputDir: options.documentOutputDir,
         log,
         shouldStop: options.shouldStop,
-        documentFilter: () => true,
+        documentFilter: (document) =>
+          new URL(document.url).hostname !== "documents.redwoodcity.org",
         validateFinalUrl: (url) => new URL(url).hostname === new URL(options.jurisdiction.sourceUrl).hostname,
         userAgent: "Mozilla/5.0 SimpleCity Agenda Online scraper"
       });
       log(`Agenda Online downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
+      if (options.jurisdiction.slug === "redwood-city") {
+        const minutesResult = await downloadLaserficheMinutes(
+          context,
+          meetings,
+          options.documentOutputDir || path.join(process.cwd(), "scraped-primegov", "redwood-city", "documents"),
+          log,
+          options.shouldStop
+        );
+        log(`Redwood City approved-minutes downloads complete: ${minutesResult.downloaded} downloaded, ${minutesResult.failed} failed.`);
+      }
     }
 
     const upcoming = meetings.filter((meeting) => meeting.status === "Upcoming").length;

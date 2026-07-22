@@ -785,6 +785,9 @@ export function extractDecisionOutcome(
 ): DecisionOutcomeDraft | null {
   if (!DECISION_OUTCOME_JURISDICTIONS.has(String(meeting.jurisdictionSlug || ""))) return null;
   if (meeting.status !== "Past") return null;
+  if (/\bpublic comment\b|\bcomment opportunity\b/i.test(String(card.agenda_item || ""))) {
+    return null;
+  }
 
   const structuredMatch = structuredResultMatch(card, meeting.items || []);
   const minutesMatch = structuredMatch ? null : minutesResultForCard(card, meeting);

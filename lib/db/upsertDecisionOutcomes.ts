@@ -11,6 +11,8 @@ import {
 } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 import { translateAndUpsertDecisionOutcomes } from "@/lib/db/upsertDecisionOutcomeTranslations";
 import { hasTranslationProvider } from "@/lib/llm/translate";
+import { findGuardedAgendaItemMatch } from "@/lib/outcomes/extractDecisionOutcome";
+import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const OUTCOME_CARD_COLUMNS = "id,source_item_id,agenda_item,source_url,created_at";
 const LEGACY_OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
@@ -23,6 +25,9 @@ export type DecisionOutcomeReconciliation = {
   resultItemsFound: number;
   resultItemsMatched: number;
   resultItemsUnmatched: number;
+  resultCardsFound: number;
+  resultCardsMatched: number;
+  resultCardsUnmatched: number;
   informationalItemsFound: number;
   duplicateCardsDetected: number;
   duplicateCardsResolved: number;
@@ -126,6 +131,30 @@ export function resolveCanonicalOutcomeAssignments<
   };
 }
 
+function cardHasOfficialResult(
+  card: Pick<SummaryCardRow, "source_item_id" | "agenda_item" | "source_url">,
+  meeting: LlmReadyMeeting,
+  resultItems: ReturnType<typeof extractMeetingOutcomeItems>["items"]
+) {
+  if (/\bpublic comment\b|\bcomment opportunity\b/i.test(String(card.agenda_item || ""))) {
+    return false;
+  }
+  const sourceItemId = String(card.source_item_id || "").trim();
+  if (sourceItemId && uniqueSourceItemIds(resultItems).has(sourceItemId)) return true;
+
+  const sourceItem = sourceItemId && uniqueSourceItemIds(meeting.items || []).has(sourceItemId)
+    ? (meeting.items || []).find((item) => item.externalId === sourceItemId)
+    : null;
+  return Boolean(findGuardedAgendaItemMatch(
+    String(card.agenda_item || ""),
+    resultItems,
+    {
+      sourceUrl: card.source_url,
+      agendaNumber: sourceItem?.agendaNumber || null
+    }
+  ));
+}
+
 function isMissingOutcomeTable(error: { code?: string; message?: string } | null) {
   return Boolean(
     error &&
@@ -214,6 +243,11 @@ export async function reconcileDecisionOutcomesForMeeting(
       .map((document) => document.url)
   );
   const resolved = resolveCanonicalOutcomeAssignments(proposals, minutesSourceUrls);
+  const resultCardIds = new Set(
+    cardRows
+      .filter((card) => cardHasOfficialResult(card, meeting, inventory.items))
+      .map((card) => card.id)
+  );
   let explanations = new Map<string, { summary: string; nextStep: string | null }>();
   if (
     options.explainWithLlm &&
@@ -258,6 +292,11 @@ export async function reconcileDecisionOutcomesForMeeting(
   const matchedItemKeys = new Set(
     resolved.selected.map((proposal) => proposal.matchedItemKey)
   );
+  const matchedResultCardIds = new Set(
+    resolved.selected
+      .filter((proposal) => resultCardIds.has(proposal.cardId))
+      .map((proposal) => proposal.cardId)
+  );
   // A few platforms expose results only in a guarded minutes-text window,
   // outside the structured result inventory.
   const knownResultItemCount = Math.max(inventory.items.length, matchedItemKeys.size);
@@ -268,11 +307,14 @@ export async function reconcileDecisionOutcomesForMeeting(
     resultItemsFound: knownResultItemCount,
     resultItemsMatched: matchedItemKeys.size,
     resultItemsUnmatched: knownResultItemCount - matchedItemKeys.size,
+    resultCardsFound: resultCardIds.size,
+    resultCardsMatched: matchedResultCardIds.size,
+    resultCardsUnmatched: resultCardIds.size - matchedResultCardIds.size,
     informationalItemsFound: inventory.informationalItemsFound,
     duplicateCardsDetected: resolved.duplicateCardsDetected,
     duplicateCardsResolved: resolved.duplicateCardsResolved,
     complete:
-      knownResultItemCount === matchedItemKeys.size &&
+      resultCardIds.size === matchedResultCardIds.size &&
       resolved.rejectedAmbiguous === 0
   };
 

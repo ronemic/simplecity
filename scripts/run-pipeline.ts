@@ -98,6 +98,17 @@ async function main() {
   console.log(`Saved pipeline result to ${outputJson}`);
 
   if (result.status === "failed") process.exit(1);
+  if (process.argv.includes("--require-results-coverage")) {
+    const coverageErrors = result.errors.filter((error) =>
+      /Outcome coverage incomplete|Decision outcome reconciliation failed|Minutes ingestion incomplete/i.test(error)
+    );
+    if (coverageErrors.length > 0) {
+      console.error(
+        `Results coverage gate failed with ${coverageErrors.length} ingestion or matching error(s).`
+      );
+      process.exit(1);
+    }
+  }
 }
 
 main().catch((error) => {

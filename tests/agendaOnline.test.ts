@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
-import { normalizeAgendaOnlineRows } from "@/lib/sources/agenda-online";
+import {
+  attachLaserficheMinutes,
+  normalizeAgendaOnlineRows
+} from "@/lib/sources/agenda-online";
 
 test("normalizes Redwood City Agenda Online rows and document types", () => {
   const jurisdiction = getJurisdictionBySlug("redwood-city");
@@ -32,4 +35,27 @@ test("normalizes Redwood City Agenda Online rows and document types", () => {
   assert.equal(meetings[0].externalId, "redwood-city-agenda-online-2716");
   assert.equal(meetings[0].status, "Upcoming");
   assert.deepEqual(meetings[0].documents.map((document) => document.type), ["Agenda", "Agenda Packet"]);
+});
+
+test("attaches Redwood City Laserfiche minutes to the unique same-day City Council meeting", () => {
+  const jurisdiction = getJurisdictionBySlug("redwood-city");
+  assert.ok(jurisdiction);
+  const meetings = normalizeAgendaOnlineRows([
+    {
+      meetingId: "2677",
+      title: "June 8, 2026 Regular City Council Meeting",
+      bodyName: "City Council",
+      dateText: "6/8/2026 6:00:00 PM",
+      rowText: "June 8, 2026 Regular City Council Meeting",
+      detailsUrl: "https://meetings.redwoodcity.org/AgendaOnline/Meetings/ViewMeeting?id=2677",
+      documents: []
+    }
+  ], jurisdiction, Date.parse("2026-07-01"));
+
+  assert.equal(attachLaserficheMinutes(meetings, [{
+    label: "2026.06.08 Approved Minutes",
+    url: "https://documents.redwoodcity.org/PublicWeblink/0/doc/528589/Page1.aspx"
+  }]), 1);
+  assert.equal(meetings[0].documents[0].type, "Minutes");
+  assert.match(meetings[0].documents[0].url, /528589/);
 });

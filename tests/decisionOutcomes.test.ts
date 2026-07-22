@@ -551,6 +551,9 @@ test("reconciliation withholds both cards when they resolve to the same official
     resultItemsFound: 1,
     resultItemsMatched: 0,
     resultItemsUnmatched: 1,
+    resultCardsFound: 2,
+    resultCardsMatched: 0,
+    resultCardsUnmatched: 2,
     informationalItemsFound: 0,
     duplicateCardsDetected: 1,
     duplicateCardsResolved: 0,
@@ -823,6 +826,9 @@ test("reconciles all ten May 12 outcomes to their existing agenda cards", async 
   assert.equal(result.resultItemsFound, 10);
   assert.equal(result.resultItemsMatched, 10);
   assert.equal(result.resultItemsUnmatched, 0);
+  assert.equal(result.resultCardsFound, 10);
+  assert.equal(result.resultCardsMatched, 10);
+  assert.equal(result.resultCardsUnmatched, 0);
   assert.equal(result.outcomesUpserted, 10);
   assert.equal(result.outcomesRejectedAmbiguous, 0);
   assert.equal(persistedRows.length, 10);
@@ -1010,6 +1016,25 @@ test("does not publish outcomes for unsupported, upcoming, or result-free meetin
     ),
     null
   );
+});
+
+test("does not attach a decision result to a public-comment card", () => {
+  const result = extractDecisionOutcome(
+    {
+      ...card,
+      agenda_item: "Public comment opportunity for Board meeting",
+      source_item_id: null
+    },
+    meeting("san-francisco", {
+      items: [agendaItem({
+        title: "Approve Board meeting minutes after public comment",
+        action: "Approved",
+        result: "Pass"
+      })]
+    })
+  );
+
+  assert.equal(result, null);
 });
 
 test("decision outcome migration enforces one verified outcome per card with public-card RLS", () => {
