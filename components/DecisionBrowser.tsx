@@ -89,23 +89,21 @@ export function DecisionBrowser({
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-stretch">
-        <div className="min-w-0 flex-1 rounded-lg border border-black/10 bg-transparent p-4">
-          {resultsCoverage}
-        </div>
-        <div className="relative min-h-20 shrink-0 rounded-lg border border-black/10 bg-transparent p-4 text-left md:w-64">
-          <p className="whitespace-nowrap text-sm font-semibold leading-5 text-black/55">
-            {resultSummary(locale, resultStart, resultEnd, totalCount)}
-          </p>
+      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 flex-1">{resultsCoverage}</div>
+        <div className="relative flex shrink-0 justify-end">
           <span
             aria-live="polite"
-            className={`absolute bottom-3 left-4 inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-civic transition-opacity ${
+            className={`absolute bottom-full right-0 mb-1 inline-flex items-center gap-2 whitespace-nowrap text-xs font-bold text-civic transition-opacity ${
               isPending ? "opacity-100" : "invisible opacity-0"
             }`}
           >
-            <Loader2 aria-hidden className={`h-3.5 w-3.5 ${isPending ? "animate-spin" : ""}`} />
+            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
             {locale === "es" ? "Actualizando resultados" : "Updating results"}
           </span>
+          <p className="count-badge">
+            {resultSummary(locale, resultStart, resultEnd, totalCount)}
+          </p>
         </div>
       </div>
 

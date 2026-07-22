@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { CalendarCheck2 } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
 import {
   getDecisionCardPage,
@@ -77,7 +78,7 @@ function parsePage(value: string | undefined) {
   return Number.isFinite(page) && page > 0 ? page : 1;
 }
 
-function freshnessDateLabel(
+function freshnessLabel(
   freshness: DecisionResultFreshness,
   slug: string,
   locale: "en" | "es"
@@ -102,45 +103,46 @@ function freshnessDateLabel(
     year: "numeric"
   }).format(parsed);
 
-  return formattedDate;
+  return locale === "es"
+    ? `Resultados hasta el ${formattedDate}`
+    : `Results through ${formattedDate}`;
 }
 
 function DecisionResultsCoverage({
   jurisdiction,
+  jurisdictionLabel,
   freshness,
   locale
 }: {
   jurisdiction: JurisdictionSelection;
+  jurisdictionLabel: string;
   freshness: DecisionResultFreshness;
   locale: "en" | "es";
 }) {
   const isAll = jurisdiction === ALL_JURISDICTIONS_SLUG;
   const jurisdictions = isAll
     ? getPublicJurisdictionOptions().filter((option) => option.slug !== ALL_JURISDICTIONS_SLUG)
-    : [{ name: getJurisdictionLabel(jurisdiction), slug: toPublicJurisdictionSlug(jurisdiction) }];
-  const delayNote =
-    locale === "es"
-      ? "Las actas oficiales pueden tardar días o semanas en publicarse."
-      : "Official minutes may take days or weeks to appear.";
+    : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
 
   return (
-    <section aria-labelledby="decision-results-coverage">
-      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm leading-5">
-        <h2 id="decision-results-coverage" className="font-medium leading-5 text-black/70">
-          {locale === "es" ? "Fechas de resultados más recientes" : "Latest result dates"}
+    <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
+      <div className="flex items-center gap-2">
+        <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
+        <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
+          {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
         </h2>
-        <p className="text-black/55">{delayNote}</p>
       </div>
-      <dl
-        className={`mt-2 grid gap-x-6 gap-y-2 ${
-          isAll ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "max-w-xs grid-cols-1"
-        }`}
-      >
+      <p className="mt-1 text-xs font-medium leading-4 text-black/70">
+        {locale === "es"
+          ? "Los resultados siguen a las actas oficiales, que pueden tardar días o semanas en publicarse después de una reunión."
+          : "Results follow official minutes, which may take days or weeks to appear after a meeting."}
+      </p>
+      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
         {jurisdictions.map((option) => (
-          <div key={option.slug} className="min-w-0">
-            <dt className="truncate text-xs font-medium text-black/50">{option.name}</dt>
-            <dd className="mt-0.5 text-sm font-medium leading-5 text-black/70">
-              {freshnessDateLabel(freshness, option.slug, locale)}
+          <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
+            <dt className="font-bold text-black/60">{option.name}</dt>
+            <dd className="font-black text-civic">
+              {freshnessLabel(freshness, option.slug, locale)}
             </dd>
           </div>
         ))}
@@ -209,6 +211,7 @@ export default async function DecisionsPage({
         resultsCoverage={
           <DecisionResultsCoverage
             jurisdiction={jurisdiction}
+            jurisdictionLabel={jurisdictionLabel}
             freshness={decisionResultFreshness}
             locale={locale}
           />
