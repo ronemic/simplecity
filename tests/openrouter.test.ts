@@ -651,6 +651,38 @@ test("builds bounded agenda-item batches without dropping the final item", () =>
   assert.ok(batches.some((batch) => batch.llmInputText.includes("UNIQUE_ITEM_12")));
 });
 
+test("carries meeting-wide participation context into every agenda-item batch", () => {
+  const preparedMeeting = meeting();
+  preparedMeeting.items = [
+    {
+      externalId: "item-contract",
+      fileNumber: null,
+      agendaNumber: "4",
+      itemType: "Business",
+      title: "Contract approval",
+      action: "Approve the contract.",
+      result: null,
+      sourceUrl: "https://city.example/agendas/4",
+      rowText: "The council will consider the contract."
+    }
+  ];
+  preparedMeeting.llmInputText = `
+Current meeting agenda items (use each block only for its named item):
+Official title: Contract approval
+
+Current agenda and meeting-wide participation context:
+Attend online with meeting ID 846 9472 6242.
+Email comments to planning.commission@menlopark.gov.
+1. CALL TO ORDER
+4. Contract approval for $250
+  `;
+
+  const [batch] = buildAgendaItemSummaryBatches(preparedMeeting);
+  assert.match(batch.llmInputText, /846 9472 6242/);
+  assert.match(batch.llmInputText, /planning\.commission@menlopark\.gov/);
+  assert.doesNotMatch(batch.llmInputText, /Contract approval for \$250/);
+});
+
 test("summarizes and combines every bounded agenda-item batch", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();

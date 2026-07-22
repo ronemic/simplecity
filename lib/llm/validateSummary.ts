@@ -6,7 +6,10 @@ import type { LlmReadyMeeting, MeetingStatus, SimpleCityCardTranslation, SimpleC
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
-import { findAgendaItemForCard } from "@/lib/scraper/agendaItemContext";
+import {
+  extractMeetingWideParticipationContext,
+  findAgendaItemForCard
+} from "@/lib/scraper/agendaItemContext";
 
 const allowedCategories = new Set<string>(CATEGORIES);
 const allowedStatuses = new Set<string>(CARD_STATUSES);
@@ -146,6 +149,7 @@ export type SummaryValidationOptions = {
   meetingStatus?: MeetingStatus;
   allowedSourceItemIds?: string[];
   sourceTextForCard?: (sourceItemId: string | null, agendaItem: string) => string | null;
+  meetingWideParticipationText?: string;
   onIssue?: (issue: SummaryValidationIssue) => void;
 };
 
@@ -418,12 +422,17 @@ function resolveOfficialSource(source: string, options: SummaryValidationOptions
   return fallback;
 }
 
-function cardGroundingText(card: z.infer<typeof CardSchema>) {
+function cardItemGroundingText(card: z.infer<typeof CardSchema>) {
   return [
     card.agendaItem,
     ...card.whatIsHappening,
     card.whyItMatters,
-    card.status,
+    card.status
+  ].filter(Boolean).join(" ");
+}
+
+function cardParticipationGroundingText(card: z.infer<typeof CardSchema>) {
+  return [
     card.commentWindow.opens,
     card.commentWindow.closes,
     card.howToAct.attend,
@@ -537,6 +546,9 @@ export function validationOptionsForMeeting(
   const items = meeting.items || [];
   const uniqueIds = uniqueSourceItemIds(items);
   const meetingMetadataText = buildMeetingMetadataText(meeting);
+  const meetingWideParticipationText = extractMeetingWideParticipationContext(
+    meeting.llmInputText
+  );
   return {
     fallbackSource: meeting.sourceUrl || "",
     allowedSourceUrls: [
@@ -546,6 +558,7 @@ export function validationOptionsForMeeting(
       ...meeting.documents.map((doc) => doc.url)
     ].filter((url): url is string => Boolean(url)),
     sourceText: buildMeetingSourceText(meeting),
+    meetingWideParticipationText,
     maxConfidence: maxConfidenceForMeeting(meeting),
     meetingStatus: meeting.status,
     allowedSourceItemIds: Array.from(uniqueIds),
@@ -631,11 +644,24 @@ export function validateSimpleCitySummary(
       const sourceItemId = card.sourceItemId?.trim() || null;
       const groundingSourceText =
         options.sourceTextForCard?.(sourceItemId, card.agendaItem) || sourceText;
-      const unsupportedValues = groundingSourceText
-        ? extractGroundableValues(cardGroundingText(card)).filter(
+      const itemUnsupportedValues = groundingSourceText
+        ? extractGroundableValues(cardItemGroundingText(card)).filter(
             (value) => !isGroundedValue(value, groundingSourceText)
           )
         : [];
+      const participationGroundingSource = [
+        groundingSourceText,
+        options.meetingWideParticipationText
+      ].filter(Boolean).join("\n");
+      const participationUnsupportedValues = participationGroundingSource
+        ? extractGroundableValues(cardParticipationGroundingText(card)).filter(
+            (value) => !isGroundedValue(value, participationGroundingSource)
+          )
+        : [];
+      const unsupportedValues = uniqueValues([
+        ...itemUnsupportedValues,
+        ...participationUnsupportedValues
+      ]);
 
       if (!source) {
         options.onIssue?.({

@@ -291,6 +291,59 @@ test("grounds matching ordinary numbers without comparing unit wording", () => {
   assert.equal(result.cards.length, 1);
 });
 
+test("grounds participation details against shared meeting-wide context", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          sourceItemId: "item-parks",
+          howToAct: {
+            attend: "Attend the meeting at 7:00 PM.",
+            email: "Email planning.commission@menlopark.gov.",
+            submitComment: "Not listed in the source document."
+          }
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      allowedSourceItemIds: ["item-parks"],
+      sourceText: "Item 4 parks contract for $100.",
+      sourceTextForCard: () => "Item 4 parks contract for $100.",
+      meetingWideParticipationText:
+        "Meeting starts at 7:00 PM. Email comments to planning.commission@menlopark.gov."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("does not use shared participation context to ground item-specific facts", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          sourceItemId: "item-parks",
+          whatIsHappening: ["The parks contract would cost $250."]
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      allowedSourceItemIds: ["item-parks"],
+      sourceText: "Item 4 parks contract for $100.",
+      sourceTextForCard: () => "Item 4 parks contract for $100. Meeting at 7:00 PM.",
+      meetingWideParticipationText: "General instructions updated for fiscal year 2026 at a cost of $250."
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+});
+
 test("grounds values only against the matched agenda item when item context is available", () => {
   const result = validateSimpleCitySummary(
     {

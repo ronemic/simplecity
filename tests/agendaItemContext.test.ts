@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  extractMeetingWideParticipationContext,
   extractAgendaItemsFromText,
   formatAgendaItemContexts
 } from "../lib/scraper/agendaItemContext";
@@ -37,6 +38,24 @@ SUBJECT: Canopy Informational Presentation
 Recommendation: Receive a general informational presentation from Canopy.
 Background: Canopy will explain its tree and environmental services.
 `;
+
+test("extracts shared participation instructions without leaking agenda items", () => {
+  const context = extractMeetingWideParticipationContext(`
+Current meeting agenda items (use each block only for its named item):
+Official title: Contract approval
+
+Current agenda and meeting-wide participation context:
+REGULAR MEETING AGENDA
+Join online with meeting ID 846 9472 6242.
+Email comments to planning.commission@menlopark.gov.
+1. CALL TO ORDER
+2. Contract approval for $250
+  `);
+
+  assert.match(context, /846 9472 6242/);
+  assert.match(context, /planning\.commission@menlopark\.gov/);
+  assert.doesNotMatch(context, /Contract approval for \$250/);
+});
 
 test("extracts current numbered agenda items and their recommendations", () => {
   const items = extractAgendaItemsFromText(meeting, agendaText);

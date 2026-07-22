@@ -12,6 +12,23 @@ const RECOMMENDATION = /\b(?:recommendation|recommended action|action requested)
 const SUBJECT = /\bsubject\s*:?\s*([\s\S]{1,500}?)(?=\s+\b(?:recommendation|recommended action|background|analysis|public notice)\b)/gi;
 const SECTION_TITLE = /^(?:call to order(?: and roll call)?|roll call|opening remarks?|approval of (?:the )?agenda|approval of (?:the )?minutes|approval of (?:the )?consent calendar|public comments?|consent calendar|study sessions?|special presentations?|presentations?|public hearings?|staff(?:\/(?:commission|committee))?(?: oral)? reports?|commission reports?|committee reports?|old business|new business|regular business|business items?|informational (?:items?|reports?)|discussion and action|written communications?|future (?:commission )?agenda item requests?|adjournment)\s*:?\s*$/i;
 const RECOMMENDATION_END = /\s+\b(?:background|analysis|discussion|fiscal impact|financial impact|public notice|attachments?|conclusion)\s*:?/i;
+export const MEETING_WIDE_CONTEXT_HEADING =
+  "Current agenda and meeting-wide participation context:";
+export const MAX_MEETING_WIDE_CONTEXT_CHARS = 8000;
+
+export function extractMeetingWideParticipationContext(text: string) {
+  const headingIndex = text.indexOf(MEETING_WIDE_CONTEXT_HEADING);
+  if (headingIndex < 0) return "";
+
+  const sourceText = text
+    .slice(headingIndex + MEETING_WIDE_CONTEXT_HEADING.length)
+    .trim();
+  const agendaStart = sourceText.search(
+    /(?:^|\n)\s*(?:1\s*[.):-]\s*)?(?:call to order|roll call|opening remarks?)\b/im
+  );
+  const participationText = agendaStart > 0 ? sourceText.slice(0, agendaStart) : sourceText;
+  return participationText.slice(0, MAX_MEETING_WIDE_CONTEXT_CHARS).trim();
+}
 
 function currentMeetingBoundary(text: string) {
   const staffReport = text.search(

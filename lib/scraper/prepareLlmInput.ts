@@ -6,6 +6,7 @@ import {
   currentMeetingSourceText,
   extractAgendaItemsFromText,
   formatAgendaItemContexts,
+  MEETING_WIDE_CONTEXT_HEADING,
   mergeAgendaItems
 } from "@/lib/scraper/agendaItemContext";
 
@@ -489,7 +490,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     const currentSourceContext = currentMeetingSourceText(selectedText);
     selectedText = [
       structuredItemContext,
-      "Current agenda and meeting-wide participation context:",
+      MEETING_WIDE_CONTEXT_HEADING,
       currentSourceContext
     ].join("\n\n");
     extractionNotes.push(

@@ -1,6 +1,10 @@
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
-import { formatAgendaItemContexts } from "@/lib/scraper/agendaItemContext";
+import {
+  extractMeetingWideParticipationContext,
+  formatAgendaItemContexts,
+  MEETING_WIDE_CONTEXT_HEADING
+} from "@/lib/scraper/agendaItemContext";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
@@ -63,6 +67,19 @@ export const MAX_AGENDA_ITEM_BATCH_CHARS = 18_000;
 export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmReadyMeeting[] {
   if (meeting.status === "Cancelled" || !meeting.items?.length) return [meeting];
 
+  const meetingWideContext = extractMeetingWideParticipationContext(meeting.llmInputText);
+  const batchIntroduction =
+    "Generate cards only for the official items in this batch. Do not create cards for neighboring or omitted items.";
+  const sharedContextBlock = meetingWideContext
+    ? [
+        MEETING_WIDE_CONTEXT_HEADING,
+        meetingWideContext
+      ].join("\n")
+    : "";
+  const batchItemLimit = Math.max(
+    7000,
+    MAX_AGENDA_ITEM_BATCH_CHARS - sharedContextBlock.length - batchIntroduction.length - 200
+  );
   const itemBatches: NonNullable<LlmReadyMeeting["items"]>[] = [];
   let currentItems: NonNullable<LlmReadyMeeting["items"]> = [];
   let currentLength = 0;
@@ -71,7 +88,7 @@ export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmRead
     const itemLength = formatAgendaItemContexts([item]).length;
     if (
       currentItems.length > 0 &&
-      currentLength + itemLength > MAX_AGENDA_ITEM_BATCH_CHARS
+      currentLength + itemLength > batchItemLimit
     ) {
       itemBatches.push(currentItems);
       currentItems = [];
@@ -86,9 +103,10 @@ export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmRead
     ...meeting,
     items,
     llmInputText: [
-      `Agenda-item batch ${index + 1} of ${itemBatches.length}. Generate cards only for the official items in this batch. Do not create cards for neighboring or omitted items.`,
-      formatAgendaItemContexts(items)
-    ].join("\n\n"),
+      `Agenda-item batch ${index + 1} of ${itemBatches.length}. ${batchIntroduction}`,
+      formatAgendaItemContexts(items),
+      sharedContextBlock
+    ].filter(Boolean).join("\n\n"),
     extractionNotes: [
       ...meeting.extractionNotes,
       `Summarizing structured agenda-item batch ${index + 1} of ${itemBatches.length}.`

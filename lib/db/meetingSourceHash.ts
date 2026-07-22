@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { LlmReadyMeeting } from "@/lib/types";
+import { MEETING_WIDE_CONTEXT_HEADING } from "@/lib/scraper/agendaItemContext";
 
 function stableDocumentShape(meeting: LlmReadyMeeting) {
   return meeting.documents
@@ -16,6 +17,9 @@ function stableDocumentShape(meeting: LlmReadyMeeting) {
 
 export function meetingSourceHash(meeting: LlmReadyMeeting) {
   const source = {
+    ...(meeting.llmInputText.includes(MEETING_WIDE_CONTEXT_HEADING)
+      ? { summaryInputVersion: "meeting-wide-participation-v1" }
+      : {}),
     title: meeting.title,
     meetingType: meeting.meetingType,
     dateText: meeting.dateText,
