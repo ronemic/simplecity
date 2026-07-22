@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   classifyLegistarLink,
-  shouldDownloadLegistarDocumentForWindow
+  shouldDownloadLegistarDocumentForWindow,
+  shouldEnrichLegistarAgendaAttachments
 } from "@/lib/sources/legistar";
 import type { DocumentType } from "@/lib/types";
 
@@ -16,6 +17,19 @@ test("deep Legistar refreshes skip packets and item attachments", () => {
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 3), false);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Document"), 3), false);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 1), true);
+});
+
+test("Legistar attachment enrichment defaults on and honors the universal switch", () => {
+  assert.equal(shouldEnrichLegistarAgendaAttachments({}), true);
+  assert.equal(
+    shouldEnrichLegistarAgendaAttachments({ enrichAgendaAttachments: true, enrichLegislation: false }),
+    true
+  );
+  assert.equal(
+    shouldEnrichLegistarAgendaAttachments({ enrichAgendaAttachments: false, enrichLegislation: true }),
+    false
+  );
+  assert.equal(shouldEnrichLegistarAgendaAttachments({ enrichLegislation: false }), false);
 });
 
 test("classifies Mountain View Legistar document labels by visible text first", () => {

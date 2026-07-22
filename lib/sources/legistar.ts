@@ -7,6 +7,7 @@ import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import { mergeDiscoveredAgendaItemAttachments } from "@/lib/scraper/itemAttachments";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
 
@@ -28,6 +29,12 @@ export type ScrapeLegistarOptions = ScrapePortalOptions & {
   limit?: number;
   maxItemsPerMeeting?: number;
 };
+
+export function shouldEnrichLegistarAgendaAttachments(
+  options: Pick<ScrapeLegistarOptions, "enrichAgendaAttachments" | "enrichLegislation">
+) {
+  return options.enrichAgendaAttachments ?? options.enrichLegislation ?? true;
+}
 
 type LegistarDocument = PrimeGovDocument;
 
@@ -294,6 +301,7 @@ function isLegistarViewUrl(url: string) {
 }
 
 function shouldDownloadLegistarDocument(doc: LegistarDocument) {
+  if (doc.isAgendaItemAttachment) return true;
   if (DOWNLOADABLE_DOCUMENT_TYPES.has(doc.type)) return true;
   return doc.type === "Media" && isLegistarViewUrl(doc.url);
 }
@@ -1407,7 +1415,7 @@ export async function scrapeLegistarMeetings(
       });
     }
 
-    if (options.enrichLegislation) {
+    if (shouldEnrichLegistarAgendaAttachments(options)) {
       log("Enriching Legistar legislation detail pages where available...");
       meetings = await mapLimit(meetings as LegistarMeeting[], 2, async (meeting) => {
         if (options.shouldStop?.()) {
@@ -1416,13 +1424,27 @@ export async function scrapeLegistarMeetings(
         }
 
         const items = meeting.items || [];
-        const limit = options.maxItemsPerMeeting ?? 100;
+        const limit = options.maxItemsPerMeeting ?? items.length;
         const limitedItems = items.slice(0, limit);
         const enrichedItems = await mapLimit(limitedItems, 3, (item) =>
           enrichLegislationItem(context, item)
         );
 
         meeting.items = [...enrichedItems, ...items.slice(limit)];
+        mergeDiscoveredAgendaItemAttachments(
+          meeting,
+          enrichedItems.map((item) => ({
+            agendaNumber: item.agendaNumber,
+            title: item.title,
+            rowText: item.rowText,
+            sourceUrl: item.sourceUrl,
+            attachments: (item.attachments || []).map((attachment) => ({
+              label: attachment.label,
+              url: attachment.url,
+              type: attachment.type
+            }))
+          }))
+        );
         if (enrichedItems.length > 0) {
           meeting.detailText = cleanText(
             [

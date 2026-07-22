@@ -3,7 +3,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { BrowserContext } from "playwright";
 import type { PrimeGovDocument, PrimeGovMeeting } from "@/lib/types";
-import { buildDownloadFilename } from "./primegov";
+import {
+  buildDownloadFilename,
+  resolvePrimeGovAttachmentDownloadUrl
+} from "./primegov";
 import { slugify } from "@/lib/utils/slug";
 
 export const SCRAPED_DIR = path.join(process.cwd(), "scraped-primegov");
@@ -94,6 +97,7 @@ function isIqm2DownloadCandidate(doc: PrimeGovDocument) {
 
   const url = doc.url.toLowerCase();
   return (
+    doc.isAgendaItemAttachment ||
     doc.type === "Agenda" ||
     doc.type === "Agenda Packet" ||
     doc.type === "Minutes" ||
@@ -111,7 +115,13 @@ const OFFICIAL_SITE_DOWNLOADABLE_DOCUMENT_TYPES = new Set<PrimeGovDocument["type
   "Special Event Notice",
   "Early Staff Report Release",
   "Document",
-  "Attachment"
+  "Attachment",
+  "Staff Report",
+  "Resolution",
+  "Ordinance",
+  "Contract",
+  "Exhibit",
+  "Public Comment"
 ]);
 
 function officialSiteDocumentFilename(
@@ -212,7 +222,7 @@ export async function downloadCompiledDocuments(
 
   for (const meeting of meetings) {
     const compiledDocs = meeting.documents.filter((doc) =>
-      doc.url.includes("/Public/CompiledDocument")
+      doc.url.includes("/Public/CompiledDocument") || doc.isAgendaItemAttachment
     );
 
     for (const doc of compiledDocs) {
@@ -225,7 +235,18 @@ export async function downloadCompiledDocuments(
       const filePath = path.join(docsDir, `${filename}.pdf`);
 
       try {
-        const response = await context.request.get(doc.url, {
+        const downloadUrl = doc.isAgendaItemAttachment
+          ? await resolvePrimeGovAttachmentDownloadUrl(context, doc.url)
+          : doc.url;
+        if (!downloadUrl) {
+          failed += 1;
+          doc.localPath = null;
+          doc.downloadError = "PrimeGov did not provide a current PDF download URL.";
+          log(`Failed to resolve download URL for ${doc.url}.`);
+          continue;
+        }
+
+        const response = await context.request.get(downloadUrl, {
           headers: {
             "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper"
           },

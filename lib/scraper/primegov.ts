@@ -1,5 +1,9 @@
 import { chromium, type BrowserContext, type Page } from "playwright";
 import type { PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
+import {
+  mergeDiscoveredAgendaItemAttachments,
+  type DiscoveredAgendaItemAttachments
+} from "@/lib/scraper/itemAttachments";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 
@@ -320,6 +324,279 @@ export async function scrapeHtmlAgendaText(context: BrowserContext, meeting: Pri
   }
 }
 
+type PrimeGovAgendaAttachmentRow = {
+  agendaNumber: string | null;
+  title: string | null;
+  rowText: string;
+  itemDetailsUrl: string;
+};
+
+export type PrimeGovAttachmentIdentityInput = {
+  itemDetailsUrl: string;
+  previewUrl?: string | null;
+  documentId?: string | null;
+  attachmentId?: string | null;
+};
+
+export type PrimeGovAttachmentDownloadDescriptor = {
+  origin: string;
+  kind: "document" | "attachment";
+  id: string;
+};
+
+export function normalizePrimeGovItemDetailsUrl(value: string, baseUrl: string) {
+  try {
+    const direct = new URL(value, baseUrl);
+    if (/\/portal\/item$/i.test(direct.pathname) && direct.searchParams.get("meetingitemid")) {
+      return direct.toString();
+    }
+    const sharedUrl = direct.searchParams.get("url") || direct.searchParams.get("u");
+    if (!sharedUrl) return null;
+    const decoded = new URL(decodeURIComponent(sharedUrl), baseUrl);
+    return /\/portal\/item$/i.test(decoded.pathname) && decoded.searchParams.get("meetingitemid")
+      ? decoded.toString()
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+async function mapWithConcurrency<T, U>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T, index: number) => Promise<U>
+) {
+  const results = new Array<U>(values.length);
+  let nextIndex = 0;
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, async () => {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(values[index], index);
+    }
+  }));
+  return results;
+}
+
+async function extractPrimeGovAttachmentRows(page: Page): Promise<PrimeGovAgendaAttachmentRow[]> {
+  await page.evaluate("globalThis.__name = (value) => value");
+  const rows = await page.evaluate(() => {
+    const clean = (value = "") => value.replace(/\s+/g, " ").trim();
+    const itemRows = Array.from(document.querySelectorAll('[title="Has Attachments"]'))
+      .map((marker) => marker.closest("tr"))
+      .filter((row): row is HTMLTableRowElement => Boolean(row));
+    return Array.from(new Set(itemRows))
+      .flatMap((row) => {
+        const cells = Array.from(row.querySelectorAll(":scope > td"));
+        const number = cells.map((cell) => clean((cell as HTMLElement).innerText || ""))
+          .find((value) => /^\d+(?:\.\d+)+\.?$/.test(value)) || null;
+        const numberIndex = cells.findIndex((cell) => clean((cell as HTMLElement).innerText || "") === number);
+        const titleCell = numberIndex >= 0 ? cells[numberIndex + 1] : null;
+        const title = clean((titleCell as HTMLElement | null)?.innerText || "") || null;
+        const hrefs = Array.from(row.querySelectorAll("a[href]"))
+          .map((anchor) => (anchor as HTMLAnchorElement).href);
+        return [{
+          agendaNumber: number?.replace(/\.$/, "") || null,
+          title,
+          rowText: clean(row.innerText || ""),
+          hrefs
+        }];
+      });
+  });
+
+  const seenItemUrls = new Set<string>();
+  return rows.flatMap((row) => {
+    const itemDetailsUrl = row.hrefs
+      .map((href) => normalizePrimeGovItemDetailsUrl(href, page.url()))
+      .find(Boolean);
+    if (!itemDetailsUrl || seenItemUrls.has(itemDetailsUrl)) return [];
+    seenItemUrls.add(itemDetailsUrl);
+    return [{ ...row, itemDetailsUrl }];
+  });
+}
+
+function normalizedPrimeGovPreviewUrl(value?: string | null) {
+  if (!value) return null;
+
+  try {
+    const source = new URL(value);
+    if (!/^https?:$/i.test(source.protocol) || !/\/viewer\/preview$/i.test(source.pathname)) {
+      return null;
+    }
+
+    const id = source.searchParams.get("id");
+    const uid = source.searchParams.get("uid");
+    const type = source.searchParams.get("type");
+    if (!id || !type || !["0", "2"].includes(type) || (type === "2" && !uid)) return null;
+
+    source.search = "";
+    source.hash = "";
+    source.searchParams.set("id", id);
+    if (uid) source.searchParams.set("uid", uid);
+    source.searchParams.set("type", type);
+    return source.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function buildPrimeGovAttachmentIdentityUrl(
+  input: PrimeGovAttachmentIdentityInput
+) {
+  try {
+    const itemUrl = new URL(input.itemDetailsUrl);
+    if (!/^https?:$/i.test(itemUrl.protocol)) return null;
+
+    const previewUrl = normalizedPrimeGovPreviewUrl(input.previewUrl);
+    if (previewUrl && new URL(previewUrl).origin === itemUrl.origin) return previewUrl;
+
+    const kind = input.documentId ? "document" : input.attachmentId ? "attachment" : null;
+    const id = input.documentId || input.attachmentId;
+    if (!kind || !id) return null;
+    itemUrl.hash = new URLSearchParams({ [`primegov-${kind}`]: id }).toString();
+    return itemUrl.toString();
+  } catch {
+    return null;
+  }
+}
+
+export function primeGovAttachmentDownloadDescriptor(
+  sourceUrl: string
+): PrimeGovAttachmentDownloadDescriptor | null {
+  try {
+    const source = new URL(sourceUrl);
+    if (!/^https?:$/i.test(source.protocol)) return null;
+
+    if (/\/viewer\/preview$/i.test(source.pathname)) {
+      const type = source.searchParams.get("type");
+      const id = type === "2"
+        ? source.searchParams.get("uid")
+        : type === "0"
+          ? source.searchParams.get("id")
+          : null;
+      if (!id) return null;
+      return {
+        origin: source.origin,
+        kind: type === "2" ? "attachment" : "document",
+        id
+      };
+    }
+
+    const hash = new URLSearchParams(source.hash.replace(/^#/, ""));
+    const documentId = hash.get("primegov-document");
+    const attachmentId = hash.get("primegov-attachment");
+    if (!documentId && !attachmentId) return null;
+    return {
+      origin: source.origin,
+      kind: documentId ? "document" : "attachment",
+      id: documentId || attachmentId || ""
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function resolvePrimeGovAttachmentUrl(
+  context: BrowserContext,
+  origin: string,
+  kind: "document" | "attachment",
+  id: string
+) {
+  const path = kind === "document"
+    ? `/api/systemdocument/GetPublicPdfDownloadUrl/${encodeURIComponent(id)}`
+    : `/api/systemitemattachment/GetPublicPdfDownloadUrlV1/${encodeURIComponent(id)}`;
+  const response = await context.request.get(new URL(path, origin).toString(), { timeout: 60_000 });
+  if (!response.ok()) return null;
+  const value = await response.json().catch(() => null) as unknown;
+  return typeof value === "string" && /^https?:/i.test(value) ? value : null;
+}
+
+export async function resolvePrimeGovAttachmentDownloadUrl(
+  context: BrowserContext,
+  sourceUrl: string
+) {
+  const descriptor = primeGovAttachmentDownloadDescriptor(sourceUrl);
+  if (!descriptor) return sourceUrl;
+  return resolvePrimeGovAttachmentUrl(
+    context,
+    descriptor.origin,
+    descriptor.kind,
+    descriptor.id
+  );
+}
+
+async function scrapePrimeGovItemAttachments(
+  context: BrowserContext,
+  row: PrimeGovAgendaAttachmentRow
+): Promise<DiscoveredAgendaItemAttachments> {
+  const page = await context.newPage();
+  try {
+    await page.goto(row.itemDetailsUrl, { waitUntil: "networkidle", timeout: 60_000 });
+    const heading = page.locator("#AttachmentsHeading");
+    if ((await heading.count()) === 1) {
+      await heading.click();
+      await page.waitForTimeout(250);
+    }
+    await page.evaluate("globalThis.__name = (value) => value");
+    const candidates = await page.evaluate(() => Array.from(document.querySelectorAll("#AttachmentsTable tbody tr"))
+      .flatMap((attachmentRow) => {
+        const label = (attachmentRow.querySelector("td")?.textContent || "").replace(/\s+/g, " ").trim();
+        const hrefs = Array.from(attachmentRow.querySelectorAll("a[href]"))
+          .map((anchor) => anchor.getAttribute("href") || "");
+        const documentId = hrefs.map((href) => href.match(/downloadAttachedDocumentAsPdf\((\d+)\)/)?.[1]).find(Boolean);
+        const attachmentId = hrefs.map((href) => href.match(/downloadAttachmentAsPdf\(['\"]([^'\"]+)['\"]\)/)?.[1]).find(Boolean);
+        const previewUrl = Array.from(attachmentRow.querySelectorAll("a[href]"))
+          .map((anchor) => (anchor as HTMLAnchorElement).href)
+          .find((href) => /\/viewer\/preview/i.test(href));
+        return label && (documentId || attachmentId || previewUrl)
+          ? [{ label, documentId: documentId || null, attachmentId: attachmentId || null, previewUrl: previewUrl || null }]
+          : [];
+      }));
+    const uniqueCandidates = Array.from(new Map(candidates.map((candidate) => [
+      candidate.documentId || candidate.attachmentId || candidate.previewUrl,
+      candidate
+    ])).values());
+    const attachments = uniqueCandidates.map((candidate) => {
+      const url = buildPrimeGovAttachmentIdentityUrl({
+        itemDetailsUrl: row.itemDetailsUrl,
+        previewUrl: candidate.previewUrl,
+        documentId: candidate.documentId,
+        attachmentId: candidate.attachmentId
+      });
+      return url ? { label: candidate.label, url } : null;
+    }).filter((attachment): attachment is { label: string; url: string } => Boolean(attachment));
+    return { ...row, sourceUrl: row.itemDetailsUrl, attachments };
+  } finally {
+    await page.close();
+  }
+}
+
+export async function discoverPrimeGovAgendaAttachments(
+  context: BrowserContext,
+  meeting: PrimeGovMeeting,
+  options: { log?: (message: string) => void; shouldStop?: () => boolean } = {}
+) {
+  const htmlAgenda = meeting.documents.find((document) => document.type === "HTML Agenda");
+  if (!htmlAgenda) return { attachmentsAdded: 0, itemsWithAttachments: 0 };
+  const page = await context.newPage();
+  try {
+    await page.goto(htmlAgenda.url, { waitUntil: "networkidle", timeout: 60_000 });
+    const rows = await extractPrimeGovAttachmentRows(page);
+    const discoveries = (await mapWithConcurrency(rows, 4, async (row) => {
+      if (options.shouldStop?.()) return null;
+      try {
+        return await scrapePrimeGovItemAttachments(context, row);
+      } catch (error) {
+        options.log?.(`PrimeGov item attachment discovery failed for ${row.itemDetailsUrl}: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      }
+    })).filter((discovery): discovery is DiscoveredAgendaItemAttachments => Boolean(discovery));
+    return mergeDiscoveredAgendaItemAttachments(meeting, discoveries);
+  } finally {
+    await page.close();
+  }
+}
+
 async function extractPaginatedPortalMeetings(page: Page) {
   const pageSize = page.locator('select[name="archivedMeetingsTable_length"]');
   if (await pageSize.count()) {
@@ -425,6 +702,21 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
       }
     }
 
+    if (options.enrichAgendaAttachments ?? true) {
+      log("Discovering PrimeGov item attachments...");
+      for (const meeting of meetings) {
+        if (options.shouldStop?.()) break;
+        if (!meeting.hasHtmlAgenda) continue;
+        const result = await discoverPrimeGovAgendaAttachments(context, meeting, {
+          log,
+          shouldStop: options.shouldStop
+        });
+        if (result.attachmentsAdded > 0) {
+          log(`Discovered ${result.attachmentsAdded} PrimeGov attachment(s) for ${meeting.title}.`);
+        }
+      }
+    }
+
     if (options.downloadDocuments) {
       const { downloadCompiledDocuments } = await import("./downloadDocuments");
       log("Downloading PDFs where available...");
@@ -457,14 +749,27 @@ export async function scrapeAllArchivePages(options: ScrapePortalOptions = {}) {
 }
 
 export function buildDownloadFilename(meeting: PrimeGovMeeting, docType: string, sourceUrl: string) {
-  const meetingId = getMeetingTemplateId(sourceUrl) || "unknown-id";
+  let documentId = primeGovAttachmentDownloadDescriptor(sourceUrl)?.id || getMeetingTemplateId(sourceUrl);
+  if (!documentId) {
+    try {
+      const parsed = new URL(sourceUrl);
+      documentId =
+        parsed.searchParams.get("uid") ||
+        parsed.searchParams.get("id") ||
+        parsed.searchParams.get("documentId") ||
+        slugify(parsed.pathname.split("/").filter(Boolean).slice(-5).join("-")) ||
+        "unknown-id";
+    } catch {
+      documentId = slugify(sourceUrl.slice(-80)) || "unknown-id";
+    }
+  }
 
   return [
     meeting.section === "Archived Meetings" ? "archived" : "upcoming",
     meeting.dateText ? slugify(meeting.dateText) : "no-date",
     slugify(meeting.title || "untitled-meeting"),
     slugify(docType),
-    meetingId
+    documentId
   ]
     .filter(Boolean)
     .join("__");

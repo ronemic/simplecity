@@ -14,6 +14,7 @@ export const MAX_ATTACHMENT_CONTEXT_CHARS_PER_ITEM = 2500;
 const MIN_PRIMARY_SOURCE_CHARS = 300;
 const MIN_HTML_AGENDA_CHARS = 500;
 const MIN_ROW_SOURCE_CHARS = 40;
+const MIN_ATTACHMENT_CONTEXT_CHARS = 200;
 
 export function normalizeSourceText(text = "") {
   return text
@@ -93,14 +94,39 @@ async function extractTextForDocument(doc: PrimeGovDocument | undefined | null) 
   return extracted?.text || "";
 }
 
+function attachmentPriority(doc: PrimeGovDocument) {
+  const label = doc.label.toLowerCase();
+
+  if (doc.type === "Staff Report" || /staff\s+report/.test(label)) return 0;
+  if (doc.type === "Public Comment" || /public\s+(?:hearing\s+)?notice/.test(label)) return 1;
+  if (doc.type === "Contract" || doc.type === "Resolution" || doc.type === "Ordinance") return 2;
+  if (doc.type === "Exhibit") return 3;
+  return 4;
+}
+
+function rankedItemAttachments(item: NonNullable<PrimeGovMeeting["items"]>[number]) {
+  const seenUrls = new Set<string>();
+
+  return (item.attachments || [])
+    .filter((doc) => {
+      const normalizedUrl = doc.url.trim().toLowerCase();
+      if (!normalizedUrl || seenUrls.has(normalizedUrl)) return false;
+      seenUrls.add(normalizedUrl);
+      return true;
+    })
+    .map((doc, index) => ({ doc, index }))
+    .sort(
+      (left, right) =>
+        attachmentPriority(left.doc) - attachmentPriority(right.doc) || left.index - right.index
+    )
+    .map(({ doc }) => doc);
+}
+
 export async function appendAgendaItemAttachmentContext(
   meeting: PrimeGovMeeting,
   baseText: string
 ) {
-  if (
-    !["menlo-park", "los-altos"].includes(String(meeting.jurisdictionSlug || "")) ||
-    !meeting.items?.length
-  ) {
+  if (!meeting.items?.length) {
     return { text: baseText, included: 0 };
   }
 
@@ -108,7 +134,6 @@ export async function appendAgendaItemAttachmentContext(
   const remainingCharacters = MAX_CHARS_FOR_LLM - cleanedBase.length;
   if (remainingCharacters < 400) return { text: cleanedBase, included: 0 };
 
-  const seenUrls = new Set<string>();
   const candidates: Array<{
     agendaNumber: string;
     title: string;
@@ -118,25 +143,20 @@ export async function appendAgendaItemAttachmentContext(
   }> = [];
 
   for (const item of meeting.items) {
-    const itemAttachments = (item.attachments || []).filter(
-      (doc) => doc.isAgendaItemAttachment && !seenUrls.has(doc.url)
-    );
-    const attachment =
-      itemAttachments.find((doc) => doc.type === "Staff Report") || itemAttachments[0];
-    if (!attachment) continue;
+    for (const attachment of rankedItemAttachments(item)) {
+      const text = cleanText(await extractTextForDocument(attachment));
+      if (text.length < MIN_ATTACHMENT_CONTEXT_CHARS) continue;
 
-    seenUrls.add(attachment.url);
-    const text = cleanText(await extractTextForDocument(attachment));
-    if (text.length < 200) continue;
-    if (!attachment.extractedText) attachment.extractedText = text;
-
-    candidates.push({
-      agendaNumber: item.agendaNumber || attachment.agendaItemNumber || "Unnumbered",
-      title: item.title || attachment.agendaItemTitle || item.rowText,
-      label: attachment.label || "Attachment",
-      url: attachment.url,
-      text
-    });
+      attachment.extractedText = text;
+      candidates.push({
+        agendaNumber: item.agendaNumber || attachment.agendaItemNumber || "Unnumbered",
+        title: item.title || attachment.agendaItemTitle || item.rowText,
+        label: attachment.label || "Attachment",
+        url: attachment.url,
+        text
+      });
+      break;
+    }
   }
 
   if (candidates.length === 0) return { text: cleanedBase, included: 0 };
@@ -158,7 +178,7 @@ export async function appendAgendaItemAttachmentContext(
       MAX_ATTACHMENT_CONTEXT_CHARS_PER_ITEM,
       Math.floor((remainingCharacters - formattingCharacters) / includedCandidates.length)
     );
-    if (perItemBudget >= 200) break;
+    if (perItemBudget >= MIN_ATTACHMENT_CONTEXT_CHARS) break;
     includedCandidates = includedCandidates.slice(0, -1);
   }
 
@@ -453,6 +473,9 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     }
   }
 
+  const extractedItems = extractAgendaItemsFromText(meeting, selectedText);
+  meeting.items = mergeAgendaItems(meeting.items || [], extractedItems);
+
   const attachmentContext = await appendAgendaItemAttachmentContext(meeting, selectedText);
   selectedText = attachmentContext.text;
   if (attachmentContext.included > 0) {
@@ -461,8 +484,6 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     );
   }
 
-  const extractedItems = extractAgendaItemsFromText(meeting, selectedText);
-  meeting.items = mergeAgendaItems(meeting.items || [], extractedItems);
   const structuredItemContext = formatAgendaItemContexts(meeting.items);
   if (structuredItemContext) {
     const currentSourceContext = currentMeetingSourceText(selectedText);

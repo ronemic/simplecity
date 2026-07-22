@@ -4,6 +4,10 @@ import type { PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/li
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import {
+  mergeDiscoveredAgendaItemAttachments,
+  type DiscoveredAgendaItemAttachments
+} from "@/lib/scraper/itemAttachments";
 
 const IQM2_ORIGIN = "https://sccgov.iqm2.com";
 export const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
@@ -612,6 +616,70 @@ async function extractLinksFromDetailPage(page: Page) {
   });
 }
 
+export type Iqm2DetailRow = {
+  cells: string[];
+  rowText: string;
+  links: Array<{ label: string; url: string }>;
+};
+
+export function extractIqm2AgendaItemAttachments(
+  rows: Iqm2DetailRow[],
+  sourceUrl: string
+): DiscoveredAgendaItemAttachments[] {
+  const discoveries: DiscoveredAgendaItemAttachments[] = [];
+  let current: DiscoveredAgendaItemAttachments | null = null;
+
+  for (const row of rows) {
+    const agendaNumber = row.cells.find((cell) => /^\d+(?:\.\d+)*\.?$/.test(cell))
+      ?.replace(/\.$/, "") || null;
+    const itemLink = row.links.find((link) => /detail_legifile\.aspx/i.test(link.url));
+    const isItemRow = Boolean(agendaNumber && (itemLink || row.cells.length >= 3));
+
+    if (isItemRow) {
+      const numberIndex = row.cells.findIndex((cell) => cell.replace(/\.$/, "") === agendaNumber);
+      const title = cleanText(itemLink?.label || row.cells.slice(numberIndex + 1).join(" ")) || null;
+      current = {
+        agendaNumber,
+        title,
+        rowText: row.rowText,
+        sourceUrl: itemLink?.url || sourceUrl,
+        attachments: []
+      };
+      discoveries.push(current);
+      continue;
+    }
+
+    if (!current) continue;
+    for (const link of row.links) {
+      if (!/fileopen\.aspx|\.pdf(?:$|[?#])/i.test(link.url)) continue;
+      current.attachments.push({ label: link.label || "Attachment", url: link.url });
+    }
+  }
+
+  return discoveries.filter((discovery) => discovery.attachments.length > 0);
+}
+
+async function extractIqm2DetailRows(page: Page): Promise<Iqm2DetailRow[]> {
+  return page.evaluate(() => {
+    const clean = (value = "") => value.replace(/\s+/g, " ").trim();
+    const absolute = (href: string | null) => {
+      try { return href ? new URL(href, window.location.href).toString() : null; } catch { return null; }
+    };
+    return Array.from(document.querySelectorAll("table tr"))
+      .map((row) => ({
+        cells: Array.from(row.querySelectorAll(":scope > td")).map((cell) => clean(cell.textContent || "")),
+        rowText: clean(row.textContent || ""),
+        links: Array.from(row.querySelectorAll("a[href]"))
+          .map((anchor) => ({
+            label: clean(anchor.textContent || ""),
+            url: absolute(anchor.getAttribute("href"))
+          }))
+          .filter((link): link is { label: string; url: string } => Boolean(link.url))
+      }))
+      .filter((row) => row.rowText && row.cells.length > 1);
+  });
+}
+
 export async function enrichIqm2MeetingDetails(
   context: BrowserContext,
   meeting: PrimeGovMeeting,
@@ -630,7 +698,11 @@ export async function enrichIqm2MeetingDetails(
     await page.waitForTimeout(1500);
 
     iqm2Meeting.detailText = cleanText(await page.locator("body").innerText());
-    const links = await extractLinksFromDetailPage(page);
+    await page.evaluate("globalThis.__name = (value) => value");
+    const [links, detailRows] = await Promise.all([
+      extractLinksFromDetailPage(page),
+      extractIqm2DetailRows(page)
+    ]);
 
     const detailDocuments: Iqm2Document[] = [];
     for (const link of links) {
@@ -656,7 +728,13 @@ export async function enrichIqm2MeetingDetails(
       ["Agenda", "Agenda Packet", "Document"].includes(doc.type)
     );
 
-    log(`Enriched IQM2 detail page for ${meeting.title}.`);
+    const itemAttachments = extractIqm2AgendaItemAttachments(
+      detailRows,
+      iqm2Meeting.meetingDetailsUrl
+    );
+    const merged = mergeDiscoveredAgendaItemAttachments(iqm2Meeting, itemAttachments);
+
+    log(`Enriched IQM2 detail page for ${meeting.title}; associated ${merged.attachmentsAssociated} item attachment(s).`);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown IQM2 detail page error";
     meeting.extractionNotes = [

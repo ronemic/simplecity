@@ -3,6 +3,7 @@ import test from "node:test";
 import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import {
   attachLaserficheMinutes,
+  normalizeAgendaOnlineItemLink,
   normalizeAgendaOnlineRows
 } from "@/lib/sources/agenda-online";
 
@@ -58,4 +59,15 @@ test("attaches Redwood City Laserfiche minutes to the unique same-day City Counc
   }]), 1);
   assert.equal(meetings[0].documents[0].type, "Minutes");
   assert.match(meetings[0].documents[0].url, /528589/);
+});
+
+test("normalizes Agenda Online item identifiers without losing dotted item numbers", () => {
+  assert.deepEqual(
+    normalizeAgendaOnlineItemLink("14763", "7.A. Authorization of annual membership dues"),
+    {
+      itemId: "14763",
+      agendaNumber: "7.A",
+      title: "Authorization of annual membership dues"
+    }
+  );
 });

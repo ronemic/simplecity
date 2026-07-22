@@ -150,3 +150,60 @@ ${repeatSentence("Historical supporting material.", 20)}
   assert.doesNotMatch(prepared.llmInputText, /Historical contract award/);
   assert.doesNotMatch(prepared.llmInputText, /72 hours before/);
 });
+
+test("builds agenda items before enriching their attachments for any jurisdiction", async () => {
+  const agendaText = `
+CITY COUNCIL AGENDA
+Residents may comment in person during the meeting. ${repeatSentence(
+    "The agenda lists the current business before the council.",
+    8
+  )}
+1. CALL TO ORDER
+2. Central Park playground repair contract
+Recommendation: Approve the playground repair contract.
+3. ADJOURNMENT
+`;
+  const attachmentText = repeatSentence(
+    "The supporting document provides the playground repair schedule and funding details.",
+    12
+  );
+  const meeting: PrimeGovMeeting = {
+    externalId: "foster-city-council-2026-07-21",
+    jurisdictionSlug: "foster-city",
+    section: "Upcoming Meetings",
+    title: "City Council",
+    dateText: "July 21, 2026",
+    meetingType: "City Council",
+    rowText: "City Council July 21, 2026 Agenda",
+    status: "Upcoming",
+    sourceUrl: "https://city.example/agenda.pdf",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda",
+        label: "Agenda",
+        url: "https://city.example/agenda.pdf",
+        extractedText: agendaText
+      },
+      {
+        type: "Attachment",
+        label: "Playground Contract Staff Report",
+        url: "https://city.example/playground-staff-report.pdf",
+        extractedText: attachmentText,
+        agendaItemNumber: "2"
+      }
+    ]
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.deepEqual(prepared.items?.map((item) => item.agendaNumber), ["2"]);
+  assert.equal(prepared.items?.[0].attachments?.length, 1);
+  assert.match(prepared.llmInputText, /playground repair schedule and funding details/);
+  assert.ok(
+    prepared.extractionNotes.some((note) =>
+      note.includes("Included item-aware context from 1 agenda attachment")
+    )
+  );
+});

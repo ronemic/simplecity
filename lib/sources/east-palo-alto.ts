@@ -6,6 +6,10 @@ import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import {
+  mergeDiscoveredAgendaItemAttachments,
+  type DiscoveredAgendaItemAttachments
+} from "@/lib/scraper/itemAttachments";
 
 export type EastPaloAltoExtractedLink = { label: string; url: string; column: string };
 export type EastPaloAltoExtractedRow = {
@@ -225,6 +229,55 @@ function mergeExtractedRows(rows: EastPaloAltoExtractedRow[]) {
   return Array.from(merged.values());
 }
 
+async function discoverEastPaloAltoAgendaAttachments(page: Page, meeting: PrimeGovMeeting) {
+  const agendaUrl = meeting.documents.find((document) =>
+    document.type === "Agenda" && /granicus\.com\/AgendaViewer\.php/i.test(document.url)
+  )?.url;
+  if (!agendaUrl) return { attachmentsAdded: 0, itemsWithAttachments: 0 };
+
+  await page.goto(agendaUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+  await page.evaluate("globalThis.__name = (value) => value");
+  const discoveries = await page.evaluate(() => {
+    const clean = (value = "") => value.replace(/\s+/g, " ").trim();
+    const results: Array<{
+      agendaNumber: string | null;
+      title: string | null;
+      rowText: string;
+      sourceUrl: string;
+      attachments: Array<{ label: string; url: string }>;
+    }> = [];
+    const headings = Array.from(document.querySelectorAll("h2, h3, h4"));
+    for (const heading of headings) {
+      const text = clean(heading.textContent || "");
+      const match = text.match(/^(\d+(?:\.\d+)+)\.?\s+(.+)$/);
+      if (!match) continue;
+      const links: Array<{ label: string; url: string }> = [];
+      let sibling = heading.nextElementSibling;
+      while (sibling && !/^H[234]$/.test(sibling.tagName)) {
+        for (const anchor of Array.from(sibling.querySelectorAll("a[href]"))) {
+          const label = clean(anchor.textContent || anchor.getAttribute("title") || "Attachment");
+          const url = (anchor as HTMLAnchorElement).href;
+          if (/\.pdf(?:$|[?#])|attachment|staff\s*report|resolution|exhibit/i.test(`${label} ${url}`)) {
+            links.push({ label, url });
+          }
+        }
+        sibling = sibling.nextElementSibling;
+      }
+      if (links.length > 0) {
+        results.push({
+          agendaNumber: match[1],
+          title: match[2],
+          rowText: text,
+          sourceUrl: window.location.href,
+          attachments: links
+        });
+      }
+    }
+    return results;
+  }) as DiscoveredAgendaItemAttachments[];
+  return mergeDiscoveredAgendaItemAttachments(meeting, discoveries);
+}
+
 async function fetchOfficialPage(url: string) {
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -306,6 +359,23 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
     log(`East Palo Alto documents found: ${meetings.flatMap((meeting) => meeting.documents).length}.`);
     log(`East Palo Alto recordings found: ${meetings.flatMap((meeting) => meeting.documents).filter((doc) => doc.type === "Video").length}.`);
     if (!meetings.length) throw new Error("East Palo Alto scraper found zero valid meetings in the Upcoming Events table.");
+    if (options.enrichAgendaAttachments ?? true) {
+      log("Discovering East Palo Alto item attachment links.");
+      for (const meeting of meetings) {
+        if (options.shouldStop?.()) break;
+        try {
+          const result = await discoverEastPaloAltoAgendaAttachments(page, meeting);
+          if (result.attachmentsAdded > 0) {
+            log(`Discovered ${result.attachmentsAdded} East Palo Alto attachment(s) for ${meeting.title}.`);
+          }
+        } catch (error) {
+          meeting.extractionNotes = [
+            ...(meeting.extractionNotes || []),
+            `Agenda attachment discovery failed: ${error instanceof Error ? error.message : String(error)}`
+          ];
+        }
+      }
+    }
     if (options.downloadDocuments) {
       const { downloadOfficialSiteDocuments } = await import("@/lib/scraper/downloadDocuments");
       const result = await downloadOfficialSiteDocuments(context, meetings, { outputDir: options.documentOutputDir, log, shouldStop: options.shouldStop });

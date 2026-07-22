@@ -57,6 +57,7 @@ async function main() {
     headful: process.argv.includes("--headful"),
     downloadDocuments: process.argv.includes("--download"),
     enrichDetails: !process.argv.includes("--no-details"),
+    enrichAgendaAttachments: !process.argv.includes("--no-agenda-attachments"),
     enrichLegislation: process.argv.includes("--legislation"),
     limit: parsePositiveInteger(getArgValue("limit")),
     maxItemsPerMeeting: parsePositiveInteger(getArgValue("max-items-per-meeting")),

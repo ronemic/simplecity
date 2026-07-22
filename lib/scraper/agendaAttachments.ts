@@ -8,7 +8,6 @@ import pdfParse, {
 import type { AgendaItem, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
 
-export const MENLO_PARK_ATTACHMENT_MAX_PAGES = 20;
 export const MENLO_PARK_ATTACHMENT_MAX_ITEMS = 12;
 export const MENLO_PARK_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 export const MENLO_PARK_ATTACHMENT_TIMEOUT_MS = 20_000;
@@ -234,6 +233,24 @@ export function selectAgendaItemAttachments(
   return selected;
 }
 
+export function selectAllAgendaItemAttachments(
+  items: DiscoveredAgendaItem[],
+  limit = Number.POSITIVE_INFINITY
+) {
+  const grouped = new Map<string, DiscoveredAgendaItem>();
+  for (const item of items) {
+    const existing = grouped.get(item.agendaNumber);
+    if (!existing) {
+      if (grouped.size >= limit) continue;
+      grouped.set(item.agendaNumber, { ...item, links: [...item.links] });
+      continue;
+    }
+    const urls = new Set(existing.links.map((link) => link.url));
+    existing.links.push(...item.links.filter((link) => !urls.has(link.url)));
+  }
+  return Array.from(grouped.values());
+}
+
 export async function extractAgendaPdfPages(localPath: string): Promise<AgendaPdfPage[]> {
   const buffer = await fs.readFile(localPath);
   const pages: AgendaPdfPage[] = [];
@@ -241,7 +258,6 @@ export async function extractAgendaPdfPages(localPath: string): Promise<AgendaPd
 
   await pdfParse(buffer, {
     version: "v2.0.550",
-    max: MENLO_PARK_ATTACHMENT_MAX_PAGES,
     pagerender: async (page: PdfPageData) => {
       pageNumber += 1;
       const [textContent, annotations] = await Promise.all([
@@ -312,31 +328,35 @@ export async function discoverMenloParkAgendaAttachments(
     const existingByUrl = new Map(
       meeting.documents.map((doc) => [normalizeMenloParkAttachmentUrl(doc.url) || doc.url, doc])
     );
-    const selected = selectAgendaItemAttachments(foundItems);
+    const selected = selectAllAgendaItemAttachments(foundItems);
     const newItems: AgendaItem[] = [];
 
     for (const item of selected) {
       const parentDocumentUrl = parentByItem.get(item.agendaNumber) || meeting.sourceUrl || "";
-      let attachment = existingByUrl.get(item.selectedLink.url);
+      const attachments = [];
+      for (const link of item.links) {
+        let attachment = existingByUrl.get(link.url);
 
-      if (!attachment) {
-        attachment = {
-          jurisdictionName: meeting.jurisdictionName,
-          jurisdictionSlug: meeting.jurisdictionSlug,
-          platform: meeting.platform,
-          type: "Attachment",
-          label: item.selectedLink.label || `Agenda item ${item.agendaNumber} attachment`,
-          url: item.selectedLink.url
-        };
-        meeting.documents.push(attachment);
-        existingByUrl.set(item.selectedLink.url, attachment);
-        discovered += 1;
+        if (!attachment) {
+          attachment = {
+            jurisdictionName: meeting.jurisdictionName,
+            jurisdictionSlug: meeting.jurisdictionSlug,
+            platform: meeting.platform,
+            type: "Attachment",
+            label: link.label || `Agenda item ${item.agendaNumber} attachment`,
+            url: link.url
+          };
+          meeting.documents.push(attachment);
+          existingByUrl.set(link.url, attachment);
+          discovered += 1;
+        }
+
+        attachment.agendaItemNumber = item.agendaNumber;
+        attachment.agendaItemTitle = item.title;
+        attachment.parentDocumentUrl = parentDocumentUrl;
+        attachment.isAgendaItemAttachment = true;
+        attachments.push(attachment);
       }
-
-      attachment.agendaItemNumber = item.agendaNumber;
-      attachment.agendaItemTitle = item.title;
-      attachment.parentDocumentUrl = parentDocumentUrl;
-      attachment.isAgendaItemAttachment = true;
 
       newItems.push({
         externalId: itemExternalId(meeting, item.agendaNumber),
@@ -348,7 +368,7 @@ export async function discoverMenloParkAgendaAttachments(
         result: null,
         sourceUrl: parentDocumentUrl,
         rowText: item.rowText,
-        attachments: [attachment]
+        attachments
       });
     }
 

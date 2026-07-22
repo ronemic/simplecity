@@ -8,6 +8,10 @@ import { downloadOfficialSiteDocuments } from "@/lib/scraper/downloadDocuments";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
+import {
+  mergeDiscoveredAgendaItemAttachments,
+  type DiscoveredAgendaItemAttachments
+} from "@/lib/scraper/itemAttachments";
 
 type AgendaOnlineRow = {
   meetingId: string;
@@ -180,16 +184,19 @@ export async function downloadLaserficheMinutes(
   return { downloaded, failed };
 }
 
-async function resolveDocumentStreams(context: BrowserContext, meetings: PrimeGovMeeting[]) {
+export async function resolveDocumentStreams(context: BrowserContext, meetings: PrimeGovMeeting[]) {
   for (const meeting of meetings) {
     for (const document of meeting.documents) {
       const source = new URL(document.url);
       const meetingId = source.searchParams.get("meetingId") || "0";
       const documentType = source.searchParams.get("documentType") || "1";
+      const itemId = source.searchParams.get("itemId") || "0";
+      const publishId = source.searchParams.get("publishId") || "0";
+      const isSection = source.searchParams.get("isSection")?.toLowerCase() === "true";
       const isAttachment = source.searchParams.get("isAttachment")?.toLowerCase() === "true";
       const documentName = decodeURIComponent(source.pathname.split("/").at(-1) || "document.pdf");
       const invokePath = isAttachment
-        ? `/AgendaOnline/Documents/InvokeDownloadAttachment/${encodeURIComponent(documentName)}?meetingId=${meetingId}&itemId=0&publishId=0&isSection=false&documentType=${documentType}`
+        ? `/AgendaOnline/Documents/InvokeDownloadAttachment/${encodeURIComponent(documentName)}?meetingId=${meetingId}&itemId=${itemId}&publishId=${publishId}&isSection=${isSection}&documentType=${documentType}`
         : `/AgendaOnline/Documents/InvokeDownloadMeetingDocument/${encodeURIComponent(documentName)}?meetingId=${meetingId}&documentType=${documentType}`;
       const response = await context.request.post(new URL(invokePath, source.origin).toString(), {
         headers: { Referer: document.url }
@@ -215,6 +222,87 @@ async function resolveDocumentStreams(context: BrowserContext, meetings: PrimeGo
       view.searchParams.set("isSection", String(stream.IsSection ?? false).toLowerCase());
       document.url = view.toString();
     }
+  }
+}
+
+export type AgendaOnlineItemLink = {
+  itemId: string;
+  agendaNumber: string | null;
+  title: string | null;
+};
+
+export function normalizeAgendaOnlineItemLink(itemId: string, label: string): AgendaOnlineItemLink {
+  const cleaned = cleanText(label);
+  const match = cleaned.match(/^(\d+(?:\.[A-Z0-9]+)+)\.?\s+(.+)$/i);
+  return {
+    itemId,
+    agendaNumber: match?.[1] || null,
+    title: cleanText(match?.[2] || cleaned) || null
+  };
+}
+
+export async function discoverAgendaOnlineAttachments(
+  context: BrowserContext,
+  meeting: PrimeGovMeeting,
+  options: { log: (message: string) => void; shouldStop?: () => boolean }
+) {
+  if (!meeting.meetingDetailsUrl) return { attachmentsAdded: 0, itemsWithAttachments: 0 };
+  const detailsUrl = new URL(meeting.meetingDetailsUrl);
+  const meetingId = detailsUrl.searchParams.get("id") || detailsUrl.searchParams.get("meetingId");
+  if (!meetingId) return { attachmentsAdded: 0, itemsWithAttachments: 0 };
+
+  const page = await context.newPage();
+  try {
+    const agendaUrl = new URL("/AgendaOnline/Meetings/ViewMeetingAgenda", detailsUrl.origin);
+    agendaUrl.searchParams.set("meetingId", meetingId);
+    agendaUrl.searchParams.set("type", "agenda");
+    await page.goto(agendaUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.evaluate("globalThis.__name = (value) => value");
+    const itemLinks = await page.evaluate(() => Array.from(document.querySelectorAll("a[href]"))
+      .flatMap((anchor) => {
+        const action = `${anchor.getAttribute("href") || ""} ${anchor.getAttribute("onclick") || ""}`;
+        const match = action.match(/loadAgendaItem\((\d+)(?:,\s*(false|true))?\)/i);
+        const label = (anchor.textContent || "").replace(/\s+/g, " ").trim();
+        return match && (!match[2] || match[2].toLowerCase() === "false") && label
+          ? [{ itemId: match[1], label }]
+          : [];
+      }));
+    const discoveries: DiscoveredAgendaItemAttachments[] = [];
+
+    for (const rawItem of itemLinks) {
+      if (options.shouldStop?.()) break;
+      const item = normalizeAgendaOnlineItemLink(rawItem.itemId, rawItem.label);
+      const itemUrl = new URL("/AgendaOnline/Meetings/ViewMeetingAgendaItem", detailsUrl.origin);
+      itemUrl.searchParams.set("meetingId", meetingId);
+      itemUrl.searchParams.set("itemId", item.itemId);
+      itemUrl.searchParams.set("isSection", "false");
+      itemUrl.searchParams.set("type", "agenda");
+      try {
+        await page.goto(itemUrl.toString(), { waitUntil: "domcontentloaded", timeout: 60_000 });
+        await page.evaluate("globalThis.__name = (value) => value");
+        const attachments = await page.evaluate(() => Array.from(document.querySelectorAll("a[href]"))
+          .map((anchor) => ({
+            label: (anchor.textContent || "").replace(/\s+/g, " ").trim(),
+            url: (anchor as HTMLAnchorElement).href
+          }))
+          .filter((link) => /\/AgendaOnline\/Documents\/DownloadFile/i.test(link.url)));
+        if (attachments.length > 0) {
+          discoveries.push({
+            agendaNumber: item.agendaNumber,
+            title: item.title,
+            rowText: rawItem.label,
+            sourceUrl: itemUrl.toString(),
+            attachments
+          });
+        }
+      } catch (error) {
+        options.log(`Agenda Online item attachment discovery failed for ${itemUrl}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    return mergeDiscoveredAgendaItemAttachments(meeting, discoveries);
+  } finally {
+    await page.close();
   }
 }
 
@@ -330,6 +418,20 @@ export async function scrapeAgendaOnlineMeetings(
         log(`Redwood City Laserfiche archive exposed ${entries.length} approved minutes document(s); attached ${attached} to scraped meetings.`);
       } finally {
         await archivePage.close();
+      }
+    }
+
+    if (options.enrichAgendaAttachments ?? true) {
+      log("Discovering Agenda Online item attachments...");
+      for (const meeting of meetings) {
+        if (options.shouldStop?.()) break;
+        const result = await discoverAgendaOnlineAttachments(context, meeting, {
+          log,
+          shouldStop: options.shouldStop
+        });
+        if (result.attachmentsAdded > 0) {
+          log(`Discovered ${result.attachmentsAdded} Agenda Online attachment(s) for ${meeting.title}.`);
+        }
       }
     }
 

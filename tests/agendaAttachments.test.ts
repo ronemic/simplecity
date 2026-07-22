@@ -9,6 +9,7 @@ import {
   MENLO_PARK_ATTACHMENT_MAX_ITEMS,
   normalizeMenloParkAttachmentUrl,
   selectAgendaItemAttachments,
+  selectAllAgendaItemAttachments,
   type AgendaPdfPage,
   type DiscoveredAgendaItem
 } from "@/lib/scraper/agendaAttachments";
@@ -16,6 +17,7 @@ import {
   appendAgendaItemAttachmentContext,
   MAX_CHARS_FOR_LLM
 } from "@/lib/scraper/prepareLlmInput";
+import { KNOWN_JURISDICTION_SLUGS } from "@/lib/config/jurisdictions";
 import type { PrimeGovDocument, PrimeGovMeeting } from "@/lib/types";
 
 function text(str: string, x: number, y: number) {
@@ -133,10 +135,55 @@ test("selects no more than twelve unique item attachments", () => {
   assert.equal(selectAgendaItemAttachments(items).length, MENLO_PARK_ATTACHMENT_MAX_ITEMS);
 });
 
-function meetingWithAttachments(documents: PrimeGovDocument[]): PrimeGovMeeting {
+test("keeps every unique attachment for each selected agenda item", () => {
+  const selected = selectAllAgendaItemAttachments([
+    {
+      agendaNumber: "H1",
+      title: "Housing",
+      rowText: "H1 Housing",
+      pageNumber: 1,
+      links: [
+        { label: "Staff Report", url: "https://www.menlopark.gov/files/sharedassets/h1.pdf" },
+        { label: "Exhibit A", url: "https://www.menlopark.gov/files/sharedassets/h1-a.pdf" }
+      ]
+    },
+    {
+      agendaNumber: "H1",
+      title: "Housing",
+      rowText: "H1 Housing",
+      pageNumber: 2,
+      links: [
+        { label: "Exhibit B", url: "https://www.menlopark.gov/files/sharedassets/h1-b.pdf" }
+      ]
+    }
+  ]);
+
+  assert.equal(selected.length, 1);
+  assert.equal(selected[0].links.length, 3);
+});
+
+test("does not cap all-link Menlo Park discovery at the legacy twelve-item prompt limit", () => {
+  const items = Array.from({ length: MENLO_PARK_ATTACHMENT_MAX_ITEMS + 4 }, (_, index) => ({
+    agendaNumber: `H${index + 1}`,
+    title: `Housing ${index + 1}`,
+    rowText: `H${index + 1} Housing ${index + 1}`,
+    pageNumber: 1,
+    links: [{
+      label: "Staff Report",
+      url: `https://www.menlopark.gov/files/sharedassets/h${index + 1}.pdf`
+    }]
+  }));
+
+  assert.equal(selectAllAgendaItemAttachments(items).length, items.length);
+});
+
+function meetingWithAttachments(
+  documents: PrimeGovDocument[],
+  jurisdictionSlug = "menlo-park"
+): PrimeGovMeeting {
   return {
     externalId: "menlo-test-meeting",
-    jurisdictionSlug: "menlo-park",
+    jurisdictionSlug,
     section: "Upcoming Meetings",
     title: "City Council",
     dateText: "July 14, 2026",
@@ -159,6 +206,26 @@ function meetingWithAttachments(documents: PrimeGovDocument[]): PrimeGovMeeting 
     }))
   };
 }
+
+test("enriches associated attachments for every configured jurisdiction", async () => {
+  for (const jurisdictionSlug of KNOWN_JURISDICTION_SLUGS) {
+    const document: PrimeGovDocument = {
+      type: "Attachment",
+      label: `${jurisdictionSlug} supporting document`,
+      url: `https://${jurisdictionSlug}.example/item-attachment.pdf`,
+      extractedText: `${jurisdictionSlug} item-specific supporting evidence. `.repeat(20),
+      agendaItemNumber: "H1"
+    };
+
+    const result = await appendAgendaItemAttachmentContext(
+      meetingWithAttachments([document], jurisdictionSlug),
+      "Base agenda text."
+    );
+
+    assert.equal(result.included, 1, jurisdictionSlug);
+    assert.match(result.text, new RegExp(`${jurisdictionSlug} item-specific supporting evidence`));
+  }
+});
 
 test("appends readable attachment text beneath only its named agenda item", async () => {
   const firstText = "Complete Streets details and project schedule. ".repeat(80);
@@ -200,6 +267,31 @@ test("appends readable attachment text beneath only its named agenda item", asyn
   assert.match(secondBlock, /Caltrain service update/);
 });
 
+test("keeps a shared supporting document associated with each named agenda item", async () => {
+  const sharedDocument: PrimeGovDocument = {
+    type: "Staff Report",
+    label: "Shared Capital Program Staff Report",
+    url: "https://city.example/shared-capital-program.pdf",
+    extractedText: "The shared report contains separate evidence for both capital program items. ".repeat(12)
+  };
+  const meeting = meetingWithAttachments([sharedDocument], "san-mateo-county");
+  meeting.items!.push({
+    ...meeting.items![0],
+    externalId: "item-2",
+    agendaNumber: "H2",
+    title: "Presentation 2",
+    rowText: "H2. Presentation 2",
+    attachments: [sharedDocument]
+  });
+
+  const result = await appendAgendaItemAttachmentContext(meeting, "Base agenda text.");
+
+  assert.equal(result.included, 2);
+  assert.equal(result.text.match(/Source URL: https:\/\/city\.example\/shared-capital-program\.pdf/g)?.length, 2);
+  assert.match(result.text, /Agenda item H1/);
+  assert.match(result.text, /Agenda item H2/);
+});
+
 test("does not displace a base agenda that already fills the LLM budget", async () => {
   const document: PrimeGovDocument = {
     type: "Attachment",
@@ -217,6 +309,34 @@ test("does not displace a base agenda that already fills the LLM budget", async 
 
   assert.equal(result.included, 0);
   assert.equal(result.text, baseText);
+});
+
+test("falls back to the next ranked attachment when a staff report has no usable text", async () => {
+  const unreadableStaffReport: PrimeGovDocument = {
+    type: "Staff Report",
+    label: "Staff Report",
+    url: "https://city.example/staff-report.pdf",
+    extractedText: "Scanned",
+    agendaItemNumber: "H1"
+  };
+  const readableExhibit: PrimeGovDocument = {
+    type: "Exhibit",
+    label: "Project Scope Exhibit",
+    url: "https://city.example/project-scope.pdf",
+    extractedText: "The project scope includes item-specific schedule and funding details. ".repeat(12),
+    agendaItemNumber: "H1"
+  };
+
+  const meeting = meetingWithAttachments([unreadableStaffReport]);
+  meeting.documents.push(readableExhibit);
+  meeting.items![0].attachments = [readableExhibit, unreadableStaffReport];
+
+  const result = await appendAgendaItemAttachmentContext(meeting, "Base agenda text.");
+
+  assert.equal(result.included, 1);
+  assert.match(result.text, /Linked document: Project Scope Exhibit/);
+  assert.match(result.text, /item-specific schedule and funding details/);
+  assert.doesNotMatch(result.text, /Linked document: Staff Report/);
 });
 
 test("malformed PDFs fail attachment discovery without producing page data", async () => {
