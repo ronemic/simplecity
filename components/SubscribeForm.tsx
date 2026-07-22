@@ -88,9 +88,9 @@ export function SubscribeForm({
   }
 
   return (
-    <form className="quiet-card grid gap-5 p-5 sm:p-6" onSubmit={handleSubmit}>
+    <form className="quiet-card grid gap-6 p-5 sm:p-7" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <label className="text-sm font-black text-ink" htmlFor="subscribe-email">
+        <label className="text-sm font-bold text-ink" htmlFor="subscribe-email">
           {t(locale, "subscribeEmailAddress")}
         </label>
         <div className="relative">
@@ -121,21 +121,21 @@ export function SubscribeForm({
         type="text"
       />
 
-      <fieldset className="grid gap-3">
-        <legend className="text-sm font-black text-ink">
+      <fieldset className="grid gap-3 border-t border-black/10 pt-5">
+        <legend className="text-sm font-bold text-ink">
           {t(locale, "subscribeWeeklyDigestAreas")}
         </legend>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid border-y border-black/10 sm:grid-cols-2">
           {jurisdictions.map((jurisdiction) => {
             const checked = selectedJurisdictions.includes(jurisdiction.value);
 
             return (
               <label
                 key={jurisdiction.value}
-                className={`flex min-h-12 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 text-sm font-bold transition ${
+                className={`flex min-h-12 cursor-pointer items-center gap-3 border-b border-black/10 px-1 py-3 text-sm font-semibold transition last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:odd:border-r sm:odd:border-black/10 sm:odd:pr-4 sm:even:pl-4 ${
                   checked
-                    ? "border-civic/35 bg-civic/10 text-civic"
-                    : "border-black/12 bg-white text-ink hover:border-civic/25 hover:bg-[#f7fbff]"
+                    ? "text-civic"
+                    : "text-ink hover:bg-[#f7fbff]"
                 }`}
               >
                 <input
@@ -151,11 +151,8 @@ export function SubscribeForm({
         </div>
       </fieldset>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-semibold leading-6 text-black/60">
-          {t(locale, "subscribeAlreadySubscribedHelp")}
-        </p>
-        <button className="action-primary shrink-0" disabled={isSubmitting} type="submit">
+      <div className="grid gap-5">
+        <button className="action-primary w-full" disabled={isSubmitting} type="submit">
           {isSubmitting ? (
             <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
           ) : (
@@ -163,6 +160,9 @@ export function SubscribeForm({
           )}
           {t(locale, "subscribe")}
         </button>
+        <p className="border-t border-black/10 pt-5 text-sm font-medium leading-6 text-black/60">
+          {t(locale, "subscribeAlreadySubscribedHelp")}
+        </p>
       </div>
 
       {message ? (
