@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import { CalendarCheck2 } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
+import { DecisionResultSelect } from "@/components/DecisionResultSelect";
 import {
   getDecisionCardPage,
   getDecisionResultFreshness,
@@ -19,6 +21,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { categoryFromSlug } from "@/lib/utils/decisionFilters";
+import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
@@ -27,7 +30,7 @@ export const revalidate = 300;
 export async function generateMetadata({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; category?: string; jurisdiction?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; result?: string; jurisdiction?: string; page?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
   const jurisdiction = params.jurisdiction
@@ -41,7 +44,7 @@ export async function generateMetadata({
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
-  const isFiltered = Boolean(params.q || params.category || params.page);
+  const isFiltered = Boolean(params.q || params.category || params.result || params.page);
 
   return {
     title,
@@ -112,12 +115,14 @@ function DecisionResultsCoverage({
   jurisdiction,
   jurisdictionLabel,
   freshness,
-  locale
+  locale,
+  children
 }: {
   jurisdiction: JurisdictionSelection;
   jurisdictionLabel: string;
   freshness: DecisionResultFreshness;
   locale: "en" | "es";
+  children?: ReactNode;
 }) {
   const isAll = jurisdiction === ALL_JURISDICTIONS_SLUG;
   const jurisdictions = isAll
@@ -126,27 +131,34 @@ function DecisionResultsCoverage({
 
   return (
     <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
-      <div className="flex items-center gap-2">
-        <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
-        <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
-          {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
-        </h2>
-      </div>
-      <p className="mt-1 text-xs font-medium leading-4 text-black/70">
-        {locale === "es"
-          ? "Los resultados siguen a las actas oficiales, que pueden tardar días o semanas en publicarse después de una reunión."
-          : "Results follow official minutes, which may take days or weeks to appear after a meeting."}
-      </p>
-      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        {jurisdictions.map((option) => (
-          <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
-            <dt className="font-bold text-black/60">{option.name}</dt>
-            <dd className="font-black text-civic">
-              {freshnessLabel(freshness, option.slug, locale)}
-            </dd>
+      <div>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
+            <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
+              {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
+            </h2>
           </div>
-        ))}
-      </dl>
+          <p className="mt-1 text-xs font-medium leading-4 text-black/70">
+            {locale === "es"
+              ? "Los resultados siguen a las actas oficiales, que pueden tardar días o semanas en publicarse después de una reunión."
+              : "Results follow official minutes, which may take days or weeks to appear after a meeting."}
+          </p>
+        </div>
+      </div>
+      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          {jurisdictions.map((option) => (
+            <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
+              <dt className="font-bold text-black/60">{option.name}</dt>
+              <dd className="font-black text-civic">
+                {freshnessLabel(freshness, option.slug, locale)}
+              </dd>
+            </div>
+          ))}
+        </dl>
+        {children ? <div className="shrink-0">{children}</div> : null}
+      </div>
     </section>
   );
 }
@@ -157,6 +169,7 @@ export default async function DecisionsPage({
   searchParams: Promise<{
     q?: string;
     category?: string;
+    result?: string;
     jurisdiction?: string;
     page?: string;
   }>;
@@ -172,6 +185,7 @@ export default async function DecisionsPage({
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const search = (params.q || "").trim();
   const selectedCategory = categoryFromSlug(params.category);
+  const selectedResult = decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
   const [result, decisionResultFreshness] = await Promise.all([
     getDecisionCardPage({
@@ -179,6 +193,7 @@ export default async function DecisionsPage({
       locale,
       search,
       category: selectedCategory,
+      result: selectedResult,
       page: currentPage
     }),
     getDecisionResultFreshness()
@@ -197,7 +212,7 @@ export default async function DecisionsPage({
       </div>
 
       <DecisionBrowser
-        key={`${jurisdiction}-${selectedCategory || "all"}-${search}`}
+        key={`${jurisdiction}-${selectedCategory || "all"}-${selectedResult || "all"}-${search}`}
         cards={result.cards}
         initialSearch={search}
         currentPage={result.page}
@@ -205,7 +220,7 @@ export default async function DecisionsPage({
         pageSize={result.pageSize}
         totalCount={result.totalCount}
         selectedCategory={selectedCategory}
-        jurisdiction={params.jurisdiction}
+        selectedResult={selectedResult}
         locale={locale}
         emptyDescription={noCardsDescription(locale, jurisdiction, jurisdictionLabel)}
         resultsCoverage={
@@ -214,7 +229,9 @@ export default async function DecisionsPage({
             jurisdictionLabel={jurisdictionLabel}
             freshness={decisionResultFreshness}
             locale={locale}
-          />
+          >
+            <DecisionResultSelect selectedResult={selectedResult} locale={locale} />
+          </DecisionResultsCoverage>
         }
       />
     </div>

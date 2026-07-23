@@ -303,6 +303,10 @@ p {
   @apply flex min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-black/20 bg-white px-4 py-3 text-left text-base font-semibold text-ink shadow-sm transition hover:border-civic/30 hover:bg-[#f7fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
 }
 
+.select-trigger-compact {
+  @apply flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-black/15 bg-[#f8fafb] px-2.5 py-1.5 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
 .menu-popover {
   @apply absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)];
 }

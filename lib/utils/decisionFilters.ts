@@ -2,6 +2,10 @@ import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/const
 import type { SummaryCardRow } from "@/lib/types";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
+import {
+  matchesDecisionResultFilter,
+  type DecisionResultFilter
+} from "@/lib/utils/decisionResultFilter";
 
 export function categoryFromSlug(slug: string | null | undefined): CategoryName | undefined {
   return CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
@@ -60,9 +64,11 @@ export function decisionCardSearchFilters(pattern: string, meetingIds: string[])
 export function matchesDecisionFilters(
   card: SummaryCardRow,
   search: string,
-  category?: CategoryName
+  category?: CategoryName,
+  result?: DecisionResultFilter
 ) {
   if (category && !(card.category_tags || []).includes(category)) return false;
+  if (!matchesDecisionResultFilter(card, result)) return false;
   if (!search) return true;
 
   const visibleFields = [

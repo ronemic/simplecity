@@ -3,13 +3,14 @@
 import { Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
-import { DecisionCategorySelector } from "@/components/DecisionCategorySelector";
+import { DecisionFilters } from "@/components/DecisionFilters";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { PaginationJumpForm } from "@/components/PaginationJumpForm";
 import { SummaryCard } from "@/components/SummaryCard";
 import { type Locale, t } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
 import { type CategoryName } from "@/lib/constants";
+import type { DecisionResultFilter as ResultFilter } from "@/lib/utils/decisionResultFilter";
 
 function resultSummary(locale: Locale, start: number, end: number, total: number) {
   if (total === 0) return locale === "es" ? "0 decisiones" : "0 decisions";
@@ -27,7 +28,7 @@ export function DecisionBrowser({
   pageSize,
   totalCount,
   selectedCategory,
-  jurisdiction,
+  selectedResult,
   locale,
   emptyDescription,
   resultsCoverage
@@ -39,7 +40,7 @@ export function DecisionBrowser({
   pageSize: number;
   totalCount: number;
   selectedCategory?: CategoryName;
-  jurisdiction?: string;
+  selectedResult?: ResultFilter;
   locale: Locale;
   emptyDescription: string;
   resultsCoverage?: ReactNode;
@@ -110,10 +111,8 @@ export function DecisionBrowser({
       <div aria-busy={isPending}>
         <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
       </div>
-      <DecisionCategorySelector
+      <DecisionFilters
         selectedCategory={selectedCategory}
-        search={initialSearch}
-        jurisdiction={jurisdiction}
         locale={locale}
       />
 
@@ -124,12 +123,12 @@ export function DecisionBrowser({
         {cards.length === 0 ? (
           <div className="quiet-card p-8 text-center">
             <h3 className="text-lg font-semibold text-ink">
-              {initialSearch || selectedCategory
+              {initialSearch || selectedCategory || selectedResult
                 ? t(locale, "noMatchingDecisions")
                 : t(locale, "noDecisionsYet")}
             </h3>
             <p className="mt-2 text-sm leading-6 text-black/70">
-              {initialSearch || selectedCategory ? t(locale, "tryChangingFilters") : emptyDescription}
+              {initialSearch || selectedCategory || selectedResult ? t(locale, "tryChangingFilters") : emptyDescription}
             </p>
           </div>
         ) : null}

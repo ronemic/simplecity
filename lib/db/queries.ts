@@ -41,6 +41,7 @@ import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
 import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
+import type { DecisionResultFilter } from "@/lib/utils/decisionResultFilter";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
@@ -109,6 +110,7 @@ type DecisionCardPageFilters = {
   locale: Locale;
   search: string;
   category?: CategoryName;
+  result?: DecisionResultFilter;
   page: number;
   pageSize: number;
 };
@@ -841,13 +843,14 @@ async function loadLegacyDecisionCardPage(
   locale: Locale,
   search: string,
   category: CategoryName | "",
+  result: DecisionResultFilter | "",
   page: number,
   pageSize: number
 ): Promise<DecisionCardPageResult> {
   const offset = (page - 1) * pageSize;
   const matchingCards = sortCards(
     (await loadPublishedCardsForSelection(selection, locale)).filter((card) =>
-      matchesDecisionFilters(card, search, category || undefined)
+      matchesDecisionFilters(card, search, category || undefined, result || undefined)
     )
   );
   const totalCount = matchingCards.length;
@@ -867,6 +870,7 @@ const getCachedDecisionCardPage = unstable_cache(
     locale: Locale,
     search: string,
     category: CategoryName | "",
+    result: DecisionResultFilter | "",
     page: number,
     pageSize: number
   ): Promise<DecisionCardPageResult> => {
@@ -875,12 +879,13 @@ const getCachedDecisionCardPage = unstable_cache(
     const offset = (normalizedPage - 1) * normalizedPageSize;
     const normalizedSearch = normalizeSearch(search);
 
-    if (normalizedSearch) {
+    if (normalizedSearch || result) {
       return loadLegacyDecisionCardPage(
         selection,
         locale,
         normalizedSearch,
         category,
+        result,
         normalizedPage,
         normalizedPageSize
       );
@@ -926,6 +931,7 @@ const getCachedDecisionCardPage = unstable_cache(
         locale,
         "",
         category,
+        "",
         normalizedPage,
         normalizedPageSize
       );
@@ -945,7 +951,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v6"],
+  ["decision-card-page-rendered-search-v7"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1270,6 +1276,7 @@ export async function getDecisionCardPage({
   locale = "en",
   search = "",
   category,
+  result,
   page = 1,
   pageSize = DECISION_CARD_PAGE_SIZE
 }: {
@@ -1277,6 +1284,7 @@ export async function getDecisionCardPage({
   locale?: Locale;
   search?: string;
   category?: CategoryName;
+  result?: DecisionResultFilter;
   page?: number;
   pageSize?: number;
 }) {
@@ -1285,6 +1293,7 @@ export async function getDecisionCardPage({
     locale,
     normalizeSearch(search),
     category || "",
+    result || "",
     normalizePositiveInteger(page, 1),
     normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE)
   );

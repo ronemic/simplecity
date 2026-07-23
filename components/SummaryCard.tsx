@@ -16,6 +16,7 @@ import { formatCompactDisplayDate, formatDisplayDate, formatPacificTimestamp } f
 import { cn } from "@/lib/utils/cn";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
 import { cardPreviewText, cardSummaryPoints } from "@/lib/utils/cardShare";
+import { isAwaitingDecisionResult } from "@/lib/utils/decisionResultFilter";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -66,7 +67,7 @@ export function statusSummary(
     };
   }
 
-  if (status === "Upcoming vote" && card.meetings?.status === "Past" && !outcome) {
+  if (isAwaitingDecisionResult(card, outcome)) {
     return {
       label: locale === "es" ? "Esperando resultado oficial" : "Awaiting official result",
       className: "border-[#aabce6] bg-[#eef2ff] text-[#354f9b]",

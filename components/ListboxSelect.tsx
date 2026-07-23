@@ -14,6 +14,8 @@ export function ListboxSelect({
   value,
   options,
   className,
+  compact = false,
+  prefix,
   onValueChange
 }: {
   name: string;
@@ -21,6 +23,8 @@ export function ListboxSelect({
   value: string;
   options: Option[];
   className?: string;
+  compact?: boolean;
+  prefix?: string;
   onValueChange?: (value: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -59,10 +63,13 @@ export function ListboxSelect({
         type="button"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        className="select-trigger"
+        className={compact ? "select-trigger-compact" : "select-trigger"}
         onClick={() => setIsOpen((open) => !open)}
       >
-        <span className="truncate">{selectedOption?.label || label}</span>
+        <span className="truncate">
+          {prefix ? <span className="font-semibold text-black/55">{prefix}: </span> : null}
+          {selectedOption?.label || label}
+        </span>
         <ChevronDown
           aria-hidden="true"
           className={`h-4 w-4 shrink-0 text-black/60 transition ${isOpen ? "rotate-180" : ""}`}
