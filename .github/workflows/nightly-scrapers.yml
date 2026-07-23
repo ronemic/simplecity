@@ -107,7 +107,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run San Mateo pipeline
         run: npm run pipeline:san-mateo-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
@@ -139,7 +139,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run San Mateo County pipeline
         run: npm run pipeline:san-mateo-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage
@@ -171,7 +171,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run Foster City pipeline
         run: npm run pipeline:foster-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
@@ -203,7 +203,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run Santa Clara County pipeline
         run: npm run pipeline:santa-clara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage
@@ -235,7 +235,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run Mountain View pipeline
         run: npm run pipeline:mountain-view -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
@@ -267,7 +267,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run San Francisco pipeline
         run: npm run pipeline:san-francisco -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage
@@ -299,7 +299,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run Los Altos pipeline
         run: npm run pipeline:los-altos -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
@@ -331,7 +331,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run Redwood City pipeline
         run: npm run pipeline:redwood-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
@@ -363,7 +363,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run East Palo Alto pipeline
         run: npm run pipeline:east-palo-alto -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage

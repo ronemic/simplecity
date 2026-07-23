@@ -3,8 +3,11 @@ import test from "node:test";
 import {
   classifyLegistarLink,
   legistarDocumentDownloadPriority,
+  MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING,
+  selectLegistarDocumentsForDownload,
   shouldDownloadLegistarDocumentForWindow,
-  shouldEnrichLegistarAgendaAttachments
+  shouldEnrichLegistarAgendaAttachments,
+  shouldEnrichLegistarMeetingAttachments
 } from "@/lib/sources/legistar";
 import type { DocumentType } from "@/lib/types";
 
@@ -38,6 +41,47 @@ test("prioritizes minutes and agendas ahead of optional Legistar attachments", (
   ]);
 });
 
+test("nightly Legistar downloads keep past minutes but skip past item attachments", () => {
+  const minutes = document("Minutes");
+  const attachment = { ...document("Attachment"), isAgendaItemAttachment: true };
+  const selected = selectLegistarDocumentsForDownload(
+    {
+      section: "Past Meetings",
+      status: "Past",
+      documents: [attachment, minutes]
+    },
+    1
+  );
+
+  assert.deepEqual(selected, [minutes]);
+});
+
+test("nightly Legistar downloads bound attachments for upcoming meetings", () => {
+  const minutes = document("Minutes");
+  const attachments = Array.from(
+    { length: MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING + 10 },
+    (_, index) => ({
+      ...document("Attachment"),
+      url: `https://example.test/attachment-${index}`,
+      isAgendaItemAttachment: true
+    })
+  );
+  const selected = selectLegistarDocumentsForDownload(
+    {
+      section: "Upcoming Meetings",
+      status: "Upcoming",
+      documents: [...attachments, minutes]
+    },
+    1
+  );
+
+  assert.equal(
+    selected.filter((item) => item.isAgendaItemAttachment).length,
+    MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING
+  );
+  assert.equal(selected.includes(minutes), true);
+});
+
 test("Legistar attachment enrichment defaults on and honors the universal switch", () => {
   assert.equal(shouldEnrichLegistarAgendaAttachments({}), true);
   assert.equal(
@@ -49,6 +93,21 @@ test("Legistar attachment enrichment defaults on and honors the universal switch
     false
   );
   assert.equal(shouldEnrichLegistarAgendaAttachments({ enrichLegislation: false }), false);
+});
+
+test("nightly Legistar enrichment skips past legislation unless explicitly requested", () => {
+  const pastMeeting = { section: "Past Meetings" as const, status: "Past" as const };
+  const upcomingMeeting = {
+    section: "Upcoming Meetings" as const,
+    status: "Upcoming" as const
+  };
+
+  assert.equal(shouldEnrichLegistarMeetingAttachments(pastMeeting, {}), false);
+  assert.equal(shouldEnrichLegistarMeetingAttachments(upcomingMeeting, {}), true);
+  assert.equal(
+    shouldEnrichLegistarMeetingAttachments(pastMeeting, { enrichLegislation: true }),
+    true
+  );
 });
 
 test("classifies Mountain View Legistar document labels by visible text first", () => {

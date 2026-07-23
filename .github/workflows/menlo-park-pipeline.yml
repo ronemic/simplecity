@@ -49,7 +49,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Run Menlo Park pipeline
         run: npm run pipeline:menlo-park -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage

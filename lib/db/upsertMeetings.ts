@@ -752,6 +752,12 @@ export async function appendSummaryCardsForMeeting(
       .filter((card) => Boolean(card.source_item_id))
       .map((card) => [card.source_item_id as string, card])
   );
+  const existingByExactKey = new Map(
+    retainedExistingCards.map((card) => [
+      exactCardKey(card.agenda_item, card.source_url),
+      card
+    ])
+  );
 
   for (const card of retainedExistingCards) {
     existingExactKeys.add(exactCardKey(card.agenda_item, card.source_url));
@@ -804,9 +810,17 @@ export async function appendSummaryCardsForMeeting(
   const cardsToInsert: CardWithSummaryIndex[] = [];
   let rawPayloadAssigned = false;
   for (const entry of cardsToPersist) {
-    const existing = entry.card.sourceItemId
+    const existingByIdentity = entry.card.sourceItemId
       ? existingBySourceItemId.get(entry.card.sourceItemId)
       : null;
+    // Cards created before source_item_id was introduced can already own the
+    // legacy (meeting, agenda item, source URL) unique key. Adopt that row and
+    // attach the stable source ID instead of attempting a conflicting insert.
+    const existing =
+      existingByIdentity ||
+      existingByExactKey.get(
+        exactCardKey(entry.card.agendaItem, entry.card.source)
+      );
     if (!existing) {
       cardsToInsert.push(entry);
       continue;

@@ -238,6 +238,92 @@ test("removes an obsolete agenda placeholder when real agenda cards are appended
   assert.equal(meetingUpdates[0].summarized_source_hash, "new-source-hash");
 });
 
+test("adopts a legacy exact-key card when appending a stable source item id", async () => {
+  const updatedRows: Array<Record<string, unknown>> = [];
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const meetingUpdates: Array<Record<string, unknown>> = [];
+  const incomingCard = card(7);
+  const legacyCard = {
+    id: "legacy-card",
+    source_item_id: null,
+    agenda_item: incomingCard.agendaItem,
+    source_url: incomingCard.source,
+    is_published: false,
+    is_featured: true,
+    admin_notes: "Keep this review"
+  };
+
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return {
+          update(values: Record<string, unknown>) {
+            meetingUpdates.push(values);
+            return { async eq() { return { error: null }; } };
+          }
+        };
+      }
+
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [legacyCard], error: null }; } };
+        },
+        update(values: Record<string, unknown>) {
+          updatedRows.push(values);
+          return {
+            eq(column: string, value: string) {
+              assert.equal(column, "id");
+              assert.equal(value, legacyCard.id);
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id: legacyCard.id,
+                          source_item_id: values.source_item_id,
+                          agenda_item: values.agenda_item,
+                          source_url: values.source_url
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return { async select() { return { data: [], error: null }; } };
+        }
+      };
+    }
+  };
+
+  const persisted = await appendSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-legacy",
+    { ...summary(0), cards: [incomingCard] },
+    { response: "new summary" },
+    { sourceHash: "legacy-upgraded" }
+  );
+
+  assert.equal(insertedRows.length, 0);
+  assert.equal(updatedRows.length, 1);
+  assert.equal(updatedRows[0].source_item_id, incomingCard.sourceItemId);
+  assert.equal(updatedRows[0].is_published, false);
+  assert.equal(updatedRows[0].is_featured, true);
+  assert.equal(updatedRows[0].admin_notes, legacyCard.admin_notes);
+  assert.equal(persisted[0].id, legacyCard.id);
+  assert.equal(meetingUpdates[0].summarized_source_hash, "legacy-upgraded");
+});
+
 test("persists a large meeting in batches and marks it summarized after all writes", async () => {
   const insertedBatches: Array<Array<Record<string, unknown>>> = [];
   const meetingUpdates: Array<Record<string, unknown>> = [];

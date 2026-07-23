@@ -11,6 +11,7 @@ import { mergeDiscoveredAgendaItemAttachments } from "@/lib/scraper/itemAttachme
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
 export const LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES = 50 * 1024 * 1024;
+export const MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING = 24;
 const LEGISTAR_OPTIONAL_DOCUMENT_TIMEOUT_MS = 20_000;
 
 const DOWNLOADABLE_DOCUMENT_TYPES = new Set([
@@ -36,6 +37,17 @@ export function shouldEnrichLegistarAgendaAttachments(
   options: Pick<ScrapeLegistarOptions, "enrichAgendaAttachments" | "enrichLegislation">
 ) {
   return options.enrichAgendaAttachments ?? options.enrichLegislation ?? true;
+}
+
+export function shouldEnrichLegistarMeetingAttachments(
+  meeting: Pick<PrimeGovMeeting, "section" | "status">,
+  options: Pick<ScrapeLegistarOptions, "enrichLegislation">
+) {
+  return (
+    options.enrichLegislation === true ||
+    meeting.status === "Upcoming" ||
+    meeting.section === "Upcoming Meetings"
+  );
 }
 
 type LegistarDocument = PrimeGovDocument;
@@ -318,6 +330,37 @@ function isEssentialLegistarDocument(doc: LegistarDocument) {
   ].includes(doc.type);
 }
 
+export function selectLegistarDocumentsForDownload(
+  meeting: Pick<PrimeGovMeeting, "documents" | "section" | "status">,
+  monthsBack = 1
+) {
+  let upcomingAttachmentCount = 0;
+  const isUpcoming =
+    meeting.status === "Upcoming" || meeting.section === "Upcoming Meetings";
+
+  return meeting.documents.filter((document) => {
+    if (
+      !shouldDownloadLegistarDocument(document) ||
+      !shouldDownloadLegistarDocumentForWindow(document, monthsBack)
+    ) {
+      return false;
+    }
+
+    // Item attachments help create upcoming decision cards, but add no value to
+    // nightly result reconciliation for meetings that have already happened.
+    // Legistar can expose hundreds of historical attachments per meeting, so
+    // downloading all of them can prevent official minutes from being parsed.
+    if (!document.isAgendaItemAttachment) return true;
+    if (!isUpcoming) return false;
+    if (upcomingAttachmentCount >= MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING) {
+      return false;
+    }
+
+    upcomingAttachmentCount += 1;
+    return true;
+  });
+}
+
 export function legistarDocumentDownloadPriority(doc: PrimeGovDocument) {
   if (["Minutes", "Accessible Minutes"].includes(doc.type)) return 0;
   if (["Agenda", "Accessible Agenda", "Notice of Cancellation"].includes(doc.type)) return 1;
@@ -436,12 +479,7 @@ async function downloadLegistarDocuments(
 
   const downloadQueue = meetings
     .flatMap((meeting) =>
-      meeting.documents
-        .filter(
-          (document) =>
-            shouldDownloadLegistarDocument(document) &&
-            shouldDownloadLegistarDocumentForWindow(document, options.monthsBack)
-        )
+      selectLegistarDocumentsForDownload(meeting, options.monthsBack)
         .map((doc) => ({ meeting, doc }))
     )
     .sort(
@@ -1470,6 +1508,9 @@ export async function scrapeLegistarMeetings(
       meetings = await mapLimit(meetings as LegistarMeeting[], 2, async (meeting) => {
         if (options.shouldStop?.()) {
           log("Stopping Legistar legislation detail enrichment early because the pipeline deadline is near.");
+          return meeting;
+        }
+        if (!shouldEnrichLegistarMeetingAttachments(meeting, options)) {
           return meeting;
         }
 

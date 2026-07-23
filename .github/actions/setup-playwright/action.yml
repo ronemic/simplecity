@@ -1,0 +1,37 @@
+name: Set up Playwright Chromium
+description: Cache Chromium and retry bounded dependency/browser installation
+
+runs:
+  using: composite
+  steps:
+    - name: Restore Playwright browser cache
+      id: playwright-cache
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: node_modules/playwright-core/.local-browsers
+        key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+
+    - name: Install Chromium system dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        for attempt in 1 2; do
+          if timeout 5m npx playwright install-deps chromium; then
+            exit 0
+          fi
+          echo "Playwright dependency installation attempt ${attempt} failed; retrying."
+        done
+        exit 1
+
+    - name: Install Chromium browser
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        for attempt in 1 2; do
+          if timeout 5m env PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium; then
+            exit 0
+          fi
+          echo "Playwright browser installation attempt ${attempt} failed; retrying."
+        done
+        exit 1
