@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, MessageSquare } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
 import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
@@ -49,7 +49,8 @@ function getPrimaryCategory(card: SummaryCardRow) {
 
 export function statusSummary(
   card: SummaryCardRow,
-  locale: Locale
+  locale: Locale,
+  outcome: DecisionOutcome | null = card.outcome || null
 ) {
   const status = card.status || card.meetings?.status || "Info only";
   const compactMeetingDate = formatCompactDisplayDate(
@@ -62,6 +63,14 @@ export function statusSummary(
       label: t(locale, "meetingCanceled"),
       className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]",
       icon: null
+    };
+  }
+
+  if (status === "Upcoming vote" && card.meetings?.status === "Past" && !outcome) {
+    return {
+      label: locale === "es" ? "Esperando resultado oficial" : "Awaiting official result",
+      className: "border-[#aabce6] bg-[#eef2ff] text-[#354f9b]",
+      icon: Hourglass
     };
   }
 
@@ -193,12 +202,13 @@ export function SummaryCard({
   const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
-  const status = statusSummary(card, locale);
+  const status = statusSummary(card, locale, outcome);
   const comment = commentSummary(commentDeadline, hasCommentOption, locale);
   const summaryConfidence = confidenceLabel(card, locale);
   const createdTimestamp = formatPacificTimestamp(card.created_at);
   const updatedTimestamp = formatPacificTimestamp(card.updated_at);
   const CommentIcon = comment?.icon;
+  const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
   const primaryButtonClass = "action-primary-sm font-black";
@@ -251,6 +261,7 @@ export function SummaryCard({
                 status.className
               )}
             >
+              {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
               <HighlightedText text={status.label} query={highlight} />
             </span>
             {comment ? (
