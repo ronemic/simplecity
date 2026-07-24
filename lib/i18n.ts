@@ -208,7 +208,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
       "If you already confirmed, you are all set. Submit the form again only if you need a fresh confirmation email.",
     subscribeInvalidTitle: "That link is expired or already used",
     subscribePageDescription:
-      "Choose the cities and counties you care about. We will send a weekly digest when new public-meeting cards are published.",
+      "Choose the cities and counties you care about. We’ll email you each week when new public-meeting cards are published.",
     subscribePageTitle: "Get new SimpleCity posts by email.",
     subscribeUnsubscribedBody: "You will no longer receive SimpleCity email digests.",
     subscribeUnsubscribedTitle: "You are unsubscribed",
