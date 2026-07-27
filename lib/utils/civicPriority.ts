@@ -44,6 +44,23 @@ const RECENCY_WINDOW_DAYS = 60;
 const RECENCY_MAX_BONUS = 24;
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
+export function digestMeetingCutoff(now = new Date()) {
+  const startOfThisWeek = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  );
+  const daysSinceMonday = (startOfThisWeek.getUTCDay() + 6) % 7;
+  startOfThisWeek.setUTCDate(startOfThisWeek.getUTCDate() - daysSinceMonday - 7);
+  return startOfThisWeek;
+}
+
+export function isMeetingFreshForDigest(card: SummaryCardRow, now = new Date()) {
+  const value = card.meetings?.meeting_datetime;
+  if (!value) return false;
+
+  const meetingTime = Date.parse(value);
+  return !Number.isNaN(meetingTime) && meetingTime >= digestMeetingCutoff(now).getTime();
+}
+
 function compactText(values: Array<string | null | undefined>) {
   return values.filter(Boolean).join(" ").replace(/\s+/g, " ").trim();
 }

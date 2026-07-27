@@ -26,6 +26,8 @@ import {
 } from "@/lib/db/translationFingerprint";
 import {
   compareDigestCards,
+  digestMeetingCutoff,
+  isMeetingFreshForDigest,
   selectDigestCardGroups,
   selectDigestCards
 } from "@/lib/utils/civicPriority";
@@ -68,7 +70,7 @@ const DIGEST_SUMMARY_CARD_COLUMNS = [
   "created_at",
   "updated_at"
 ].join(",");
-const DIGEST_SUMMARY_CARD_SELECT = `${DIGEST_SUMMARY_CARD_COLUMNS},meetings(${DIGEST_CARD_MEETING_COLUMNS})`;
+const DIGEST_SUMMARY_CARD_SELECT = `${DIGEST_SUMMARY_CARD_COLUMNS},meetings!inner(${DIGEST_CARD_MEETING_COLUMNS})`;
 const DIGEST_CARD_TRANSLATION_COLUMNS = [
   "summary_card_id",
   "locale",
@@ -255,12 +257,14 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
   if (!jurisdiction) throw new Error(`Unknown jurisdiction: ${subscription.jurisdiction_slug}`);
 
   const supabase = getServiceSupabaseClientForJurisdiction(subscription.jurisdiction_slug);
+  const meetingCutoff = digestMeetingCutoff();
   const { data, error } = await supabase
     .from("summary_cards")
     .select(DIGEST_SUMMARY_CARD_SELECT)
     .eq("jurisdiction_slug", subscription.jurisdiction_slug)
     .eq("is_published", true)
     .gt("created_at", mostRecentSentAt(subscription))
+    .gte("meetings.meeting_datetime", meetingCutoff.toISOString())
     .order("created_at", { ascending: false })
     .limit(DIGEST_CANDIDATE_CARD_LIMIT);
 
@@ -268,9 +272,9 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
     throw new Error(`Failed to load ${jurisdiction.name} digest cards: ${error.message}`);
   }
 
-  const cards = ((data || []) as unknown as SummaryCardRow[]).map((card) =>
-    withJurisdictionFallback(card, jurisdiction)
-  );
+  const cards = ((data || []) as unknown as SummaryCardRow[])
+    .map((card) => withJurisdictionFallback(card, jurisdiction))
+    .filter((card) => isMeetingFreshForDigest(card));
   const digestCards = selectDigestCards(cards, DIGEST_CARD_LIMIT);
 
   return applySpanishTranslations(supabase, digestCards);

@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   compareDigestCards,
   compareCardsByPublicInterest,
+  digestMeetingCutoff,
+  isMeetingFreshForDigest,
   isDigestWorthyCard,
   isPublicInterestCard,
   publicAgendaTitle,
@@ -143,6 +145,37 @@ test("digest selection keeps public-interest or featured cards only", () => {
     selectDigestCards([minutes], 10).map((item) => item.id),
     ["minutes"]
   );
+});
+
+test("digest freshness follows the meeting date instead of a backfill card timestamp", () => {
+  const now = new Date("2026-07-27T17:00:00.000Z");
+  const oldBackfill = card({
+    created_at: "2026-07-27T16:00:00.000Z",
+    meetings: {
+      ...card().meetings!,
+      meeting_datetime: "2026-04-28T19:00:00.000Z",
+      status: "Past"
+    }
+  });
+  const recentMeeting = card({
+    meetings: {
+      ...card().meetings!,
+      meeting_datetime: "2026-07-20T00:00:00.000Z",
+      status: "Past"
+    }
+  });
+  const upcomingMeeting = card({
+    meetings: {
+      ...card().meetings!,
+      meeting_datetime: "2026-08-10T19:00:00.000Z",
+      status: "Upcoming"
+    }
+  });
+
+  assert.equal(digestMeetingCutoff(now).toISOString(), "2026-07-20T00:00:00.000Z");
+  assert.equal(isMeetingFreshForDigest(oldBackfill, now), false);
+  assert.equal(isMeetingFreshForDigest(recentMeeting, now), true);
+  assert.equal(isMeetingFreshForDigest(upcomingMeeting, now), true);
 });
 
 test("digest group selection keeps represented jurisdictions before filling extras", () => {
