@@ -4,7 +4,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { normalizeAppUrl } from "@/lib/appUrl";
 import { sendEmail, type SendEmailResult } from "@/lib/email/resend";
-import type { SummaryCardRow } from "@/lib/types";
+import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 import { cardSharePath } from "@/lib/utils/cardShare";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
 import { formatDisplayDate } from "@/lib/utils/date";
@@ -45,6 +45,11 @@ const COPY: Record<
     intro: string;
     disclaimer: string;
     unsubscribe: string;
+    decisionResult: string;
+    decided: string;
+    vote: string;
+    nextStep: string;
+    officialResult: string;
   }
 > = {
   en: {
@@ -54,10 +59,15 @@ const COPY: Record<
     readCard: "Read the SimpleCity card",
     sectionLabel: "",
     intro:
-      "New public-meeting summaries were published since your last digest. Here are the latest cards.",
+      "New local decisions and verified results were published since your last digest.",
     disclaimer:
       "SimpleCity summarizes official public meeting documents. Always check the original source before making formal decisions.",
-    unsubscribe: "Unsubscribe"
+    unsubscribe: "Unsubscribe",
+    decisionResult: "Verified decision result",
+    decided: "Decided",
+    vote: "Vote",
+    nextStep: "What happens next",
+    officialResult: "View official result"
   },
   es: {
     agendaFallback: "Punto de agenda no indicado",
@@ -66,10 +76,15 @@ const COPY: Record<
     readCard: "Leer la tarjeta de SimpleCity",
     sectionLabel: "En español",
     intro:
-      "Se publicaron nuevos resúmenes de reuniones públicas desde tu último resumen. Aquí están las tarjetas más recientes.",
+      "Se publicaron nuevas decisiones locales y resultados verificados desde tu último resumen.",
     disclaimer:
       "SimpleCity resume documentos oficiales de reuniones públicas. Siempre revisa la fuente original antes de tomar decisiones formales.",
-    unsubscribe: "Cancelar suscripción"
+    unsubscribe: "Cancelar suscripción",
+    decisionResult: "Resultado verificado de la decisión",
+    decided: "Decidido",
+    vote: "Votación",
+    nextStep: "Lo que sigue",
+    officialResult: "Ver resultado oficial"
   }
 };
 
@@ -145,6 +160,58 @@ function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale =
   ];
 }
 
+function decidedAtLabel(value: string, locale: Locale) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/Los_Angeles"
+  }).format(parsed);
+}
+
+function textLinesForOutcome(outcome: DecisionOutcome | null | undefined, locale: Locale) {
+  if (!outcome) return [];
+  return [
+    `${COPY[locale].decisionResult}: ${compactText(outcome.headline, COPY[locale].decisionResult)}`,
+    compactText(outcome.summary, ""),
+    outcome.decided_at ? `${COPY[locale].decided}: ${decidedAtLabel(outcome.decided_at, locale)}` : "",
+    outcome.vote ? `${COPY[locale].vote}: ${compactText(outcome.vote, "")}` : "",
+    outcome.next_step ? `${COPY[locale].nextStep}: ${compactText(outcome.next_step, "")}` : "",
+    outcome.source_url ? `${COPY[locale].officialResult}: ${outcome.source_url}` : ""
+  ].filter(Boolean);
+}
+
+function htmlForOutcome(outcome: DecisionOutcome | null | undefined, locale: Locale) {
+  if (!outcome) return "";
+  const details = [
+    outcome.decided_at
+      ? `<strong>${escapeHtml(COPY[locale].decided)}:</strong> ${escapeHtml(decidedAtLabel(outcome.decided_at, locale))}`
+      : "",
+    outcome.vote
+      ? `<strong>${escapeHtml(COPY[locale].vote)}:</strong> ${escapeHtml(outcome.vote)}`
+      : "",
+    outcome.next_step
+      ? `<strong>${escapeHtml(COPY[locale].nextStep)}:</strong> ${escapeHtml(outcome.next_step)}`
+      : ""
+  ].filter(Boolean);
+
+  return `<div style="margin: 14px 0; padding: 14px; border: 1px solid #9fc6b2; border-left: 4px solid #237a49; border-radius: 6px; background: #f1fbf4;">
+    <div style="font-size: 12px; font-weight: 800; color: #17683b; text-transform: uppercase; letter-spacing: .04em;">
+      ${escapeHtml(COPY[locale].decisionResult)}
+    </div>
+    <div style="margin-top: 4px; font-size: 18px; font-weight: 800; line-height: 1.3; color: ${EMAIL_INK};">
+      ${escapeHtml(outcome.headline)}
+    </div>
+    <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: ${EMAIL_INK};">
+      ${escapeHtml(outcome.summary)}
+    </p>
+    ${details.length > 0 ? `<p style="margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: ${EMAIL_MUTED};">${details.join("<br>")}</p>` : ""}
+    ${outcome.source_url ? `<a href="${escapeHtml(outcome.source_url)}" style="display: inline-block; margin-top: 8px; color: #17683b; font-size: 13px; font-weight: 800; text-decoration: none;">${escapeHtml(COPY[locale].officialResult)}</a>` : ""}
+  </div>`;
+}
+
 function htmlForCardSection(card: SummaryCardRow, appUrl: string, locale: Locale) {
   const [title, metadata, summary, url] = textLinesForCard(card, appUrl, locale);
   const rawCategory = card.category_tags?.[0] || (locale === "es" ? "Actualización cívica" : "Civic update");
@@ -164,6 +231,7 @@ function htmlForCardSection(card: SummaryCardRow, appUrl: string, locale: Locale
           <p style="margin: 0 0 14px; font-size: 15px; line-height: 1.6; color: ${EMAIL_INK};">
             ${escapeHtml(summary)}
           </p>
+          ${htmlForOutcome(card.outcome, locale)}
           <a href="${escapeHtml(url)}" style="display: inline-block; color: #0f5e7c; font-weight: 800; text-decoration: none;">
             ${escapeHtml(COPY[locale].readCard)}
           </a>
@@ -171,7 +239,8 @@ function htmlForCardSection(card: SummaryCardRow, appUrl: string, locale: Locale
 }
 
 function textForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
-  return [...textLinesForCard(card, appUrl, locale), ""];
+  const [title, metadata, summary, url] = textLinesForCard(card, appUrl, locale);
+  return [title, metadata, summary, ...textLinesForOutcome(card.outcome, locale), url, ""];
 }
 
 function htmlForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
@@ -192,12 +261,12 @@ export function buildNewPostsDigestEmail({
   const count = cards.length;
   const englishSubject =
     count === 1
-      ? `Weekly SimpleCity digest: 1 new post for ${selectionLabel}`
-      : `Weekly SimpleCity digest: ${count} new posts for ${selectionLabel}`;
+      ? `Weekly SimpleCity digest: 1 civic update for ${selectionLabel}`
+      : `Weekly SimpleCity digest: ${count} civic updates for ${selectionLabel}`;
   const spanishSubject =
     count === 1
-      ? `Resumen semanal de SimpleCity: 1 publicación nueva para ${selectionLabel}`
-      : `Resumen semanal de SimpleCity: ${count} publicaciones nuevas para ${selectionLabel}`;
+      ? `Resumen semanal de SimpleCity: 1 actualización cívica para ${selectionLabel}`
+      : `Resumen semanal de SimpleCity: ${count} actualizaciones cívicas para ${selectionLabel}`;
   const subject = `${englishSubject} / ${spanishSubject}`;
   const safeAppUrl = normalizeAppUrl(appUrl);
   const spanishCards = cards

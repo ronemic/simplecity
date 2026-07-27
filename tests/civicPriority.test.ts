@@ -147,6 +147,58 @@ test("digest selection keeps public-interest or featured cards only", () => {
   );
 });
 
+test("digest selection includes verified decision results alongside decisions", () => {
+  const decision = card({
+    id: "upcoming-decision",
+    agenda_item: "Affordable housing zoning vote",
+    category_tags: ["Housing"],
+    status: "Upcoming vote"
+  });
+  const result = card({
+    id: "verified-result",
+    agenda_item: "Approve park contract",
+    category_tags: ["City Services"],
+    status: "Routine approval",
+    outcome: {
+      kind: "approved",
+      headline: "Approved",
+      summary: "The council approved the contract."
+    }
+  });
+
+  assert.equal(isDigestWorthyCard(result), true);
+  assert.deepEqual(
+    new Set(selectDigestCards([decision, result], 2).map((item) => item.id)),
+    new Set(["verified-result", "upcoming-decision"])
+  );
+});
+
+test("digest selection reserves space for both results and decisions", () => {
+  const results = Array.from({ length: 30 }, (_, index) =>
+    card({
+      id: `result-${index}`,
+      agenda_item: `Result ${index}`,
+      outcome: {
+        kind: "approved",
+        headline: "Approved",
+        summary: "The council approved the item."
+      }
+    })
+  );
+  const decisions = Array.from({ length: 30 }, (_, index) =>
+    card({
+      id: `decision-${index}`,
+      agenda_item: `Housing decision ${index}`,
+      category_tags: ["Housing"],
+      status: "Upcoming vote"
+    })
+  );
+
+  const selected = selectDigestCards([...results, ...decisions], 20);
+  assert.equal(selected.filter((item) => item.outcome).length, 10);
+  assert.equal(selected.filter((item) => !item.outcome).length, 10);
+});
+
 test("digest freshness follows the meeting date instead of a backfill card timestamp", () => {
   const now = new Date("2026-07-27T17:00:00.000Z");
   const oldBackfill = card({

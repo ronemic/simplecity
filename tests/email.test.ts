@@ -21,7 +21,23 @@ import {
   unsubscribeEmailSubscriber,
   unsubscribeUrl
 } from "@/lib/email/subscriptions";
-import type { SummaryCardRow } from "@/lib/types";
+import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
+
+function testOutcome(overrides: Partial<DecisionOutcome> = {}): DecisionOutcome {
+  return {
+    id: "outcome-1",
+    summary_card_id: "card-1",
+    meeting_id: "meeting-1",
+    kind: "approved",
+    headline: "Approved unanimously",
+    summary: "The council approved the park maintenance contract.",
+    decided_at: "2026-06-11T02:00:00.000Z",
+    vote: "5–0",
+    next_step: "Staff will execute the contract.",
+    source_url: "https://city.example/minutes?item=4&result=approved",
+    ...overrides
+  };
+}
 
 function testCard(overrides: Partial<SummaryCardRow> = {}): SummaryCardRow {
   return {
@@ -107,7 +123,7 @@ test("builds a new posts digest with escaped card content and localized card lin
     selectionLabel: "San Mateo"
   });
 
-  assert.match(email.subject, /Weekly SimpleCity digest: 1 new post/);
+  assert.match(email.subject, /Weekly SimpleCity digest: 1 civic update/);
   assert.match(email.html, /&lt;Approve&gt;/);
   assert.doesNotMatch(email.html, /<Approve>/);
   assert.match(
@@ -164,6 +180,41 @@ test("builds a bilingual digest when Spanish translations are attached", () => {
     email.text,
     /https:\/\/simplecity\.example\/cards\/card-1\?lang=es/
   );
+});
+
+test("renders verified decision results in English and Spanish", () => {
+  const englishOutcome = testOutcome();
+  const spanishOutcome = testOutcome({
+    headline: "Aprobado por unanimidad",
+    summary: "El concejo aprobó el contrato de mantenimiento del parque.",
+    next_step: "El personal ejecutará el contrato."
+  });
+  const spanishCard = testCard({
+    agenda_item: "Aprobar contrato de mantenimiento del parque",
+    outcome: spanishOutcome
+  });
+  const email = buildNewPostsDigestEmail({
+    cards: [
+      {
+        ...testCard({ outcome: englishOutcome }),
+        translations: { es: spanishCard }
+      }
+    ],
+    appUrl: "https://simplecity.example"
+  });
+
+  assert.match(email.html, /Verified decision result/);
+  assert.match(email.html, /Approved unanimously/);
+  assert.match(email.html, /Vote:<\/strong> 5–0/);
+  assert.match(email.html, /View official result/);
+  assert.match(email.html, /item=4&amp;result=approved/);
+  assert.match(email.text, /Verified decision result: Approved unanimously/);
+  assert.match(email.text, /Vote: 5–0/);
+  assert.match(email.html, /Resultado verificado de la decisión/);
+  assert.match(email.html, /Aprobado por unanimidad/);
+  assert.match(email.text, /Lo que sigue: El personal ejecutará el contrato/);
+  assert.ok(email.html.indexOf("Approved unanimously") < email.html.indexOf("En español"));
+  assert.ok(email.html.indexOf("En español") < email.html.indexOf("Aprobado por unanimidad"));
 });
 
 test("groups every English card before the Spanish section", () => {
@@ -241,7 +292,7 @@ test("labels digest subjects by updated areas only", () => {
       appUrl: "https://simplecity.test",
       selectionLabel: labelForEmailSelections(["san-mateo-city", "mountain-view"])
     }).subject,
-    /Weekly SimpleCity digest: 1 new post for 2 SimpleCity areas/
+    /Weekly SimpleCity digest: 1 civic update for 2 SimpleCity areas/
   );
 });
 

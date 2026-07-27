@@ -327,7 +327,7 @@ export function compareCardsByPublicInterest(left: SummaryCardRow, right: Summar
 }
 
 export function isDigestWorthyCard(card: SummaryCardRow) {
-  return Boolean(card.is_featured) || isPublicInterestCard(card);
+  return Boolean(card.outcome) || Boolean(card.is_featured) || isPublicInterestCard(card);
 }
 
 export function compareDigestCards(left: SummaryCardRow, right: SummaryCardRow, now = Date.now()) {
@@ -340,10 +340,24 @@ export function compareDigestCards(left: SummaryCardRow, right: SummaryCardRow, 
 export function selectDigestCards(cards: SummaryCardRow[], limit: number, now = Date.now()) {
   const digestWorthyCards = cards.filter(isDigestWorthyCard);
   const candidates = digestWorthyCards.length > 0 ? digestWorthyCards : cards;
+  const ranked = [...candidates].sort((left, right) => compareDigestCards(left, right, now));
+  const results = ranked.filter((card) => Boolean(card.outcome));
+  const decisions = ranked.filter((card) => !card.outcome);
+  if (results.length === 0 || decisions.length === 0) return ranked.slice(0, limit);
 
-  return [...candidates]
-    .sort((left, right) => compareDigestCards(left, right, now))
-    .slice(0, limit);
+  const resultTarget = Math.ceil(limit / 2);
+  const selectedResults = results.slice(0, resultTarget);
+  const selectedDecisions = decisions.slice(0, limit - selectedResults.length);
+  const remainingSlots = limit - selectedResults.length - selectedDecisions.length;
+  const additionalResults = results.slice(
+    selectedResults.length,
+    selectedResults.length + remainingSlots
+  );
+  const selectedIds = new Set(
+    [...selectedResults, ...selectedDecisions, ...additionalResults].map((card) => card.id)
+  );
+
+  return ranked.filter((card) => selectedIds.has(card.id)).slice(0, limit);
 }
 
 export function selectDigestCardGroups<

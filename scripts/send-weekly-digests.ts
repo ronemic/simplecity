@@ -24,14 +24,15 @@ import {
   meetingTranslationFingerprint,
   summaryCardTranslationFingerprint
 } from "@/lib/db/translationFingerprint";
+import { applyDecisionOutcomeTranslation } from "@/lib/i18n/decisionOutcome";
 import {
-  compareDigestCards,
   digestMeetingCutoff,
   isMeetingFreshForDigest,
-  selectDigestCardGroups,
   selectDigestCards
 } from "@/lib/utils/civicPriority";
 import type {
+  DecisionOutcome,
+  DecisionOutcomeTranslationRow,
   MeetingRow,
   MeetingTranslationRow,
   SummaryCardRow,
@@ -89,6 +90,10 @@ const DIGEST_CARD_TRANSLATION_COLUMNS = [
 ].join(",");
 const DIGEST_MEETING_TRANSLATION_COLUMNS =
   "meeting_id,locale,title,meeting_type,source_fingerprint,translation_status";
+const DIGEST_DECISION_OUTCOME_COLUMNS =
+  "id,summary_card_id,meeting_id,jurisdiction_name,jurisdiction_slug,platform,kind,headline,summary,decided_at,vote,next_step,source_url,created_at,updated_at";
+const DIGEST_DECISION_OUTCOME_TRANSLATION_COLUMNS =
+  "decision_outcome_id,locale,headline,summary,vote,next_step,source_fingerprint,translation_status";
 const DIGEST_CANDIDATE_CARD_LIMIT = 80;
 const DIGEST_CARD_LIMIT = 20;
 
@@ -203,8 +208,15 @@ async function applySpanishTranslations(
   const meetingIds = cards
     .map((card) => card.meetings?.id)
     .filter((id): id is string => Boolean(id));
+  const outcomeIds = cards
+    .map((card) => card.outcome?.id)
+    .filter((id): id is string => Boolean(id));
 
-  const [{ data: cardTranslationRows, error: cardTranslationError }, meetingResult] =
+  const [
+    { data: cardTranslationRows, error: cardTranslationError },
+    meetingResult,
+    outcomeTranslationResult
+  ] =
     await Promise.all([
       supabase
         .from("summary_card_translations")
@@ -219,6 +231,14 @@ async function applySpanishTranslations(
             .eq("locale", "es")
             .in("translation_status", ["machine", "reviewed"])
             .in("meeting_id", meetingIds)
+        : Promise.resolve({ data: [], error: null }),
+      outcomeIds.length > 0
+        ? supabase
+            .from("decision_outcome_translations")
+            .select(DIGEST_DECISION_OUTCOME_TRANSLATION_COLUMNS)
+            .eq("locale", "es")
+            .in("translation_status", ["machine", "reviewed"])
+            .in("decision_outcome_id", outcomeIds)
         : Promise.resolve({ data: [], error: null })
     ]);
 
@@ -228,6 +248,11 @@ async function applySpanishTranslations(
 
   if (meetingResult.error) {
     throw new Error(`Failed to load Spanish digest meeting translations: ${meetingResult.error.message}`);
+  }
+  if (outcomeTranslationResult.error) {
+    throw new Error(
+      `Failed to load Spanish digest outcome translations: ${outcomeTranslationResult.error.message}`
+    );
   }
 
   const cardTranslations = new Map(
@@ -240,16 +265,48 @@ async function applySpanishTranslations(
       (translation) => [translation.meeting_id, translation]
     )
   );
+  const outcomeTranslations = new Map(
+    ((outcomeTranslationResult.data || []) as unknown as DecisionOutcomeTranslationRow[]).map(
+      (translation) => [translation.decision_outcome_id, translation]
+    )
+  );
 
   return cards.map((card) => {
     const spanish = translatedCard(card, cardTranslations, meetingTranslations);
+    const spanishOutcome = card.outcome
+      ? applyDecisionOutcomeTranslation(
+          card.outcome,
+          card.outcome.id ? outcomeTranslations.get(card.outcome.id) : null
+        )
+      : null;
     return spanish
       ? ({
           ...card,
-          translations: { es: spanish }
+          translations: { es: { ...spanish, outcome: spanishOutcome } }
         } satisfies LocalizedDigestCard)
       : (card as LocalizedDigestCard);
   });
+}
+
+async function attachDecisionOutcomes(
+  supabase: ReturnType<typeof getServiceSupabaseClientForJurisdiction>,
+  cards: SummaryCardRow[]
+) {
+  if (cards.length === 0) return cards;
+
+  const { data, error } = await supabase
+    .from("decision_outcomes")
+    .select(DIGEST_DECISION_OUTCOME_COLUMNS)
+    .in("summary_card_id", cards.map((card) => card.id));
+
+  if (error) throw new Error(`Failed to load digest decision results: ${error.message}`);
+  const outcomes = new Map(
+    ((data || []) as unknown as DecisionOutcome[])
+      .filter((outcome) => Boolean(outcome.summary_card_id))
+      .map((outcome) => [outcome.summary_card_id!, outcome])
+  );
+
+  return cards.map((card) => ({ ...card, outcome: outcomes.get(card.id) || null }));
 }
 
 async function cardsForSubscription(subscription: EmailSubscriptionRow) {
@@ -258,23 +315,64 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
 
   const supabase = getServiceSupabaseClientForJurisdiction(subscription.jurisdiction_slug);
   const meetingCutoff = digestMeetingCutoff();
-  const { data, error } = await supabase
-    .from("summary_cards")
-    .select(DIGEST_SUMMARY_CARD_SELECT)
-    .eq("jurisdiction_slug", subscription.jurisdiction_slug)
-    .eq("is_published", true)
-    .gt("created_at", mostRecentSentAt(subscription))
-    .gte("meetings.meeting_datetime", meetingCutoff.toISOString())
-    .order("created_at", { ascending: false })
-    .limit(DIGEST_CANDIDATE_CARD_LIMIT);
+  const sentAt = mostRecentSentAt(subscription);
+  const [newCardResult, newOutcomeResult] = await Promise.all([
+    supabase
+      .from("summary_cards")
+      .select(DIGEST_SUMMARY_CARD_SELECT)
+      .eq("jurisdiction_slug", subscription.jurisdiction_slug)
+      .eq("is_published", true)
+      .gt("created_at", sentAt)
+      .gte("meetings.meeting_datetime", meetingCutoff.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(DIGEST_CANDIDATE_CARD_LIMIT),
+    supabase
+      .from("decision_outcomes")
+      .select(DIGEST_DECISION_OUTCOME_COLUMNS)
+      .eq("jurisdiction_slug", subscription.jurisdiction_slug)
+      .gt("created_at", sentAt)
+      .order("created_at", { ascending: false })
+      .limit(DIGEST_CANDIDATE_CARD_LIMIT)
+  ]);
 
-  if (error) {
-    throw new Error(`Failed to load ${jurisdiction.name} digest cards: ${error.message}`);
+  if (newCardResult.error) {
+    throw new Error(
+      `Failed to load ${jurisdiction.name} digest cards: ${newCardResult.error.message}`
+    );
+  }
+  if (newOutcomeResult.error) {
+    throw new Error(
+      `Failed to load ${jurisdiction.name} digest results: ${newOutcomeResult.error.message}`
+    );
   }
 
-  const cards = ((data || []) as unknown as SummaryCardRow[])
+  const newCards = ((newCardResult.data || []) as unknown as SummaryCardRow[])
     .map((card) => withJurisdictionFallback(card, jurisdiction))
     .filter((card) => isMeetingFreshForDigest(card));
+  const resultCardIds = Array.from(
+    new Set(
+      ((newOutcomeResult.data || []) as unknown as DecisionOutcome[])
+        .map((outcome) => outcome.summary_card_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  let resultCards: SummaryCardRow[] = [];
+  if (resultCardIds.length > 0) {
+    const { data, error } = await supabase
+      .from("summary_cards")
+      .select(DIGEST_SUMMARY_CARD_SELECT)
+      .eq("jurisdiction_slug", subscription.jurisdiction_slug)
+      .eq("is_published", true)
+      .in("id", resultCardIds);
+    if (error) {
+      throw new Error(`Failed to load ${jurisdiction.name} result cards: ${error.message}`);
+    }
+    resultCards = ((data || []) as unknown as SummaryCardRow[]).map((card) =>
+      withJurisdictionFallback(card, jurisdiction)
+    );
+  }
+
+  const cards = await attachDecisionOutcomes(supabase, uniqueCards([...newCards, ...resultCards]));
   const digestCards = selectDigestCards(cards, DIGEST_CARD_LIMIT);
 
   return applySpanishTranslations(supabase, digestCards);
@@ -296,10 +394,14 @@ async function sendDigestForSubscriber(
     }))
   );
   const updatedBatches = batches.filter((batch) => batch.cards.length > 0);
-  const selectedBatches = selectDigestCardGroups(updatedBatches, DIGEST_CARD_LIMIT);
-  const cards = uniqueCards(selectedBatches.flatMap((batch) => batch.cards))
-    .sort(compareDigestCards)
-    .slice(0, DIGEST_CARD_LIMIT);
+  const cards = selectDigestCards(
+    uniqueCards(updatedBatches.flatMap((batch) => batch.cards)),
+    DIGEST_CARD_LIMIT
+  );
+  const selectedCardIds = new Set(cards.map((card) => card.id));
+  const selectedBatches = updatedBatches.filter((batch) =>
+    batch.cards.some((card) => selectedCardIds.has(card.id))
+  );
   const updatedSubscriptions = selectedBatches.map((batch) => batch.subscription);
   const subscriptionIds = updatedSubscriptions.map((subscription) => subscription.id);
   const jurisdictionSlugs = updatedSubscriptions.map(
@@ -308,12 +410,15 @@ async function sendDigestForSubscriber(
 
   if (cards.length === 0) {
     console.log("No new cards for a due subscriber.");
-    return { sent: false, cardCount: 0 };
+    return { sent: false, cardCount: 0, resultCount: 0 };
   }
 
+  const resultCount = cards.filter((card) => Boolean(card.outcome)).length;
   if (options.dryRun) {
-    console.log(`[dry-run] Would send ${cards.length} cards to a subscriber.`);
-    return { sent: false, cardCount: cards.length };
+    console.log(
+      `[dry-run] Would send ${cards.length} civic update(s), including ${resultCount} verified result(s), to a subscriber.`
+    );
+    return { sent: false, cardCount: cards.length, resultCount };
   }
 
   const sentAt = new Date().toISOString();
@@ -334,8 +439,10 @@ async function sendDigestForSubscriber(
     providerMessageId: result.id,
     sentAt
   });
-  console.log(`Sent ${cards.length} cards to a subscriber.`);
-  return { sent: true, cardCount: cards.length };
+  console.log(
+    `Sent ${cards.length} civic update(s), including ${resultCount} verified result(s), to a subscriber.`
+  );
+  return { sent: true, cardCount: cards.length, resultCount };
 }
 
 async function main() {
@@ -362,6 +469,7 @@ async function main() {
     options.limitSubscribers === null ? subscribers : subscribers.slice(0, options.limitSubscribers);
   let sentCount = 0;
   let cardCount = 0;
+  let resultCount = 0;
   let failureCount = 0;
 
   for (const subscriber of limitedSubscribers) {
@@ -369,6 +477,7 @@ async function main() {
       const result = await sendDigestForSubscriber(subscriber, options);
       if (result.sent) sentCount += 1;
       cardCount += result.cardCount;
+      resultCount += result.resultCount;
     } catch (error) {
       failureCount += 1;
       console.error("Failed to send a subscriber digest. Details were omitted from public logs.");
@@ -387,7 +496,7 @@ async function main() {
   }
 
   console.log(
-    `Weekly digest complete. Subscribers sent: ${sentCount}. Cards included: ${cardCount}. Failures: ${failureCount}.`
+    `Weekly digest complete. Subscribers sent: ${sentCount}. Civic updates included: ${cardCount}. Verified results included: ${resultCount}. Failures: ${failureCount}.`
   );
 
   if (failureCount > 0) {
