@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import { CalendarCheck2 } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
 import { DecisionResultSelect } from "@/components/DecisionResultSelect";
@@ -115,14 +114,12 @@ function DecisionResultsCoverage({
   jurisdiction,
   jurisdictionLabel,
   freshness,
-  locale,
-  children
+  locale
 }: {
   jurisdiction: JurisdictionSelection;
   jurisdictionLabel: string;
   freshness: DecisionResultFreshness;
   locale: "en" | "es";
-  children?: ReactNode;
 }) {
   const isAll = jurisdiction === ALL_JURISDICTIONS_SLUG;
   const jurisdictions = isAll
@@ -146,19 +143,16 @@ function DecisionResultsCoverage({
           </p>
         </div>
       </div>
-      <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <dl className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-          {jurisdictions.map((option) => (
-            <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
-              <dt className="font-bold text-black/60">{option.name}</dt>
-              <dd className="font-black text-civic">
-                {freshnessLabel(freshness, option.slug, locale)}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        {children ? <div className="shrink-0">{children}</div> : null}
-      </div>
+      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+        {jurisdictions.map((option) => (
+          <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
+            <dt className="font-bold text-black/60">{option.name}</dt>
+            <dd className="font-black text-civic">
+              {freshnessLabel(freshness, option.slug, locale)}
+            </dd>
+          </div>
+        ))}
+      </dl>
     </section>
   );
 }
@@ -223,15 +217,14 @@ export default async function DecisionsPage({
         selectedResult={selectedResult}
         locale={locale}
         emptyDescription={noCardsDescription(locale, jurisdiction, jurisdictionLabel)}
+        resultFilter={<DecisionResultSelect selectedResult={selectedResult} locale={locale} />}
         resultsCoverage={
           <DecisionResultsCoverage
             jurisdiction={jurisdiction}
             jurisdictionLabel={jurisdictionLabel}
             freshness={decisionResultFreshness}
             locale={locale}
-          >
-            <DecisionResultSelect selectedResult={selectedResult} locale={locale} />
-          </DecisionResultsCoverage>
+          />
         }
       />
     </div>

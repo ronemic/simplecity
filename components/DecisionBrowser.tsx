@@ -31,6 +31,7 @@ export function DecisionBrowser({
   selectedResult,
   locale,
   emptyDescription,
+  resultFilter,
   resultsCoverage
 }: {
   cards: SummaryCardRow[];
@@ -43,6 +44,7 @@ export function DecisionBrowser({
   selectedResult?: ResultFilter;
   locale: Locale;
   emptyDescription: string;
+  resultFilter?: ReactNode;
   resultsCoverage?: ReactNode;
 }) {
   const pathname = usePathname();
@@ -90,21 +92,22 @@ export function DecisionBrowser({
 
   return (
     <>
-      <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="min-w-0 flex-1">{resultsCoverage}</div>
-        <div className="relative flex shrink-0 justify-end">
-          <span
-            aria-live="polite"
-            className={`absolute bottom-full right-0 mb-1 inline-flex items-center gap-2 whitespace-nowrap text-xs font-bold text-civic transition-opacity ${
-              isPending ? "opacity-100" : "invisible opacity-0"
-            }`}
-          >
-            <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
-            {locale === "es" ? "Actualizando resultados" : "Updating results"}
-          </span>
-          <p className="count-badge">
-            {resultSummary(locale, resultStart, resultEnd, totalCount)}
-          </p>
+      <div className="mb-4">
+        {resultsCoverage}
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>{resultFilter}</div>
+          <div className="flex shrink-0 justify-end">
+            <p aria-live="polite" className="count-badge gap-2 whitespace-nowrap">
+              {isPending ? (
+                <>
+                  <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                  {locale === "es" ? "Actualizando resultados" : "Updating results"}
+                </>
+              ) : (
+                resultSummary(locale, resultStart, resultEnd, totalCount)
+              )}
+            </p>
+          </div>
         </div>
       </div>
 
