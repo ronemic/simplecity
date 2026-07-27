@@ -166,6 +166,52 @@ test("builds a bilingual digest when Spanish translations are attached", () => {
   );
 });
 
+test("groups every English card before the Spanish section", () => {
+  const email = buildNewPostsDigestEmail({
+    cards: [
+      {
+        ...testCard({ id: "card-1", agenda_item: "English card one" }),
+        translations: {
+          es: testCard({ id: "card-1", agenda_item: "Tarjeta en español uno" })
+        }
+      },
+      {
+        ...testCard({ id: "card-2", agenda_item: "English card two" }),
+        translations: {
+          es: testCard({ id: "card-2", agenda_item: "Tarjeta en español dos" })
+        }
+      }
+    ],
+    appUrl: "https://simplecity.example",
+    selectionLabel: "San Mateo"
+  });
+
+  for (const content of [email.html, email.text]) {
+    const englishOne = content.indexOf("English card one");
+    const englishTwo = content.indexOf("English card two");
+    const spanishHeading = content.indexOf("En español");
+    const spanishOne = content.indexOf("Tarjeta en español uno");
+    const spanishTwo = content.indexOf("Tarjeta en español dos");
+
+    assert.ok(englishOne >= 0);
+    assert.ok(englishOne < englishTwo);
+    assert.ok(englishTwo < spanishHeading);
+    assert.ok(spanishHeading < spanishOne);
+    assert.ok(spanishOne < spanishTwo);
+  }
+});
+
+test("omits the Spanish section when no translated cards are available", () => {
+  const email = buildNewPostsDigestEmail({
+    cards: [testCard()],
+    appUrl: "https://simplecity.example"
+  });
+
+  assert.doesNotMatch(email.html, />\s*En español\s*</);
+  assert.doesNotMatch(email.text, /\nEn español\n/);
+  assert.doesNotMatch(email.html, /Se publicaron nuevos resúmenes/);
+});
+
 test("digest unsubscribe footer only advertises unsubscribe", () => {
   const email = buildNewPostsDigestEmail({
     cards: [testCard()],

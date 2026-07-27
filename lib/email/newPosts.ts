@@ -149,14 +149,9 @@ function htmlForCardSection(card: SummaryCardRow, appUrl: string, locale: Locale
   const [title, metadata, summary, url] = textLinesForCard(card, appUrl, locale);
   const rawCategory = card.category_tags?.[0] || (locale === "es" ? "Actualización cívica" : "Civic update");
   const category = categoryLabel(locale, rawCategory) || rawCategory;
-  const sectionLabel = COPY[locale].sectionLabel;
-  const sectionLabelHtml = sectionLabel
-    ? `<div style="margin: 0 0 8px; font-size: 12px; font-weight: 800; color: #0f5e7c;">${escapeHtml(sectionLabel)}</div>`
-    : "";
 
   return `
-        ${sectionLabelHtml}
-        <div style="${locale === "es" ? `border-left: 3px solid ${EMAIL_BORDER}; padding-left: 14px; margin-top: 16px;` : ""}">
+        <div>
           <div style="font-size: 12px; font-weight: 700; color: ${EMAIL_MUTED}; text-transform: uppercase; letter-spacing: .04em;">
             ${escapeHtml(category)}
           </div>
@@ -175,29 +170,15 @@ function htmlForCardSection(card: SummaryCardRow, appUrl: string, locale: Locale
         </div>`;
 }
 
-function textForCard(card: LocalizedDigestCard, appUrl: string) {
-  const englishLines = textLinesForCard(card, appUrl, "en");
-  const spanish = card.translations?.es;
-
-  if (!spanish) return [...englishLines, ""];
-
-  return [
-    ...englishLines,
-    "",
-    COPY.es.sectionLabel,
-    ...textLinesForCard(spanish, appUrl, "es"),
-    ""
-  ];
+function textForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
+  return [...textLinesForCard(card, appUrl, locale), ""];
 }
 
-function htmlForCard(card: LocalizedDigestCard, appUrl: string) {
-  const spanish = card.translations?.es;
-
+function htmlForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
   return `
     <tr>
       <td style="padding: 18px 0; border-top: 1px solid ${EMAIL_BORDER};">
-        ${htmlForCardSection(card, appUrl, "en")}
-        ${spanish ? htmlForCardSection(spanish, appUrl, "es") : ""}
+        ${htmlForCardSection(card, appUrl, locale)}
       </td>
     </tr>`;
 }
@@ -219,8 +200,34 @@ export function buildNewPostsDigestEmail({
       : `Resumen semanal de SimpleCity: ${count} publicaciones nuevas para ${selectionLabel}`;
   const subject = `${englishSubject} / ${spanishSubject}`;
   const safeAppUrl = normalizeAppUrl(appUrl);
-  const preheader = "Your weekly civic updates are ready in English and Spanish.";
-  const cardRows = cards.map((card) => htmlForCard(card, safeAppUrl)).join("");
+  const spanishCards = cards
+    .map((card) => card.translations?.es)
+    .filter((card): card is SummaryCardRow => Boolean(card));
+  const preheader = spanishCards.length > 0
+    ? "Your weekly civic updates are ready in English and Spanish."
+    : "Your weekly civic updates are ready.";
+  const englishCardRows = cards
+    .map((card) => htmlForCard(card, safeAppUrl, "en"))
+    .join("");
+  const spanishCardRows = spanishCards
+    .map((card) => htmlForCard(card, safeAppUrl, "es"))
+    .join("");
+  const spanishSection = spanishCards.length > 0
+    ? `<div style="margin-top: 30px; padding-top: 24px; border-top: 3px solid #0f5e7c;">
+        <h2 style="margin: 0 0 8px; font-size: 22px; line-height: 1.25; color: ${EMAIL_INK};">
+          ${escapeHtml(COPY.es.sectionLabel)}
+        </h2>
+        <p style="margin: 0 0 8px; font-size: 15px; line-height: 1.6; color: ${EMAIL_MUTED};">
+          ${escapeHtml(COPY.es.intro)}
+        </p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          ${spanishCardRows}
+        </table>
+        <p style="margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: ${EMAIL_MUTED};">
+          ${escapeHtml(COPY.es.disclaimer)}
+        </p>
+      </div>`
+    : "";
   const unsubscribeFooter = unsubscribeUrl
     ? `<p style="margin: 18px 0 0; font-size: 12px; line-height: 1.5; color: ${EMAIL_MUTED};">
         <a href="${escapeHtml(unsubscribeUrl)}" style="color: ${EMAIL_MUTED};">${COPY.en.unsubscribe} / ${COPY.es.unsubscribe}</a>
@@ -243,21 +250,18 @@ export function buildNewPostsDigestEmail({
                 </h1>
                 <p style="margin: 0; font-size: 15px; line-height: 1.6; color: ${EMAIL_MUTED};">
                   ${escapeHtml(COPY.en.intro)}
-                  <br>
-                  ${escapeHtml(COPY.es.intro)}
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding: 0 28px 26px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
-                  ${cardRows}
+                  ${englishCardRows}
                 </table>
                 <p style="margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: ${EMAIL_MUTED};">
                   ${escapeHtml(COPY.en.disclaimer)}
-                  <br>
-                  ${escapeHtml(COPY.es.disclaimer)}
                 </p>
+                ${spanishSection}
                 ${unsubscribeFooter}
               </td>
             </tr>
@@ -272,11 +276,19 @@ export function buildNewPostsDigestEmail({
     subject,
     "",
     COPY.en.intro,
-    COPY.es.intro,
     "",
-    ...cards.flatMap((card) => textForCard(card, safeAppUrl)),
+    ...cards.flatMap((card) => textForCard(card, safeAppUrl, "en")),
     COPY.en.disclaimer,
-    COPY.es.disclaimer,
+    ...(spanishCards.length > 0
+      ? [
+          "",
+          COPY.es.sectionLabel,
+          COPY.es.intro,
+          "",
+          ...spanishCards.flatMap((card) => textForCard(card, safeAppUrl, "es")),
+          COPY.es.disclaimer
+        ]
+      : []),
     unsubscribeUrl ? `${COPY.en.unsubscribe} / ${COPY.es.unsubscribe}: ${unsubscribeUrl}` : ""
   ]
     .filter((line, index, lines) => line || lines[index - 1])
