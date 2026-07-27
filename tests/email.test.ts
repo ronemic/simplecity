@@ -285,7 +285,7 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
   );
 });
 
-test("weekly digest subscriptions are only due after their cadence window", () => {
+test("weekly digest subscriptions become due in the next calendar week", () => {
   const now = new Date("2026-07-08T00:00:00.000Z");
 
   assert.equal(
@@ -298,6 +298,13 @@ test("weekly digest subscriptions are only due after their cadence window", () =
   assert.equal(
     isSubscriptionDueForDigest(
       testSubscription({ last_digest_sent_at: "2026-07-02T00:00:00.000Z" }),
+      now
+    ),
+    true
+  );
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({ last_digest_sent_at: "2026-07-06T23:59:59.000Z" }),
       now
     ),
     false
@@ -319,6 +326,25 @@ test("weekly digest subscriptions are only due after their cadence window", () =
         last_digest_sent_at: "2026-07-07T12:00:00.000Z"
       }),
       now
+    ),
+    false
+  );
+});
+
+test("a delayed Monday send is due again at the next Monday workflow", () => {
+  const nextMondayRun = new Date("2026-07-27T17:00:00.000Z");
+
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({ last_digest_sent_at: "2026-07-20T22:56:22.569Z" }),
+      nextMondayRun
+    ),
+    true
+  );
+  assert.equal(
+    isSubscriptionDueForDigest(
+      testSubscription({ last_digest_sent_at: "2026-07-27T00:00:00.000Z" }),
+      nextMondayRun
     ),
     false
   );
@@ -347,7 +373,7 @@ test("filters digest subscribers down to due subscriptions", () => {
         testSubscription({
           id: "subscription-not-due",
           jurisdiction_slug: "mountain-view",
-          last_digest_sent_at: "2026-07-04T00:00:00.000Z"
+          last_digest_sent_at: "2026-07-06T00:00:00.000Z"
         })
       ]
     }

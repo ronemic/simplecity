@@ -56,10 +56,16 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const TOKEN_BYTES = 32;
 const CONFIRMATION_RESEND_COOLDOWN_MS = 15 * 60 * 1000;
 const DEFAULT_EMAIL_FREQUENCY: EmailFrequency = "weekly";
-const EMAIL_DIGEST_INTERVAL_MS: Record<EmailFrequency, number> = {
-  daily: 24 * 60 * 60 * 1000,
-  weekly: 7 * 24 * 60 * 60 * 1000
-};
+const DAILY_DIGEST_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+function startOfUtcWeek(date: Date) {
+  const start = new Date(
+    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate())
+  );
+  const daysSinceMonday = (start.getUTCDay() + 6) % 7;
+  start.setUTCDate(start.getUTCDate() - daysSinceMonday);
+  return start.getTime();
+}
 
 export class EmailSubscriptionInputError extends Error {
   constructor(message: string) {
@@ -428,7 +434,14 @@ export function isSubscriptionDueForDigest(
   const baselineTime = Date.parse(baseline);
   if (Number.isNaN(baselineTime)) return true;
 
-  return now.getTime() - baselineTime >= EMAIL_DIGEST_INTERVAL_MS[subscription.frequency];
+  if (subscription.frequency === "weekly") {
+    // Weekly digests run on Monday. Compare calendar weeks instead of requiring
+    // an exact 168 hours, which can skip an entire run when a prior send or a
+    // delayed workflow completed later in the day.
+    return baselineTime < startOfUtcWeek(now);
+  }
+
+  return now.getTime() - baselineTime >= DAILY_DIGEST_INTERVAL_MS;
 }
 
 export function filterSubscribersDueForDigest(
