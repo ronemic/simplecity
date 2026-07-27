@@ -472,6 +472,12 @@ function structuredResultMatch(
   );
 }
 
+export function isDecisionParticipationInstruction(title?: string | null) {
+  return /\bpublic comment\b|\bcomment opportunity\b|\b(?:submit|send|email|provide)\s+(?:a\s+)?written comments?\b|\bwritten comment (?:instructions?|deadline|period)\b/i.test(
+    String(title || "")
+  );
+}
+
 function parsedMinuteItems(meeting: LlmReadyMeeting, document: PrimeGovDocument) {
   const text = normalizeSourceText(document.extractedText || "");
   return extractAgendaItemsFromText(meeting, text)
@@ -611,13 +617,32 @@ function numberedMinuteBlock(
   agendaNumber: string,
   text: string
 ) {
-  const number = escapeRegExp(agendaNumber);
-  const nextNumber = "[A-Z]?\\d{1,2}(?:\\.\\d{1,3})?";
-  const pattern = new RegExp(
-    `(?:^|\\n)\\s*(?:agenda\\s+)?(?:item\\s+)?${number}\\s*(?:[.):-]|\\s)\\s*([\\s\\S]{0,2600}?)(?=\\n\\s*(?:agenda\\s+)?(?:item\\s+)?${nextNumber}\\s*(?:[.):-]|\\s)|$)`,
-    "i"
-  );
-  return text.match(pattern)?.[0] || null;
+  const lines = text.split("\n");
+  const requestedNumber = normalizedIdentifier(agendaNumber);
+  const itemLinePattern =
+    /^\s*(?:agenda\s+)?(?:item\s+)?([A-Z]?\d{1,2}(?:\.\d{1,3})?)\s*(?:[.)]|:\s+(?!\d)|-\s+(?!\d)|\s+)\s*\S/i;
+  const sectionLinePattern = /^\s*[A-Z]\s*[.)-]\s+[A-Z][\s\S]{1,120}$/;
+  const start = lines.findIndex((line) => {
+    const match = line.match(itemLinePattern);
+    return normalizedIdentifier(match?.[1]) === requestedNumber;
+  });
+  if (start < 0) return null;
+
+  let end = lines.length;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    const match = line.match(itemLinePattern);
+    const nextNumber = normalizedIdentifier(match?.[1]);
+    if (
+      (nextNumber && nextNumber !== requestedNumber) ||
+      sectionLinePattern.test(line)
+    ) {
+      end = index;
+      break;
+    }
+  }
+
+  return lines.slice(start, end).join("\n").trim() || null;
 }
 
 function guardedResultWindow(cardTitle: string, text: string) {
@@ -661,6 +686,29 @@ function minutesResultForCard(
 ) {
   const title = String(card.agenda_item || "").trim();
   if (!title) return null;
+  const inventory = extractMeetingOutcomeItems(meeting);
+  const sourceItemId = String(card.source_item_id || "").trim();
+  if (sourceItemId && uniqueSourceItemIds(inventory.items).has(sourceItemId)) {
+    const item = inventory.items.find(
+      (candidate) => candidate.externalId === sourceItemId && Boolean(candidate.result)
+    );
+    const document = item
+      ? minutesDocuments(meeting).find((candidate) => candidate.url === item.sourceUrl) ||
+        minutesDocuments(meeting)[0]
+      : null;
+    if (item && document) {
+      return {
+        item,
+        document,
+        match: {
+          item,
+          method: "source_item_id" as const,
+          score: 1,
+          runnerUpScore: null
+        }
+      };
+    }
+  }
   const sourceItem =
     card.source_item_id && uniqueSourceItemIds(meeting.items || []).has(card.source_item_id)
       ? (meeting.items || []).find((item) => item.externalId === card.source_item_id)
@@ -671,7 +719,6 @@ function minutesResultForCard(
         sourceUrl: card.source_url
       });
   const agendaNumber = String(agendaMatch?.item.agendaNumber || "").trim();
-  const inventory = extractMeetingOutcomeItems(meeting);
   const inventoryMatch = findGuardedAgendaItemMatch(title, inventory.items, {
     agendaNumber
   });
@@ -785,7 +832,7 @@ export function extractDecisionOutcome(
 ): DecisionOutcomeDraft | null {
   if (!DECISION_OUTCOME_JURISDICTIONS.has(String(meeting.jurisdictionSlug || ""))) return null;
   if (meeting.status !== "Past") return null;
-  if (/\bpublic comment\b|\bcomment opportunity\b/i.test(String(card.agenda_item || ""))) {
+  if (isDecisionParticipationInstruction(card.agenda_item)) {
     return null;
   }
 

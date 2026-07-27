@@ -667,6 +667,95 @@ test("extracts a Menlo Park agenda-item result from official minutes text", () =
   assert.match(result.summary, /official minutes/i);
 });
 
+test("extracts a Menlo Park result after a long numbered minutes discussion", () => {
+  const longDiscussion = "Residents discussed the proposed fee schedule. ".repeat(400);
+  const result = extractDecisionOutcome(
+    {
+      id: "long-item-card",
+      source_item_id: "item-i1",
+      agenda_item: "Amend the comprehensive master fee schedule",
+      source_url: "https://example.com/agenda.pdf"
+    },
+    meeting("menlo-park", {
+      items: [
+        agendaItem({
+          externalId: "item-i1",
+          agendaNumber: "I1",
+          title: "Amend the comprehensive master fee schedule",
+          action: null,
+          result: null,
+          sourceUrl: "https://example.com/agenda.pdf"
+        })
+      ],
+      documents: [
+        {
+          type: "Minutes",
+          label: "Approved minutes",
+          url: "https://example.com/minutes.pdf",
+          extractedText: `
+            I1. Amend the comprehensive master fee schedule
+            ${longDiscussion}
+            11:29 p.m. The meeting continued after discussion.
+            4-0-1 vote was recorded by the clerk.
+            ACTION: The City Council adopted the amended fee schedule, passed 4-0-1.
+            J1. Future agenda topic
+          `
+        }
+      ]
+    })
+  );
+
+  assert.ok(result);
+  assert.equal(result.matchedAgendaNumber, "I1");
+  assert.equal(result.vote, "4–0–1");
+});
+
+test("uses a minutes source id when the current agenda item id changed", () => {
+  const longDiscussion = "Residents discussed the proposed fee schedule. ".repeat(400);
+  const baseMeeting = meeting("menlo-park", {
+    items: [
+      agendaItem({
+        externalId: "new-agenda-identity",
+        agendaNumber: "I1",
+        title: "Comprehensive master fee schedule",
+        action: null,
+        result: null
+      })
+    ],
+    documents: [
+      {
+        type: "Minutes",
+        label: "Approved minutes",
+        url: "https://example.com/minutes.pdf",
+        extractedText: `
+          I1. Comprehensive master fee schedule
+          ${longDiscussion}
+          ACTION: The City Council adopted the amended fee schedule, passed 4-0-1.
+          J1. Future agenda topic
+        `
+      }
+    ]
+  });
+  const minutesItem = extractMeetingOutcomeItems(baseMeeting).items.find(
+    (item) => item.agendaNumber === "I1"
+  );
+  assert.ok(minutesItem);
+
+  const result = extractDecisionOutcome(
+    {
+      id: "stale-agenda-id-card",
+      source_item_id: minutesItem.externalId,
+      agenda_item: "Fee changes",
+      source_url: "https://example.com/old-agenda.pdf"
+    },
+    baseMeeting
+  );
+
+  assert.ok(result);
+  assert.equal(result.matchMethod, "source_item_id");
+  assert.equal(result.vote, "4–0–1");
+});
+
 test("does not use prior-meeting minutes attached to a current agenda item", () => {
   const result = extractDecisionOutcome(
     {
@@ -1063,6 +1152,29 @@ test("does not attach a decision result to a public-comment card", () => {
         title: "Approve Board meeting minutes after public comment",
         action: "Approved",
         result: "Pass"
+      })]
+    })
+  );
+
+  assert.equal(result, null);
+});
+
+test("does not attach a decision result to written-comment instructions", () => {
+  const sourceItemId = "planning-item-f4";
+  const result = extractDecisionOutcome(
+    {
+      id: "written-comment-card",
+      agenda_item: "Submit written comments to the Planning Commission",
+      source_item_id: sourceItemId,
+      source_url: "https://example.com/planning-agenda.pdf"
+    },
+    meeting("menlo-park", {
+      items: [agendaItem({
+        externalId: sourceItemId,
+        agendaNumber: "F4",
+        title: "Amend the downtown specific plan",
+        action: "Approve the amendment",
+        result: "Commissioners approved the amendment 5-0"
       })]
     })
   );

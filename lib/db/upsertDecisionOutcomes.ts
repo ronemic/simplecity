@@ -4,7 +4,8 @@ import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import {
   type DecisionOutcomeMatchMethod,
   extractDecisionOutcome,
-  extractMeetingOutcomeItems
+  extractMeetingOutcomeItems,
+  isDecisionParticipationInstruction
 } from "@/lib/outcomes/extractDecisionOutcome";
 import {
   generateDecisionOutcomeExplanations,
@@ -168,7 +169,7 @@ function cardHasOfficialResult(
   meeting: LlmReadyMeeting,
   resultItems: ReturnType<typeof extractMeetingOutcomeItems>["items"]
 ) {
-  if (/\bpublic comment\b|\bcomment opportunity\b/i.test(String(card.agenda_item || ""))) {
+  if (isDecisionParticipationInstruction(card.agenda_item)) {
     return false;
   }
   const sourceItemId = String(card.source_item_id || "").trim();
