@@ -24,24 +24,34 @@ export function proxy(request: NextRequest) {
   const ignoresJurisdiction = ["/about", "/subscribe", "/topics"].includes(pathname);
   const hasIgnoredJurisdiction =
     ignoresJurisdiction && request.nextUrl.searchParams.has("jurisdiction");
-  if (!hasLanguageParam && !legacyJurisdiction && !hasIgnoredJurisdiction) {
-    return NextResponse.next();
+  const invalidLanguageParam = hasLanguageParam && !locale;
+  if (legacyJurisdiction || hasIgnoredJurisdiction || invalidLanguageParam) {
+    const canonicalUrl = request.nextUrl.clone();
+    if (invalidLanguageParam) canonicalUrl.searchParams.delete("lang");
+    if (legacyJurisdiction) canonicalUrl.searchParams.set("jurisdiction", "san-mateo");
+    if (ignoresJurisdiction) canonicalUrl.searchParams.delete("jurisdiction");
+    const response = NextResponse.redirect(canonicalUrl, 307);
+    if (locale) {
+      response.cookies.set(LOCALE_COOKIE, locale, {
+        path: "/",
+        maxAge: 60 * 60 * 24 * 365,
+        sameSite: "lax"
+      });
+    }
+    return response;
   }
 
-  const canonicalUrl = request.nextUrl.clone();
-  if (hasLanguageParam) canonicalUrl.searchParams.delete("lang");
-  if (legacyJurisdiction) canonicalUrl.searchParams.set("jurisdiction", "san-mateo");
-  if (ignoresJurisdiction) canonicalUrl.searchParams.delete("jurisdiction");
-  const response = NextResponse.redirect(canonicalUrl, 307);
+  if (!locale) return NextResponse.next();
 
-  if (locale) {
-    response.cookies.set(LOCALE_COOKIE, locale, {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: "lax"
-    });
-  }
-
+  request.cookies.set(LOCALE_COOKIE, locale);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("cookie", request.cookies.toString());
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.cookies.set(LOCALE_COOKIE, locale, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax"
+  });
   return response;
 }
 

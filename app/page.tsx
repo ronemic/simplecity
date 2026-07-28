@@ -31,29 +31,37 @@ import type { SummaryCardRow } from "@/lib/types";
 import { categoryShortLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 
 export const revalidate = 300;
 
-export const metadata: Metadata = {
-  title: "SimpleCity | Easy-to-understand local decisions",
-  description: "Find upcoming local government decisions, public meetings, official sources, and ways to participate across Bay Area communities.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "SimpleCity | Easy-to-understand local decisions",
-    description: "Find upcoming local decisions, public meetings, official sources, and ways to participate.",
-    type: "website",
-    url: "/",
-    siteName: "SimpleCity"
-  },
-  twitter: {
-    card: "summary",
-    title: "SimpleCity | Easy-to-understand local decisions",
-    description: "Find upcoming local decisions, public meetings, official sources, and ways to participate."
-  }
-};
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}): Promise<Metadata> {
+  const locale = seoLocale((await searchParams).lang);
+  const title =
+    locale === "es"
+      ? "SimpleCity | Decisiones locales fáciles de entender"
+      : "SimpleCity | Easy-to-understand local decisions";
+  const description =
+    locale === "es"
+      ? "Encuentra próximas decisiones del gobierno local, reuniones públicas, fuentes oficiales y formas de participar en comunidades del Área de la Bahía."
+      : "Find upcoming local government decisions, public meetings, official sources, and ways to participate across Bay Area communities.";
+  const urls = localizedSeoUrls("/", locale);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: urls.canonical, languages: urls.languages },
+    openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
+    twitter: { card: "summary", title, description }
+  };
+}
 
 function matchesSearch(card: SummaryCardRow, search: string) {
   if (!search) return true;
@@ -112,7 +120,7 @@ function pluralize(count: number, singular: string, plural: string) {
 export default async function Home({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; jurisdiction?: string }>;
+  searchParams: Promise<{ q?: string; jurisdiction?: string; lang?: string }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([
     searchParams,

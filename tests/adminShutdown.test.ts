@@ -26,7 +26,7 @@ test("public routes still pass through the request proxy", () => {
   assert.equal(response.headers.get("x-middleware-next"), "1");
 });
 
-test("language preferences redirect to a clean canonical URL", () => {
+test("language preferences survive canonical jurisdiction redirects", () => {
   const response = proxy(
     new NextRequest(
       "https://simplecity.example/decisions?jurisdiction=san-mateo-city&lang=es"
@@ -36,9 +36,31 @@ test("language preferences redirect to a clean canonical URL", () => {
   assert.equal(response.status, 307);
   assert.equal(
     response.headers.get("location"),
-    "https://simplecity.example/decisions?jurisdiction=san-mateo"
+    "https://simplecity.example/decisions?jurisdiction=san-mateo&lang=es"
   );
   assert.equal(response.cookies.get("simplecity_locale")?.value, "es");
+});
+
+test("shareable language URLs render in the requested language", () => {
+  const response = proxy(
+    new NextRequest("https://simplecity.example/about?lang=es")
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-middleware-next"), "1");
+  assert.match(response.headers.get("x-middleware-request-cookie") || "", /simplecity_locale=es/);
+  assert.equal(response.cookies.get("simplecity_locale")?.value, "es");
+});
+
+test("shareable English language URLs render in English", () => {
+  const response = proxy(
+    new NextRequest("https://simplecity.example/about?lang=en")
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-middleware-next"), "1");
+  assert.match(response.headers.get("x-middleware-request-cookie") || "", /simplecity_locale=en/);
+  assert.equal(response.cookies.get("simplecity_locale")?.value, "en");
 });
 
 test("invalid language parameters are removed without setting a preference", () => {

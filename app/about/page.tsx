@@ -11,19 +11,32 @@ import {
 } from "lucide-react";
 import { getPublicStats } from "@/lib/db/queries";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "About SimpleCity | Easy-to-understand local decisions",
-  description: "Learn how SimpleCity helps residents follow Bay Area decisions, upcoming votes, participation options, and official outcomes.",
-  alternates: { canonical: "/about" },
-  openGraph: {
-    title: "About SimpleCity",
-    description: "Track local decisions, participation opportunities, and outcomes with direct links to official records.",
-    type: "website",
-    url: "/about",
-    siteName: "SimpleCity"
-  }
-};
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}): Promise<Metadata> {
+  const locale = seoLocale((await searchParams).lang);
+  const title =
+    locale === "es"
+      ? "Acerca de SimpleCity | Decisiones locales fáciles de entender"
+      : "About SimpleCity | Easy-to-understand local decisions";
+  const description =
+    locale === "es"
+      ? "Descubre cómo SimpleCity ayuda a residentes a seguir decisiones, votaciones, opciones de participación y resultados oficiales del Área de la Bahía."
+      : "Learn how SimpleCity helps residents follow Bay Area decisions, upcoming votes, participation options, and official outcomes.";
+  const urls = localizedSeoUrls("/about", locale);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: urls.canonical, languages: urls.languages },
+    openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
+    twitter: { card: "summary", title, description }
+  };
+}
 
 export const revalidate = 300;
 

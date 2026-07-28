@@ -4,24 +4,29 @@ import { ArrowRight } from "lucide-react";
 import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Local government topics | SimpleCity",
-  description: "Explore local decisions about housing, transportation, public safety, parks, budgets, development, schools, and city services.",
-  alternates: { canonical: "/topics" },
-  openGraph: {
-    title: "Local government topics | SimpleCity",
-    description: "Explore local decisions by the parts of daily life they affect.",
-    type: "website",
-    url: "/topics",
-    siteName: "SimpleCity"
-  },
-  twitter: {
-    card: "summary",
-    title: "Local government topics | SimpleCity",
-    description: "Explore local decisions by the parts of daily life they affect."
-  }
-};
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}): Promise<Metadata> {
+  const locale = seoLocale((await searchParams).lang);
+  const title = locale === "es" ? "Temas del gobierno local | SimpleCity" : "Local government topics | SimpleCity";
+  const description =
+    locale === "es"
+      ? "Explora decisiones locales sobre vivienda, transporte, seguridad pública, parques, presupuestos, desarrollo, escuelas y servicios municipales."
+      : "Explore local decisions about housing, transportation, public safety, parks, budgets, development, schools, and city services.";
+  const urls = localizedSeoUrls("/topics", locale);
+
+  return {
+    title,
+    description,
+    alternates: { canonical: urls.canonical, languages: urls.languages },
+    openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
+    twitter: { card: "summary", title, description }
+  };
+}
 
 export default async function TopicsPage() {
   const locale = await getRequestLocale();

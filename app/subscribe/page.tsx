@@ -7,19 +7,21 @@ import {
 } from "@/lib/config/jurisdictions";
 import { publicEmailJurisdictionOptions } from "@/lib/email/subscriptions";
 import { LOCALE_COOKIE, normalizeLocale, t, type Locale } from "@/lib/i18n";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export async function generateMetadata({
   searchParams
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; lang?: string }>;
 }): Promise<Metadata> {
-  const [cookieStore, params] = await Promise.all([cookies(), searchParams]);
-  const locale = normalizeLocale(cookieStore.get(LOCALE_COOKIE)?.value);
+  const params = await searchParams;
+  const locale = seoLocale(params.lang);
+  const urls = localizedSeoUrls("/subscribe", locale);
 
   return {
     title: `${t(locale, "subscribe")} | SimpleCity`,
     description: t(locale, "subscribePageDescription"),
-    alternates: { canonical: "/subscribe" },
+    alternates: { canonical: urls.canonical, languages: urls.languages },
     robots: params.status ? { index: false, follow: true } : undefined
   };
 }
@@ -63,7 +65,7 @@ function statusMessage(status: string | undefined, locale: Locale) {
 export default async function SubscribePage({
   searchParams
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; lang?: string }>;
 }) {
   const [params, cookieStore] = await Promise.all([searchParams, cookies()]);
   const initialJurisdiction = normalizeJurisdictionSelection(

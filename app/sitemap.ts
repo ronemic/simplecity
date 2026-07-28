@@ -15,6 +15,27 @@ function jurisdictionUrl(appUrl: string, path: string, jurisdiction: string) {
   return url.toString();
 }
 
+function addLanguageVariants(routes: MetadataRoute.Sitemap): MetadataRoute.Sitemap {
+  return routes.flatMap((route) => {
+    const defaultUrl = new URL(route.url);
+    defaultUrl.searchParams.delete("lang");
+    const englishUrl = new URL(defaultUrl);
+    englishUrl.searchParams.set("lang", "en");
+    const spanishUrl = new URL(defaultUrl);
+    spanishUrl.searchParams.set("lang", "es");
+    const languages = {
+      "en-US": englishUrl.toString(),
+      "es-US": spanishUrl.toString(),
+      "x-default": defaultUrl.toString()
+    };
+
+    return [
+      { ...route, url: englishUrl.toString(), alternates: { languages } },
+      { ...route, url: spanishUrl.toString(), alternates: { languages } }
+    ];
+  });
+}
+
 export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
   const now = new Date();
   const routes: MetadataRoute.Sitemap = [
@@ -22,7 +43,8 @@ export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
     { url: `${appUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: `${appUrl}/decisions`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${appUrl}/meetings`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
-    { url: `${appUrl}/topics`, lastModified: now, changeFrequency: "weekly", priority: 0.8 }
+    { url: `${appUrl}/topics`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
+    { url: `${appUrl}/subscribe`, lastModified: now, changeFrequency: "monthly", priority: 0.7 }
   ];
 
   for (const option of PUBLIC_JURISDICTION_OPTIONS) {
@@ -63,7 +85,7 @@ export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
     }
   }
 
-  return routes;
+  return addLanguageVariants(routes);
 }
 
 async function sitemapAppUrl() {

@@ -6,16 +6,28 @@ test("sitemap exposes discovery pages without individual content", () => {
   const entries = buildSitemapEntries("https://simplecity.app");
   const urls = entries.map((entry) => entry.url);
 
-  assert.ok(urls.includes("https://simplecity.app/"));
-  assert.ok(urls.includes("https://simplecity.app/decisions"));
-  assert.ok(urls.includes("https://simplecity.app/meetings"));
-  assert.ok(urls.includes("https://simplecity.app/topics/housing"));
-  assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo"));
-  assert.ok(urls.includes("https://simplecity.app/topics/housing?jurisdiction=san-mateo"));
+  assert.ok(urls.includes("https://simplecity.app/?lang=en"));
+  assert.ok(urls.includes("https://simplecity.app/decisions?lang=en"));
+  assert.ok(urls.includes("https://simplecity.app/meetings?lang=en"));
+  assert.ok(urls.includes("https://simplecity.app/topics/housing?lang=en"));
+  assert.ok(urls.includes("https://simplecity.app/topics/housing?lang=es"));
+  assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo&lang=en"));
+  assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo&lang=es"));
+  assert.ok(urls.includes("https://simplecity.app/topics/housing?jurisdiction=san-mateo&lang=en"));
+  assert.ok(urls.includes("https://simplecity.app/subscribe?lang=es"));
   assert.equal(
-    entries.find((entry) => entry.url === "https://simplecity.app/about")?.priority,
+    entries.find((entry) => entry.url === "https://simplecity.app/about?lang=en")?.priority,
     0.9
   );
   assert.equal(urls.some((url) => url.includes("/cards/")), false);
   assert.equal(urls.some((url) => /\/meetings\/[^?]/.test(url)), false);
+
+  const spanishAbout = entries.find(
+    (entry) => entry.url === "https://simplecity.app/about?lang=es"
+  );
+  assert.deepEqual(spanishAbout?.alternates?.languages, {
+    "en-US": "https://simplecity.app/about?lang=en",
+    "es-US": "https://simplecity.app/about?lang=es",
+    "x-default": "https://simplecity.app/about"
+  });
 });

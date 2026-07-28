@@ -16,6 +16,7 @@ import {
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export const revalidate = 300;
 
@@ -28,11 +29,12 @@ export async function generateMetadata({
   searchParams
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ period?: string; jurisdiction?: string }>;
+  searchParams: Promise<{ period?: string; jurisdiction?: string; lang?: string }>;
 }): Promise<Metadata> {
   const [{ category: slug }, query] = await Promise.all([params, searchParams]);
   const category = categoryFromSlug(slug);
   if (!category) return { title: "Topic not found | SimpleCity", robots: { index: false } };
+  const locale = seoLocale(query.lang);
 
   const jurisdiction = query.jurisdiction
     ? normalizeJurisdictionSelection(query.jurisdiction)
@@ -40,19 +42,23 @@ export async function generateMetadata({
   const jurisdictionPrefix =
     jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local" : getJurisdictionLabel(jurisdiction);
   const definition = CATEGORY_DEFINITIONS[category];
-  const title = `${jurisdictionPrefix} ${category.toLowerCase()} decisions | SimpleCity`;
-  const description = definition.description;
+  const title =
+    locale === "es"
+      ? `${jurisdiction === ALL_JURISDICTIONS_SLUG ? "Decisiones locales" : `Decisiones de ${jurisdictionPrefix}`} sobre ${categoryLabel(locale, category).toLowerCase()} | SimpleCity`
+      : `${jurisdictionPrefix} ${category.toLowerCase()} decisions | SimpleCity`;
+  const description = locale === "es" ? categoryDescription(locale, category) : definition.description;
   const canonicalUrl = new URL(`/topics/${definition.slug}`, getConfiguredAppUrl());
   if (query.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
+  const urls = localizedSeoUrls(canonicalUrl, locale);
 
   return {
     title,
     description,
-    alternates: { canonical: canonicalUrl.toString() },
+    alternates: { canonical: urls.canonical, languages: urls.languages },
     robots: query.period ? { index: false, follow: true } : undefined,
-    openGraph: { title, description, type: "website", url: canonicalUrl.toString(), siteName: "SimpleCity" },
+    openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
     twitter: { card: "summary", title, description }
   };
 }
@@ -62,7 +68,7 @@ export default async function CategoryDetailPage({
   searchParams
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ period?: string; jurisdiction?: string }>;
+  searchParams: Promise<{ period?: string; jurisdiction?: string; lang?: string }>;
 }) {
   const [{ category: slug }, query] = await Promise.all([params, searchParams]);
   const locale = await getRequestLocale();

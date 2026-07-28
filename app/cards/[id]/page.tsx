@@ -10,32 +10,35 @@ import {
   cardShareDescription,
   cardShareTitle
 } from "@/lib/utils/cardShare";
-import { serializeJsonLd } from "@/lib/seo";
+import { localizedSeoUrls, seoLocale, serializeJsonLd } from "@/lib/seo";
 
 export const revalidate = 300;
 
 export async function generateMetadata({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
-  const card = await getPublishedCard(id, "en");
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const locale = seoLocale(query.lang);
+  const card = await getPublishedCard(id, locale);
   if (!card) return { title: "Card not found | SimpleCity" };
 
   const title = `${cardShareTitle(card)} | SimpleCity`;
-  const description = cardShareDescription(card, "en");
-  const canonical = `${getConfiguredAppUrl()}/cards/${encodeURIComponent(id)}`;
+  const description = cardShareDescription(card, locale);
+  const urls = localizedSeoUrls(`/cards/${encodeURIComponent(id)}`, locale);
 
   return {
     title,
     description,
-    alternates: { canonical },
+    alternates: { canonical: urls.canonical, languages: urls.languages },
     openGraph: {
       title,
       description,
       type: "article",
-      url: canonical,
+      url: urls.canonical,
       siteName: "SimpleCity"
     },
     twitter: { card: "summary", title, description }

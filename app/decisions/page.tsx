@@ -18,39 +18,47 @@ import {
   toPublicJurisdictionSlug,
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
-import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { categoryFromSlug } from "@/lib/utils/decisionFilters";
 import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export const revalidate = 300;
 
 export async function generateMetadata({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; category?: string; result?: string; jurisdiction?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; result?: string; jurisdiction?: string; page?: string; lang?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
+  const locale = seoLocale(params.lang);
   const jurisdiction = params.jurisdiction
     ? normalizeJurisdictionSelection(params.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
-  const title = `${label} decisions | SimpleCity`;
-  const description = `Track ${label.toLowerCase()} decisions, upcoming votes, public meetings, outcomes, and ways residents can participate.`;
-  const canonicalUrl = new URL("/decisions", getConfiguredAppUrl());
+  const title =
+    locale === "es"
+      ? `${jurisdiction === ALL_JURISDICTIONS_SLUG ? "Decisiones del gobierno local" : `Decisiones de ${jurisdictionLabel}`} | SimpleCity`
+      : `${label} decisions | SimpleCity`;
+  const description =
+    locale === "es"
+      ? `Sigue decisiones de ${jurisdiction === ALL_JURISDICTIONS_SLUG ? "gobiernos locales" : jurisdictionLabel}, próximas votaciones, reuniones públicas, resultados y formas de participar.`
+      : `Track ${label.toLowerCase()} decisions, upcoming votes, public meetings, outcomes, and ways residents can participate.`;
+  const canonicalUrl = new URL("/decisions", "https://simplecity.invalid");
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
+  const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, locale);
   const isFiltered = Boolean(params.q || params.category || params.result || params.page);
 
   return {
     title,
     description,
-    alternates: { canonical: canonicalUrl.toString() },
+    alternates: { canonical: urls.canonical, languages: urls.languages },
     robots: isFiltered ? { index: false, follow: true } : undefined,
-    openGraph: { title, description, type: "website", url: canonicalUrl.toString(), siteName: "SimpleCity" },
+    openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
     twitter: { card: "summary", title, description }
   };
 }
@@ -166,6 +174,7 @@ export default async function DecisionsPage({
     result?: string;
     jurisdiction?: string;
     page?: string;
+    lang?: string;
   }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([

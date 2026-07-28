@@ -148,10 +148,14 @@ export function HeaderNav({
   }, [isLanguageMenuOpen]);
 
   function hrefWithJurisdiction(href: string) {
-    if (href !== "/decisions" && href !== "/meetings") return href;
     const params = new URLSearchParams();
-    params.set("jurisdiction", selected);
-    return `${href}?${params.toString()}`;
+    if (href === "/decisions" || href === "/meetings") {
+      params.set("jurisdiction", selected);
+    }
+    const lang = searchParams.get("lang");
+    if (lang) params.set("lang", lang);
+    const query = params.toString();
+    return `${href}${query ? `?${query}` : ""}`;
   }
 
   function hrefWithSelection(key: "jurisdiction" | "lang", value: string) {
@@ -195,7 +199,7 @@ export function HeaderNav({
     }
     announceLocalePreference(value);
     startTransition(() => {
-      router.refresh();
+      router.push(hrefWithSelection("lang", value), { scroll: false });
     });
   }
 

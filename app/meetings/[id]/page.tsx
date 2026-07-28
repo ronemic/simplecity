@@ -25,7 +25,7 @@ import { getEmbeddableVideoDocuments, getVideoLinkUrl } from "@/lib/utils/videoE
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
-import { serializeJsonLd } from "@/lib/seo";
+import { localizedSeoUrls, seoLocale, serializeJsonLd } from "@/lib/seo";
 import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 
 export const revalidate = 300;
@@ -134,33 +134,42 @@ export async function generateMetadata({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string }>;
+  searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string; lang?: string }>;
 }): Promise<Metadata> {
   const [{ id }, query] = await Promise.all([params, searchParams]);
+  const locale = seoLocale(query.lang);
   const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
-  const { meeting } = await getMeetingDetail(id, jurisdiction, "en");
+  const { meeting } = await getMeetingDetail(id, jurisdiction, locale);
   if (!meeting) return { title: "Meeting not found | SimpleCity", robots: { index: false } };
 
   const jurisdictionSlug = toPublicJurisdictionSlug(jurisdiction);
   const jurisdictionLabel = getJurisdictionDisplayLabel(
     meeting.jurisdiction_slug || meeting.jurisdiction_name
   );
-  const meetingTitle = displayMeetingTitle(meeting, "Public meeting", "en");
+  const meetingTitle = displayMeetingTitle(
+    meeting,
+    locale === "es" ? "Reunión pública" : "Public meeting",
+    locale
+  );
   const date = formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text);
   const title = `${meetingTitle} - ${jurisdictionLabel} | SimpleCity`;
-  const description = `${meetingTitle} on ${date}. View the agenda, official documents, and decision briefings from ${jurisdictionLabel}.`;
+  const description =
+    locale === "es"
+      ? `${meetingTitle} el ${date}. Consulta la agenda, los documentos oficiales y los resúmenes de decisiones de ${jurisdictionLabel}.`
+      : `${meetingTitle} on ${date}. View the agenda, official documents, and decision briefings from ${jurisdictionLabel}.`;
   const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
   canonicalUrl.searchParams.set("jurisdiction", jurisdictionSlug);
+  const urls = localizedSeoUrls(canonicalUrl, locale);
 
   return {
     title,
     description,
-    alternates: { canonical: canonicalUrl.toString() },
+    alternates: { canonical: urls.canonical, languages: urls.languages },
     openGraph: {
       title,
       description,
       type: "article",
-      url: canonicalUrl.toString(),
+      url: urls.canonical,
       siteName: "SimpleCity"
     },
     twitter: { card: "summary", title, description }
@@ -176,7 +185,7 @@ export default async function MeetingDetailPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string }>;
+  searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string; lang?: string }>;
 }) {
   const [{ id }, query, locale, cookieStore] = await Promise.all([
     params,

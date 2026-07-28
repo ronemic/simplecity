@@ -9,9 +9,9 @@ import {
   normalizeJurisdictionSelection,
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
-import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 import {
   MEETING_VIEW_PREFERENCE_COOKIE,
   normalizeMeetingView
@@ -28,28 +28,37 @@ export async function generateMetadata({
     date?: string;
     view?: string;
     jurisdiction?: string;
+    lang?: string;
   }>;
 }): Promise<Metadata> {
   const params = await searchParams;
+  const locale = seoLocale(params.lang);
   const jurisdiction = params.jurisdiction
     ? normalizeJurisdictionSelection(params.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
-  const title = `${label} public meetings | SimpleCity`;
-  const description = `Browse ${label.toLowerCase()} public meetings, dates, agendas, official documents, and decision briefings.`;
-  const canonicalUrl = new URL("/meetings", getConfiguredAppUrl());
+  const title =
+    locale === "es"
+      ? `${jurisdiction === ALL_JURISDICTIONS_SLUG ? "Reuniones públicas locales" : `Reuniones públicas de ${jurisdictionLabel}`} | SimpleCity`
+      : `${label} public meetings | SimpleCity`;
+  const description =
+    locale === "es"
+      ? `Consulta reuniones públicas de ${jurisdiction === ALL_JURISDICTIONS_SLUG ? "gobiernos locales" : jurisdictionLabel}, fechas, agendas, documentos oficiales y resúmenes de decisiones.`
+      : `Browse ${label.toLowerCase()} public meetings, dates, agendas, official documents, and decision briefings.`;
+  const canonicalUrl = new URL("/meetings", "https://simplecity.invalid");
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
+  const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, locale);
   const isFiltered = Boolean(params.q || params.month || params.date || params.view);
 
   return {
     title,
     description,
-    alternates: { canonical: canonicalUrl.toString() },
+    alternates: { canonical: urls.canonical, languages: urls.languages },
     robots: isFiltered ? { index: false, follow: true } : undefined,
-    openGraph: { title, description, type: "website", url: canonicalUrl.toString(), siteName: "SimpleCity" },
+    openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
     twitter: { card: "summary", title, description }
   };
 }
@@ -71,6 +80,7 @@ export default async function MeetingsPage({
     date?: string;
     view?: string;
     jurisdiction?: string;
+    lang?: string;
   }>;
 }) {
   const params = await searchParams;
