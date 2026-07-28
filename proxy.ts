@@ -17,24 +17,30 @@ export function proxy(request: NextRequest) {
     return NextResponse.rewrite(new URL("/__simplecity_not_found__", request.url));
   }
 
+  const hasLanguageParam = request.nextUrl.searchParams.has("lang");
   const locale = queryLocale(request.nextUrl.searchParams.get("lang"));
-  if (!locale) return NextResponse.next();
+  const legacyJurisdiction =
+    request.nextUrl.searchParams.get("jurisdiction") === "san-mateo-city";
+  const ignoresJurisdiction = ["/about", "/subscribe", "/topics"].includes(pathname);
+  const hasIgnoredJurisdiction =
+    ignoresJurisdiction && request.nextUrl.searchParams.has("jurisdiction");
+  if (!hasLanguageParam && !legacyJurisdiction && !hasIgnoredJurisdiction) {
+    return NextResponse.next();
+  }
 
-  request.cookies.set(LOCALE_COOKIE, locale);
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("cookie", request.cookies.toString());
+  const canonicalUrl = request.nextUrl.clone();
+  if (hasLanguageParam) canonicalUrl.searchParams.delete("lang");
+  if (legacyJurisdiction) canonicalUrl.searchParams.set("jurisdiction", "san-mateo");
+  if (ignoresJurisdiction) canonicalUrl.searchParams.delete("jurisdiction");
+  const response = NextResponse.redirect(canonicalUrl, 307);
 
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders
-    }
-  });
-
-  response.cookies.set(LOCALE_COOKIE, locale, {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-    sameSite: "lax"
-  });
+  if (locale) {
+    response.cookies.set(LOCALE_COOKIE, locale, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax"
+    });
+  }
 
   return response;
 }
@@ -47,6 +53,10 @@ export const config = {
     {
       source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
       has: [{ type: "query", key: "lang" }]
+    },
+    {
+      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
+      has: [{ type: "query", key: "jurisdiction" }]
     }
   ]
 };

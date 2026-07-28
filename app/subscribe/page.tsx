@@ -8,13 +8,19 @@ import {
 import { publicEmailJurisdictionOptions } from "@/lib/email/subscriptions";
 import { LOCALE_COOKIE, normalizeLocale, t, type Locale } from "@/lib/i18n";
 
-export async function generateMetadata(): Promise<Metadata> {
-  const cookieStore = await cookies();
+export async function generateMetadata({
+  searchParams
+}: {
+  searchParams: Promise<{ status?: string }>;
+}): Promise<Metadata> {
+  const [cookieStore, params] = await Promise.all([cookies(), searchParams]);
   const locale = normalizeLocale(cookieStore.get(LOCALE_COOKIE)?.value);
 
   return {
     title: `${t(locale, "subscribe")} | SimpleCity`,
-    description: t(locale, "subscribePageDescription")
+    description: t(locale, "subscribePageDescription"),
+    alternates: { canonical: "/subscribe" },
+    robots: params.status ? { index: false, follow: true } : undefined
   };
 }
 
