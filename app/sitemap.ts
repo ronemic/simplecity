@@ -19,7 +19,7 @@ export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
   const now = new Date();
   const routes: MetadataRoute.Sitemap = [
     { url: `${appUrl}/`, lastModified: now, changeFrequency: "daily", priority: 1 },
-    { url: `${appUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${appUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: `${appUrl}/decisions`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${appUrl}/meetings`, lastModified: now, changeFrequency: "daily", priority: 0.9 },
     { url: `${appUrl}/topics`, lastModified: now, changeFrequency: "weekly", priority: 0.8 }

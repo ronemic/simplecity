@@ -12,6 +12,10 @@ test("sitemap exposes discovery pages without individual content", () => {
   assert.ok(urls.includes("https://simplecity.app/topics/housing"));
   assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo"));
   assert.ok(urls.includes("https://simplecity.app/topics/housing?jurisdiction=san-mateo"));
+  assert.equal(
+    entries.find((entry) => entry.url === "https://simplecity.app/about")?.priority,
+    0.9
+  );
   assert.equal(urls.some((url) => url.includes("/cards/")), false);
   assert.equal(urls.some((url) => /\/meetings\/[^?]/.test(url)), false);
 });
