@@ -29,6 +29,7 @@ export const revalidate = 300;
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
+const CONTACT_EMAIL = "simplecityadmin@gmail.com";
 
 function formatStat(value: number, locale: "en" | "es") {
   return new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(value);
@@ -103,6 +104,17 @@ export default async function AboutPage() {
                   : "Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
               </p>
             </div>
+            <p className="mt-5 text-sm font-semibold text-black/70">
+              {locale === "es"
+                ? "¿Tienes una pregunta, corrección o idea? Contáctanos en"
+                : "Have a question, correction, or idea? Contact us at"}{" "}
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
+                className="font-bold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
+              >
+                {CONTACT_EMAIL}
+              </a>
+            </p>
           </section>
         </div>
 

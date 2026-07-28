@@ -195,7 +195,7 @@ export function HeaderNav({
     }
     announceLocalePreference(value);
     startTransition(() => {
-      router.push(hrefWithSelection("lang", value), { scroll: false });
+      router.refresh();
     });
   }
 
