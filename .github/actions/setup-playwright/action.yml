@@ -1,5 +1,5 @@
 name: Set up Playwright Chromium
-description: Cache Chromium and retry bounded dependency/browser installation
+description: Cache Chromium, tolerate transient package mirrors, and verify a real browser launch
 
 runs:
   using: composite
@@ -15,23 +15,41 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        for attempt in 1 2; do
+        dependencies_installed=false
+        for attempt in 1 2 3; do
           if timeout 5m npx playwright install-deps chromium; then
-            exit 0
+            dependencies_installed=true
+            break
           fi
-          echo "Playwright dependency installation attempt ${attempt} failed; retrying."
+          echo "::warning::Playwright dependency installation attempt ${attempt} failed."
+          sleep $((attempt * 10))
         done
-        exit 1
+        if [ "$dependencies_installed" != "true" ]; then
+          echo "::warning::Dependency installation was unavailable; continuing because the runner may already contain Chromium libraries. The launch check will remain authoritative."
+        fi
 
-    - name: Install Chromium browser
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
+    - name: Install and verify Chromium browser
       shell: bash
+      env:
+        PLAYWRIGHT_BROWSERS_PATH: "0"
+        PLAYWRIGHT_DOWNLOAD_CONNECTION_TIMEOUT: "120000"
       run: |
         set -euo pipefail
-        for attempt in 1 2; do
-          if timeout 5m env PLAYWRIGHT_BROWSERS_PATH=0 npx playwright install chromium; then
-            exit 0
+        for attempt in 1 2 3; do
+          if timeout 8m npx playwright install chromium; then
+            if timeout 45s node --input-type=module -e 'import { chromium } from "playwright"; const browser = await chromium.launch({ headless: true }); await browser.close();'; then
+              echo "Chromium installation and launch check succeeded."
+              exit 0
+            fi
+            echo "::warning::Chromium launch check failed on attempt ${attempt}."
+          else
+            echo "::warning::Chromium browser installation attempt ${attempt} failed."
           fi
-          echo "Playwright browser installation attempt ${attempt} failed; retrying."
+
+          # A failed launch can mean the runner image changed underneath a valid
+          # browser cache. Retry system dependencies before the next launch.
+          timeout 5m npx playwright install-deps chromium || true
+          sleep $((attempt * 10))
         done
+        echo "::error::Chromium could not be installed and launched after three attempts."
         exit 1
