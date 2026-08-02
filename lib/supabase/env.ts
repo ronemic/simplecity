@@ -42,7 +42,7 @@ export function getRequiredPublicSupabaseEnv(slug?: JurisdictionSlug) {
       );
     }
 
-    if (slug === "los-altos") {
+    if (slug === "los-altos" || slug === "los-altos-hills") {
       throw new Error(SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE);
     }
 

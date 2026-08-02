@@ -33,7 +33,7 @@ test("groups alphabetized cities beneath their clickable counties", () => {
     options
       .filter((jurisdiction) => jurisdiction.parentCountySlug === "santa-clara-county")
       .map((jurisdiction) => jurisdiction.slug),
-    ["los-altos", "mountain-view"]
+    ["los-altos", "los-altos-hills", "mountain-view"]
   );
   assert.equal(
     options.find((jurisdiction) => jurisdiction.slug === "san-mateo-county")?.parentCountySlug,
@@ -92,7 +92,23 @@ test("Los Altos is a valid CivicClerk jurisdiction in the Santa Clara region", (
   );
 });
 
-test("Los Altos uses only Santa Clara regional Supabase credentials", () => {
+test("Los Altos Hills is a valid CivicClerk jurisdiction in the Santa Clara region", () => {
+  const losAltosHills = getJurisdictionBySlug("los-altos-hills");
+
+  assert.equal(requireValidJurisdictionSlug("los-altos-hills"), "los-altos-hills");
+  assert.equal(losAltosHills?.name, "Los Altos Hills");
+  assert.equal(losAltosHills?.officialName, "Town of Los Altos Hills");
+  assert.equal(losAltosHills?.platform, "civicclerk");
+  assert.equal(losAltosHills?.regionSlug, "santa-clara");
+  assert.equal(losAltosHills?.timezone, "America/Los_Angeles");
+  assert.equal(
+    losAltosHills?.sourceUrl,
+    "https://losaltoshillsca.portal.civicclerk.com/"
+  );
+  assert.equal(toPublicJurisdictionSlug("los-altos-hills"), "los-altos-hills");
+});
+
+test("Los Altos jurisdictions use only Santa Clara regional Supabase credentials", () => {
   const previous = {
     url: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
     anonKey: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_ANON_KEY,
@@ -104,10 +120,12 @@ test("Los Altos uses only Santa Clara regional Supabase credentials", () => {
   process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY = "regional-service-key";
 
   try {
-    const losAltos = getJurisdictionBySlug("los-altos");
-    assert.equal(losAltos?.supabaseUrl, "https://santa-clara.example.test");
-    assert.equal(losAltos?.supabaseAnonKey, "regional-anon-key");
-    assert.equal(losAltos?.supabaseServiceRoleKey, "regional-service-key");
+    for (const slug of ["los-altos", "los-altos-hills"] as const) {
+      const jurisdiction = getJurisdictionBySlug(slug);
+      assert.equal(jurisdiction?.supabaseUrl, "https://santa-clara.example.test");
+      assert.equal(jurisdiction?.supabaseAnonKey, "regional-anon-key");
+      assert.equal(jurisdiction?.supabaseServiceRoleKey, "regional-service-key");
+    }
   } finally {
     if (previous.url === undefined) delete process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL;
     else process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL = previous.url;

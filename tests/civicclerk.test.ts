@@ -77,6 +77,32 @@ test("normalizes separate CivicClerk event IDs without merging same-day meetings
   assert.ok(meetings.every((meeting) => meeting.status === "Upcoming"));
 });
 
+test("normalizes Los Altos Hills events and derives its CivicClerk API host", () => {
+  const jurisdiction = getJurisdictionBySlug("los-altos-hills");
+  assert.ok(jurisdiction);
+
+  const [meeting] = normalizeCivicClerkEventCards(
+    [
+      event({
+        eventId: "4567",
+        eventUrl: "https://losaltoshillsca.portal.civicclerk.com/event/4567/files",
+        title: "City Council Regular Meeting",
+        location: "Town Hall, 26379 Fremont Road, Los Altos Hills, CA 94022"
+      })
+    ],
+    jurisdiction,
+    Date.parse("2026-07-11T12:00:00-07:00")
+  );
+
+  assert.equal(meeting.externalId, "los-altos-hills-civicclerk-event-4567");
+  assert.equal(meeting.jurisdictionSlug, "los-altos-hills");
+  assert.equal(meeting.platform, "civicclerk");
+  assert.equal(
+    buildCivicClerkFileUrl(jurisdiction.sourceUrl, "9001"),
+    "https://losaltoshillsca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=9001,plainText=false)"
+  );
+});
+
 test("includes Los Altos item staff-report context through the existing LLM preparation", async () => {
   const jurisdiction = getJurisdictionBySlug("los-altos");
   assert.ok(jurisdiction);

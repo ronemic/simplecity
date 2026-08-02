@@ -1525,4 +1525,15 @@ to anon, authenticated;
 grant all privileges on table public.jurisdictions
 to service_role;
 
+-- -----------------------------------------------------------------------------
+-- Source: supabase/migrations/20260802000000_add_los_altos_hills_jurisdiction.sql
+-- -----------------------------------------------------------------------------
+
+insert into public.jurisdictions (slug, name, region_slug)
+values ('los-altos-hills', 'Los Altos Hills', 'santa-clara')
+on conflict (slug) do update
+set name = excluded.name,
+    region_slug = excluded.region_slug,
+    updated_at = now();
+
 commit;

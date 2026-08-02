@@ -36,8 +36,8 @@ function requestedJurisdiction(): JurisdictionSlug {
 async function main() {
   const jurisdiction = getJurisdictionBySlug(requestedJurisdiction());
   if (!jurisdiction) throw new Error("Unknown jurisdiction.");
-  if (jurisdiction.slug !== "los-altos" || jurisdiction.platform !== "civicclerk") {
-    throw new Error(`${jurisdiction.name} is configured for ${jurisdiction.platform}, not Los Altos CivicClerk.`);
+  if (jurisdiction.platform !== "civicclerk") {
+    throw new Error(`${jurisdiction.name} is configured for ${jurisdiction.platform}, not CivicClerk.`);
   }
 
   const outputDir = getJurisdictionScrapedDir(jurisdiction.slug);
@@ -60,7 +60,7 @@ async function main() {
 
   const outputJson = path.join(outputDir, "meetings.json");
   await fs.writeFile(outputJson, JSON.stringify(result, null, 2), "utf8");
-  console.log(`Saved ${result.totalMeetingCount} Los Altos meetings to ${outputJson}`);
+  console.log(`Saved ${result.totalMeetingCount} ${jurisdiction.name} meetings to ${outputJson}`);
 }
 
 main().catch((error) => {

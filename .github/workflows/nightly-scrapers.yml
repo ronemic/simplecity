@@ -11,6 +11,7 @@ on:
     - cron: "30 13 * * *"
     - cron: "0 14 * * *"
     - cron: "30 14 * * *"
+    - cron: "0 15 * * *"
   workflow_dispatch:
     inputs:
       jurisdiction:
@@ -27,6 +28,7 @@ on:
           - mountain-view
           - san-francisco
           - los-altos
+          - los-altos-hills
           - redwood-city
           - east-palo-alto
 
@@ -67,6 +69,7 @@ env:
   SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY }}
   SAN_FRANCISCO_LEGISTAR_URL: https://sfgov.legistar.com/Calendar.aspx
   LOS_ALTOS_CIVICCLERK_URL: https://losaltosca.portal.civicclerk.com/
+  LOS_ALTOS_HILLS_CIVICCLERK_URL: https://losaltoshillsca.portal.civicclerk.com/
   EAST_PALO_ALTO_AGENDA_URL: https://www.cityofepa.org/agenda
   EAST_PALO_ALTO_MEETINGS_URL: https://www.cityofepa.org/meetings
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
@@ -335,6 +338,38 @@ jobs:
 
       - name: Run Redwood City pipeline
         run: npm run pipeline:redwood-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+
+  los-altos-hills:
+    name: Los Altos Hills scraper
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    if: >
+      (github.event_name == 'workflow_dispatch' &&
+      (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'los-altos-hills')) ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 15 * * *')
+    concurrency:
+      group: nightly-scraper-los-altos-hills
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        uses: ./.github/actions/setup-playwright
+
+      - name: Run Los Altos Hills pipeline
+        run: npm run pipeline:los-altos-hills -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
 
   east-palo-alto:
     name: East Palo Alto scraper

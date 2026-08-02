@@ -48,6 +48,10 @@ function sourceCredentials(slug: JurisdictionSlug) {
       process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
       process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
     ],
+    "los-altos-hills": [
+      process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
+      process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+    ],
     "san-francisco": [
       process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,
       process.env.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY
