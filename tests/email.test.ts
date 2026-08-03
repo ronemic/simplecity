@@ -364,6 +364,8 @@ test("requires Resend config before sending", async () => {
 });
 
 test("normalizes subscription emails and concrete jurisdictions", () => {
+  const jurisdictionOptions = publicEmailJurisdictionOptions();
+
   assert.equal(normalizeSubscriberEmail(" Resident@Example.COM "), "resident@example.com");
   assert.equal(isValidSubscriberEmail("resident@example.com"), true);
   assert.equal(isValidSubscriberEmail("not-an-email"), false);
@@ -377,8 +379,20 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
     ["san-mateo-city", "mountain-view"]
   );
   assert.equal(
-    publicEmailJurisdictionOptions().map((option) => String(option.value)).includes("all"),
+    jurisdictionOptions.map((option) => String(option.value)).includes("all"),
     false
+  );
+  assert.equal(
+    jurisdictionOptions.find((option) => option.value === "los-altos-hills")?.parentCountyValue,
+    "santa-clara-county"
+  );
+  assert.equal(
+    jurisdictionOptions.find((option) => option.value === "redwood-city")?.parentCountyValue,
+    "san-mateo-county"
+  );
+  assert.equal(
+    jurisdictionOptions.find((option) => option.value === "san-francisco")?.parentCountyValue,
+    undefined
   );
 });
 

@@ -84,6 +84,9 @@ type TranslationKey =
   | "subscribeAlreadySubscribedHelp"
   | "subscribeConfirmedBody"
   | "subscribeConfirmedTitle"
+  | "subscribeRegionalCoverage"
+  | "subscribeSanMateoCountyCities"
+  | "subscribeSantaClaraCountyCities"
   | "subscribeEmailAddress"
   | "subscribeEmailPlaceholder"
   | "subscribeErrorBody"
@@ -192,10 +195,13 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     status: "Status",
     subscribe: "Subscribe",
     subscribeAlreadySubscribedHelp:
-      "Already subscribed? Enter the same email and choose new areas to update your email preferences. We will send a confirmation email before changing anything.",
+      "Already subscribed? Use the same email to update your areas. We’ll confirm changes by email.",
     subscribeConfirmedBody:
       "Weekly digests will use your latest selected areas when new SimpleCity cards are published.",
     subscribeConfirmedTitle: "Your email updates are confirmed",
+    subscribeRegionalCoverage: "Regional coverage",
+    subscribeSanMateoCountyCities: "Cities in San Mateo County",
+    subscribeSantaClaraCountyCities: "Cities in Santa Clara County",
     subscribeEmailAddress: "Email address",
     subscribeEmailPlaceholder: "you@example.com",
     subscribeErrorBody: "Please try again in a moment.",
@@ -306,10 +312,13 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     status: "Estado",
     subscribe: "Suscribirse",
     subscribeAlreadySubscribedHelp:
-      "¿Ya estás suscrito? Ingresa el mismo email y elige nuevas áreas para actualizar tus preferencias. Enviaremos un email de confirmación antes de cambiar nada.",
+      "¿Ya estás suscrito? Usa el mismo email para actualizar tus áreas. Confirmaremos los cambios por email.",
     subscribeConfirmedBody:
       "Los resúmenes semanales usarán las áreas que elegiste más recientemente cuando se publiquen nuevas tarjetas de SimpleCity.",
     subscribeConfirmedTitle: "Tus actualizaciones por email están confirmadas",
+    subscribeRegionalCoverage: "Cobertura regional",
+    subscribeSanMateoCountyCities: "Ciudades del condado de San Mateo",
+    subscribeSantaClaraCountyCities: "Ciudades del condado de Santa Clara",
     subscribeEmailAddress: "Email",
     subscribeEmailPlaceholder: "tu@ejemplo.com",
     subscribeErrorBody: "Inténtalo de nuevo en un momento.",

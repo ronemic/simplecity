@@ -135,7 +135,10 @@ export function publicEmailJurisdictionOptions() {
     .filter((jurisdiction) => jurisdiction.slug !== "all")
     .map((jurisdiction) => ({
       value: requireValidJurisdictionSlug(jurisdiction.slug) as JurisdictionSlug,
-      label: jurisdiction.name
+      label: jurisdiction.name,
+      parentCountyValue: jurisdiction.parentCountySlug
+        ? (requireValidJurisdictionSlug(jurisdiction.parentCountySlug) as JurisdictionSlug)
+        : undefined
     }));
 }
 

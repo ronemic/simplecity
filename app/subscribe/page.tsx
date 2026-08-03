@@ -75,21 +75,23 @@ export default async function SubscribePage({
   const message = statusMessage(params.status, locale);
 
   return (
-    <div className="section-shell py-10">
-      <div className="max-w-3xl">
-        <p className="label-eyebrow text-civic">{t(locale, "subscribeEyebrow")}</p>
-        <h1 className="page-title mt-2">{t(locale, "subscribePageTitle")}</h1>
-        <p className="page-copy mt-3 text-base">{t(locale, "subscribePageDescription")}</p>
+    <div className="section-shell py-8 sm:py-10">
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-end lg:gap-12">
+        <div className="max-w-2xl">
+          <p className="label-eyebrow text-civic">{t(locale, "subscribeEyebrow")}</p>
+          <h1 className="page-title mt-2">{t(locale, "subscribePageTitle")}</h1>
+        </div>
+        <p className="page-copy text-base lg:pb-1">{t(locale, "subscribePageDescription")}</p>
 
         {message ? (
-          <div className={`mt-5 rounded-lg border px-4 py-3 ${message.className}`}>
-            <h2 className="text-base font-bold">{message.title}</h2>
+          <div className={`rounded-lg border px-4 py-3 lg:col-span-2 ${message.className}`}>
+            <h2 className="text-base font-black">{message.title}</h2>
             <p className="mt-1 text-sm font-semibold leading-6 text-current/80">{message.body}</p>
           </div>
         ) : null}
       </div>
 
-      <div className="mt-8 max-w-[980px]">
+      <div className="mt-7">
         <SubscribeForm
           initialJurisdiction={initialJurisdiction}
           jurisdictions={publicEmailJurisdictionOptions()}

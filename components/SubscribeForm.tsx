@@ -7,6 +7,7 @@ import { t, type Locale } from "@/lib/i18n";
 type JurisdictionOption = {
   value: string;
   label: string;
+  parentCountyValue?: string;
 };
 
 type SubscribeStatus = "idle" | "success" | "error";
@@ -33,6 +34,30 @@ export function SubscribeForm({
   const [status, setStatus] = useState<SubscribeStatus>("idle");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const jurisdictionGroups = [
+    {
+      id: "regional",
+      label: t(locale, "subscribeRegionalCoverage"),
+      jurisdictions: jurisdictions.filter((jurisdiction) => !jurisdiction.parentCountyValue),
+      columns: "sm:grid-cols-3 md:grid-cols-1"
+    },
+    {
+      id: "san-mateo-cities",
+      label: t(locale, "subscribeSanMateoCountyCities"),
+      jurisdictions: jurisdictions.filter(
+        (jurisdiction) => jurisdiction.parentCountyValue === "san-mateo-county"
+      ),
+      columns: "sm:grid-cols-2"
+    },
+    {
+      id: "santa-clara-cities",
+      label: t(locale, "subscribeSantaClaraCountyCities"),
+      jurisdictions: jurisdictions.filter(
+        (jurisdiction) => jurisdiction.parentCountyValue === "santa-clara-county"
+      ),
+      columns: "sm:grid-cols-2 md:grid-cols-1"
+    }
+  ].filter((group) => group.jurisdictions.length > 0);
 
   function toggleJurisdiction(value: string) {
     setSelectedJurisdictions((current) => {
@@ -88,28 +113,47 @@ export function SubscribeForm({
   }
 
   return (
-    <form className="quiet-card grid gap-6 p-5 sm:p-7" onSubmit={handleSubmit}>
-      <div className="grid gap-2">
-        <label className="text-sm font-bold text-ink" htmlFor="subscribe-email">
-          {t(locale, "subscribeEmailAddress")}
-        </label>
-        <div className="relative">
-          <Mail
-            aria-hidden
-            className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-civic"
-          />
-          <input
-            id="subscribe-email"
-            name="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            className="input-control input-control--with-icon"
-            placeholder={t(locale, "subscribeEmailPlaceholder")}
-          />
+    <form className="quiet-card grid gap-5 p-5 sm:p-6" onSubmit={handleSubmit}>
+      <div className="grid gap-2.5">
+        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+          <div className="grid gap-2">
+            <label className="text-sm font-black text-ink" htmlFor="subscribe-email">
+              {t(locale, "subscribeEmailAddress")}
+            </label>
+            <div className="relative">
+              <Mail
+                aria-hidden
+                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-civic"
+              />
+              <input
+                id="subscribe-email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="input-control input-control--with-icon"
+                placeholder={t(locale, "subscribeEmailPlaceholder")}
+              />
+            </div>
+          </div>
+          <button
+            className="action-primary min-w-44 shrink-0"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? (
+              <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send aria-hidden className="h-4 w-4" />
+            )}
+            {t(locale, "subscribe")}
+          </button>
         </div>
+        <p className="text-sm font-semibold leading-6 text-black/60">
+          {t(locale, "subscribeAlreadySubscribedHelp")}
+        </p>
       </div>
 
       <input
@@ -121,49 +165,53 @@ export function SubscribeForm({
         type="text"
       />
 
-      <fieldset className="grid gap-3 border-t border-black/10 pt-5">
-        <legend className="text-sm font-bold text-ink">
+      <fieldset className="grid gap-3">
+        <legend className="text-sm font-black text-ink">
           {t(locale, "subscribeWeeklyDigestAreas")}
         </legend>
-        <div className="grid border-y border-black/10 sm:grid-cols-2">
-          {jurisdictions.map((jurisdiction) => {
-            const checked = selectedJurisdictions.includes(jurisdiction.value);
-
-            return (
-              <label
-                key={jurisdiction.value}
-                className={`flex min-h-12 cursor-pointer items-center gap-3 border-b border-black/10 px-1 py-3 text-sm font-semibold transition last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:odd:border-r sm:odd:border-black/10 sm:odd:pr-4 sm:even:pl-4 ${
-                  checked
-                    ? "text-civic"
-                    : "text-ink hover:bg-[#f7fbff]"
-                }`}
+        <div className="grid gap-3 md:grid-cols-[0.78fr_1.3fr_0.92fr]">
+          {jurisdictionGroups.map((group) => (
+            <div
+              aria-labelledby={`${group.id}-label`}
+              className="rounded-xl bg-black/[0.025] p-3.5"
+              key={group.id}
+              role="group"
+            >
+              <h2
+                className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.05em] text-black/60"
+                id={`${group.id}-label`}
               >
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 accent-[#2457a6]"
-                  checked={checked}
-                  onChange={() => toggleJurisdiction(jurisdiction.value)}
-                />
-                <span>{jurisdiction.label}</span>
-              </label>
-            );
-          })}
+                <span aria-hidden className="h-4 w-1 rounded-full bg-civic" />
+                {group.label}
+              </h2>
+              <div className={`grid gap-2 ${group.columns}`}>
+                {group.jurisdictions.map((jurisdiction) => {
+                  const checked = selectedJurisdictions.includes(jurisdiction.value);
+
+                  return (
+                    <label
+                      key={jurisdiction.value}
+                      className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold shadow-[0_1px_2px_rgba(23,23,23,0.04)] ring-1 transition ${
+                        checked
+                          ? "bg-civic/10 text-civic ring-civic/35"
+                          : "bg-white text-ink ring-black/[0.08] hover:bg-[#f8fbff] hover:ring-civic/25"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 shrink-0 accent-[#2457a6]"
+                        checked={checked}
+                        onChange={() => toggleJurisdiction(jurisdiction.value)}
+                      />
+                      <span>{jurisdiction.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </fieldset>
-
-      <div className="grid gap-5">
-        <button className="action-primary w-full" disabled={isSubmitting} type="submit">
-          {isSubmitting ? (
-            <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-          ) : (
-            <Send aria-hidden className="h-4 w-4" />
-          )}
-          {t(locale, "subscribe")}
-        </button>
-        <p className="border-t border-black/10 pt-5 text-sm font-medium leading-6 text-black/60">
-          {t(locale, "subscribeAlreadySubscribedHelp")}
-        </p>
-      </div>
 
       {message ? (
         <div
