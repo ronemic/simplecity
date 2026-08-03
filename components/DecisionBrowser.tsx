@@ -92,12 +92,12 @@ export function DecisionBrowser({
 
   return (
     <>
-      <div className="mb-4">
+      <div className="mb-5 grid gap-3">
         {resultsCoverage}
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>{resultFilter}</div>
-          <div className="flex shrink-0 justify-end">
-            <p aria-live="polite" className="count-badge gap-2 whitespace-nowrap">
+        <div className="grid gap-2.5 sm:flex sm:items-center sm:justify-between">
+          <div className="min-w-0">{resultFilter}</div>
+          <div className="flex min-w-0 sm:justify-end">
+            <p aria-live="polite" className="count-badge w-full justify-center gap-2 text-center sm:w-auto sm:whitespace-nowrap">
               {isPending ? (
                 <>
                   <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />

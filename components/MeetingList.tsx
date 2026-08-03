@@ -375,8 +375,8 @@ export function MeetingList({
 
   return (
     <div className="grid gap-6">
-      <div className="hidden md:flex justify-end">
-        <div className="segmented-control">
+      <div className="flex justify-end">
+        <div className="segmented-control w-full sm:w-auto">
           {(["calendar", "list"] as MeetingView[]).map((option) => {
             const selected = activeView === option;
 
@@ -388,6 +388,7 @@ export function MeetingList({
                 aria-current={selected ? "page" : undefined}
                 className={cn(
                   "segmented-button",
+                  "flex-1 justify-center sm:flex-none",
                   selected && "segmented-button-selected"
                 )}
               >
@@ -416,10 +417,10 @@ export function MeetingList({
           <div
             className={cn(
               "grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start",
-              activeView !== "calendar" && "md:hidden"
+              activeView !== "calendar" && "hidden"
             )}
           >
-            <section className="hidden quiet-card overflow-hidden md:block">
+            <section className="quiet-card overflow-hidden">
               <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
                 <div>
                   <p className="label-eyebrow text-civic">{t(locale, "monthView")}</p>
@@ -458,7 +459,7 @@ export function MeetingList({
               </div>
 
               <div className="overflow-x-auto">
-                <div className="min-w-[720px]">
+                <div className="min-w-[620px] sm:min-w-[720px]">
                   <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
                     {weekdayLabels.map((day) => (
                       <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
@@ -466,7 +467,7 @@ export function MeetingList({
                       </div>
                     ))}
                   </div>
-                  <div className="grid auto-rows-[minmax(150px,auto)] grid-cols-7 bg-[#edf2f5]">
+                  <div className="grid auto-rows-[minmax(120px,auto)] grid-cols-7 bg-[#edf2f5] sm:auto-rows-[minmax(150px,auto)]">
                     {monthDays.map((day) => {
                       const inMonth = day.startsWith(activeMonth);
                       const dayMeetings = inMonth ? meetingsByDate.get(day) || [] : [];
@@ -606,7 +607,7 @@ export function MeetingList({
           <section
             className={cn(
               "quiet-card overflow-hidden",
-              activeView !== "list" && "md:hidden"
+              activeView !== "list" && "hidden"
             )}
           >
             <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">

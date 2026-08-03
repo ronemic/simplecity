@@ -61,7 +61,7 @@ export function DecisionResultSelect({
         options={options}
         onValueChange={updateResult}
         prefix={locale === "es" ? "Filtrar por resultado" : "Filter by result"}
-        className="w-64 max-w-[82vw] sm:w-72"
+        className="w-full sm:w-72"
         compact
       />
     </div>
