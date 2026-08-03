@@ -135,7 +135,7 @@ function DecisionResultsCoverage({
     : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
 
   return (
-    <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-2.5 shadow-sm" aria-labelledby="decision-results-coverage">
+    <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-3 shadow-sm" aria-labelledby="decision-results-coverage">
       <div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -151,11 +151,11 @@ function DecisionResultsCoverage({
           </p>
         </div>
       </div>
-      <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+      <dl className="mt-3 grid gap-1 text-xs sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
         {jurisdictions.map((option) => (
-          <div key={option.slug} className="inline-flex min-w-0 items-baseline gap-1.5">
-            <dt className="font-bold text-black/60">{option.name}</dt>
-            <dd className="font-black text-civic">
+          <div key={option.slug} className="flex min-w-0 items-baseline gap-1.5">
+            <dt className="shrink-0 font-bold text-black/60">{option.name}</dt>
+            <dd className="min-w-0 font-black text-civic">
               {freshnessLabel(freshness, option.slug, locale)}
             </dd>
           </div>
