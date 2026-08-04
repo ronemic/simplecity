@@ -49,6 +49,7 @@ type TranslationKey =
   | "meetingTypeNotListed"
   | "meetings"
   | "meetingsDescription"
+  | "menu"
   | "monthView"
   | "next"
   | "noCardsInCategory"
@@ -162,6 +163,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     meetingTypeNotListed: "Meeting type not listed",
     meetings: "Meetings",
     meetingsDescription: "See every collected meeting by month, day, or list, with search.",
+    menu: "Menu",
     monthView: "Month view",
     next: "Next",
     noCardsInCategory: "No cards in this topic yet",
@@ -279,6 +281,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     meetingTypeNotListed: "Tipo de reunión no indicado",
     meetings: "Reuniones",
     meetingsDescription: "Consulta cada reunión recopilada por mes, día o lista, con búsqueda.",
+    menu: "Menú",
     monthView: "Vista mensual",
     next: "Siguiente",
     noCardsInCategory: "Aún no hay tarjetas en este tema",

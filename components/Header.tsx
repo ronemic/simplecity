@@ -18,20 +18,20 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f8fafb]/95 backdrop-blur-md">
-      <div className="section-shell flex min-h-[70px] flex-col items-stretch justify-between gap-3 py-3 md:flex-row md:items-center">
+      <div className="section-shell grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 md:flex md:min-h-[70px] md:justify-between md:py-3">
         <Link
           href="/"
-          className="flex items-center gap-3 text-[21px] font-black leading-none text-ink focus-visible:focus-ring"
+          className="flex items-center gap-2.5 text-lg font-black leading-none text-ink focus-visible:focus-ring lg:gap-3 lg:text-[21px]"
         >
           <Image
             src="/favicon.svg"
             alt=""
             width={36}
             height={36}
-            className="h-9 w-9 shrink-0 rounded-lg"
+            className="h-8 w-8 shrink-0 rounded-lg lg:h-9 lg:w-9"
             priority
           />
-          <span>SimpleCity</span>
+          <span className="md:hidden min-[980px]:inline">SimpleCity</span>
         </Link>
         <Suspense fallback={<HeaderNavFallback />}>
           <HeaderNav

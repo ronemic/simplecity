@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Languages, Loader2, MapPin } from "lucide-react";
+import { Check, ChevronDown, Languages, Loader2, MapPin, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -84,12 +84,14 @@ export function HeaderNav({
   );
   const [isJurisdictionMenuOpen, setIsJurisdictionMenuOpen] = useState(false);
   const [isLanguageMenuOpen, setIsLanguageMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [optimisticJurisdiction, setOptimisticJurisdiction] = useState(routeSelectedJurisdiction);
   const [selectedLocale, setSelectedLocale] = useState<Locale>(locale);
   const [isPending, startTransition] = useTransition();
   const [pendingSelector, setPendingSelector] = useState<"jurisdiction" | "language" | null>(null);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
   const languageMenuRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLElement>(null);
   const isJurisdictionPending = isPending && pendingSelector === "jurisdiction";
   const isLanguagePending = isPending && pendingSelector === "language";
   const selected = isJurisdictionPending ? optimisticJurisdiction : routeSelectedJurisdiction;
@@ -147,6 +149,34 @@ export function HeaderNav({
     };
   }, [isLanguageMenuOpen]);
 
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!mobileMenuRef.current?.contains(event.target as Node)) {
+        setIsMobileMenuOpen(false);
+        setIsJurisdictionMenuOpen(false);
+        setIsLanguageMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsMobileMenuOpen(false);
+        setIsJurisdictionMenuOpen(false);
+        setIsLanguageMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isMobileMenuOpen]);
+
   function hrefWithJurisdiction(href: string) {
     const params = new URLSearchParams();
     if (href === "/decisions" || href === "/meetings") {
@@ -173,6 +203,7 @@ export function HeaderNav({
 
   function changeJurisdiction(value: string) {
     setIsJurisdictionMenuOpen(false);
+    setIsMobileMenuOpen(false);
     setOptimisticJurisdiction(value);
     setStoredJurisdiction(value);
     setPendingSelector("jurisdiction");
@@ -189,6 +220,7 @@ export function HeaderNav({
 
   function changeLanguage(value: Locale) {
     setIsLanguageMenuOpen(false);
+    setIsMobileMenuOpen(false);
     setSelectedLocale(value);
     setPendingSelector("language");
     try {
@@ -205,10 +237,49 @@ export function HeaderNav({
 
   return (
     <nav
+      ref={mobileMenuRef}
       aria-label="Primary navigation"
-      className="grid w-full grid-cols-5 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
+      className="contents text-sm font-semibold text-ink md:ml-auto md:block"
     >
-      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:col-span-1 md:mr-2 md:w-48">
+      <button
+        aria-controls="mobile-primary-navigation"
+        aria-expanded={isMobileMenuOpen}
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 bg-white px-3 py-2 font-bold shadow-sm transition hover:border-civic/30 focus-visible:focus-ring md:hidden"
+        onClick={() => {
+          setIsMobileMenuOpen((isOpen) => !isOpen);
+          setIsJurisdictionMenuOpen(false);
+          setIsLanguageMenuOpen(false);
+        }}
+        type="button"
+      >
+        <span aria-hidden className="relative h-4 w-4 text-civic">
+          <Menu
+            className={`absolute inset-0 h-4 w-4 transition duration-200 ${
+              isMobileMenuOpen ? "rotate-90 scale-75 opacity-0" : "rotate-0 scale-100 opacity-100"
+            }`}
+          />
+          <X
+            className={`absolute inset-0 h-4 w-4 transition duration-200 ${
+              isMobileMenuOpen ? "rotate-0 scale-100 opacity-100" : "-rotate-90 scale-75 opacity-0"
+            }`}
+          />
+        </span>
+        {t(selectedLocale, "menu")}
+      </button>
+
+      <div
+        className={`${
+          isMobileMenuOpen
+            ? `visible mt-3 max-h-52 translate-y-0 opacity-100 ${
+                isJurisdictionMenuOpen || isLanguageMenuOpen
+                  ? "overflow-visible"
+                  : "overflow-hidden"
+              }`
+            : "pointer-events-none invisible mt-0 max-h-0 -translate-y-2 overflow-hidden opacity-0"
+        } col-span-2 grid min-h-0 w-full grid-cols-5 items-center gap-1 transition-[max-height,margin,opacity,transform,visibility] duration-200 ease-out md:pointer-events-auto md:visible md:mt-0 md:flex md:max-h-none md:w-auto md:translate-y-0 md:items-center md:justify-end md:gap-1 md:overflow-visible md:opacity-100`}
+        id="mobile-primary-navigation"
+      >
+      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2">
         <button
           type="button"
           aria-haspopup="listbox"
@@ -263,7 +334,7 @@ export function HeaderNav({
           </div>
         ) : null}
       </div>
-      <div ref={languageMenuRef} className="relative col-span-5 md:col-span-1 md:mr-2 md:w-36">
+      <div ref={languageMenuRef} className="relative col-span-5 md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-36 lg:mr-2">
         <button
           type="button"
           aria-haspopup="listbox"
@@ -322,7 +393,8 @@ export function HeaderNav({
             key={item.href}
             href={hrefWithJurisdiction(item.href)}
             aria-current={isActive ? "page" : undefined}
-            className={`relative inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center transition focus-visible:focus-ring md:px-3.5 ${
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
               isActive
                 ? "font-black text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
                 : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
@@ -332,6 +404,7 @@ export function HeaderNav({
           </Link>
         );
       })}
+      </div>
     </nav>
   );
 }
@@ -340,9 +413,14 @@ export function HeaderNavFallback() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="grid w-full grid-cols-5 items-center gap-1 text-sm font-semibold text-ink md:flex md:w-auto md:justify-end md:gap-1"
+      className="contents text-sm font-semibold text-ink md:ml-auto md:block"
     >
-      <label className="menu-trigger col-span-5 md:col-span-1 md:mr-2 md:w-48">
+      <span className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 bg-white px-3 py-2 font-bold shadow-sm md:hidden">
+        <Menu aria-hidden className="h-4 w-4 text-civic" />
+        Menu
+      </span>
+      <div className="hidden md:flex md:items-center md:justify-end">
+      <label className="menu-trigger md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2">
         <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
@@ -356,7 +434,7 @@ export function HeaderNavFallback() {
           ))}
         </select>
       </label>
-      <label className="menu-trigger col-span-5 md:col-span-1 md:mr-2 md:w-36">
+      <label className="menu-trigger md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-36 lg:mr-2">
         <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Language</span>
         <select
@@ -374,11 +452,12 @@ export function HeaderNavFallback() {
         <Link
           key={item.href}
           href={item.href}
-          className="inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring md:px-3.5"
+          className="inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5"
         >
           {t("en", item.labelKey)}
         </Link>
       ))}
+      </div>
     </nav>
   );
 }
