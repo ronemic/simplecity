@@ -62,7 +62,7 @@ export function SubscribeForm({
   function toggleJurisdiction(value: string) {
     setSelectedJurisdictions((current) => {
       if (current.includes(value)) {
-        return current.length === 1 ? current : current.filter((item) => item !== value);
+        return current.filter((item) => item !== value);
       }
 
       return [...current, value];
@@ -71,6 +71,8 @@ export function SubscribeForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (selectedJurisdictions.length === 0) return;
+
     const form = event.currentTarget;
     const formData = new FormData(form);
 
@@ -140,7 +142,7 @@ export function SubscribeForm({
           </div>
           <button
             className="action-primary min-w-44 shrink-0"
-            disabled={isSubmitting}
+            disabled={isSubmitting || selectedJurisdictions.length === 0}
             type="submit"
           >
             {isSubmitting ? (
