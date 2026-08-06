@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { HighlightedText } from "@/components/HighlightedText";
@@ -42,6 +42,15 @@ type MeetingCalendarProps = {
   view?: MeetingView;
   locale?: Locale;
 };
+
+const CALENDAR_AVAILABLE_HEIGHT = 248;
+const CALENDAR_CARD_GAP = 6;
+const CALENDAR_MORE_CONTROL_HEIGHT = 28;
+const CALENDAR_MIN_CARD_HEIGHT = 68;
+const CALENDAR_MAX_VISIBLE_MEETINGS = 3;
+const CALENDAR_DEFAULT_CHARS_PER_LINE = 22;
+const CALENDAR_LINE_HEIGHT = 16;
+const CALENDAR_CARD_FIXED_HEIGHT = 30;
 
 function writeMeetingViewPreference(view: MeetingView) {
   document.cookie = `${MEETING_VIEW_PREFERENCE_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
@@ -123,6 +132,125 @@ function calendarMeetingTone(status?: string | null) {
   }
 
   return "border-black/10 bg-white/90 text-ink hover:border-civic/25 hover:bg-[#f7fbff]";
+}
+
+function calendarMeetingTitle(meeting: MeetingRow, locale: Locale) {
+  return displayMeetingTitle(
+    meeting,
+    locale === "es" ? "Reunión no indicada" : "Meeting not listed",
+    locale
+  );
+}
+
+function calendarMeetingMinHeight(
+  meeting: MeetingRow,
+  locale: Locale,
+  columnWidth: number,
+  highlight: string
+) {
+  const charsPerLine = columnWidth
+    ? Math.max(12, Math.floor((columnWidth - 16) / 6.25))
+    : CALENDAR_DEFAULT_CHARS_PER_LINE;
+  const estimatedLines = Math.max(
+    1,
+    Math.ceil(calendarMeetingTitle(meeting, locale).length / charsPerLine)
+  );
+  const searchMatch = meetingSearchMatch(meeting, highlight, locale);
+  const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight, locale);
+  const extraSearchLine = searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? 1 : 0;
+
+  return Math.max(
+    CALENDAR_MIN_CARD_HEIGHT,
+    CALENDAR_CARD_FIXED_HEIGHT + (estimatedLines + extraSearchLine) * CALENDAR_LINE_HEIGHT
+  );
+}
+
+function buildCalendarDayLayout(
+  meetings: MeetingRow[],
+  locale: Locale,
+  columnWidth: number,
+  highlight: string
+) {
+  let visibleCount = 0;
+  let cardMinHeight = CALENDAR_MIN_CARD_HEIGHT;
+
+  for (const meeting of meetings.slice(0, CALENDAR_MAX_VISIBLE_MEETINGS)) {
+    const nextCount = visibleCount + 1;
+    const nextCardMinHeight = Math.max(
+      cardMinHeight,
+      calendarMeetingMinHeight(meeting, locale, columnWidth, highlight)
+    );
+    const hasOverflow = nextCount < meetings.length;
+    const requiredHeight =
+      nextCount * nextCardMinHeight +
+      (nextCount - 1) * CALENDAR_CARD_GAP +
+      (hasOverflow ? CALENDAR_MORE_CONTROL_HEIGHT : 0);
+
+    if (requiredHeight > CALENDAR_AVAILABLE_HEIGHT && visibleCount > 0) break;
+
+    visibleCount = nextCount;
+    cardMinHeight = nextCardMinHeight;
+  }
+
+  const visibleMeetings = meetings.slice(0, visibleCount);
+  const overflowCount = meetings.length - visibleCount;
+  const availableCardHeight =
+    CALENDAR_AVAILABLE_HEIGHT -
+    (visibleCount - 1) * CALENDAR_CARD_GAP -
+    (overflowCount > 0 ? CALENDAR_MORE_CONTROL_HEIGHT : 0);
+
+  return {
+    visibleMeetings,
+    overflowCount,
+    cardMinHeight:
+      visibleCount > 1
+        ? Math.max(cardMinHeight, Math.floor(availableCardHeight / visibleCount))
+        : cardMinHeight
+  };
+}
+
+function CalendarMeetingLink({
+  meeting,
+  highlight,
+  locale,
+  minHeight
+}: {
+  meeting: MeetingRow;
+  highlight: string;
+  locale: Locale;
+  minHeight?: number;
+}) {
+  const searchMatch = meetingSearchMatch(meeting, highlight, locale);
+  const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight, locale);
+
+  return (
+    <PendingLink
+      href={meetingHref(meeting)}
+      mode="overlay"
+      className={cn(
+        "pointer-events-auto relative z-20 block min-h-[68px] shrink-0 !overflow-visible rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
+        calendarMeetingTone(meeting.status)
+      )}
+      style={minHeight ? { minHeight: `${minHeight}px` } : undefined}
+      contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
+      pendingLabel={t(locale, "openingMeeting")}
+    >
+      <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
+        <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
+      </span>
+      <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
+        <HighlightedText
+          text={calendarMeetingTitle(meeting, locale)}
+          query={highlight}
+        />
+      </span>
+      {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
+        <span className="block w-full whitespace-normal break-words text-[10px] font-black leading-4 text-current">
+          <HighlightedText text={searchMatch.text} query={highlight} />
+        </span>
+      ) : null}
+    </PendingLink>
+  );
 }
 
 function MeetingLine({
@@ -212,6 +340,10 @@ export function MeetingList({
     const initialMonth = isValidMonthKey(month) ? month : todayKey.slice(0, 7);
     return firstDateInMonth(initialMonth, selectedDate, todayKey);
   });
+  const [openCalendarPopoverDate, setOpenCalendarPopoverDate] = useState<string | null>(null);
+  const [calendarColumnWidth, setCalendarColumnWidth] = useState(0);
+  const calendarPopoverRef = useRef<HTMLDivElement>(null);
+  const calendarGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -230,6 +362,50 @@ export function MeetingList({
       // Ignore storage failures and fall back to the server-rendered default.
     }
   }, []);
+
+  useEffect(() => {
+    if (!openCalendarPopoverDate) return;
+
+    function handlePopoverKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpenCalendarPopoverDate(null);
+      }
+    }
+
+    function handleOutsidePointerDown(event: PointerEvent) {
+      if (!calendarPopoverRef.current?.contains(event.target as Node)) {
+        setOpenCalendarPopoverDate(null);
+      }
+    }
+
+    document.addEventListener("keydown", handlePopoverKeyDown);
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    const focusFrame = window.requestAnimationFrame(() => {
+      calendarPopoverRef.current?.focus();
+    });
+
+    return () => {
+      document.removeEventListener("keydown", handlePopoverKeyDown);
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+      window.cancelAnimationFrame(focusFrame);
+    };
+  }, [openCalendarPopoverDate]);
+
+  useEffect(() => {
+    const grid = calendarGridRef.current;
+    if (!grid) return;
+
+    const updateColumnWidth = () => {
+      setCalendarColumnWidth(grid.getBoundingClientRect().width / 7);
+    };
+
+    updateColumnWidth();
+    const observer = new ResizeObserver(updateColumnWidth);
+    observer.observe(grid);
+
+    return () => observer.disconnect();
+  }, [activeMonth, activeView]);
 
   // Sync form input helper
   const syncFormInput = (name: string, value: string) => {
@@ -320,6 +496,7 @@ export function MeetingList({
 
   const handlePrevMonth = (e: React.MouseEvent) => {
     e.preventDefault();
+    setOpenCalendarPopoverDate(null);
     const newMonth = addMonths(activeMonth, -1);
     setActiveMonth(newMonth);
     const newDate = firstDateInMonth(newMonth, activeDate, todayKey);
@@ -329,6 +506,7 @@ export function MeetingList({
 
   const handleNextMonth = (e: React.MouseEvent) => {
     e.preventDefault();
+    setOpenCalendarPopoverDate(null);
     const newMonth = addMonths(activeMonth, 1);
     setActiveMonth(newMonth);
     const newDate = firstDateInMonth(newMonth, activeDate, todayKey);
@@ -338,6 +516,7 @@ export function MeetingList({
 
   const handleToday = (e: React.MouseEvent) => {
     e.preventDefault();
+    setOpenCalendarPopoverDate(null);
     const newMonth = todayKey.slice(0, 7);
     setActiveMonth(newMonth);
     setActiveDate(todayKey);
@@ -347,10 +526,15 @@ export function MeetingList({
   const handleDateClick = (e: React.MouseEvent, day: string) => {
     e.preventDefault();
     if (!day.startsWith(activeMonth)) return;
+    setOpenCalendarPopoverDate(null);
     const newMonth = day.slice(0, 7);
     setActiveMonth(newMonth);
     setActiveDate(day);
     updateUrlParams({ month: newMonth, date: day });
+  };
+
+  const toggleCalendarPopover = (day: string) => {
+    setOpenCalendarPopoverDate((current) => (current === day ? null : day));
   };
 
   const monthDays = buildMonthDays(activeMonth);
@@ -467,10 +651,20 @@ export function MeetingList({
                       </div>
                     ))}
                   </div>
-                  <div className="grid auto-rows-[minmax(120px,auto)] grid-cols-7 bg-[#edf2f5] sm:auto-rows-[minmax(150px,auto)]">
-                    {monthDays.map((day) => {
+                  <div
+                    ref={calendarGridRef}
+                    className="grid auto-rows-[300px] grid-cols-7 bg-[#edf2f5]"
+                  >
+                    {monthDays.map((day, dayIndex) => {
                       const inMonth = day.startsWith(activeMonth);
                       const dayMeetings = inMonth ? meetingsByDate.get(day) || [] : [];
+                      const isPopoverOpen = openCalendarPopoverDate === day;
+                      const calendarDayLayout = buildCalendarDayLayout(
+                        dayMeetings,
+                        locale,
+                        calendarColumnWidth,
+                        highlight
+                      );
                       const isSelected = inMonth && day === activeDate;
                       const isToday = inMonth && day === todayKey;
 
@@ -480,7 +674,8 @@ export function MeetingList({
                           className={cn(
                             "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2",
                             !inMonth && "bg-[#eef1f4] text-black/25",
-                            isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]"
+                            isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]",
+                            isPopoverOpen && "z-30"
                           )}
                         >
                           <button
@@ -503,59 +698,94 @@ export function MeetingList({
                             <span
                               className={cn(
                                 "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition",
-                                isSelected || isToday
+                                isSelected
                                   ? "bg-civic text-white"
-                                  : inMonth
-                                    ? "text-ink"
-                                    : "text-black/25"
+                                  : isToday
+                                    ? "bg-[#dce9ff] text-civic ring-1 ring-civic/20"
+                                    : inMonth
+                                      ? "text-ink"
+                                      : "text-black/25"
                               )}
                             >
                               {Number(day.slice(-2))}
                             </span>
                           </div>
-                          <div className="pointer-events-none relative z-10 mt-2 grid flex-1 content-start gap-1.5">
-                            {dayMeetings.map((meeting) => {
-                              const searchMatch = meetingSearchMatch(meeting, highlight, locale);
-                              const timeMatchIsVisible = searchMatchesMeetingTime(
-                                meeting,
-                                highlight,
-                                locale
-                              );
-
-                              return (
-                              <PendingLink
+                          <div className="pointer-events-none relative z-10 mt-2 flex min-h-0 flex-none flex-col gap-1.5 overflow-visible">
+                            {calendarDayLayout.visibleMeetings.map((meeting) => (
+                              <CalendarMeetingLink
                                 key={meeting.id}
-                                href={meetingHref(meeting)}
-                                mode="overlay"
-                                className={cn(
-                                  "pointer-events-auto relative z-20 block rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
-                                  calendarMeetingTone(meeting.status)
-                                )}
-                                contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
-                                pendingLabel={t(locale, "openingMeeting")}
-                              >
-                                <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
-                                  <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
-                                </span>
-                                <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
-                                  <HighlightedText
-                                    text={displayMeetingTitle(
-                                      meeting,
-                                      locale === "es" ? "Reunión no indicada" : "Meeting not listed",
-                                      locale
-                                    )}
-                                    query={highlight}
-                                  />
-                                </span>
-                                {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
-                                  <span className="block w-full whitespace-normal break-words text-[10px] font-black leading-4 text-current">
-                                    <HighlightedText text={searchMatch.text} query={highlight} />
-                                  </span>
-                                ) : null}
-                              </PendingLink>
-                              );
-                            })}
+                                meeting={meeting}
+                                highlight={highlight}
+                                locale={locale}
+                                minHeight={calendarDayLayout.cardMinHeight}
+                              />
+                            ))}
                           </div>
+                          {calendarDayLayout.overflowCount > 0 ? (
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                toggleCalendarPopover(day);
+                              }}
+                              aria-expanded={isPopoverOpen}
+                              aria-controls={`calendar-popover-${day}`}
+                              className="absolute bottom-2 left-2 z-20 rounded-md bg-white/90 px-2 py-1 text-left text-[10px] font-black leading-4 text-civic transition hover:bg-civic/[0.08] focus-visible:focus-ring"
+                              aria-label={
+                                locale === "es"
+                                  ? `Mostrar ${calendarDayLayout.overflowCount} reuniones más del ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
+                                  : `Show ${calendarDayLayout.overflowCount} more meetings on ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
+                              }
+                            >
+                              {locale === "es"
+                                ? `+${calendarDayLayout.overflowCount} más`
+                                : `+${calendarDayLayout.overflowCount} more`}
+                            </button>
+                          ) : null}
+                          {isPopoverOpen ? (
+                            <div
+                              id={`calendar-popover-${day}`}
+                              role="dialog"
+                              ref={calendarPopoverRef}
+                              tabIndex={-1}
+                              aria-label={formatDateKey(day, {
+                                weekday: "long",
+                                month: "long",
+                                day: "numeric"
+                              }, locale)}
+                              className={cn(
+                                "pointer-events-auto absolute z-40 w-[min(280px,calc(100vw-2rem))] rounded-lg border border-black/15 bg-white shadow-[0_12px_30px_rgba(23,23,23,0.18)]",
+                                dayIndex % 7 >= 5 ? "right-2" : "left-2",
+                                dayIndex >= 35 ? "bottom-2" : "top-10"
+                              )}
+                            >
+                              <div className="border-b border-black/10 px-3 py-2.5">
+                                <p className="text-sm font-black text-ink">
+                                  {formatDateKey(day, {
+                                    weekday: "long",
+                                    month: "short",
+                                    day: "numeric"
+                                  }, locale)}
+                                </p>
+                                <p className="mt-0.5 text-[10px] font-bold text-black/55">
+                                  {locale === "es"
+                                    ? `${dayMeetings.length} reuniones`
+                                    : `${dayMeetings.length} meetings`}
+                                </p>
+                              </div>
+                              <div className="grid max-h-[min(55vh,420px)] gap-1.5 overflow-y-auto p-2">
+                                {dayMeetings.map((meeting) => (
+                                  <CalendarMeetingLink
+                                    key={meeting.id}
+                                    meeting={meeting}
+                                    highlight={highlight}
+                                    locale={locale}
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       );
                     })}
