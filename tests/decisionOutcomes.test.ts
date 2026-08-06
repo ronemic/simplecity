@@ -17,6 +17,7 @@ import {
   validateDecisionOutcomeExplanation
 } from "@/lib/outcomes/generateDecisionOutcomeExplanations";
 import {
+  canReuseDecisionOutcomeExplanation,
   decisionOutcomeCoverageComplete,
   fallbackDecisionOutcomeSummary,
   keepUniqueOutcomeAssignments,
@@ -513,6 +514,38 @@ test("uses the card title for concise grounded copy when LLM explanation is unav
   assert.equal(
     fallbackDecisionOutcomeSummary("Continue the housing appeal", "No action taken"),
     "No action was taken on “Continue the housing appeal”."
+  );
+});
+
+test("reuses a stored decision explanation only when its official result source is unchanged", () => {
+  assert.equal(
+    canReuseDecisionOutcomeExplanation(
+      { source_hash: "same-source", summary: "The board approved the item." },
+      "same-source"
+    ),
+    true
+  );
+  assert.equal(
+    canReuseDecisionOutcomeExplanation(
+      { source_hash: "old-source", summary: "The board approved the item." },
+      "new-source"
+    ),
+    false
+  );
+  assert.equal(
+    canReuseDecisionOutcomeExplanation(
+      { source_hash: "same-source", summary: "   " },
+      "same-source"
+    ),
+    false
+  );
+  assert.equal(
+    canReuseDecisionOutcomeExplanation(
+      { source_hash: "same-source", summary: "The item passed." },
+      "same-source",
+      "The item passed."
+    ),
+    false
   );
 });
 

@@ -18,6 +18,15 @@ import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const OUTCOME_CARD_COLUMNS = "id,source_item_id,agenda_item,source_url,created_at";
 const LEGACY_OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
+const CACHED_OUTCOME_EXPLANATION_COLUMNS =
+  "summary_card_id,source_hash,summary,next_step";
+
+type CachedOutcomeExplanation = {
+  summary_card_id: string;
+  source_hash: string | null;
+  summary: string | null;
+  next_step: string | null;
+};
 
 export type DecisionOutcomeReconciliation = {
   cardsChecked: number;
@@ -200,6 +209,19 @@ function isMissingSourceItemIdColumn(error: { code?: string; message?: string } 
   return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
 }
 
+export function canReuseDecisionOutcomeExplanation(
+  existing: Pick<CachedOutcomeExplanation, "source_hash" | "summary"> | null | undefined,
+  sourceHash: string,
+  fallbackSummary?: string | null
+) {
+  const summary = existing?.summary?.trim();
+  return Boolean(
+    existing?.source_hash === sourceHash &&
+    summary &&
+    (!fallbackSummary || summary !== fallbackSummary.trim())
+  );
+}
+
 export async function reconcileDecisionOutcomesForMeeting(
   supabase: SupabaseClient,
   meetingId: string,
@@ -292,25 +314,81 @@ export async function reconcileDecisionOutcomesForMeeting(
       resultCardIds.delete(proposal.cardId);
     }
   }
-  let explanations = new Map<string, { summary: string; nextStep: string | null }>();
+  const explanations = new Map<string, { summary: string; nextStep: string | null }>();
   if (
     options.explainWithLlm &&
     resolved.selected.length > 0 &&
     hasDecisionOutcomeExplanationProvider()
   ) {
-    try {
-      explanations = await generateDecisionOutcomeExplanations(
-        resolved.selected.map((proposal) => ({
-          id: proposal.cardId,
-          title: proposal.cardTitle,
-          canonicalStatus: proposal.outcome.canonicalStatus,
-          canonicalHeadline: proposal.outcome.headline,
-          fallbackSummary: proposal.outcome.summary,
-          fallbackNextStep: proposal.outcome.nextStep,
-          sourceContext: proposal.outcome.sourceContext
-        })),
-        { log: options.log }
+    const selectedCardIds = resolved.selected.map((proposal) => proposal.cardId);
+    let cachedByCardId = new Map<string, CachedOutcomeExplanation>();
+
+    const cachedResult = await supabase
+      .from("decision_outcomes")
+      .select(CACHED_OUTCOME_EXPLANATION_COLUMNS)
+      .in("summary_card_id", selectedCardIds);
+
+    if (cachedResult.error) {
+      if (!isMissingOutcomeTable(cachedResult.error)) {
+        options.log?.(
+          `Could not inspect cached decision explanations; changed results will still be explained: ${cachedResult.error.message}`
+        );
+      }
+    } else {
+      cachedByCardId = new Map(
+        ((cachedResult.data || []) as CachedOutcomeExplanation[]).map((outcome) => [
+          outcome.summary_card_id,
+          outcome
+        ])
       );
+    }
+
+    const explanationTargets = resolved.selected.filter((proposal) => {
+      const cached = cachedByCardId.get(proposal.cardId);
+      const fallbackSummary = fallbackDecisionOutcomeSummary(
+        proposal.cardTitle,
+        proposal.outcome.headline,
+        proposal.outcome.vote
+      );
+      if (!canReuseDecisionOutcomeExplanation(
+        cached,
+        proposal.outcome.sourceHash,
+        fallbackSummary
+      )) {
+        return true;
+      }
+
+      explanations.set(proposal.cardId, {
+        summary: cached!.summary!.trim(),
+        nextStep: cached!.next_step
+      });
+      return false;
+    });
+
+    if (explanations.size > 0) {
+      options.log?.(
+        `Reused ${explanations.size} unchanged decision explanation(s) without an LLM request.`
+      );
+    }
+
+    try {
+      if (explanationTargets.length > 0) {
+        const generated = await generateDecisionOutcomeExplanations(
+          explanationTargets.map((proposal) => ({
+            id: proposal.cardId,
+            title: proposal.cardTitle,
+            canonicalStatus: proposal.outcome.canonicalStatus,
+            canonicalHeadline: proposal.outcome.headline,
+            fallbackSummary: proposal.outcome.summary,
+            fallbackNextStep: proposal.outcome.nextStep,
+            sourceContext: proposal.outcome.sourceContext
+          })),
+          { log: options.log }
+        );
+        for (const [cardId, explanation] of generated) {
+          explanations.set(cardId, explanation);
+        }
+      }
     } catch (error) {
       options.log?.(
         `Decision explanation generation failed; using grounded rule-based copy: ${
