@@ -52,6 +52,10 @@ function sourceCredentials(slug: JurisdictionSlug) {
       process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
       process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
     ],
+    "santa-barbara-county": [
+      process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL,
+      process.env.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+    ],
     "san-francisco": [
       process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,
       process.env.SAN_FRANCISCO_SUPABASE_SERVICE_ROLE_KEY
@@ -91,6 +95,10 @@ function destinationCredentials(region: RegionSlug) {
         process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_URL,
       process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY ||
         process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
+    ],
+    "santa-barbara": [
+      process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL,
+      process.env.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY
     ],
     "san-francisco": [
       process.env.NEXT_PUBLIC_SAN_FRANCISCO_SUPABASE_URL,

@@ -6,7 +6,7 @@ import type { LegistarItem, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResul
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
-import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import { filterMeetingsToWindow, getMeetingWindow } from "@/lib/utils/meetingWindow";
 import { mergeDiscoveredAgendaItemAttachments } from "@/lib/scraper/itemAttachments";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
@@ -31,6 +31,34 @@ export type ScrapeLegistarOptions = ScrapePortalOptions & {
   clickSeeMore?: boolean;
   limit?: number;
   maxItemsPerMeeting?: number;
+};
+
+type LegistarApiEvent = {
+  EventId: number;
+  EventBodyId: number;
+  EventBodyName: string;
+  EventDate: string;
+  EventTime: string | null;
+  EventLocation: string | null;
+  EventAgendaStatusName: string | null;
+  EventMinutesStatusName: string | null;
+  EventAgendaFile: string | null;
+  EventMinutesFile: string | null;
+  EventComment: string | null;
+  EventInSiteURL: string | null;
+};
+
+type LegistarApiEventItem = {
+  EventItemId: number;
+  EventItemAgendaNumber: string | null;
+  EventItemMatterFile: string | null;
+  EventItemMatterType: string | null;
+  EventItemTitle: string | null;
+  EventItemActionName: string | null;
+  EventItemActionText: string | null;
+  EventItemPassedFlagName: string | null;
+  EventItemMatterId: number | null;
+  EventItemMatterGuid: string | null;
 };
 
 export function shouldEnrichLegistarAgendaAttachments(
@@ -1421,9 +1449,240 @@ async function extractVisibleLegistarMeetings(
     }));
 }
 
+function formatLegistarApiDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!match) return value;
+  return `${Number(match[2])}/${Number(match[3])}/${match[1]}`;
+}
+
+async function fetchLegistarApiJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: { "User-Agent": "SimpleCity civic agenda scraper" },
+    signal: AbortSignal.timeout(30_000)
+  });
+  if (!response.ok) {
+    throw new Error(`Legistar API ${response.status} for ${url}`);
+  }
+  return (await response.json()) as T;
+}
+
+function legistarApiItemSourceUrl(
+  client: string,
+  item: LegistarApiEventItem,
+  meetingDetailsUrl: string
+) {
+  if (item.EventItemMatterId && item.EventItemMatterGuid) {
+    const url = new URL(`https://${client}.legistar.com/LegislationDetail.aspx`);
+    url.searchParams.set("ID", String(item.EventItemMatterId));
+    url.searchParams.set("GUID", item.EventItemMatterGuid);
+    return url.toString();
+  }
+  return `${meetingDetailsUrl}#event-item-${item.EventItemId}`;
+}
+
+async function downloadLegistarApiDocuments(
+  meetings: PrimeGovMeeting[],
+  options: Pick<ScrapeLegistarOptions, "documentOutputDir" | "monthsBack" | "shouldStop" | "log">
+) {
+  const docsDir = options.documentOutputDir || path.join(process.cwd(), "scraped-primegov");
+  const log = options.log || (() => undefined);
+  await fs.mkdir(docsDir, { recursive: true });
+
+  const queue = meetings
+    .flatMap((meeting) =>
+      selectLegistarDocumentsForDownload(meeting, options.monthsBack).map((doc) => ({
+        meeting,
+        doc
+      }))
+    )
+    .sort(
+      (left, right) =>
+        legistarDocumentDownloadPriority(left.doc) - legistarDocumentDownloadPriority(right.doc)
+    );
+
+  for (const { meeting, doc } of queue) {
+    if (options.shouldStop?.()) {
+      log("Stopping Legistar API document downloads because the pipeline deadline is near.");
+      return;
+    }
+
+    const filename = buildLegistarDocumentFilename(meeting, doc.type, doc.url);
+    try {
+      const response = await fetch(doc.url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
+          Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
+        },
+        signal: AbortSignal.timeout(60_000)
+      });
+      if (!response.ok) {
+        doc.localPath = null;
+        doc.downloadError = `HTTP ${response.status}`;
+        log(`Failed download ${doc.url}: ${response.status}`);
+        continue;
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.subarray(0, 5).toString() !== "%PDF-") {
+        doc.localPath = null;
+        doc.bytes = buffer.length;
+        doc.downloadError = "Downloaded file was not a PDF document.";
+        log(`Unsupported Legistar API document response: ${doc.url}`);
+        continue;
+      }
+
+      const filePath = path.join(docsDir, `${filename}.pdf`);
+      await fs.writeFile(filePath, buffer);
+      doc.localPath = filePath;
+      doc.bytes = buffer.length;
+      doc.downloadError = null;
+      log(`Downloaded: ${filePath}`);
+    } catch (error) {
+      doc.localPath = null;
+      doc.downloadError = error instanceof Error ? error.message : "Unknown download error";
+      log(`Download error for ${doc.url}: ${doc.downloadError}`);
+    }
+  }
+}
+
+export async function scrapeLegistarApiMeetings(
+  options: ScrapeLegistarOptions
+): Promise<ScrapePortalResult> {
+  const jurisdiction = options.jurisdiction;
+  const client = jurisdiction.legistarClient;
+  if (!client) throw new Error(`${jurisdiction.name} has no Legistar API client configured.`);
+  const log = options.log || (() => undefined);
+  const window = getMeetingWindow(options);
+  const start = new Date(window.start).toISOString().slice(0, 10);
+  const end = new Date(window.end).toISOString().slice(0, 10);
+  const filter = [
+    `EventDate ge datetime'${start}T00:00:00'`,
+    `EventDate lt datetime'${end}T00:00:00'`,
+    "EventBodyId eq 1"
+  ].join(" and ");
+  const eventsUrl = new URL(`https://webapi.legistar.com/v1/${client}/events`);
+  eventsUrl.searchParams.set("$filter", filter);
+  eventsUrl.searchParams.set("$orderby", "EventDate desc");
+  eventsUrl.searchParams.set("$top", "1000");
+
+  log(`Fetching ${jurisdiction.name} meetings from the official Legistar API.`);
+  let events = await fetchLegistarApiJson<LegistarApiEvent[]>(eventsUrl.toString());
+  if (typeof options.limit === "number" && options.limit > 0) {
+    events = events.slice(0, options.limit);
+  }
+
+  const now = Date.now();
+  const meetings = await mapLimit(events, 4, async (event): Promise<LegistarMeeting> => {
+    const itemsUrl = new URL(
+      `https://webapi.legistar.com/v1/${client}/events/${event.EventId}/eventitems`
+    );
+    itemsUrl.searchParams.set("$top", "1000");
+    const apiItems = await fetchLegistarApiJson<LegistarApiEventItem[]>(itemsUrl.toString());
+    const meetingDetailsUrl =
+      event.EventInSiteURL ||
+      `https://${client}.legistar.com/MeetingDetail.aspx?LEGID=${event.EventId}`;
+    const items: LegistarItem[] = apiItems.map((item) => {
+      const sourceUrl = legistarApiItemSourceUrl(client, item, meetingDetailsUrl);
+      return {
+        externalId: `legistar-event-item-${item.EventItemId}`,
+        fileNumber: item.EventItemMatterFile,
+        agendaNumber: item.EventItemAgendaNumber,
+        itemType: item.EventItemMatterType,
+        title: item.EventItemTitle,
+        action: item.EventItemActionName,
+        result: item.EventItemPassedFlagName,
+        sourceUrl,
+        rowText: cleanText(
+          [
+            item.EventItemAgendaNumber,
+            item.EventItemMatterFile,
+            item.EventItemTitle,
+            item.EventItemActionName,
+            item.EventItemActionText,
+            item.EventItemPassedFlagName
+          ]
+            .filter(Boolean)
+            .join(" | ")
+        )
+      };
+    });
+    const dateText = formatLegistarApiDate(event.EventDate);
+    const meetingIso = parseMeetingDate([dateText, event.EventTime].filter(Boolean).join(" "));
+    const cancelled = /\b(no meeting|cancelled|canceled)\b/i.test(event.EventComment || "");
+    const isPast = Boolean(meetingIso && new Date(meetingIso).getTime() < now);
+    const documents: LegistarDocument[] = [];
+    if (event.EventAgendaFile) {
+      documents.push({ type: "Agenda", label: "Agenda", url: event.EventAgendaFile });
+    }
+    if (event.EventMinutesFile) {
+      documents.push({ type: "Minutes", label: "Minutes", url: event.EventMinutesFile });
+    }
+    const bodyName = cleanText(event.EventBodyName || "Board of Supervisors");
+    const meeting: LegistarMeeting = {
+      externalId: `${jurisdiction.slug}:legistar-event:${event.EventId}`,
+      jurisdictionName: jurisdiction.name,
+      jurisdictionSlug: jurisdiction.slug,
+      platform: jurisdiction.platform,
+      section: isPast ? "Past Meetings" : "Upcoming Meetings",
+      title: bodyName,
+      bodyName,
+      meetingType: bodyName,
+      dateText,
+      timeText: event.EventTime,
+      location: event.EventLocation,
+      rowText: cleanText(
+        [bodyName, dateText, event.EventTime, event.EventLocation, event.EventComment].filter(Boolean).join(" | ")
+      ),
+      status: cancelled ? "Cancelled" : isPast ? "Past" : "Upcoming",
+      source: jurisdiction.sourceUrl,
+      sourceUrl: meetingDetailsUrl,
+      meetingDetailsUrl,
+      hasHtmlAgenda: false,
+      hasPdf: documents.length > 0,
+      documents,
+      items,
+      detailText: cleanText(
+        [
+          event.EventComment,
+          event.EventAgendaStatusName ? `Agenda status: ${event.EventAgendaStatusName}` : null,
+          event.EventMinutesStatusName ? `Minutes status: ${event.EventMinutesStatusName}` : null,
+          formatLegistarItems(items)
+        ]
+          .filter(Boolean)
+          .join("\n\n")
+      )
+    };
+    return meeting;
+  });
+
+  applyJurisdictionMetadata(meetings, jurisdiction);
+  if (options.downloadDocuments) {
+    log("Downloading Legistar API agenda and minutes documents.");
+    await downloadLegistarApiDocuments(meetings, options);
+  }
+
+  const upcomingCount = countByStatus(meetings, "Upcoming");
+  const pastCount = countByStatus(meetings, "Past");
+  const cancelledCount = countByStatus(meetings, "Cancelled");
+  log(
+    `Legistar API returned ${meetings.length} meetings and ${meetings.reduce((sum, meeting) => sum + (meeting.items?.length || 0), 0)} agenda items.`
+  );
+  return {
+    source: jurisdiction.sourceUrl,
+    scrapedAt: new Date().toISOString(),
+    totalMeetingCount: meetings.length,
+    currentAndUpcomingCount: upcomingCount,
+    archivedCount: pastCount + cancelledCount,
+    meetings
+  };
+}
+
 export async function scrapeLegistarMeetings(
   options: ScrapeLegistarOptions
 ): Promise<ScrapePortalResult> {
+  if (options.jurisdiction.legistarClient) {
+    return scrapeLegistarApiMeetings(options);
+  }
   const log = options.log || (() => undefined);
   const jurisdiction = options.jurisdiction;
   const portalUrl = options.portalUrl || jurisdiction.legistarUrl || jurisdiction.sourceUrl || DEFAULT_LEGISTAR_URL;

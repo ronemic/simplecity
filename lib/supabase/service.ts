@@ -3,6 +3,7 @@ import { getPublicSupabaseEnv, getServiceRoleKey } from "./env";
 import {
   MENLO_PARK_MISSING_SUPABASE_CONFIG_MESSAGE,
   SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
+  SANTA_BARBARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE,
   SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
@@ -32,6 +33,10 @@ export function createServiceSupabaseClient(slug?: JurisdictionSlug) {
 
     if (slug === "los-altos" || slug === "los-altos-hills") {
       throw new Error(SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE);
+    }
+
+    if (slug === "santa-barbara-county") {
+      throw new Error(SANTA_BARBARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE);
     }
 
     if (slug === "san-francisco") {

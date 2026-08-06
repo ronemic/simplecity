@@ -11,6 +11,7 @@ export type JurisdictionSlug =
   | "mountain-view"
   | "los-altos"
   | "los-altos-hills"
+  | "santa-barbara-county"
   | "san-francisco"
   | "menlo-park"
   | "east-palo-alto"
@@ -23,6 +24,7 @@ export type PublicJurisdictionSlug =
   | "mountain-view"
   | "los-altos"
   | "los-altos-hills"
+  | "santa-barbara-county"
   | "san-francisco"
   | "menlo-park"
   | "east-palo-alto"
@@ -36,7 +38,8 @@ export type RegionSlug =
   | "san-francisco"
   | "north-san-mateo"
   | "south-san-mateo"
-  | "santa-clara";
+  | "santa-clara"
+  | "santa-barbara";
 
 export type JurisdictionConfig = {
   name: string;
@@ -49,6 +52,7 @@ export type JurisdictionConfig = {
   primegovUrl?: string;
   iqm2Url?: string;
   legistarUrl?: string;
+  legistarClient?: string;
   officialSiteUrl?: string;
   meetingsUrl?: string;
   civicClerkUrl?: string;
@@ -76,6 +80,9 @@ const DEFAULT_MOUNTAIN_VIEW_LEGISTAR_URL =
 const DEFAULT_SAN_FRANCISCO_LEGISTAR_URL =
   process.env.SAN_FRANCISCO_LEGISTAR_URL ||
   "https://sfgov.legistar.com/Calendar.aspx";
+export const DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL =
+  process.env.SANTA_BARBARA_COUNTY_LEGISTAR_URL ||
+  "https://santabarbara.legistar.com/Calendar.aspx";
 const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
@@ -114,6 +121,12 @@ export const SOUTH_SAN_MATEO_REGION_MISSING_SUPABASE_CONFIG_MESSAGE = [
   "NEXT_PUBLIC_SOUTH_SAN_MATEO_SUPABASE_ANON_KEY, and",
   "SOUTH_SAN_MATEO_SUPABASE_SERVICE_ROLE_KEY."
 ].join("\n");
+export const SANTA_BARBARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE = [
+  "Santa Barbara region Supabase configuration is missing. Set",
+  "NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL,",
+  "NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY, and",
+  "SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY."
+].join("\n");
 
 const publicClients = new Map<JurisdictionSlug, SupabaseClient>();
 const serviceClients = new Map<JurisdictionSlug, SupabaseClient>();
@@ -126,6 +139,7 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "santa-clara-county",
   "los-altos",
   "los-altos-hills",
+  "santa-barbara-county",
   "san-francisco",
   "menlo-park",
   "east-palo-alto",
@@ -135,6 +149,7 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
 export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "All", slug: ALL_JURISDICTIONS_SLUG },
   { name: "San Francisco", slug: "san-francisco" },
+  { name: "Santa Barbara County", slug: "santa-barbara-county" },
   { name: "San Mateo County", slug: "san-mateo-county" },
   { name: "East Palo Alto", slug: "east-palo-alto", parentCountySlug: "san-mateo-county" },
   { name: "Foster City", slug: "foster-city", parentCountySlug: "san-mateo-county" },
@@ -170,6 +185,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "mountain-view") return "Mountain View";
   if (internalSlug === "los-altos") return "Los Altos";
   if (internalSlug === "los-altos-hills") return "Los Altos Hills";
+  if (internalSlug === "santa-barbara-county") return "Santa Barbara County";
   if (internalSlug === "san-francisco") return "San Francisco";
   if (internalSlug === "menlo-park") return "Menlo Park";
   if (internalSlug === "east-palo-alto") return "East Palo Alto";
@@ -213,6 +229,11 @@ export function getJurisdictions(): JurisdictionConfig[] {
       process.env.NEXT_PUBLIC_SANTA_CLARA_COUNTY_SUPABASE_ANON_KEY,
       process.env.SANTA_CLARA_COUNTY_SUPABASE_SERVICE_ROLE_KEY
     );
+  const santaBarbara = regionalCredentials(
+    process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY,
+    process.env.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+  );
 
   return [
     {
@@ -356,6 +377,20 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseServiceRoleKey: santaClara?.serviceRoleKey
     },
     {
+      name: "Santa Barbara County",
+      officialName: "County of Santa Barbara",
+      slug: "santa-barbara-county",
+      regionSlug: "santa-barbara",
+      platform: "legistar",
+      timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL,
+      legistarUrl: DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL,
+      legistarClient: "santabarbara",
+      supabaseUrl: santaBarbara?.url,
+      supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
       name: "San Francisco",
       officialName: "City and County of San Francisco",
       slug: "san-francisco",
@@ -452,6 +487,15 @@ export function usesRegionalSupabase(jurisdiction: JurisdictionConfig) {
       )
     );
   }
+  if (jurisdiction.regionSlug === "santa-barbara") {
+    return Boolean(
+      regionalCredentials(
+        process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY,
+        process.env.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+      )
+    );
+  }
   if (jurisdiction.regionSlug === "san-francisco") {
     return Boolean(
       regionalCredentials(
@@ -492,6 +536,7 @@ export function requireValidJurisdictionSlug(
     slug === "mountain-view" ||
     slug === "los-altos" ||
     slug === "los-altos-hills" ||
+    slug === "santa-barbara-county" ||
     slug === "san-francisco" ||
     slug === "menlo-park" ||
     slug === "east-palo-alto" ||
@@ -546,6 +591,10 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
 
   if (jurisdiction.slug === "los-altos" || jurisdiction.slug === "los-altos-hills") {
     return SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
+  }
+
+  if (jurisdiction.slug === "santa-barbara-county") {
+    return SANTA_BARBARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 
   if (jurisdiction.slug === "san-francisco") {

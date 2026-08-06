@@ -1,4 +1,6 @@
--- Complete SimpleCity schema bootstrap for a brand-new Supabase project.
+-- Complete SimpleCity schema bootstrap for the central/default Supabase project.
+-- It includes centralized email subscription and delivery tables. Content-only
+-- regional projects do not use those three email tables.
 -- Generated from every migration in chronological order.
 -- Run this entire file once in the Supabase SQL Editor.
 --
@@ -1531,6 +1533,17 @@ to service_role;
 
 insert into public.jurisdictions (slug, name, region_slug)
 values ('los-altos-hills', 'Los Altos Hills', 'santa-clara')
+on conflict (slug) do update
+set name = excluded.name,
+    region_slug = excluded.region_slug,
+    updated_at = now();
+
+-- -----------------------------------------------------------------------------
+-- Source: supabase/migrations/20260805000000_add_santa_barbara_county_jurisdiction.sql
+-- -----------------------------------------------------------------------------
+
+insert into public.jurisdictions (slug, name, region_slug)
+values ('santa-barbara-county', 'Santa Barbara County', 'santa-barbara')
 on conflict (slug) do update
 set name = excluded.name,
     region_slug = excluded.region_slug,

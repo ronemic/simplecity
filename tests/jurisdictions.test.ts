@@ -74,6 +74,24 @@ test("San Francisco is a valid Legistar jurisdiction", () => {
   );
 });
 
+test("Santa Barbara County is an API-backed Legistar jurisdiction", () => {
+  const jurisdiction = getJurisdictionBySlug("santa-barbara-county");
+
+  assert.equal(requireValidJurisdictionSlug("santa-barbara-county"), "santa-barbara-county");
+  assert.equal(jurisdiction?.name, "Santa Barbara County");
+  assert.equal(jurisdiction?.officialName, "County of Santa Barbara");
+  assert.equal(jurisdiction?.regionSlug, "santa-barbara");
+  assert.equal(jurisdiction?.platform, "legistar");
+  assert.equal(jurisdiction?.legistarClient, "santabarbara");
+  assert.equal(jurisdiction?.sourceUrl, "https://santabarbara.legistar.com/Calendar.aspx");
+  assert.ok(
+    getPublicJurisdictionOptions().some(
+      (option) =>
+        option.slug === "santa-barbara-county" && option.name === "Santa Barbara County"
+    )
+  );
+});
+
 test("Los Altos is a valid CivicClerk jurisdiction in the Santa Clara region", () => {
   const losAltos = getJurisdictionBySlug("los-altos");
 

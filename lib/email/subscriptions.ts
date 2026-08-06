@@ -85,6 +85,8 @@ export class EmailSubscriptionRateLimitError extends Error {
 }
 
 function subscriptionSupabase() {
+  // Subscriber identity and delivery history are centralized in the default
+  // database. Jurisdiction databases store civic content only.
   return getServiceSupabaseClientForJurisdiction(getDefaultJurisdiction().slug);
 }
 

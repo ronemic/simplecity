@@ -394,6 +394,11 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
     jurisdictionOptions.find((option) => option.value === "san-francisco")?.parentCountyValue,
     undefined
   );
+  assert.equal(
+    jurisdictionOptions.find((option) => option.value === "santa-barbara-county")
+      ?.parentCountyValue,
+    undefined
+  );
 });
 
 test("weekly digest subscriptions become due in the next calendar week", () => {
