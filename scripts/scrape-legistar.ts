@@ -11,6 +11,7 @@ import {
   getJurisdictionScrapedDir
 } from "@/lib/scraper/downloadDocuments";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
+import { scrapeSantaBarbaraCountyMeetings } from "@/lib/sources/santa-barbara-county";
 
 function getArgValue(name: string) {
   const prefix = `--${name}=`;
@@ -50,7 +51,7 @@ async function main() {
   const documentsDir = getJurisdictionDocumentsDir(jurisdiction.slug);
   await fs.mkdir(outputDir, { recursive: true });
 
-  const result = await scrapeLegistarMeetings({
+  const scrapeOptions = {
     jurisdiction,
     portalUrl: jurisdiction.legistarUrl || jurisdiction.sourceUrl,
     documentOutputDir: documentsDir,
@@ -62,12 +63,16 @@ async function main() {
     limit: parsePositiveInteger(getArgValue("limit")),
     maxItemsPerMeeting: parsePositiveInteger(getArgValue("max-items-per-meeting")),
     log: console.log
-  });
+  };
+  const result =
+    jurisdiction.slug === "santa-barbara-county"
+      ? await scrapeSantaBarbaraCountyMeetings(scrapeOptions)
+      : await scrapeLegistarMeetings(scrapeOptions);
 
   const outputJson = path.join(outputDir, "meetings.json");
   await fs.writeFile(outputJson, JSON.stringify(result, null, 2), "utf8");
 
-  console.log(`Saved ${result.totalMeetingCount} Legistar meetings to ${outputJson}`);
+  console.log(`Saved ${result.totalMeetingCount} meeting(s) to ${outputJson}`);
 }
 
 main().catch((error) => {

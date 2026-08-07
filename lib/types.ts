@@ -124,6 +124,7 @@ export type ScrapePortalResult = {
   currentAndUpcomingCount: number;
   archivedCount: number;
   meetings: PrimeGovMeeting[];
+  errors?: string[];
 };
 
 export type LlmReadyMeeting = PrimeGovMeeting & {

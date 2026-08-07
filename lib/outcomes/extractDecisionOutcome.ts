@@ -20,7 +20,7 @@ import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 export const DECISION_OUTCOME_JURISDICTIONS = new Set<string>(KNOWN_JURISDICTION_SLUGS);
 
 const OUTCOME_TERMS =
-  "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?";
+  "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|determined|reported|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?";
 const OUTCOME_TERM_PATTERN = new RegExp(`\\b(?:${OUTCOME_TERMS})\\b`, "i");
 const RESULT_PARAGRAPH_FRAGMENT = "(?:(?!\\n\\n)[\\s\\S])";
 const RESULT_MARKER_PATTERN = new RegExp(

@@ -28,6 +28,10 @@ import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
 import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
+import {
+  enrichSantaBarbaraPlanningCommissionItems,
+  scrapeSantaBarbaraCountyMeetings
+} from "@/lib/sources/santa-barbara-county";
 import { scrapeCivicClerkMeetings } from "@/lib/sources/civicclerk";
 import { scrapeAgendaOnlineMeetings } from "@/lib/sources/agenda-online";
 import {
@@ -300,7 +304,17 @@ export async function runSimpleCityPipeline(
             log
           })
           : jurisdiction.platform === "legistar"
-          ? await scrapeLegistarMeetings({
+          ? jurisdiction.slug === "santa-barbara-county"
+            ? await scrapeSantaBarbaraCountyMeetings({
+                ...options,
+                jurisdiction,
+                portalUrl: options.portalUrl || jurisdiction.legistarUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              })
+            : await scrapeLegistarMeetings({
               ...options,
               jurisdiction,
               portalUrl: options.portalUrl || jurisdiction.legistarUrl || jurisdiction.sourceUrl,
@@ -360,6 +374,10 @@ export async function runSimpleCityPipeline(
                 log
               });
     applyJurisdictionMetadata(scrapeResult.meetings, jurisdiction);
+    for (const scrapeError of scrapeResult.errors || []) {
+      errors.push(scrapeError);
+      log(scrapeError);
+    }
 
     meetingsFound = scrapeResult.totalMeetingCount;
     documentsDownloaded = scrapeResult.meetings
@@ -370,6 +388,11 @@ export async function runSimpleCityPipeline(
       log("Extracting PDF text.");
       const pdfNotes = await extractPdfTextForMeetings(scrapeResult.meetings);
       for (const note of pdfNotes) log(note);
+
+      if (jurisdiction.slug === "santa-barbara-county") {
+        const itemCount = enrichSantaBarbaraPlanningCommissionItems(scrapeResult.meetings);
+        log(`Parsed ${itemCount} Santa Barbara County Planning Commission agenda item(s).`);
+      }
 
       if (jurisdiction.slug === "menlo-park") {
         const enrichedCount = enrichMenloParkMeetingTimesFromAgendaText(scrapeResult.meetings);

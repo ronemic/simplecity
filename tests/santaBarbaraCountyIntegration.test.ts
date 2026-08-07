@@ -3,6 +3,14 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import { scrapeLegistarApiMeetings } from "@/lib/sources/legistar";
+import {
+  classifyPlanningCommissionDocument,
+  enrichSantaBarbaraPlanningCommissionItems,
+  parseBoxSharedFolderHtml,
+  parsePlanningCommissionFolder,
+  SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL,
+  SANTA_BARBARA_PLANNING_COMMISSION_URL
+} from "@/lib/sources/santa-barbara-county";
 
 const migration = readFileSync(
   new URL(
@@ -23,6 +31,11 @@ const nightlyWorkflow = readFileSync(
 const packageJson = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8")
 ) as { scripts: Record<string, string> };
+const pipeline = readFileSync(new URL("../lib/pipeline.ts", import.meta.url), "utf8");
+const standaloneScraper = readFileSync(
+  new URL("../scripts/scrape-legistar.ts", import.meta.url),
+  "utf8"
+);
 
 test("Santa Barbara County migration and complete bootstrap target its regional database", () => {
   for (const sql of [migration, bootstrap]) {
@@ -51,6 +64,114 @@ test("Santa Barbara County has scraper, pipeline, and scheduled workflow entry p
   assert.match(workflow, /--require-results-coverage/);
   assert.match(workflow, /NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL/);
   assert.doesNotMatch(nightlyWorkflow, /santa-barbara-county/);
+  assert.match(pipeline, /scrapeSantaBarbaraCountyMeetings/);
+  assert.match(standaloneScraper, /scrapeSantaBarbaraCountyMeetings/);
+});
+
+test("Santa Barbara County Planning Commission uses the official county and Box sources", () => {
+  assert.equal(
+    SANTA_BARBARA_PLANNING_COMMISSION_URL,
+    "https://www.countyofsb.org/pl-county-planning-commission"
+  );
+  assert.equal(
+    SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL,
+    "https://cosantabarbara.app.box.com/s/q97rv82305oyfnbdjhcyxrrdhu3dgkqy"
+  );
+});
+
+test("parses Box folder payloads and Planning Commission meeting statuses", () => {
+  const html = `<script>Box.postStreamData = ${JSON.stringify({
+    "/app-api/enduserapp/shared-folder": {
+      items: [
+        { type: "folder", id: 405882985896, name: "08-12-2026" },
+        { type: "folder", id: 402499139390, name: "07-29-2026 (Canceled)" },
+        { type: "file", id: 2302739682937, name: "Agenda.pdf", extension: "pdf" }
+      ],
+      pageCount: 2,
+      pageNumber: 1
+    }
+  })};</script>`;
+  const payload = parseBoxSharedFolderHtml(html);
+  assert.equal(payload.items.length, 3);
+  assert.equal(payload.pageCount, 2);
+
+  const scheduled = parsePlanningCommissionFolder(payload.items[0]);
+  const cancelled = parsePlanningCommissionFolder(payload.items[1]);
+  assert.equal(scheduled?.dateText, "8/12/2026");
+  assert.equal(scheduled?.cancelled, false);
+  assert.equal(cancelled?.dateText, "7/29/2026");
+  assert.equal(cancelled?.cancelled, true);
+  assert.equal(
+    parsePlanningCommissionFolder({
+      type: "folder",
+      id: 1,
+      name: "08-05-2026 (to be adjourned)"
+    })?.cancelled,
+    true
+  );
+  assert.equal(parsePlanningCommissionFolder(payload.items[2]), null);
+});
+
+test("classifies marked agendas as official Planning Commission result documents", () => {
+  assert.equal(classifyPlanningCommissionDocument("Agenda.pdf"), "Agenda");
+  assert.equal(classifyPlanningCommissionDocument("Marked Agenda.pdf"), "Minutes");
+  assert.equal(classifyPlanningCommissionDocument("06-03-26 Unapproved Minutes.pdf"), "Minutes");
+  assert.equal(
+    classifyPlanningCommissionDocument("Notice of Meeting Cancellation.pdf"),
+    "Notice of Cancellation"
+  );
+  assert.equal(
+    classifyPlanningCommissionDocument("Notice of Adjournment.pdf"),
+    "Notice of Cancellation"
+  );
+});
+
+test("parses Planning Commission agenda items and attaches marked-agenda results", () => {
+  const meeting = {
+    externalId: "santa-barbara-county:box-planning-commission:123",
+    jurisdictionName: "Santa Barbara County",
+    jurisdictionSlug: "santa-barbara-county",
+    platform: "official-site",
+    section: "Past Meetings",
+    title: "County Planning Commission",
+    bodyName: "County Planning Commission",
+    meetingType: "County Planning Commission",
+    dateText: "7/1/2026",
+    timeText: "9:00 AM",
+    location: null,
+    rowText: "County Planning Commission | 7/1/2026",
+    status: "Past" as const,
+    source: SANTA_BARBARA_PLANNING_COMMISSION_URL,
+    sourceUrl: SANTA_BARBARA_PLANNING_COMMISSION_URL,
+    sectionUrl: SANTA_BARBARA_PLANNING_COMMISSION_URL,
+    meetingDetailsUrl: SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL,
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda" as const,
+        label: "Agenda.pdf",
+        url: "https://example.test/agenda.pdf",
+        extractedText:
+          "STANDARD AGENDA:\n1. 26TRM-00001 Hope Villas Tract Map Santa Barbara\nHearing on the request for a tentative tract map.\n2. 26RZN-00004 Airport Land Use Compatibility Plan Amendments Countywide\nHearing on proposed amendments."
+      },
+      {
+        type: "Minutes" as const,
+        label: "Marked Agenda — 7/1/2026",
+        url: "https://example.test/marked-agenda.pdf",
+        extractedText:
+          "STANDARD AGENDA:\n1. 26TRM-00001 Hope Villas Tract Map Santa Barbara\nHearing on the request for a tentative tract map.\nACTION: Approved the project by taking these actions:\n1. Made the required findings.\n2. Approved the tract map.\nAmerikaner/Ford Vote: 4-0\n2. 26RZN-00004 Airport Land Use Compatibility Plan Amendments Countywide\nHearing on proposed amendments.\nACTION: Recommended that the Board of Supervisors approve the amendments.\nFord/Parke Vote: 3-1."
+      }
+    ],
+    detailText: null
+  };
+
+  assert.equal(enrichSantaBarbaraPlanningCommissionItems([meeting]), 2);
+  assert.equal(meeting.items?.[0].agendaNumber, "1");
+  assert.equal(meeting.items?.[0].fileNumber, "26TRM-00001");
+  assert.match(meeting.items?.[0].result || "", /Approved the project/);
+  assert.equal(meeting.items?.[0].sourceUrl, "https://example.test/marked-agenda.pdf");
+  assert.match(meeting.items?.[1].result || "", /Recommended.*approve the amendments/);
 });
 
 test("Legistar API maps stable item ids and official actions without Playwright", async () => {
