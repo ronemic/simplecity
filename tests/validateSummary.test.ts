@@ -320,6 +320,33 @@ test("grounds participation details against shared meeting-wide context", () => 
   assert.equal(result.cards.length, 1);
 });
 
+test("does not treat sentence punctuation after a grounded participation URL as part of the URL", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          howToAct: {
+            attend:
+              "Watch at https://www.countyofsb.org/1333/CSBTV-Livestream, or attend in person at 7:00 PM.",
+            email: "Not listed in the source document.",
+            submitComment: "Not listed in the source document."
+          }
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText: "Item 4 parks contract for $100.",
+      meetingWideParticipationText:
+        "Meeting starts at 7:00 PM. Watch at https://www.countyofsb.org/1333/CSBTV-Livestream."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
 test("grounds an address when PDF extraction splits adjacent address digits", () => {
   const result = validateSimpleCitySummary(
     {

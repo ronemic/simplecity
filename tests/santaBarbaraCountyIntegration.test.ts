@@ -36,6 +36,10 @@ const standaloneScraper = readFileSync(
   new URL("../scripts/scrape-legistar.ts", import.meta.url),
   "utf8"
 );
+const pipelineRunner = readFileSync(
+  new URL("../scripts/run-pipeline.ts", import.meta.url),
+  "utf8"
+);
 
 test("Santa Barbara County migration and complete bootstrap target its regional database", () => {
   for (const sql of [migration, bootstrap]) {
@@ -66,6 +70,8 @@ test("Santa Barbara County has scraper, pipeline, and scheduled workflow entry p
   assert.doesNotMatch(nightlyWorkflow, /santa-barbara-county/);
   assert.match(pipeline, /scrapeSantaBarbaraCountyMeetings/);
   assert.match(standaloneScraper, /scrapeSantaBarbaraCountyMeetings/);
+  assert.match(pipelineRunner, /Summary coverage incomplete/);
+  assert.match(pipelineRunner, /LLM failed for/);
 });
 
 test("Santa Barbara County Planning Commission uses the official county and Box sources", () => {
@@ -160,18 +166,23 @@ test("parses Planning Commission agenda items and attaches marked-agenda results
         label: "Marked Agenda — 7/1/2026",
         url: "https://example.test/marked-agenda.pdf",
         extractedText:
-          "STANDARD AGENDA:\n1. 26TRM-00001 Hope Villas Tract Map Santa Barbara\nHearing on the request for a tentative tract map.\nACTION: Approved the project by taking these actions:\n1. Made the required findings.\n2. Approved the tract map.\nAmerikaner/Ford Vote: 4-0\n2. 26RZN-00004 Airport Land Use Compatibility Plan Amendments Countywide\nHearing on proposed amendments.\nACTION: Recommended that the Board of Supervisors approve the amendments.\nFord/Parke Vote: 3-1."
+          "STANDARD AGENDA:\n1. 26TRM-00001 Hope Villas Tract Map Santa Barbara\nHearing on the request for a tentative tract map.\nACTION: Motion to accept a late submittal into the record.\nFord/Amerikaner Vote: 2-2; motion fails.\nACTION: Approved the project by taking these actions:\n1. Made the required findings.\n2. Approved the tract map.\nAmerikaner/Ford Vote: 4-0\n2. 26RZN-00004 Airport Land Use Compatibility Plan Amendments Countywide\nHearing on proposed amendments.\nACTION: Recommended that the Board approve the Airport Land Use Compatibility Plan amendments.\nAmerikaner/Ford Vote: 4-0.\nACTION: Recommended that the Board approve the Minor Coastal Land Use Plan oil and gas amendment.\nFord/Parke Vote: 3-1."
       }
     ],
     detailText: null
   };
 
-  assert.equal(enrichSantaBarbaraPlanningCommissionItems([meeting]), 2);
+  assert.equal(enrichSantaBarbaraPlanningCommissionItems([meeting]), 3);
   assert.equal(meeting.items?.[0].agendaNumber, "1");
   assert.equal(meeting.items?.[0].fileNumber, "26TRM-00001");
   assert.match(meeting.items?.[0].result || "", /Approved the project/);
   assert.equal(meeting.items?.[0].sourceUrl, "https://example.test/marked-agenda.pdf");
-  assert.match(meeting.items?.[1].result || "", /Recommended.*approve the amendments/);
+  assert.equal(meeting.items?.[1].title, "Airport Land Use Compatibility Plan amendments");
+  assert.equal(meeting.items?.[1].agendaNumber, "2A");
+  assert.match(meeting.items?.[1].result || "", /Vote: 4-0/);
+  assert.equal(meeting.items?.[2].title, "Minor Coastal Land Use Plan oil and gas amendment");
+  assert.equal(meeting.items?.[2].agendaNumber, "2B");
+  assert.match(meeting.items?.[2].result || "", /Vote: 3-1/);
 });
 
 test("Legistar API maps stable item ids and official actions without Playwright", async () => {

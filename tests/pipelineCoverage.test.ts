@@ -101,8 +101,10 @@ test("minutes coverage reports download and extraction failures without double-c
   ]);
 });
 
-test("unchanged source hashes suppress repeated zero-card summary attempts", () => {
+test("unchanged source hashes retry structured meetings whose prior summary produced zero cards", () => {
   assert.equal(shouldSkipUnchangedSummary("same-hash", "same-hash"), true);
+  assert.equal(shouldSkipUnchangedSummary("same-hash", "same-hash", 0, 2), false);
+  assert.equal(shouldSkipUnchangedSummary("same-hash", "same-hash", 0, 0), true);
   assert.equal(shouldSkipUnchangedSummary("new-hash", "old-hash"), false);
   assert.equal(shouldSkipUnchangedSummary(null, null), false);
 });

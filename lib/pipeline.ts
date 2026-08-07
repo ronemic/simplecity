@@ -189,9 +189,15 @@ export function shouldReconcileMinutesWithoutGeneratingCards(
 
 export function shouldSkipUnchangedSummary(
   sourceHash: string | null,
-  summarizedSourceHash: string | null
+  summarizedSourceHash: string | null,
+  existingCardCount = 1,
+  agendaItemCount = 0
 ) {
-  return Boolean(sourceHash && summarizedSourceHash === sourceHash);
+  return Boolean(
+    sourceHash &&
+      summarizedSourceHash === sourceHash &&
+      (existingCardCount > 0 || agendaItemCount === 0)
+  );
 }
 
 export async function runSimpleCityPipeline(
@@ -497,7 +503,14 @@ export async function runSimpleCityPipeline(
               continue;
             }
 
-            if (shouldSkipUnchangedSummary(item.sourceHash, item.summarizedSourceHash)) {
+            if (
+              shouldSkipUnchangedSummary(
+                item.sourceHash,
+                item.summarizedSourceHash,
+                item.existingCardCount,
+                item.meeting.items?.length || 0
+              )
+            ) {
               log(
                 item.existingCardCount > 0
                   ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.`
@@ -507,6 +520,14 @@ export async function runSimpleCityPipeline(
             }
 
             const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
+            if ((item.meeting.items?.length || 0) > 0 && summary.cards.length === 0) {
+              const message =
+                `Summary coverage incomplete for ${item.meeting.title} ${item.meeting.dateText || ""}: ` +
+                `the model produced zero cards for ${item.meeting.items?.length || 0} official agenda item(s).`;
+              errors.push(message);
+              log(message);
+              continue;
+            }
             if (persistSummaries && supabase && item.id) {
               const inserted = shouldAppendToExisting
                 ? await appendSummaryCardsForMeeting(
@@ -546,7 +567,7 @@ export async function runSimpleCityPipeline(
             consecutiveRateLimitFailures = 0;
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown LLM error";
-            errors.push(`${item.meeting.title}: ${message}`);
+            errors.push(`LLM failed for ${item.meeting.title}: ${message}`);
             log(`LLM failed for ${item.meeting.title}: ${message}`);
 
             if (isLlmRateLimitError(error)) {

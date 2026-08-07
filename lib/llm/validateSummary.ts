@@ -286,7 +286,11 @@ function extractGroundableValues(text: string) {
               other.value.length > match.value.length
           )
       )
-      .map((match) => match.value)
+      .map((match) =>
+        /^https?:\/\//i.test(match.value)
+          ? match.value.replace(/[.,;:!?]+$/, "")
+          : match.value
+      )
   );
 }
 

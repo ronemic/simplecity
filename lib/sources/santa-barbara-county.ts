@@ -202,36 +202,61 @@ function planningCommissionAgendaItems(
     );
   });
 
-  return starts.map((match, index) => {
+  return starts.flatMap((match, index) => {
     const start = match.index || 0;
     const end = starts[index + 1]?.index ?? standardAgenda.length;
     const block = standardAgenda.slice(start, end).trim();
     const actionStarts = Array.from(block.matchAll(/(?:^|\n)\s*ACTION:\s*/g));
-    const lastAction = actionStarts.at(-1);
-    const result = lastAction
-      ? cleanText(block.slice((lastAction.index || 0) + lastAction[0].length)).slice(0, 6000)
-      : null;
+    const actionResults = actionStarts
+      .map((action, actionIndex) => {
+        const actionStart = (action.index || 0) + action[0].length;
+        const actionEnd = actionStarts[actionIndex + 1]?.index ?? block.length;
+        const raw = block
+          .slice(actionStart, actionEnd)
+          .replace(/\n\s*(?:\d{2}[A-Z]{2,6}-\d{5}\s*\n){2,}[\s\S]*$/i, "")
+          .replace(/\n\s*_{5,}[\s\S]*$/, "");
+        return cleanText(raw).slice(0, 6000);
+      })
+      .filter(Boolean);
+    const substantiveActions = actionResults.filter(
+      (result) => !/\b(?:accept|admit).*\blate submittal\b/i.test(result)
+    );
+    const results = substantiveActions.length > 0 ? substantiveActions : actionResults;
     const agendaNumber = match[1];
     const title = cleanText(match[2]);
     const fileNumber = block.match(/\b\d{2}[A-Z]{2,6}-\d{5}\b/)?.[0] || null;
 
-    return {
-      externalId: `${meeting.externalId}:agenda-item:${agendaNumber}`,
-      fileNumber,
-      agendaNumber,
+    const actionTitle = (result: string) => {
+      const subjects = Array.from(
+        result.matchAll(
+          /\b(?:approve|adopt|deny|reject|continue|receive)s?\s+(?:the\s+)?([^.;]{4,300}?)(?=\s+by\s+(?:adopt|approv|deny|reject|continu)|\s+Vote\s*:|[.;]|$)/gi
+        )
+      );
+      const subject = subjects.at(-1)?.[1];
+      return subject ? cleanText(subject).slice(0, 800) : title;
+    };
+    const itemResults = results.length > 0 ? results : [null];
+
+    return itemResults.map((result, resultIndex) => ({
+      externalId: `${meeting.externalId}:agenda-item:${agendaNumber}${itemResults.length > 1 ? `:action:${resultIndex + 1}` : ""}`,
+      fileNumber: result?.match(/\b\d{2}[A-Z]{2,6}-\d{5}\b/)?.[0] || fileNumber,
+      agendaNumber:
+        itemResults.length > 1
+          ? `${agendaNumber}${String.fromCharCode(65 + resultIndex)}`
+          : agendaNumber,
       itemType: null,
-      title,
+      title: result && itemResults.length > 1 ? actionTitle(result) : title,
       action: result,
       result,
       sourceUrl,
-      rowText: cleanText(block).slice(0, 12_000),
+      rowText: result || cleanText(block).slice(0, 12_000),
       status: meeting.status,
       meetingBody: meeting.bodyName || meeting.meetingType || meeting.title,
       onAgenda: null,
       recommendedAction: null,
       legislationText: null,
       attachments: []
-    };
+    }));
   });
 }
 
@@ -263,18 +288,35 @@ export function enrichSantaBarbaraPlanningCommissionItems(meetings: PrimeGovMeet
     const resultItems = resultDocument?.extractedText
       ? planningCommissionAgendaItems(resultDocument.extractedText, meeting, resultDocument.url)
       : [];
-    const resultByNumber = new Map(resultItems.map((item) => [item.agendaNumber, item]));
-    meeting.items = baseItems.map((item) => {
-      const officialResult = resultByNumber.get(item.agendaNumber);
-      return officialResult?.result
-        ? {
-            ...item,
-            action: officialResult.action,
-            result: officialResult.result,
-            sourceUrl: officialResult.sourceUrl,
-            rowText: officialResult.rowText
-          }
-        : item;
+    const resultsByNumber = new Map<string | null, AgendaItem[]>();
+    for (const resultItem of resultItems) {
+      const baseAgendaNumber = resultItem.agendaNumber?.replace(/[A-Z]+$/i, "") || null;
+      const existing = resultsByNumber.get(baseAgendaNumber) || [];
+      existing.push(resultItem);
+      resultsByNumber.set(baseAgendaNumber, existing);
+    }
+    meeting.items = baseItems.flatMap((item) => {
+      const officialResults = resultsByNumber.get(item.agendaNumber) || [];
+      if (officialResults.length === 0) return [item];
+      return officialResults.map((officialResult) => ({
+        ...item,
+        externalId: officialResult.externalId,
+        fileNumber: officialResult.fileNumber || item.fileNumber,
+        agendaNumber: officialResult.agendaNumber,
+        title: officialResult.title || item.title,
+        action: officialResult.action,
+        result: officialResult.result,
+        sourceUrl: officialResult.sourceUrl,
+        rowText: cleanText(
+          [
+            officialResults.length === 1 ? item.rowText : officialResult.title,
+            "Official marked-agenda result:",
+            officialResult.result
+          ]
+            .filter(Boolean)
+            .join("\n")
+        ).slice(0, 12_000)
+      }));
     });
     enriched += meeting.items.length;
   }
