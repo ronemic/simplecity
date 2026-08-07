@@ -646,6 +646,33 @@ function requirePublicConfig(jurisdiction: JurisdictionConfig) {
   };
 }
 
+function jwtRole(key: string) {
+  const payload = key.split(".")[1];
+  if (!payload) return null;
+
+  try {
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+    const parsed = JSON.parse(globalThis.atob(padded)) as { role?: unknown };
+    return typeof parsed.role === "string" ? parsed.role : null;
+  } catch {
+    return null;
+  }
+}
+
+export function assertValidServiceRoleCredential(
+  jurisdictionName: string,
+  anonKey: string,
+  serviceRoleKey: string
+) {
+  const role = jwtRole(serviceRoleKey);
+  if (serviceRoleKey === anonKey || role === "anon" || role === "authenticated") {
+    throw new Error(
+      `${jurisdictionName} service-role credential is invalid: it is an anon/authenticated key. Configure the Supabase service_role key (or an sb_secret_ key), not the anon key.`
+    );
+  }
+}
+
 function requireServiceConfig(jurisdiction: JurisdictionConfig) {
   if (
     !jurisdiction.supabaseUrl ||
@@ -654,6 +681,12 @@ function requireServiceConfig(jurisdiction: JurisdictionConfig) {
   ) {
     throw new Error(missingConfigMessage(jurisdiction, "service"));
   }
+
+  assertValidServiceRoleCredential(
+    jurisdiction.name,
+    jurisdiction.supabaseAnonKey,
+    jurisdiction.supabaseServiceRoleKey
+  );
 
   return {
     url: jurisdiction.supabaseUrl,

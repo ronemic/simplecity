@@ -257,6 +257,7 @@ export async function runSimpleCityPipeline(
   let cardsGenerated = 0;
   const generatedSummaries: PipelineResult["generatedSummaries"] = [];
   let persistSummaries = canPersist;
+  let persistenceFailed = false;
 
   if (persist && !supabase) {
     errors.push("Supabase service environment is not configured; persistence was skipped.");
@@ -438,6 +439,7 @@ export async function runSimpleCityPipeline(
         log(`Persistence failed; continuing without database writes: ${message}`);
         upserted = [];
         persistSummaries = false;
+        persistenceFailed = true;
       }
     } else {
       log("Skipping Supabase persistence.");
@@ -633,7 +635,11 @@ export async function runSimpleCityPipeline(
       }
     }
 
-    const status = errors.length > 0 ? "success_with_errors" : "success";
+    const status = persistenceFailed
+      ? "failed"
+      : errors.length > 0
+        ? "success_with_errors"
+        : "success";
     log(`Pipeline finished with status ${status}.`);
 
     if (canPersist && supabase && runId) {

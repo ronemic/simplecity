@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  assertValidServiceRoleCredential,
   getDefaultJurisdiction,
   getJurisdictionBySlug,
   getPublicJurisdictionOptions,
@@ -12,12 +13,48 @@ import {
   toPublicJurisdictionSlug
 } from "../lib/config/jurisdictions";
 
+function testJwt(role: string) {
+  const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  return `${encode({ alg: "HS256", typ: "JWT" })}.${encode({ role })}.signature`;
+}
+
 test("the first-time jurisdiction defaults to San Mateo in data and navigation", () => {
   const defaultJurisdiction = getDefaultJurisdiction();
 
   assert.equal(defaultJurisdiction.slug, "san-mateo-city");
   assert.equal(normalizeJurisdictionSelection(undefined), "san-mateo-city");
   assert.equal(toPublicJurisdictionSlug(defaultJurisdiction.slug), "san-mateo");
+});
+
+test("rejects an anon key configured as a pipeline service-role credential", () => {
+  const anonKey = testJwt("anon");
+  assert.throws(
+    () => assertValidServiceRoleCredential("Santa Barbara County", anonKey, anonKey),
+    /service-role credential is invalid.*anon\/authenticated key/i
+  );
+  assert.throws(
+    () =>
+      assertValidServiceRoleCredential(
+        "Santa Barbara County",
+        testJwt("anon"),
+        testJwt("authenticated")
+      ),
+    /service-role credential is invalid/i
+  );
+  assert.doesNotThrow(() =>
+    assertValidServiceRoleCredential(
+      "Santa Barbara County",
+      testJwt("anon"),
+      testJwt("service_role")
+    )
+  );
+  assert.doesNotThrow(() =>
+    assertValidServiceRoleCredential(
+      "Santa Barbara County",
+      testJwt("anon"),
+      "sb_secret_example"
+    )
+  );
 });
 
 test("groups alphabetized cities beneath their clickable counties", () => {
