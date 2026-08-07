@@ -139,17 +139,16 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "santa-clara-county",
   "los-altos",
   "los-altos-hills",
-  "santa-barbara-county",
   "san-francisco",
   "menlo-park",
   "east-palo-alto",
-  "redwood-city"
+  "redwood-city",
+  "santa-barbara-county"
 ];
 
 export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "All", slug: ALL_JURISDICTIONS_SLUG },
   { name: "San Francisco", slug: "san-francisco" },
-  { name: "Santa Barbara County", slug: "santa-barbara-county" },
   { name: "San Mateo County", slug: "san-mateo-county" },
   { name: "East Palo Alto", slug: "east-palo-alto", parentCountySlug: "san-mateo-county" },
   { name: "Foster City", slug: "foster-city", parentCountySlug: "san-mateo-county" },
@@ -159,7 +158,8 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "Santa Clara County", slug: "santa-clara-county" },
   { name: "Los Altos", slug: "los-altos", parentCountySlug: "santa-clara-county" },
   { name: "Los Altos Hills", slug: "los-altos-hills", parentCountySlug: "santa-clara-county" },
-  { name: "Mountain View", slug: "mountain-view", parentCountySlug: "santa-clara-county" }
+  { name: "Mountain View", slug: "mountain-view", parentCountySlug: "santa-clara-county" },
+  { name: "Santa Barbara County", slug: "santa-barbara-county" }
 ];
 
 export function toInternalJurisdictionSlug(
@@ -377,20 +377,6 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseServiceRoleKey: santaClara?.serviceRoleKey
     },
     {
-      name: "Santa Barbara County",
-      officialName: "County of Santa Barbara",
-      slug: "santa-barbara-county",
-      regionSlug: "santa-barbara",
-      platform: "legistar",
-      timezone: "America/Los_Angeles",
-      sourceUrl: DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL,
-      legistarUrl: DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL,
-      legistarClient: "santabarbara",
-      supabaseUrl: santaBarbara?.url,
-      supabaseAnonKey: santaBarbara?.anonKey,
-      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
-    },
-    {
       name: "San Francisco",
       officialName: "City and County of San Francisco",
       slug: "san-francisco",
@@ -450,6 +436,20 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseUrl: southSanMateo?.url,
       supabaseAnonKey: southSanMateo?.anonKey,
       supabaseServiceRoleKey: southSanMateo?.serviceRoleKey
+    },
+    {
+      name: "Santa Barbara County",
+      officialName: "County of Santa Barbara",
+      slug: "santa-barbara-county",
+      regionSlug: "santa-barbara",
+      platform: "legistar",
+      timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL,
+      legistarUrl: DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL,
+      legistarClient: "santabarbara",
+      supabaseUrl: santaBarbara?.url,
+      supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
     }
   ];
 }

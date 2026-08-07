@@ -90,6 +90,7 @@ test("Santa Barbara County is an API-backed Legistar jurisdiction", () => {
         option.slug === "santa-barbara-county" && option.name === "Santa Barbara County"
     )
   );
+  assert.equal(getPublicJurisdictionOptions().at(-1)?.slug, "santa-barbara-county");
 });
 
 test("Los Altos is a valid CivicClerk jurisdiction in the Santa Clara region", () => {

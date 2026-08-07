@@ -399,6 +399,7 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
       ?.parentCountyValue,
     undefined
   );
+  assert.equal(jurisdictionOptions.at(-1)?.value, "santa-barbara-county");
 });
 
 test("weekly digest subscriptions become due in the next calendar week", () => {
