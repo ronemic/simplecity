@@ -232,6 +232,46 @@ export default async function MeetingDetailPage({
         sameAs: meeting.source_url || undefined
       }
     : null;
+  const renderMeetingNavigation = (className: string) => (
+    <nav
+      aria-label={locale === "es" ? "Navegación entre reuniones" : "Meeting navigation"}
+      className={className}
+    >
+      {olderMeeting ? (
+        <Link
+          href={meetingHref(olderMeeting.id, publicJurisdiction)}
+          aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting, meetingTitleFallback, locale)}`}
+          title={displayMeetingTitle(olderMeeting, meetingTitleFallback, locale)}
+          className="action-secondary-sm group"
+        >
+          <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-ink" />
+          <span>{locale === "es" ? "Anterior" : "Previous"}</span>
+        </Link>
+      ) : (
+        <div aria-disabled="true" className="action-disabled-sm">
+          <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
+          <span>{locale === "es" ? "Anterior" : "Previous"}</span>
+        </div>
+      )}
+
+      {newerMeeting ? (
+        <Link
+          href={meetingHref(newerMeeting.id, publicJurisdiction)}
+          aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting, meetingTitleFallback, locale)}`}
+          title={displayMeetingTitle(newerMeeting, meetingTitleFallback, locale)}
+          className="action-secondary-sm group"
+        >
+          <span>{locale === "es" ? "Siguiente" : "Next"}</span>
+          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-ink" />
+        </Link>
+      ) : (
+        <div aria-disabled="true" className="action-disabled-sm">
+          <span>{locale === "es" ? "Siguiente" : "Next"}</span>
+          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
+        </div>
+      )}
+    </nav>
+  );
 
   return (
     <div className="section-shell py-10">
@@ -241,65 +281,26 @@ export default async function MeetingDetailPage({
           dangerouslySetInnerHTML={{ __html: serializeJsonLd(eventJsonLd) }}
         />
       ) : null}
-      <div className="mb-8 max-w-4xl">
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusPill status={meeting.status} locale={locale} />
-          <span className="chip chip-selected">
-            {jurisdictionLabel}
-          </span>
-          <span className="text-sm font-semibold text-black/70">
-            {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
-          </span>
+      <div className="mb-8 grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="max-w-4xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusPill status={meeting.status} locale={locale} />
+            <span className="chip chip-selected">
+              {jurisdictionLabel}
+            </span>
+            <span className="text-sm font-semibold text-black/70">
+              {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+            </span>
+          </div>
+          <h1 className="page-title mt-3">{displayMeetingTitle(meeting, meetingTitleFallback, locale)}</h1>
+          <p className="page-copy mt-3 text-base">{displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)}</p>
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <AddToGoogleCalendarLink meeting={meeting} locale={locale} />
+            {renderMeetingNavigation("flex flex-wrap items-center gap-2 lg:hidden")}
+          </div>
         </div>
-        <h1 className="page-title mt-3">{displayMeetingTitle(meeting, meetingTitleFallback, locale)}</h1>
-        <p className="page-copy mt-3 text-base">{displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)}</p>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <AddToGoogleCalendarLink meeting={meeting} locale={locale} />
-          <nav
-            aria-label={locale === "es" ? "Navegación entre reuniones" : "Meeting navigation"}
-            className="flex flex-wrap items-center gap-2"
-          >
-            {olderMeeting ? (
-              <Link
-                href={meetingHref(olderMeeting.id, publicJurisdiction)}
-                aria-label={`${locale === "es" ? "Reunión anterior" : "Previous Meeting"}: ${displayMeetingTitle(olderMeeting, meetingTitleFallback, locale)}`}
-                title={displayMeetingTitle(olderMeeting, meetingTitleFallback, locale)}
-                className="action-secondary-sm group"
-              >
-                <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-ink" />
-                <span>{locale === "es" ? "Anterior" : "Previous"}</span>
-              </Link>
-            ) : (
-              <div
-                aria-disabled="true"
-                className="action-disabled-sm"
-              >
-                <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
-                <span>{locale === "es" ? "Anterior" : "Previous"}</span>
-              </div>
-            )}
 
-            {newerMeeting ? (
-              <Link
-                href={meetingHref(newerMeeting.id, publicJurisdiction)}
-                aria-label={`${locale === "es" ? "Siguiente reunión" : "Next Meeting"}: ${displayMeetingTitle(newerMeeting, meetingTitleFallback, locale)}`}
-                title={displayMeetingTitle(newerMeeting, meetingTitleFallback, locale)}
-                className="action-secondary-sm group"
-              >
-                <span>{locale === "es" ? "Siguiente" : "Next"}</span>
-                <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-ink" />
-              </Link>
-            ) : (
-              <div
-                aria-disabled="true"
-                className="action-disabled-sm"
-              >
-                <span>{locale === "es" ? "Siguiente" : "Next"}</span>
-                <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
-              </div>
-            )}
-          </nav>
-        </div>
+        {renderMeetingNavigation("hidden items-center gap-2 lg:sticky lg:top-24 lg:flex")}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr_340px]">
