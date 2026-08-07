@@ -138,6 +138,32 @@ test("accepts equivalent abbreviated and expanded numeric values", () => {
   assert.equal(result.cards.length, 1);
 });
 
+test("does not interpret the first letter after a street number as millions", () => {
+  const issues: Array<{ reason: string; value?: string }> = [];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Item 1 - 1237 M residential project",
+          whatIsHappening: ["The hearing concerns the residential project."],
+          whyItMatters: "The proposal affects nearby residents."
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 1. The 7:00 PM hearing concerns the residential project at 1237 Montecito Road and nearby residents.",
+      onIssue: (issue) => issues.push(issue)
+    }
+  );
+
+  assert.equal(result.cards.length, 1, JSON.stringify(issues));
+  assert.equal(issues.some((issue) => issue.value === "1237 M"), false);
+});
+
 test("accepts equivalent abbreviated and expanded month names", () => {
   const result = validateSimpleCitySummary(
     {

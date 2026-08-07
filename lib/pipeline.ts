@@ -271,6 +271,24 @@ export async function runSimpleCityPipeline(
   }
 
   if (canPersist && supabase) {
+    const interruptedBefore = new Date(Date.now() - 60 * 1000).toISOString();
+    const interruptedMessage =
+      "Previous pipeline process stopped before it could finalize this run; a later run recovered it.";
+    const { error: interruptedRunError } = await supabase
+      .from("scraper_runs")
+      .update({
+        finished_at: new Date().toISOString(),
+        status: "failed",
+        error: interruptedMessage
+      })
+      .eq("jurisdiction_slug", jurisdiction.slug)
+      .eq("status", "running")
+      .lt("started_at", interruptedBefore);
+
+    if (interruptedRunError) {
+      log(`Could not finalize interrupted scraper run records: ${interruptedRunError.message}`);
+    }
+
     const { data, error } = await supabase
       .from("scraper_runs")
       .insert({

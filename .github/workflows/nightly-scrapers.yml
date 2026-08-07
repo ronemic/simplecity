@@ -150,7 +150,7 @@ jobs:
   foster-city:
     name: Foster City scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 110
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'foster-city')) ||
@@ -177,12 +177,17 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Foster City pipeline
-        run: npm run pipeline:foster-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage)
+          npm run pipeline:foster-city -- "${pipeline_args[@]}" && exit 0
+          echo "Foster City pipeline failed; waiting five minutes before one safe retry."
+          sleep 300
+          npm run pipeline:foster-city -- "${pipeline_args[@]}"
 
   santa-clara-county:
     name: Santa Clara County scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 210
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')) ||
@@ -209,12 +214,17 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Santa Clara County pipeline
-        run: npm run pipeline:santa-clara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage)
+          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}" && exit 0
+          echo "Santa Clara County pipeline stopped; waiting two minutes before one safe retry."
+          sleep 120
+          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}"
 
   mountain-view:
     name: Mountain View scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 110
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'mountain-view')) ||
@@ -241,7 +251,12 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Mountain View pipeline
-        run: npm run pipeline:mountain-view -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage)
+          npm run pipeline:mountain-view -- "${pipeline_args[@]}" && exit 0
+          echo "Mountain View pipeline failed; waiting five minutes before one safe retry."
+          sleep 300
+          npm run pipeline:mountain-view -- "${pipeline_args[@]}"
 
   san-francisco:
     name: San Francisco scraper

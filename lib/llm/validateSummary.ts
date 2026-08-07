@@ -31,10 +31,10 @@ const GROUNDABLE_VALUE_PATTERNS = [
   /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
   /\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)\b/gi,
   /\b(?:agenda\s+item|item|resolution|ordinance)\s+(?:no\.?\s*)?[A-Z]?\d[\w.-]*/gi,
-  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?(?:\s*(?:%|percent))?/gi
+  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|bn))?(?:\s*(?:%|percent))?/gi
 ];
 const NUMERIC_VALUE_PATTERN =
-  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?(?:\s*(?:%|percent))?/gi;
+  /\$?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|bn))?(?:\s*(?:%|percent))?/gi;
 const DATE_VALUE_PATTERN =
   /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4})\b/gi;
 const NUMERIC_SCALE: Record<string, number> = {
