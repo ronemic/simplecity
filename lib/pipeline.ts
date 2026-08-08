@@ -13,7 +13,7 @@ import {
   generateSummaryForMeeting,
   hasSummaryProviderConfig,
   isLlmRateLimitError
-} from "@/lib/llm/openrouter";
+} from "@/lib/llm/groq";
 import {
   appendSummaryCardsForMeeting,
   replaceSummaryCardsForMeeting,
@@ -166,7 +166,7 @@ function createDeadline(maxRuntimeMinutes?: number) {
 }
 
 function getMaxConsecutiveRateLimitFailures() {
-  const raw = process.env.OPENROUTER_MAX_CONSECUTIVE_RATE_LIMITS;
+  const raw = process.env.GROQ_MAX_CONSECUTIVE_RATE_LIMITS;
   if (!raw) return 2;
 
   const parsed = Number(raw);
@@ -472,7 +472,7 @@ export async function runSimpleCityPipeline(
     if (shouldSummarize && !recordDeadline("LLM summarization")) {
       if (!hasSummaryProviderConfig()) {
         errors.push("No LLM provider API key is configured; summaries were not generated.");
-        log("Configure OPENROUTER_API_KEY or CEREBRAS_API_KEY to generate LLM summaries.");
+        log("Configure GROQ_API_KEY to generate LLM summaries.");
       } else if (persist && !persistSummaries) {
         const message =
           "Skipping LLM summaries because database persistence failed; generated cards would not appear on the frontend.";

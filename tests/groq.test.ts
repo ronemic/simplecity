@@ -4,7 +4,7 @@ import {
   buildAgendaItemSummaryBatches,
   generateSummaryForMeeting,
   MAX_AGENDA_ITEM_BATCH_CHARS
-} from "@/lib/llm/openrouter";
+} from "@/lib/llm/groq";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 
 const meetingSummary = {
@@ -60,7 +60,7 @@ function meeting(): LlmReadyMeeting {
   };
 }
 
-function openRouterResponse(summary: SimpleCitySummary) {
+function groqResponse(summary: SimpleCitySummary) {
   return new Response(
     JSON.stringify({
       choices: [
@@ -82,20 +82,17 @@ function openRouterResponse(summary: SimpleCitySummary) {
 
 function captureLlmEnv() {
   return {
-    openRouterApiKey: process.env.OPENROUTER_API_KEY,
-    openRouterApiKey2: process.env.OPENROUTER_API_KEY_2,
-    openRouterApiKey3: process.env.OPENROUTER_API_KEY_3,
-    openRouterModel: process.env.OPENROUTER_MODEL,
-    openRouterMinIntervalMs: process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS,
-    openRouterMaxAttempts: process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS,
-    openRouterRetryBaseMs: process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS,
-    openRouterRateLimitRetryBaseMs: process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS,
-    llmMaxRetryDelayMs: process.env.LLM_MAX_RETRY_DELAY_MS,
-    cerebrasApiKey: process.env.CEREBRAS_API_KEY,
-    cerebrasApiKey2: process.env.CEREBRAS_API_KEY_2,
-    cerebrasApiKey3: process.env.CEREBRAS_API_KEY_3,
-    cerebrasModel: process.env.CEREBRAS_MODEL,
-    cerebrasMinIntervalMs: process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS
+    groqApiKey: process.env.GROQ_API_KEY,
+    groqApiKey2: process.env.GROQ_API_KEY_2,
+    groqApiKey3: process.env.GROQ_API_KEY_3,
+    groqApiKey4: process.env.GROQ_API_KEY_4,
+    groqApiKey5: process.env.GROQ_API_KEY_5,
+    groqModel: process.env.GROQ_MODEL,
+    groqMinIntervalMs: process.env.GROQ_MIN_REQUEST_INTERVAL_MS,
+    groqMaxAttempts: process.env.GROQ_SUMMARY_MAX_ATTEMPTS,
+    groqRetryBaseMs: process.env.GROQ_SUMMARY_RETRY_BASE_MS,
+    groqRateLimitRetryBaseMs: process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS,
+    llmMaxRetryDelayMs: process.env.LLM_MAX_RETRY_DELAY_MS
   };
 }
 
@@ -108,36 +105,30 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
     }
   };
 
-  restore("OPENROUTER_API_KEY", env.openRouterApiKey);
-  restore("OPENROUTER_API_KEY_2", env.openRouterApiKey2);
-  restore("OPENROUTER_API_KEY_3", env.openRouterApiKey3);
-  restore("OPENROUTER_MODEL", env.openRouterModel);
-  restore("OPENROUTER_MIN_REQUEST_INTERVAL_MS", env.openRouterMinIntervalMs);
-  restore("OPENROUTER_SUMMARY_MAX_ATTEMPTS", env.openRouterMaxAttempts);
-  restore("OPENROUTER_SUMMARY_RETRY_BASE_MS", env.openRouterRetryBaseMs);
-  restore("OPENROUTER_RATE_LIMIT_RETRY_BASE_MS", env.openRouterRateLimitRetryBaseMs);
+  restore("GROQ_API_KEY", env.groqApiKey);
+  restore("GROQ_API_KEY_2", env.groqApiKey2);
+  restore("GROQ_API_KEY_3", env.groqApiKey3);
+  restore("GROQ_API_KEY_4", env.groqApiKey4);
+  restore("GROQ_API_KEY_5", env.groqApiKey5);
+  restore("GROQ_MODEL", env.groqModel);
+  restore("GROQ_MIN_REQUEST_INTERVAL_MS", env.groqMinIntervalMs);
+  restore("GROQ_SUMMARY_MAX_ATTEMPTS", env.groqMaxAttempts);
+  restore("GROQ_SUMMARY_RETRY_BASE_MS", env.groqRetryBaseMs);
+  restore("GROQ_RATE_LIMIT_RETRY_BASE_MS", env.groqRateLimitRetryBaseMs);
   restore("LLM_MAX_RETRY_DELAY_MS", env.llmMaxRetryDelayMs);
-  restore("CEREBRAS_API_KEY", env.cerebrasApiKey);
-  restore("CEREBRAS_API_KEY_2", env.cerebrasApiKey2);
-  restore("CEREBRAS_API_KEY_3", env.cerebrasApiKey3);
-  restore("CEREBRAS_MODEL", env.cerebrasModel);
-  restore("CEREBRAS_MIN_REQUEST_INTERVAL_MS", env.cerebrasMinIntervalMs);
 }
 
 function setLlmTestEnv() {
-  process.env.OPENROUTER_API_KEY = "test-openrouter-key";
-  delete process.env.OPENROUTER_API_KEY_2;
-  delete process.env.OPENROUTER_API_KEY_3;
-  process.env.OPENROUTER_MODEL = "test-openrouter-model";
-  process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS = "0";
-  process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "3";
-  process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS = "0";
-  process.env.OPENROUTER_RATE_LIMIT_RETRY_BASE_MS = "0";
-  delete process.env.CEREBRAS_API_KEY;
-  delete process.env.CEREBRAS_API_KEY_2;
-  delete process.env.CEREBRAS_API_KEY_3;
-  delete process.env.CEREBRAS_MODEL;
-  process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS = "0";
+  process.env.GROQ_API_KEY = "test-groq-key";
+  delete process.env.GROQ_API_KEY_2;
+  delete process.env.GROQ_API_KEY_3;
+  delete process.env.GROQ_API_KEY_4;
+  delete process.env.GROQ_API_KEY_5;
+  process.env.GROQ_MODEL = "test-groq-model";
+  process.env.GROQ_MIN_REQUEST_INTERVAL_MS = "0";
+  process.env.GROQ_SUMMARY_MAX_ATTEMPTS = "3";
+  process.env.GROQ_SUMMARY_RETRY_BASE_MS = "0";
+  process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS = "0";
 }
 
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {
@@ -175,7 +166,7 @@ test("repairs only source-unsupported cards without regenerating the meeting", a
       cards: [card()]
     };
 
-    return openRouterResponse(calls === 1 ? firstSummary : fixedSummary);
+    return groqResponse(calls === 1 ? firstSummary : fixedSummary);
   }) as typeof fetch;
 
   const result = await generateSummaryForMeeting(meeting());
@@ -202,7 +193,7 @@ test("rejects a failed targeted repair without regenerating the meeting", async 
   setLlmTestEnv();
   globalThis.fetch = (async () => {
     calls += 1;
-    return openRouterResponse({
+    return groqResponse({
       meetingSummary,
       cards: [
         card({
@@ -237,7 +228,7 @@ test("repairs only a card containing degenerate model text", async (t) => {
     };
     if (calls === 2) secondPrompt = body.messages?.at(-1)?.content || "";
 
-    return openRouterResponse({
+    return groqResponse({
       meetingSummary,
       cards: [
         card({
@@ -281,7 +272,7 @@ test("regenerates an empty summary when agenda source text is usable", async (t)
       cards: [card()]
     };
 
-    return openRouterResponse(calls === 1 ? emptySummary : fixedSummary);
+    return groqResponse(calls === 1 ? emptySummary : fixedSummary);
   }) as typeof fetch;
 
   const result = await generateSummaryForMeeting(meeting());
@@ -290,10 +281,11 @@ test("regenerates an empty summary when agenda source text is usable", async (t)
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("falls back to OpenRouter when Cerebras is rate-limited", async (t) => {
+test("falls back to the next Groq key when the selected key is rate-limited", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
+  const authorizations: Array<string | null> = [];
   const models: string[] = [];
 
   t.after(() => {
@@ -302,19 +294,20 @@ test("falls back to OpenRouter when Cerebras is rate-limited", async (t) => {
   });
 
   setLlmTestEnv();
-  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
-  process.env.CEREBRAS_MODEL = "gpt-oss-120b";
+  process.env.GROQ_API_KEY_2 = "test-groq-key-2";
 
   globalThis.fetch = (async (url, init) => {
     urls.push(String(url));
+    const authorization = new Headers(init?.headers).get("Authorization");
+    authorizations.push(authorization);
     const body = JSON.parse(String(init?.body || "{}")) as { model?: string };
     models.push(body.model || "");
 
-    if (String(url).includes("cerebras.ai")) {
+    if (authorization === "Bearer test-groq-key") {
       return new Response("temporarily rate-limited upstream", { status: 429 });
     }
 
-    return openRouterResponse({
+    return groqResponse({
       meetingSummary,
       cards: [card()]
     });
@@ -323,17 +316,18 @@ test("falls back to OpenRouter when Cerebras is rate-limited", async (t) => {
   const result = await generateSummaryForMeeting(meeting());
 
   assert.deepEqual(urls, [
-    "https://api.cerebras.ai/v1/chat/completions",
-    "https://openrouter.ai/api/v1/chat/completions"
+    "https://api.groq.com/openai/v1/chat/completions",
+    "https://api.groq.com/openai/v1/chat/completions"
   ]);
-  assert.deepEqual(models, ["gpt-oss-120b", "test-openrouter-model"]);
+  assert.deepEqual(authorizations, ["Bearer test-groq-key", "Bearer test-groq-key-2"]);
+  assert.deepEqual(models, ["test-groq-model", "test-groq-model"]);
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("tries all Cerebras keys before all OpenRouter keys", async (t) => {
+test("tries all five Groq keys when earlier keys are rate-limited", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
-  const providers: string[] = [];
+  const authorizations: Array<string | null> = [];
 
   t.after(() => {
     globalThis.fetch = originalFetch;
@@ -341,30 +335,60 @@ test("tries all Cerebras keys before all OpenRouter keys", async (t) => {
   });
 
   setLlmTestEnv();
-  process.env.OPENROUTER_API_KEY_2 = "test-openrouter-key-2";
-  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
-  process.env.CEREBRAS_API_KEY_2 = "test-cerebras-key-2";
+  process.env.GROQ_API_KEY_2 = "test-groq-key-2";
+  process.env.GROQ_API_KEY_3 = "test-groq-key-3";
+  process.env.GROQ_API_KEY_4 = "test-groq-key-4";
+  process.env.GROQ_API_KEY_5 = "test-groq-key-5";
 
-  globalThis.fetch = (async (url, init) => {
+  globalThis.fetch = (async (_url, init) => {
     const authorization = new Headers(init?.headers).get("Authorization");
-    providers.push(`${String(url).includes("openrouter.ai") ? "openrouter" : "cerebras"}:${authorization}`);
+    authorizations.push(authorization);
 
-    if (authorization !== "Bearer test-openrouter-key-2") {
+    if (authorization !== "Bearer test-groq-key-5") {
       return new Response("temporarily rate-limited", { status: 429 });
     }
 
-    return openRouterResponse({ meetingSummary, cards: [card()] });
+    return groqResponse({ meetingSummary, cards: [card()] });
   }) as typeof fetch;
 
   const result = await generateSummaryForMeeting(meeting());
 
-  assert.deepEqual(providers, [
-    "cerebras:Bearer test-cerebras-key",
-    "cerebras:Bearer test-cerebras-key-2",
-    "openrouter:Bearer test-openrouter-key",
-    "openrouter:Bearer test-openrouter-key-2"
+  assert.deepEqual(authorizations, [
+    "Bearer test-groq-key",
+    "Bearer test-groq-key-2",
+    "Bearer test-groq-key-3",
+    "Bearer test-groq-key-4",
+    "Bearer test-groq-key-5"
   ]);
   assert.equal(result.summary.cards.length, 1);
+});
+
+test("rotates the starting Groq key across successive summaries", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const authorizations: Array<string | null> = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.GROQ_API_KEY = "rotation-key-1";
+  process.env.GROQ_API_KEY_2 = "rotation-key-2";
+  process.env.GROQ_API_KEY_3 = "rotation-key-3";
+  process.env.GROQ_API_KEY_4 = "rotation-key-4";
+  process.env.GROQ_API_KEY_5 = "rotation-key-5";
+
+  globalThis.fetch = (async (_url, init) => {
+    authorizations.push(new Headers(init?.headers).get("Authorization"));
+    return groqResponse({ meetingSummary, cards: [card()] });
+  }) as typeof fetch;
+
+  await generateSummaryForMeeting(meeting());
+  await generateSummaryForMeeting(meeting());
+
+  assert.deepEqual(authorizations, ["Bearer rotation-key-1", "Bearer rotation-key-2"]);
 });
 
 test("does not sleep on an impractical provider retry-after", async (t) => {
@@ -378,7 +402,7 @@ test("does not sleep on an impractical provider retry-after", async (t) => {
   });
 
   setLlmTestEnv();
-  process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "3";
+  process.env.GROQ_SUMMARY_MAX_ATTEMPTS = "3";
   globalThis.fetch = (async () =>
     new Response("Tokens per day limit exceeded", {
       status: 429,
@@ -409,7 +433,7 @@ test("backs off and retries when all configured providers are rate-limited", asy
   });
 
   setLlmTestEnv();
-  process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "2";
+  process.env.GROQ_SUMMARY_MAX_ATTEMPTS = "2";
   globalThis.fetch = (async () => {
     calls += 1;
     if (calls === 1) {
@@ -421,7 +445,7 @@ test("backs off and retries when all configured providers are rate-limited", asy
       });
     }
 
-    return openRouterResponse({
+    return groqResponse({
       meetingSummary,
       cards: [card()]
     });
@@ -473,7 +497,7 @@ test("verifies topics and status using only matched agenda-item context", async 
     };
 
     if (calls === 1) {
-      return openRouterResponse({
+      return groqResponse({
         meetingSummary,
         cards: [card({ categoryTags: ["Public Safety"], status: "Under discussion" })]
       });
@@ -511,10 +535,11 @@ test("verifies topics and status using only matched agenda-item context", async 
   assert.doesNotMatch(topicPrompt, /FLAT_PACKET_SENTINEL/);
 });
 
-test("falls back to OpenRouter when isolated Cerebras topic verification is rate-limited", async (t) => {
+test("rotates Groq keys and falls back during isolated topic verification", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
+  const authorizations: Array<string | null> = [];
 
   t.after(() => {
     globalThis.fetch = originalFetch;
@@ -522,8 +547,8 @@ test("falls back to OpenRouter when isolated Cerebras topic verification is rate
   });
 
   setLlmTestEnv();
-  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
-  process.env.CEREBRAS_MODEL = "gpt-oss-120b";
+  process.env.GROQ_API_KEY = "topic-key-1";
+  process.env.GROQ_API_KEY_2 = "topic-key-2";
   const preparedMeeting = meeting();
   preparedMeeting.items = [
     {
@@ -539,10 +564,11 @@ test("falls back to OpenRouter when isolated Cerebras topic verification is rate
     }
   ];
 
-  globalThis.fetch = (async (url) => {
+  globalThis.fetch = (async (url, init) => {
     urls.push(String(url));
+    authorizations.push(new Headers(init?.headers).get("Authorization"));
     if (urls.length === 1) {
-      return openRouterResponse({ meetingSummary, cards: [card()] });
+      return groqResponse({ meetingSummary, cards: [card()] });
     }
     if (urls.length === 2) {
       return new Response("topic verifier rate limited", { status: 429 });
@@ -572,9 +598,14 @@ test("falls back to OpenRouter when isolated Cerebras topic verification is rate
   const result = await generateSummaryForMeeting(preparedMeeting);
 
   assert.deepEqual(urls, [
-    "https://api.cerebras.ai/v1/chat/completions",
-    "https://api.cerebras.ai/v1/chat/completions",
-    "https://openrouter.ai/api/v1/chat/completions"
+    "https://api.groq.com/openai/v1/chat/completions",
+    "https://api.groq.com/openai/v1/chat/completions",
+    "https://api.groq.com/openai/v1/chat/completions"
+  ]);
+  assert.deepEqual(authorizations, [
+    "Bearer topic-key-1",
+    "Bearer topic-key-2",
+    "Bearer topic-key-1"
   ]);
   assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
 });
@@ -609,7 +640,7 @@ test("keeps a validated summary when topic verification returns malformed JSON",
   globalThis.fetch = (async () => {
     calls += 1;
     if (calls === 1) {
-      return openRouterResponse({
+      return groqResponse({
         meetingSummary,
         cards: [card({ status: "Under discussion" })]
       });
@@ -740,7 +771,7 @@ test("summarizes and combines every bounded agenda-item batch", async (t) => {
 
     summaryCalls += 1;
     const titles = Array.from(user.matchAll(/Official title: (Decision [A-Za-z]+)/g), (match) => match[1]);
-    return openRouterResponse({
+    return groqResponse({
       meetingSummary,
       cards: titles.map((title) =>
         card({

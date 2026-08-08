@@ -1,5 +1,4 @@
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
-import { getConfiguredAppUrl } from "@/lib/appUrl";
 import {
   extractMeetingWideParticipationContext,
   formatAgendaItemContexts,
@@ -7,6 +6,11 @@ import {
 } from "@/lib/scraper/agendaItemContext";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
+import {
+  getRotatedGroqProviders,
+  hasConfiguredGroqProvider,
+  type GroqProvider
+} from "./groqProvider";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import {
   parseAndValidateSummary,
@@ -34,13 +38,7 @@ type SummaryRequestResult = {
   validationIssues: SummaryValidationIssue[];
 };
 
-type SummaryProvider = {
-  name: "OpenRouter" | "Cerebras";
-  label: string;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  headers?: Record<string, string>;
+type SummaryProvider = GroqProvider & {
   minIntervalEnv: string;
 };
 
@@ -132,7 +130,7 @@ function parseNonNegativeEnv(name: string, fallback: number) {
 }
 
 function getSummaryMaxAttempts() {
-  const raw = process.env.LLM_SUMMARY_MAX_ATTEMPTS || process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS;
+  const raw = process.env.LLM_SUMMARY_MAX_ATTEMPTS || process.env.GROQ_SUMMARY_MAX_ATTEMPTS;
   if (!raw) return 3;
 
   const parsed = Number(raw);
@@ -152,70 +150,23 @@ function parseRetryAfterMs(headers: Headers) {
   return null;
 }
 
-function getConfiguredSummaryProviders() {
-  const providers: SummaryProvider[] = [];
-  const referer = getConfiguredAppUrl();
-
-  const openRouterKeys = [
-    process.env.OPENROUTER_API_KEY,
-    process.env.OPENROUTER_API_KEY_2,
-    process.env.OPENROUTER_API_KEY_3
-  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const cerebrasKeys = [
-    process.env.CEREBRAS_API_KEY,
-    process.env.CEREBRAS_API_KEY_2,
-    process.env.CEREBRAS_API_KEY_3
-  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-
-  const addOpenRouter = (apiKey: string, index: number) => {
-    providers.push({
-      name: "OpenRouter",
-      label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
-      apiKey,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
-      headers: {
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity"
-      },
-      minIntervalEnv: "OPENROUTER_MIN_REQUEST_INTERVAL_MS"
-    });
-  };
-
-  const addCerebras = (apiKey: string, index: number) => {
-    providers.push({
-      name: "Cerebras",
-      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
-      apiKey,
-      baseUrl: "https://api.cerebras.ai/v1/chat/completions",
-      model: process.env.CEREBRAS_MODEL || "gpt-oss-120b",
-      minIntervalEnv: "CEREBRAS_MIN_REQUEST_INTERVAL_MS"
-    });
-  };
-
-  cerebrasKeys.forEach(addCerebras);
-  openRouterKeys.forEach(addOpenRouter);
-
+function getRotatedSummaryProviders() {
+  const providers = getRotatedGroqProviders().map((provider) => ({
+    ...provider,
+    minIntervalEnv: "GROQ_MIN_REQUEST_INTERVAL_MS"
+  }));
   if (providers.length === 0) {
-    throw new Error("Missing LLM provider API key. Configure an OpenRouter or Cerebras API key.");
+    throw new Error("Missing LLM provider API key. Configure a Groq API key.");
   }
-
   return providers;
 }
 
 export function hasSummaryProviderConfig() {
-  return Boolean(
-    process.env.OPENROUTER_API_KEY ||
-      process.env.OPENROUTER_API_KEY_2 ||
-      process.env.OPENROUTER_API_KEY_3 ||
-      process.env.CEREBRAS_API_KEY ||
-      process.env.CEREBRAS_API_KEY_2 ||
-      process.env.CEREBRAS_API_KEY_3
-  );
+  return hasConfiguredGroqProvider();
 }
 
 async function waitForProviderSlot(provider: SummaryProvider, options: GenerateSummaryOptions) {
-  const fallbackMs = provider.name === "OpenRouter" ? 10_000 : 5_000;
+  const fallbackMs = 5_000;
   const minIntervalMs = parseNonNegativeEnv(provider.minIntervalEnv, fallbackMs);
   if (minIntervalMs <= 0) return;
 
@@ -265,8 +216,8 @@ function retryDelayMs(error: unknown, attempt: number) {
 
   const baseMs = parseNonNegativeEnv(
     isLlmRateLimitError(error)
-      ? "OPENROUTER_RATE_LIMIT_RETRY_BASE_MS"
-      : "OPENROUTER_SUMMARY_RETRY_BASE_MS",
+      ? "GROQ_RATE_LIMIT_RETRY_BASE_MS"
+      : "GROQ_SUMMARY_RETRY_BASE_MS",
     isLlmRateLimitError(error) ? 30_000 : 5_000
   );
 
@@ -453,6 +404,34 @@ ${sourceContext}`;
   return { summary, raw, validationIssues };
 }
 
+async function requestTargetedCardRepairsWithFallback(
+  meeting: LlmReadyMeeting,
+  rejectedCards: Array<{ index: number; card: unknown }>,
+  issues: SummaryValidationIssue[],
+  options: GenerateSummaryOptions
+) {
+  const providers = getRotatedSummaryProviders();
+  let lastError: unknown;
+
+  for (const [index, provider] of providers.entries()) {
+    try {
+      return await requestTargetedCardRepairs(
+        meeting,
+        provider,
+        rejectedCards,
+        issues,
+        options
+      );
+    } catch (error) {
+      lastError = error;
+      if (index < providers.length - 1 && canTryNextProvider(error)) continue;
+      throw error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Unknown card repair error");
+}
+
 async function requestSummary(
   meeting: LlmReadyMeeting,
   provider: SummaryProvider,
@@ -540,9 +519,8 @@ async function requestSummary(
       `Repairing ${rejectedCards.length} rejected card(s) for ${meeting.title} without regenerating the meeting.`
     );
     try {
-      repairResult = await requestTargetedCardRepairs(
+      repairResult = await requestTargetedCardRepairsWithFallback(
         meeting,
-        provider,
         rejectedCards,
         validationIssues,
         options
@@ -636,7 +614,7 @@ async function requestTopicValidationWithFallback(
   candidates: TopicValidationCandidate[],
   options: GenerateSummaryOptions = {}
 ) {
-  const providers = getConfiguredSummaryProviders();
+  const providers = getRotatedSummaryProviders();
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {
@@ -730,7 +708,7 @@ async function requestSummaryWithFallback(
   options: GenerateSummaryOptions = {},
   regenerationGuidance?: string
 ) {
-  const providers = getConfiguredSummaryProviders();
+  const providers = getRotatedSummaryProviders();
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {

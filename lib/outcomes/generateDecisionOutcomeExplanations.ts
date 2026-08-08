@@ -1,6 +1,10 @@
 import { jsonrepair } from "jsonrepair";
 import { z } from "zod";
-import { getConfiguredAppUrl } from "@/lib/appUrl";
+import {
+  getConfiguredGroqProviders,
+  getRotatedGroqProviders,
+  type GroqProvider
+} from "@/lib/llm/groqProvider";
 import type { DecisionOutcomeCanonicalStatus } from "@/lib/outcomes/extractDecisionOutcome";
 
 export type DecisionOutcomeExplanationInput = {
@@ -18,13 +22,7 @@ export type DecisionOutcomeExplanation = {
   nextStep: string | null;
 };
 
-type ExplanationProvider = {
-  label: string;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  headers?: Record<string, string>;
-};
+type ExplanationProvider = GroqProvider;
 
 const lastRequestAtByProvider = new Map<string, number>();
 
@@ -62,40 +60,11 @@ const OUTCOME_BOILERPLATE_PATTERN =
   /(?:\bpage\s+\d+\s+of\s+\d+\b|\b(?:action|result|decision)\s*:)/i;
 
 function configuredProviders() {
-  const providers: ExplanationProvider[] = [];
-  const referer = getConfiguredAppUrl();
-  const cerebrasKeys = [
-    process.env.CEREBRAS_API_KEY,
-    process.env.CEREBRAS_API_KEY_2,
-    process.env.CEREBRAS_API_KEY_3
-  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const openRouterKeys = [
-    process.env.OPENROUTER_API_KEY,
-    process.env.OPENROUTER_API_KEY_2,
-    process.env.OPENROUTER_API_KEY_3
-  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+  return getConfiguredGroqProviders();
+}
 
-  cerebrasKeys.forEach((apiKey, index) => {
-    providers.push({
-      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
-      apiKey,
-      baseUrl: "https://api.cerebras.ai/v1/chat/completions",
-      model: process.env.CEREBRAS_MODEL || "gpt-oss-120b"
-    });
-  });
-  openRouterKeys.forEach((apiKey, index) => {
-    providers.push({
-      label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
-      apiKey,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model: process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free",
-      headers: {
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity"
-      }
-    });
-  });
-  return providers;
+function rotatedProviders() {
+  return getRotatedGroqProviders();
 }
 
 export function hasDecisionOutcomeExplanationProvider() {
@@ -233,7 +202,7 @@ export async function generateDecisionOutcomeExplanations(
   options: { log?: (message: string) => void } = {}
 ) {
   if (inputs.length === 0) return new Map<string, DecisionOutcomeExplanation>();
-  const providers = configuredProviders();
+  const providers = rotatedProviders();
   if (providers.length === 0) throw new Error("No LLM provider is configured for decision explanations.");
 
   let lastError: unknown;

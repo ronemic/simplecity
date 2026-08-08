@@ -1,6 +1,10 @@
 import { jsonrepair } from "jsonrepair";
-import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
+import {
+  getConfiguredGroqProviders,
+  getRotatedGroqProviders,
+  type GroqProvider
+} from "./groqProvider";
 
 export type TranslationLocale = "es";
 
@@ -53,52 +57,14 @@ export type GenerateTranslationsOptions = {
   log?: (message: string) => void;
 };
 
-type TranslationProvider = {
-  label: string;
-  apiKey: string;
-  baseUrl: string;
-  model: string;
-  headers?: Record<string, string>;
-};
+type TranslationProvider = GroqProvider;
 
 function configuredTranslationProviders() {
-  const providers: TranslationProvider[] = [];
-  const referer = getConfiguredAppUrl();
-  const openRouterKeys = [
-    process.env.OPENROUTER_API_KEY,
-    process.env.OPENROUTER_API_KEY_2,
-    process.env.OPENROUTER_API_KEY_3
-  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const cerebrasKeys = [
-    process.env.CEREBRAS_API_KEY,
-    process.env.CEREBRAS_API_KEY_2,
-    process.env.CEREBRAS_API_KEY_3
-  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+  return getConfiguredGroqProviders();
+}
 
-  cerebrasKeys.forEach((apiKey, index) => {
-    providers.push({
-      label: cerebrasKeys.length > 1 ? `Cerebras key ${index + 1}` : "Cerebras",
-      apiKey,
-      baseUrl: "https://api.cerebras.ai/v1/chat/completions",
-      model: process.env.CEREBRAS_MODEL || "gpt-oss-120b"
-    });
-  });
-  openRouterKeys.forEach((apiKey, index) => {
-    providers.push({
-      label: openRouterKeys.length > 1 ? `OpenRouter key ${index + 1}` : "OpenRouter",
-      apiKey,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model:
-        process.env.OPENROUTER_TRANSLATION_MODEL ||
-        process.env.OPENROUTER_MODEL ||
-        "google/gemma-4-31b-it:free",
-      headers: {
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity Translation"
-      }
-    });
-  });
-  return providers;
+function rotatedTranslationProviders() {
+  return getRotatedGroqProviders();
 }
 
 export function hasTranslationProvider() {
@@ -336,17 +302,10 @@ async function requestTranslations(
     }
 
     lastErrorText = await response.text();
-    if (attempt === maxAttempts || !shouldRetryProviderError(response.status, lastErrorText)) {
-      throw new Error(
-        `${provider.label} translation request failed with ${response.status}: ${lastErrorText.slice(0, 500)}`
-      );
-    }
-
-    const delayMs = Math.min(attempt * 5_000, 15_000);
-    options.log?.(
-      `${provider.label} translation request was rate-limited or unavailable; retrying in ${Math.round(delayMs / 1000)}s.`
+    const retryable = shouldRetryProviderError(response.status, lastErrorText);
+    throw new Error(
+      `${provider.label} translation request ${retryable ? "was rate-limited or unavailable" : "failed"} with ${response.status}: ${lastErrorText.slice(0, 500)}`
     );
-    await sleep(delayMs);
   }
 
   throw new Error(`${provider.label} translation request failed: ${lastErrorText.slice(0, 500)}`);
@@ -356,7 +315,7 @@ export async function generateTranslations(
   input: TranslationPayload,
   options: GenerateTranslationsOptions = {}
 ): Promise<{ translations: TranslationResult; raw: unknown }> {
-  const providers = configuredTranslationProviders();
+  const providers = rotatedTranslationProviders();
   if (providers.length === 0) throw new Error("No translation provider is configured.");
 
   options.log?.(

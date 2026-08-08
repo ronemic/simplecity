@@ -2,7 +2,7 @@ import "@/lib/env/bootstrap";
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { LlmReadyMeeting } from "@/lib/types";
-import { generateSummaryForMeeting } from "@/lib/llm/openrouter";
+import { generateSummaryForMeeting } from "@/lib/llm/groq";
 import { SCRAPED_DIR, getJurisdictionScrapedDir } from "@/lib/scraper/downloadDocuments";
 import {
   getDefaultJurisdiction,
