@@ -5,6 +5,7 @@ import {
   generateSummaryForMeeting,
   MAX_AGENDA_ITEM_BATCH_CHARS
 } from "@/lib/llm/openrouter";
+import { resetLlmCapacityForTests } from "@/lib/llm/requestPolicy";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 
 const meetingSummary = {
@@ -86,6 +87,8 @@ function captureLlmEnv() {
     openRouterApiKey2: process.env.OPENROUTER_API_KEY_2,
     openRouterApiKey3: process.env.OPENROUTER_API_KEY_3,
     openRouterModel: process.env.OPENROUTER_MODEL,
+    openRouterFallbackApiKey: process.env.OPENROUTER_FALLBACK_API_KEY,
+    openRouterFallbackModel: process.env.OPENROUTER_FALLBACK_MODEL,
     openRouterMinIntervalMs: process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS,
     openRouterMaxAttempts: process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS,
     openRouterRetryBaseMs: process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS,
@@ -95,7 +98,9 @@ function captureLlmEnv() {
     cerebrasApiKey2: process.env.CEREBRAS_API_KEY_2,
     cerebrasApiKey3: process.env.CEREBRAS_API_KEY_3,
     cerebrasModel: process.env.CEREBRAS_MODEL,
-    cerebrasMinIntervalMs: process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS
+    cerebrasMinIntervalMs: process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS,
+    cerebrasTokensPerMinute: process.env.CEREBRAS_TOKENS_PER_MINUTE,
+    legacyKeyRotation: process.env.LLM_ENABLE_LEGACY_KEY_ROTATION
   };
 }
 
@@ -112,6 +117,8 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
   restore("OPENROUTER_API_KEY_2", env.openRouterApiKey2);
   restore("OPENROUTER_API_KEY_3", env.openRouterApiKey3);
   restore("OPENROUTER_MODEL", env.openRouterModel);
+  restore("OPENROUTER_FALLBACK_API_KEY", env.openRouterFallbackApiKey);
+  restore("OPENROUTER_FALLBACK_MODEL", env.openRouterFallbackModel);
   restore("OPENROUTER_MIN_REQUEST_INTERVAL_MS", env.openRouterMinIntervalMs);
   restore("OPENROUTER_SUMMARY_MAX_ATTEMPTS", env.openRouterMaxAttempts);
   restore("OPENROUTER_SUMMARY_RETRY_BASE_MS", env.openRouterRetryBaseMs);
@@ -122,13 +129,18 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
   restore("CEREBRAS_API_KEY_3", env.cerebrasApiKey3);
   restore("CEREBRAS_MODEL", env.cerebrasModel);
   restore("CEREBRAS_MIN_REQUEST_INTERVAL_MS", env.cerebrasMinIntervalMs);
+  restore("CEREBRAS_TOKENS_PER_MINUTE", env.cerebrasTokensPerMinute);
+  restore("LLM_ENABLE_LEGACY_KEY_ROTATION", env.legacyKeyRotation);
 }
 
 function setLlmTestEnv() {
+  resetLlmCapacityForTests();
   process.env.OPENROUTER_API_KEY = "test-openrouter-key";
   delete process.env.OPENROUTER_API_KEY_2;
   delete process.env.OPENROUTER_API_KEY_3;
   process.env.OPENROUTER_MODEL = "test-openrouter-model";
+  delete process.env.OPENROUTER_FALLBACK_API_KEY;
+  delete process.env.OPENROUTER_FALLBACK_MODEL;
   process.env.OPENROUTER_MIN_REQUEST_INTERVAL_MS = "0";
   process.env.OPENROUTER_SUMMARY_MAX_ATTEMPTS = "3";
   process.env.OPENROUTER_SUMMARY_RETRY_BASE_MS = "0";
@@ -138,6 +150,8 @@ function setLlmTestEnv() {
   delete process.env.CEREBRAS_API_KEY_3;
   delete process.env.CEREBRAS_MODEL;
   process.env.CEREBRAS_MIN_REQUEST_INTERVAL_MS = "0";
+  process.env.CEREBRAS_TOKENS_PER_MINUTE = "0";
+  delete process.env.LLM_ENABLE_LEGACY_KEY_ROTATION;
 }
 
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {
@@ -330,6 +344,69 @@ test("falls back to OpenRouter when Cerebras is rate-limited", async (t) => {
   assert.equal(result.summary.cards.length, 1);
 });
 
+test("uses an explicit paid or BYOK model after shared providers are throttled", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const models: string[] = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
+  process.env.OPENROUTER_FALLBACK_API_KEY = "test-paid-key";
+  process.env.OPENROUTER_FALLBACK_MODEL = "test-paid-model";
+  globalThis.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body || "{}")) as { model?: string };
+    models.push(body.model || "");
+    if (body.model !== "test-paid-model") return new Response("rate limited", { status: 429 });
+    return openRouterResponse({ meetingSummary, cards: [card()] });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting());
+  assert.deepEqual(models, ["gpt-oss-120b", "test-openrouter-model", "test-paid-model"]);
+  assert.equal(result.summary.cards.length, 1);
+});
+
+test("falls back targeted repair and sets an explicit completion limit", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  const requests: Array<{ url: string; prompt: string; maxTokens?: number }> = [];
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  process.env.CEREBRAS_API_KEY = "test-cerebras-key";
+  globalThis.fetch = (async (url, init) => {
+    const body = JSON.parse(String(init?.body || "{}")) as {
+      messages?: Array<{ content?: string }>;
+      max_completion_tokens?: number;
+    };
+    const prompt = body.messages?.at(-1)?.content || "";
+    requests.push({ url: String(url), prompt, maxTokens: body.max_completion_tokens });
+
+    if (requests.length === 1) {
+      return openRouterResponse({
+        meetingSummary,
+        cards: [card({ whatIsHappening: ["The council will approve a $999 contract."] })]
+      });
+    }
+    if (requests.length === 2) return new Response("repair rate limited", { status: 429 });
+    return openRouterResponse({ meetingSummary, cards: [card()] });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(meeting());
+  assert.equal(requests.length, 3);
+  assert.ok(requests.every((request) => Number(request.maxTokens) > 0));
+  assert.match(requests[1].prompt, /repair only the rejected/i);
+  assert.match(requests[2].prompt, /repair only the rejected/i);
+  assert.match(requests[2].url, /openrouter/);
+  assert.equal(result.summary.cards.length, 1);
+});
+
 test("tries all Cerebras keys before all OpenRouter keys", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
@@ -344,6 +421,7 @@ test("tries all Cerebras keys before all OpenRouter keys", async (t) => {
   process.env.OPENROUTER_API_KEY_2 = "test-openrouter-key-2";
   process.env.CEREBRAS_API_KEY = "test-cerebras-key";
   process.env.CEREBRAS_API_KEY_2 = "test-cerebras-key-2";
+  process.env.LLM_ENABLE_LEGACY_KEY_ROTATION = "true";
 
   globalThis.fetch = (async (url, init) => {
     const authorization = new Headers(init?.headers).get("Authorization");

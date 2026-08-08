@@ -70,8 +70,8 @@ test("Santa Barbara County has scraper, pipeline, and scheduled workflow entry p
   assert.doesNotMatch(nightlyWorkflow, /santa-barbara-county/);
   assert.match(pipeline, /scrapeSantaBarbaraCountyMeetings/);
   assert.match(standaloneScraper, /scrapeSantaBarbaraCountyMeetings/);
-  assert.match(pipelineRunner, /Summary coverage incomplete/);
-  assert.match(pipelineRunner, /LLM failed for/);
+  assert.match(pipelineRunner, /hardPipelineIssues/);
+  assert.doesNotMatch(pipelineRunner, /Summary coverage incomplete\|LLM failed for/);
 });
 
 test("Santa Barbara County Planning Commission uses the official county and Box sources", () => {
