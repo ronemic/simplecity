@@ -1,11 +1,7 @@
 import "@/lib/env/bootstrap";
 import fs from "node:fs/promises";
 import path from "node:path";
-import {
-  hardPipelineIssues,
-  runJurisdictionPipelines,
-  runSimpleCityPipeline
-} from "@/lib/pipeline";
+import { runJurisdictionPipelines, runSimpleCityPipeline } from "@/lib/pipeline";
 import { SCRAPED_DIR, getJurisdictionScrapedDir } from "@/lib/scraper/downloadDocuments";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -104,10 +100,12 @@ async function main() {
 
   if (result.status === "failed") process.exit(1);
   if (process.argv.includes("--require-results-coverage")) {
-    const coverageIssues = hardPipelineIssues(result);
-    if (coverageIssues.length > 0) {
+    const coverageErrors = result.errors.filter((error) =>
+      /Outcome coverage incomplete|Decision outcome reconciliation failed|Minutes ingestion incomplete|Summary coverage incomplete|LLM failed for/i.test(error)
+    );
+    if (coverageErrors.length > 0) {
       console.error(
-        `Results coverage gate failed with ${coverageIssues.length} hard ingestion, persistence, or matching issue(s).`
+        `Results coverage gate failed with ${coverageErrors.length} ingestion or matching error(s).`
       );
       process.exit(1);
     }

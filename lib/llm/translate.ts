@@ -1,14 +1,6 @@
 import { jsonrepair } from "jsonrepair";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
-import {
-  jitteredBackoffMs,
-  nonNegativeNumberEnv,
-  observeLlmRateLimitHeaders,
-  parseRetryAfterMs,
-  positiveIntegerEnv,
-  waitForLlmCapacity
-} from "@/lib/llm/requestPolicy";
 
 export type TranslationLocale = "es";
 
@@ -59,8 +51,6 @@ type TranslationResult = {
 
 export type GenerateTranslationsOptions = {
   log?: (message: string) => void;
-  sleep?: (ms: number) => Promise<void>;
-  random?: () => number;
 };
 
 type TranslationProvider = {
@@ -74,19 +64,16 @@ type TranslationProvider = {
 function configuredTranslationProviders() {
   const providers: TranslationProvider[] = [];
   const referer = getConfiguredAppUrl();
-  const allOpenRouterKeys = [
+  const openRouterKeys = [
     process.env.OPENROUTER_API_KEY,
     process.env.OPENROUTER_API_KEY_2,
     process.env.OPENROUTER_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const allCerebrasKeys = [
+  const cerebrasKeys = [
     process.env.CEREBRAS_API_KEY,
     process.env.CEREBRAS_API_KEY_2,
     process.env.CEREBRAS_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const rotateKeys = process.env.LLM_ENABLE_LEGACY_KEY_ROTATION === "true";
-  const openRouterKeys = rotateKeys ? allOpenRouterKeys : allOpenRouterKeys.slice(0, 1);
-  const cerebrasKeys = rotateKeys ? allCerebrasKeys : allCerebrasKeys.slice(0, 1);
 
   cerebrasKeys.forEach((apiKey, index) => {
     providers.push({
@@ -111,20 +98,6 @@ function configuredTranslationProviders() {
       }
     });
   });
-  const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL?.trim();
-  const fallbackKey = process.env.OPENROUTER_FALLBACK_API_KEY || allOpenRouterKeys[0];
-  if (fallbackModel && fallbackKey) {
-    providers.push({
-      label: "OpenRouter paid/BYOK fallback",
-      apiKey: fallbackKey,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model: fallbackModel,
-      headers: {
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity Translation"
-      }
-    });
-  }
   return providers;
 }
 
@@ -299,32 +272,8 @@ async function requestTranslations(
   // over quickly so a rate-limited key cannot hold an entire scraper run for
   // several minutes.
   const maxAttempts = 3;
-  const inputJson = JSON.stringify(input, null, 2);
-  const maxCompletionTokens = positiveIntegerEnv("LLM_TRANSLATION_MAX_COMPLETION_TOKENS", 3000);
-  const providerName = provider.baseUrl.includes("cerebras.ai") ? "Cerebras" : "OpenRouter";
-  const capacityKey = `${providerName}:${provider.model}`;
-  const minIntervalMs = nonNegativeNumberEnv(
-    providerName === "Cerebras"
-      ? "CEREBRAS_MIN_REQUEST_INTERVAL_MS"
-      : "OPENROUTER_MIN_REQUEST_INTERVAL_MS",
-    providerName === "Cerebras" ? 5000 : 10_000
-  );
-  const tokensPerMinute = nonNegativeNumberEnv(
-    providerName === "Cerebras" ? "CEREBRAS_TOKENS_PER_MINUTE" : "OPENROUTER_TOKENS_PER_MINUTE",
-    providerName === "Cerebras" ? 60_000 : 0
-  );
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    await waitForLlmCapacity({
-      capacityKey,
-      label: provider.label,
-      prompt: `${TRANSLATION_SYSTEM_PROMPT}\n${inputJson}`,
-      maxCompletionTokens,
-      minIntervalMs,
-      tokensPerMinute,
-      sleep: options.sleep,
-      log: options.log
-    });
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
 
@@ -345,17 +294,15 @@ async function requestTranslations(
           },
           {
             role: "user",
-            content: inputJson
+            content: JSON.stringify(input, null, 2)
           }
         ],
         temperature: 0.1,
-        max_completion_tokens: maxCompletionTokens,
         response_format: {
           type: "json_object"
         }
       })
     }).finally(() => clearTimeout(timeout));
-    observeLlmRateLimitHeaders(capacityKey, response.headers);
 
     if (response.ok) {
       const raw = (await response.json()) as {
@@ -379,11 +326,11 @@ async function requestTranslations(
           throw new Error(`${provider.label} translation response could not be parsed: ${lastErrorText}`);
         }
 
-        const delayMs = jitteredBackoffMs(5_000, attempt, options.random);
+        const delayMs = attempt * 5_000;
         options.log?.(
           `${provider.label} returned invalid translation JSON (${message.slice(0, 240)}); retrying in ${Math.round(delayMs / 1000)}s.`
         );
-        await (options.sleep || sleep)(delayMs);
+        await sleep(delayMs);
         continue;
       }
     }
@@ -395,14 +342,11 @@ async function requestTranslations(
       );
     }
 
-    const delayMs = Math.min(
-      parseRetryAfterMs(response.headers) ?? jitteredBackoffMs(5_000, attempt, options.random),
-      60_000
-    );
+    const delayMs = Math.min(attempt * 5_000, 15_000);
     options.log?.(
       `${provider.label} translation request was rate-limited or unavailable; retrying in ${Math.round(delayMs / 1000)}s.`
     );
-    await (options.sleep || sleep)(delayMs);
+    await sleep(delayMs);
   }
 
   throw new Error(`${provider.label} translation request failed: ${lastErrorText.slice(0, 500)}`);

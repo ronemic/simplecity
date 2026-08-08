@@ -75,12 +75,9 @@ env:
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
   OPENROUTER_API_KEY_2: ${{ secrets.OPENROUTER_API_KEY_2 }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
-  OPENROUTER_FALLBACK_API_KEY: ${{ secrets.OPENROUTER_FALLBACK_API_KEY }}
-  OPENROUTER_FALLBACK_MODEL: ${{ secrets.OPENROUTER_FALLBACK_MODEL }}
   CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
   CEREBRAS_API_KEY_2: ${{ secrets.CEREBRAS_API_KEY_2 }}
   CEREBRAS_MODEL: ${{ secrets.CEREBRAS_MODEL || 'gpt-oss-120b' }}
-  CEREBRAS_TOKENS_PER_MINUTE: ${{ vars.CEREBRAS_TOKENS_PER_MINUTE || '60000' }}
 
 permissions:
   contents: read
@@ -180,7 +177,12 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Foster City pipeline
-        run: npm run pipeline:foster-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage)
+          npm run pipeline:foster-city -- "${pipeline_args[@]}" && exit 0
+          echo "Foster City pipeline failed; waiting five minutes before one safe retry."
+          sleep 300
+          npm run pipeline:foster-city -- "${pipeline_args[@]}"
 
   santa-clara-county:
     name: Santa Clara County scraper
@@ -212,7 +214,12 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Santa Clara County pipeline
-        run: npm run pipeline:santa-clara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage)
+          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}" && exit 0
+          echo "Santa Clara County pipeline stopped; waiting two minutes before one safe retry."
+          sleep 120
+          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}"
 
   mountain-view:
     name: Mountain View scraper
@@ -244,7 +251,12 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Mountain View pipeline
-        run: npm run pipeline:mountain-view -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage)
+          npm run pipeline:mountain-view -- "${pipeline_args[@]}" && exit 0
+          echo "Mountain View pipeline failed; waiting five minutes before one safe retry."
+          sleep 300
+          npm run pipeline:mountain-view -- "${pipeline_args[@]}"
 
   san-francisco:
     name: San Francisco scraper

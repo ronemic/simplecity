@@ -2,12 +2,6 @@ import { jsonrepair } from "jsonrepair";
 import { z } from "zod";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import type { DecisionOutcomeCanonicalStatus } from "@/lib/outcomes/extractDecisionOutcome";
-import {
-  nonNegativeNumberEnv,
-  observeLlmRateLimitHeaders,
-  positiveIntegerEnv,
-  waitForLlmCapacity
-} from "@/lib/llm/requestPolicy";
 
 export type DecisionOutcomeExplanationInput = {
   id: string;
@@ -31,6 +25,8 @@ type ExplanationProvider = {
   model: string;
   headers?: Record<string, string>;
 };
+
+const lastRequestAtByProvider = new Map<string, number>();
 
 const ExplanationResponseSchema = z.object({
   outcomes: z.array(
@@ -68,19 +64,16 @@ const OUTCOME_BOILERPLATE_PATTERN =
 function configuredProviders() {
   const providers: ExplanationProvider[] = [];
   const referer = getConfiguredAppUrl();
-  const allCerebrasKeys = [
+  const cerebrasKeys = [
     process.env.CEREBRAS_API_KEY,
     process.env.CEREBRAS_API_KEY_2,
     process.env.CEREBRAS_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const allOpenRouterKeys = [
+  const openRouterKeys = [
     process.env.OPENROUTER_API_KEY,
     process.env.OPENROUTER_API_KEY_2,
     process.env.OPENROUTER_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const rotateKeys = process.env.LLM_ENABLE_LEGACY_KEY_ROTATION === "true";
-  const cerebrasKeys = rotateKeys ? allCerebrasKeys : allCerebrasKeys.slice(0, 1);
-  const openRouterKeys = rotateKeys ? allOpenRouterKeys : allOpenRouterKeys.slice(0, 1);
 
   cerebrasKeys.forEach((apiKey, index) => {
     providers.push({
@@ -102,20 +95,6 @@ function configuredProviders() {
       }
     });
   });
-  const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL?.trim();
-  const fallbackKey = process.env.OPENROUTER_FALLBACK_API_KEY || allOpenRouterKeys[0];
-  if (fallbackModel && fallbackKey) {
-    providers.push({
-      label: "OpenRouter paid/BYOK fallback",
-      apiKey: fallbackKey,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model: fallbackModel,
-      headers: {
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity"
-      }
-    });
-  }
   return providers;
 }
 
@@ -207,26 +186,15 @@ function promptForInputs(inputs: DecisionOutcomeExplanationInput[]) {
 
 async function requestExplanations(
   provider: ExplanationProvider,
-  inputs: DecisionOutcomeExplanationInput[],
-  options: { log?: (message: string) => void; sleep?: (ms: number) => Promise<void> }
+  inputs: DecisionOutcomeExplanationInput[]
 ) {
-  const prompt = promptForInputs(inputs);
-  const maxCompletionTokens = positiveIntegerEnv("LLM_DECISION_MAX_COMPLETION_TOKENS", 2500);
-  const providerName = provider.baseUrl.includes("cerebras.ai") ? "Cerebras" : "OpenRouter";
-  const capacityKey = `${providerName}:${provider.model}`;
-  await waitForLlmCapacity({
-    capacityKey,
-    label: provider.label,
-    prompt: `${DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT}\n${prompt}`,
-    maxCompletionTokens,
-    minIntervalMs: nonNegativeNumberEnv("DECISION_EXPLANATION_MIN_REQUEST_INTERVAL_MS", 5000),
-    tokensPerMinute: nonNegativeNumberEnv(
-      providerName === "Cerebras" ? "CEREBRAS_TOKENS_PER_MINUTE" : "OPENROUTER_TOKENS_PER_MINUTE",
-      providerName === "Cerebras" ? 60_000 : 0
-    ),
-    sleep: options.sleep,
-    log: options.log
-  });
+  const minimumInterval = Number(process.env.DECISION_EXPLANATION_MIN_REQUEST_INTERVAL_MS || 5000);
+  const lastRequestAt = lastRequestAtByProvider.get(provider.label) || 0;
+  const waitMs = Number.isFinite(minimumInterval)
+    ? Math.max(0, lastRequestAt + Math.max(0, minimumInterval) - Date.now())
+    : 0;
+  if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+  lastRequestAtByProvider.set(provider.label, Date.now());
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
@@ -242,14 +210,12 @@ async function requestExplanations(
       model: provider.model,
       messages: [
         { role: "system", content: DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT },
-        { role: "user", content: prompt }
+        { role: "user", content: promptForInputs(inputs) }
       ],
       temperature: 0,
-      max_completion_tokens: maxCompletionTokens,
       response_format: { type: "json_object" }
     })
   }).finally(() => clearTimeout(timeout));
-  observeLlmRateLimitHeaders(capacityKey, response.headers);
 
   if (!response.ok) {
     throw new Error(`${provider.label} decision explanation failed with ${response.status}: ${(await response.text()).slice(0, 300)}`);
@@ -264,7 +230,7 @@ async function requestExplanations(
 
 export async function generateDecisionOutcomeExplanations(
   inputs: DecisionOutcomeExplanationInput[],
-  options: { log?: (message: string) => void; sleep?: (ms: number) => Promise<void> } = {}
+  options: { log?: (message: string) => void } = {}
 ) {
   if (inputs.length === 0) return new Map<string, DecisionOutcomeExplanation>();
   const providers = configuredProviders();
@@ -276,7 +242,7 @@ export async function generateDecisionOutcomeExplanations(
   for (const provider of providers) {
     try {
       options.log?.(`Writing ${pending.length} grounded decision explanation(s) with ${provider.label}.`);
-      const response = await requestExplanations(provider, pending, options);
+      const response = await requestExplanations(provider, pending);
       const candidates = new Map(response.outcomes.map((outcome) => [outcome.id, outcome]));
       for (const input of pending) {
         const candidate = candidates.get(input.id);

@@ -3,7 +3,6 @@ import test from "node:test";
 import {
   compactMeetingRawForStorage,
   documentExtractedTextForStorage,
-  shouldSkipWideMeetingWrite,
   uniqueExistingExternalIdsByMeetingDetailsUrl,
   uniqueMeetingDetailsIdentityUrls
 } from "@/lib/db/upsertMeetings";
@@ -89,10 +88,4 @@ test("does not select an arbitrary external id when stored rows share a details 
 
   assert.equal(externalIds.has(sharedUrl), false);
   assert.equal(externalIds.get(uniqueUrl), "unique");
-});
-
-test("skips wide database rewrites only when the stored source hash matches", () => {
-  assert.equal(shouldSkipWideMeetingWrite("same", "same"), true);
-  assert.equal(shouldSkipWideMeetingWrite("old", "new"), false);
-  assert.equal(shouldSkipWideMeetingWrite(null, "new"), false);
 });

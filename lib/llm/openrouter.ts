@@ -22,19 +22,10 @@ import {
   TOPIC_VALIDATION_SYSTEM_PROMPT,
   type TopicValidationCandidate
 } from "./topicValidation";
-import {
-  jitteredBackoffMs,
-  nonNegativeNumberEnv,
-  observeLlmRateLimitHeaders,
-  parseRetryAfterMs,
-  positiveIntegerEnv,
-  waitForLlmCapacity
-} from "./requestPolicy";
 
 export type GenerateSummaryOptions = {
   log?: (message: string) => void;
   sleep?: (ms: number) => Promise<void>;
-  random?: () => number;
 };
 
 type SummaryRequestResult = {
@@ -69,6 +60,7 @@ class SummaryProviderRequestError extends Error {
   }
 }
 
+const lastSummaryRequestAtByProvider = new Map<string, number>();
 const MAX_TOPIC_VALIDATION_PROMPT_CHARS = 60_000;
 export const MAX_AGENDA_ITEM_BATCH_CHARS = 18_000;
 
@@ -147,23 +139,33 @@ function getSummaryMaxAttempts() {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 3;
 }
 
+function parseRetryAfterMs(headers: Headers) {
+  const raw = headers.get("retry-after");
+  if (!raw) return null;
+
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+
+  const retryAt = Date.parse(raw);
+  if (!Number.isNaN(retryAt)) return Math.max(0, retryAt - Date.now());
+
+  return null;
+}
+
 function getConfiguredSummaryProviders() {
   const providers: SummaryProvider[] = [];
   const referer = getConfiguredAppUrl();
 
-  const allOpenRouterKeys = [
+  const openRouterKeys = [
     process.env.OPENROUTER_API_KEY,
     process.env.OPENROUTER_API_KEY_2,
     process.env.OPENROUTER_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const allCerebrasKeys = [
+  const cerebrasKeys = [
     process.env.CEREBRAS_API_KEY,
     process.env.CEREBRAS_API_KEY_2,
     process.env.CEREBRAS_API_KEY_3
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
-  const rotateKeys = process.env.LLM_ENABLE_LEGACY_KEY_ROTATION === "true";
-  const openRouterKeys = rotateKeys ? allOpenRouterKeys : allOpenRouterKeys.slice(0, 1);
-  const cerebrasKeys = rotateKeys ? allCerebrasKeys : allCerebrasKeys.slice(0, 1);
 
   const addOpenRouter = (apiKey: string, index: number) => {
     providers.push({
@@ -194,23 +196,6 @@ function getConfiguredSummaryProviders() {
   cerebrasKeys.forEach(addCerebras);
   openRouterKeys.forEach(addOpenRouter);
 
-  const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL?.trim();
-  const fallbackKey = process.env.OPENROUTER_FALLBACK_API_KEY || allOpenRouterKeys[0];
-  if (fallbackModel && fallbackKey && fallbackModel !== (process.env.OPENROUTER_MODEL || "google/gemma-4-31b-it:free")) {
-    providers.push({
-      name: "OpenRouter",
-      label: "OpenRouter paid/BYOK fallback",
-      apiKey: fallbackKey,
-      baseUrl: "https://openrouter.ai/api/v1/chat/completions",
-      model: fallbackModel,
-      headers: {
-        "HTTP-Referer": referer,
-        "X-OpenRouter-Title": "SimpleCity"
-      },
-      minIntervalEnv: "OPENROUTER_MIN_REQUEST_INTERVAL_MS"
-    });
-  }
-
   if (providers.length === 0) {
     throw new Error("Missing LLM provider API key. Configure an OpenRouter or Cerebras API key.");
   }
@@ -225,42 +210,25 @@ export function hasSummaryProviderConfig() {
       process.env.OPENROUTER_API_KEY_3 ||
       process.env.CEREBRAS_API_KEY ||
       process.env.CEREBRAS_API_KEY_2 ||
-      process.env.CEREBRAS_API_KEY_3 ||
-      (process.env.OPENROUTER_FALLBACK_API_KEY && process.env.OPENROUTER_FALLBACK_MODEL)
+      process.env.CEREBRAS_API_KEY_3
   );
 }
 
-function providerCapacityKey(provider: SummaryProvider) {
-  return `${provider.name}:${provider.model}`;
-}
-
-function providerTokensPerMinute(provider: SummaryProvider) {
-  return nonNegativeNumberEnv(
-    provider.name === "Cerebras"
-      ? "CEREBRAS_TOKENS_PER_MINUTE"
-      : "OPENROUTER_TOKENS_PER_MINUTE",
-    provider.name === "Cerebras" ? 60_000 : 0
-  );
-}
-
-async function waitForProviderSlot(
-  provider: SummaryProvider,
-  prompt: string,
-  maxCompletionTokens: number,
-  options: GenerateSummaryOptions
-) {
+async function waitForProviderSlot(provider: SummaryProvider, options: GenerateSummaryOptions) {
   const fallbackMs = provider.name === "OpenRouter" ? 10_000 : 5_000;
   const minIntervalMs = parseNonNegativeEnv(provider.minIntervalEnv, fallbackMs);
-  await waitForLlmCapacity({
-    capacityKey: providerCapacityKey(provider),
-    label: provider.label,
-    prompt,
-    maxCompletionTokens,
-    minIntervalMs,
-    tokensPerMinute: providerTokensPerMinute(provider),
-    sleep: options.sleep,
-    log: options.log
-  });
+  if (minIntervalMs <= 0) return;
+
+  const lastRequestAt = lastSummaryRequestAtByProvider.get(provider.label) || 0;
+  const waitMs = lastRequestAt + minIntervalMs - Date.now();
+  if (waitMs > 0) {
+    options.log?.(
+      `Waiting ${Math.ceil(waitMs / 1000)}s before the next ${provider.label} summary request.`
+    );
+    await (options.sleep || sleep)(waitMs);
+  }
+
+  lastSummaryRequestAtByProvider.set(provider.label, Date.now());
 }
 
 function canTryNextProvider(error: unknown) {
@@ -292,7 +260,7 @@ export function isLlmRateLimitError(error: unknown) {
   return /\b429\b|rate-?limited|rate limit/i.test(error.message);
 }
 
-function retryDelayMs(error: unknown, attempt: number, random?: () => number) {
+function retryDelayMs(error: unknown, attempt: number) {
   if (isSummaryProviderRequestError(error) && error.retryAfterMs !== null) return error.retryAfterMs;
 
   const baseMs = parseNonNegativeEnv(
@@ -302,7 +270,7 @@ function retryDelayMs(error: unknown, attempt: number, random?: () => number) {
     isLlmRateLimitError(error) ? 30_000 : 5_000
   );
 
-  return jitteredBackoffMs(baseMs, attempt, random);
+  return baseMs * attempt;
 }
 
 function summarizeValidationIssues(issues: SummaryValidationIssue[]) {
@@ -433,16 +401,10 @@ ${JSON.stringify(rejectedCards.map(({ card }) => card))}
 
 Matched agenda-item source:
 ${sourceContext}`;
-  const maxCompletionTokens = positiveIntegerEnv("LLM_REPAIR_MAX_COMPLETION_TOKENS", 3500);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
-  await waitForProviderSlot(
-    provider,
-    `${SIMPLECITY_SYSTEM_PROMPT}\n${repairPrompt}`,
-    maxCompletionTokens,
-    options
-  );
+  await waitForProviderSlot(provider, options);
 
   const response = await fetch(provider.baseUrl, {
     method: "POST",
@@ -459,11 +421,9 @@ ${sourceContext}`;
         { role: "user", content: repairPrompt }
       ],
       temperature: 0,
-      max_completion_tokens: maxCompletionTokens,
       response_format: { type: "json_object" }
     })
   }).finally(() => clearTimeout(timeout));
-  observeLlmRateLimitHeaders(providerCapacityKey(provider), response.headers);
 
   if (!response.ok) {
     const text = await response.text();
@@ -493,54 +453,16 @@ ${sourceContext}`;
   return { summary, raw, validationIssues };
 }
 
-async function requestTargetedCardRepairsWithFallback(
-  meeting: LlmReadyMeeting,
-  initialProvider: SummaryProvider,
-  rejectedCards: Array<{ index: number; card: unknown }>,
-  issues: SummaryValidationIssue[],
-  options: GenerateSummaryOptions
-) {
-  const providers = [
-    initialProvider,
-    ...getConfiguredSummaryProviders().filter(
-      (provider) => provider.label !== initialProvider.label || provider.model !== initialProvider.model
-    )
-  ];
-  let lastError: unknown;
-
-  for (const [index, provider] of providers.entries()) {
-    try {
-      return await requestTargetedCardRepairs(meeting, provider, rejectedCards, issues, options);
-    } catch (error) {
-      lastError = error;
-      const nextProvider = providers[index + 1];
-      if (!nextProvider || !canTryNextProvider(error)) throw error;
-      options.log?.(
-        `${provider.label} targeted repair failed for ${meeting.title}; trying ${nextProvider.label}.`
-      );
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error("Unknown targeted repair error");
-}
-
 async function requestSummary(
   meeting: LlmReadyMeeting,
   provider: SummaryProvider,
   options: GenerateSummaryOptions = {},
   regenerationGuidance?: string
 ): Promise<SummaryRequestResult> {
-  const userPrompt = buildSimpleCityUserPrompt(meeting);
-  const maxCompletionTokens = positiveIntegerEnv("LLM_SUMMARY_MAX_COMPLETION_TOKENS", 6000);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
 
-  await waitForProviderSlot(
-    provider,
-    [SIMPLECITY_SYSTEM_PROMPT, userPrompt, regenerationGuidance || ""].join("\n"),
-    maxCompletionTokens,
-    options
-  );
+  await waitForProviderSlot(provider, options);
 
   const response = await fetch(provider.baseUrl, {
     method: "POST",
@@ -559,7 +481,7 @@ async function requestSummary(
         },
         {
           role: "user",
-          content: userPrompt
+          content: buildSimpleCityUserPrompt(meeting)
         },
         ...(regenerationGuidance
           ? [
@@ -571,13 +493,11 @@ async function requestSummary(
           : [])
       ],
       temperature: 0,
-      max_completion_tokens: maxCompletionTokens,
       response_format: {
         type: "json_object"
       }
     })
   }).finally(() => clearTimeout(timeout));
-  observeLlmRateLimitHeaders(providerCapacityKey(provider), response.headers);
 
   if (!response.ok) {
     const text = await response.text();
@@ -620,7 +540,7 @@ async function requestSummary(
       `Repairing ${rejectedCards.length} rejected card(s) for ${meeting.title} without regenerating the meeting.`
     );
     try {
-      repairResult = await requestTargetedCardRepairsWithFallback(
+      repairResult = await requestTargetedCardRepairs(
         meeting,
         provider,
         rejectedCards,
@@ -630,7 +550,6 @@ async function requestSummary(
       summary = mergeValidatedSummaries(summary, repairResult.summary);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown repair error";
-      if (summary.cards.length === 0 && isRetryableSummaryError(error)) throw error;
       options.log?.(
         `Targeted card repair failed for ${meeting.title}; keeping accepted cards: ${message}`
       );
@@ -664,17 +583,10 @@ async function requestTopicValidation(
   provider: SummaryProvider,
   options: GenerateSummaryOptions = {}
 ) {
-  const topicPrompt = buildTopicValidationPrompt(candidates);
-  const maxCompletionTokens = positiveIntegerEnv("LLM_TOPIC_MAX_COMPLETION_TOKENS", 2000);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
 
-  await waitForProviderSlot(
-    provider,
-    `${TOPIC_VALIDATION_SYSTEM_PROMPT}\n${topicPrompt}`,
-    maxCompletionTokens,
-    options
-  );
+  await waitForProviderSlot(provider, options);
 
   const response = await fetch(provider.baseUrl, {
     method: "POST",
@@ -688,14 +600,12 @@ async function requestTopicValidation(
       model: provider.model,
       messages: [
         { role: "system", content: TOPIC_VALIDATION_SYSTEM_PROMPT },
-        { role: "user", content: topicPrompt }
+        { role: "user", content: buildTopicValidationPrompt(candidates) }
       ],
       temperature: 0,
-      max_completion_tokens: maxCompletionTokens,
       response_format: { type: "json_object" }
     })
   }).finally(() => clearTimeout(timeout));
-  observeLlmRateLimitHeaders(providerCapacityKey(provider), response.headers);
 
   if (!response.ok) {
     const text = await response.text();
@@ -882,7 +792,7 @@ async function generateSummaryForInput(
       lastError = error;
       const message = error instanceof Error ? error.message : "Unknown LLM error";
       if (attempt < maxAttempts && isRetryableSummaryError(error)) {
-        const delayMs = retryDelayMs(error, attempt, options.random);
+        const delayMs = retryDelayMs(error, attempt);
         options.log?.(
           `Retrying LLM summary for ${meeting.title} in ${Math.round(delayMs / 1000)}s: ${message}`
         );

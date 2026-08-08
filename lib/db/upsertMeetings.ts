@@ -278,13 +278,6 @@ type ExistingMeetingDetailsIdentity = {
   meeting_details_url?: string | null;
 };
 
-type ExistingMeetingStorage = {
-  id: string;
-  external_id: string;
-  source_hash: string | null;
-  summarized_source_hash: string | null;
-};
-
 function normalizedIdentityUrl(value?: string | null) {
   return String(value || "").trim().replace(/\/$/, "");
 }
@@ -372,32 +365,6 @@ async function loadExistingExternalIdsByMeetingDetailsUrl(
   }
 
   return externalIds;
-}
-
-async function loadExistingMeetingsByExternalId(
-  supabase: SupabaseClient,
-  externalIds: string[],
-  jurisdiction?: JurisdictionConfig
-) {
-  const meetings = new Map<string, ExistingMeetingStorage>();
-  for (const batch of chunks(Array.from(new Set(externalIds)), 100)) {
-    let query = supabase
-      .from("meetings")
-      .select("id,external_id,source_hash,summarized_source_hash")
-      .in("external_id", batch);
-    if (jurisdiction) query = query.eq("jurisdiction_slug", jurisdiction.slug);
-    const { data, error } = await query;
-    if (error) throw new Error(`Failed to preload existing meeting hashes: ${error.message}`);
-    for (const row of (data || []) as ExistingMeetingStorage[]) meetings.set(row.external_id, row);
-  }
-  return meetings;
-}
-
-export function shouldSkipWideMeetingWrite(
-  existingSourceHash: string | null | undefined,
-  sourceHash: string
-) {
-  return Boolean(existingSourceHash && existingSourceHash === sourceHash);
 }
 
 async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string) {
@@ -545,7 +512,8 @@ export async function upsertMeetings(
     meetings,
     jurisdiction
   );
-  const preparedMeetings = meetings.map((meeting) => {
+
+  for (const meeting of meetings) {
     const safeMeeting = sanitizeForDatabase(meeting);
     const identitySourceUrl = canonicalMeetingSourceUrl(meeting);
     const selectedSourceUrl = meeting.sourceUrl || identitySourceUrl;
@@ -556,16 +524,6 @@ export async function upsertMeetings(
       safeMeeting.externalId ||
       externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
-    return { meeting, safeMeeting, selectedSourceUrl, externalId, sourceHash };
-  });
-  const storedMeetings = await loadExistingMeetingsByExternalId(
-    supabase,
-    preparedMeetings.map((item) => item.externalId),
-    jurisdiction
-  );
-
-  for (const prepared of preparedMeetings) {
-    const { meeting, safeMeeting, selectedSourceUrl, externalId, sourceHash } = prepared;
     const jurisdictionColumns = jurisdiction
       ? {
           jurisdiction_name: jurisdiction.name,
@@ -575,85 +533,62 @@ export async function upsertMeetings(
       : {};
     const regionalDatabase = Boolean(jurisdiction && usesRegionalSupabase(jurisdiction));
     const compactRaw = compactMeetingRawForStorage(safeMeeting);
-    const existing = storedMeetings.get(externalId);
-    let data: { id: string; summarized_source_hash: string | null } | null = null;
-    let error: { message: string } | null = null;
 
-    if (existing && shouldSkipWideMeetingWrite(existing.source_hash, sourceHash)) {
-      const result = await supabase
-        .from("meetings")
-        .update({
+    const { data, error } = await supabase
+      .from("meetings")
+      .upsert(
+        {
+          ...jurisdictionColumns,
+          external_id: externalId,
+          title: safeMeeting.title,
+          meeting_type: safeMeeting.meetingType,
+          date_text: safeMeeting.dateText,
+          time_text: safeMeeting.timeText || null,
+          meeting_datetime: parseMeetingDate(meetingDateTimeText(safeMeeting)),
+          section: safeMeeting.section,
           status: safeMeeting.status,
+          source_type: safeMeeting.sourceType,
           source_url: selectedSourceUrl,
+          row_text: safeMeeting.rowText,
+          has_html_agenda: safeMeeting.hasHtmlAgenda,
+          has_pdf: safeMeeting.hasPdf,
+          llm_input_text: safeMeeting.llmInputText,
+          public_comments_input_text: safeMeeting.publicCommentsInputText,
+          source_hash: sourceHash,
+          extraction_notes: safeMeeting.extractionNotes,
+          raw: compactRaw,
           scraped_at: scrapedAt || new Date().toISOString()
-        })
-        .eq("id", existing.id);
-      error = result.error;
-      data = {
-        id: existing.id,
-        summarized_source_hash: existing.summarized_source_hash
-      };
-    } else {
-      const result = await supabase
-        .from("meetings")
-        .upsert(
-          {
-            ...jurisdictionColumns,
-            external_id: externalId,
-            title: safeMeeting.title,
-            meeting_type: safeMeeting.meetingType,
-            date_text: safeMeeting.dateText,
-            time_text: safeMeeting.timeText || null,
-            meeting_datetime: parseMeetingDate(meetingDateTimeText(safeMeeting)),
-            section: safeMeeting.section,
-            status: safeMeeting.status,
-            source_type: safeMeeting.sourceType,
-            source_url: selectedSourceUrl,
-            row_text: safeMeeting.rowText,
-            has_html_agenda: safeMeeting.hasHtmlAgenda,
-            has_pdf: safeMeeting.hasPdf,
-            llm_input_text: safeMeeting.llmInputText,
-            public_comments_input_text: safeMeeting.publicCommentsInputText,
-            source_hash: sourceHash,
-            extraction_notes: safeMeeting.extractionNotes,
-            raw: compactRaw,
-            scraped_at: scrapedAt || new Date().toISOString()
-          },
-          { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
-        )
-        .select("id,summarized_source_hash")
-        .single();
-      data = result.data;
-      error = result.error;
-    }
+        },
+        { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
+      )
+      .select("id,summarized_source_hash")
+      .single();
 
     if (error) throw new Error(`Failed to upsert meeting ${meeting.title}: ${error.message}`);
     if (!data?.id) throw new Error(`Failed to read meeting id for ${meeting.title}.`);
 
-    if (!shouldSkipWideMeetingWrite(existing?.source_hash, sourceHash)) {
-      for (const doc of safeMeeting.documents) {
-        const storedExtractedText = documentExtractedTextForStorage(doc.type, doc.extractedText);
-        const { error: docError } = await supabase.from("documents").upsert(
-          {
-            ...jurisdictionColumns,
-            meeting_id: data.id,
-            type: doc.type,
-            label: doc.label,
-            source_url: doc.url,
-            local_path: doc.localPath || null,
-            storage_path: doc.storagePath || null,
-            bytes: doc.bytes || null,
-            download_error: doc.downloadError || null,
-            extracted_text: storedExtractedText,
-            extraction_character_count: storedExtractedText?.length || null,
-            is_scanned: doc.isScanned || false
-          },
-          { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
-        );
+    for (const doc of safeMeeting.documents) {
+      const storedExtractedText = documentExtractedTextForStorage(doc.type, doc.extractedText);
+      const { error: docError } = await supabase.from("documents").upsert(
+        {
+          ...jurisdictionColumns,
+          meeting_id: data.id,
+          type: doc.type,
+          label: doc.label,
+          source_url: doc.url,
+          local_path: doc.localPath || null,
+          storage_path: doc.storagePath || null,
+          bytes: doc.bytes || null,
+          download_error: doc.downloadError || null,
+          extracted_text: storedExtractedText,
+          extraction_character_count: storedExtractedText?.length || null,
+          is_scanned: doc.isScanned || false
+        },
+        { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
+      );
 
-        if (docError) {
-          throw new Error(`Failed to upsert document ${doc.url}: ${docError.message}`);
-        }
+      if (docError) {
+        throw new Error(`Failed to upsert document ${doc.url}: ${docError.message}`);
       }
     }
 
