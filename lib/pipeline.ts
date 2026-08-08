@@ -40,6 +40,13 @@ import {
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
+import {
+  clearSummaryRetryJobs,
+  deferSummaryRetryJob,
+  isSummaryRetryDue,
+  loadSummaryRetryJobs,
+  type SummaryRetryJob
+} from "@/lib/db/summaryRetryJobs";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -60,6 +67,7 @@ export type PipelineResult = {
   status: "success" | "success_with_errors" | "failed";
   logs: string[];
   errors: string[];
+  issues: PipelineIssue[];
   meetingsFound: number;
   documentsDownloaded: number;
   cardsGenerated: number;
@@ -72,15 +80,38 @@ export type PipelineResult = {
   }>;
 };
 
+export type PipelineIssue = {
+  code:
+    | "configuration_error"
+    | "deadline_exceeded"
+    | "ingestion_incomplete"
+    | "persistence_failed"
+    | "summary_missing"
+    | "summary_deferred"
+    | "outcome_incomplete"
+    | "pipeline_failed";
+  severity: "error" | "warning";
+  message: string;
+  meetingId?: string;
+  sourceHash?: string | null;
+};
+
 export type MultiJurisdictionPipelineResult = {
   status: PipelineResult["status"];
   logs: string[];
   errors: string[];
+  issues: PipelineIssue[];
   results: Record<JurisdictionSlug, PipelineResult>;
   meetingsFound: number;
   documentsDownloaded: number;
   cardsGenerated: number;
 };
+
+export function hardPipelineIssues(
+  result: Pick<PipelineResult | MultiJurisdictionPipelineResult, "issues">
+) {
+  return result.issues.filter((issue) => issue.severity === "error");
+}
 
 function resolvePipelineJurisdiction(
   input?: JurisdictionSlug | JurisdictionConfig
@@ -208,6 +239,11 @@ export async function runSimpleCityPipeline(
   let deadlineRecorded = false;
   const logs: string[] = [];
   const errors: string[] = [];
+  const issues: PipelineIssue[] = [];
+  const addIssue = (issue: PipelineIssue) => {
+    issues.push(issue);
+    errors.push(issue.message);
+  };
   const log = (message: string) => {
     const publicMessage = redactPublicLogMessage(message);
     const line = `${new Date().toISOString()} [${jurisdiction.slug}] ${publicMessage}`;
@@ -220,7 +256,7 @@ export async function runSimpleCityPipeline(
 
     if (!deadlineRecorded) {
       const message = `Pipeline stopped early during ${phase} to leave time for CI cleanup and persistence.`;
-      errors.push(message);
+      addIssue({ code: "deadline_exceeded", severity: "error", message });
       log(message);
       deadlineRecorded = true;
     }
@@ -237,7 +273,7 @@ export async function runSimpleCityPipeline(
       supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Supabase service environment is not configured.";
-      errors.push(message);
+      addIssue({ code: "configuration_error", severity: "error", message });
       log(message);
 
       if (jurisdiction.slug !== "foster-city") {
@@ -246,6 +282,7 @@ export async function runSimpleCityPipeline(
           status: "failed",
           logs,
           errors,
+          issues,
           meetingsFound: 0,
           documentsDownloaded: 0,
           cardsGenerated: 0,
@@ -266,7 +303,11 @@ export async function runSimpleCityPipeline(
   let persistenceFailed = false;
 
   if (persist && !supabase) {
-    errors.push("Supabase service environment is not configured; persistence was skipped.");
+    addIssue({
+      code: "configuration_error",
+      severity: "error",
+      message: "Supabase service environment is not configured; persistence was skipped."
+    });
     log("Supabase service environment is not configured; persistence will be skipped.");
   }
 
@@ -302,7 +343,7 @@ export async function runSimpleCityPipeline(
 
     if (error) {
       const message = `Failed to create scraper run record: ${error.message}`;
-      errors.push(message);
+      addIssue({ code: "persistence_failed", severity: "error", message });
       log(message);
     } else {
       runId = data?.id || null;
@@ -400,7 +441,7 @@ export async function runSimpleCityPipeline(
               });
     applyJurisdictionMetadata(scrapeResult.meetings, jurisdiction);
     for (const scrapeError of scrapeResult.errors || []) {
-      errors.push(scrapeError);
+      addIssue({ code: "ingestion_incomplete", severity: "error", message: scrapeError });
       log(scrapeError);
     }
 
@@ -428,7 +469,7 @@ export async function runSimpleCityPipeline(
     }
 
     for (const minutesError of minutesIngestionErrors(scrapeResult.meetings)) {
-      errors.push(minutesError);
+      addIssue({ code: "ingestion_incomplete", severity: "error", message: minutesError });
       log(minutesError);
     }
 
@@ -459,7 +500,7 @@ export async function runSimpleCityPipeline(
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown persistence error";
-        errors.push(message);
+        addIssue({ code: "persistence_failed", severity: "error", message });
         log(`Persistence failed; continuing without database writes: ${message}`);
         upserted = [];
         persistSummaries = false;
@@ -471,12 +512,16 @@ export async function runSimpleCityPipeline(
 
     if (shouldSummarize && !recordDeadline("LLM summarization")) {
       if (!hasSummaryProviderConfig()) {
-        errors.push("No LLM provider API key is configured; summaries were not generated.");
+        addIssue({
+          code: "configuration_error",
+          severity: "error",
+          message: "No LLM provider API key is configured; summaries were not generated."
+        });
         log("Configure OPENROUTER_API_KEY or CEREBRAS_API_KEY to generate LLM summaries.");
       } else if (persist && !persistSummaries) {
         const message =
           "Skipping LLM summaries because database persistence failed; generated cards would not appear on the frontend.";
-        errors.push(message);
+        addIssue({ code: "persistence_failed", severity: "error", message });
         log(message);
       } else {
         const summaryTargets = persistSummaries
@@ -489,6 +534,14 @@ export async function runSimpleCityPipeline(
               summarizedSourceHash: null,
               existingCardCount: 0
             }));
+        let retryJobs = new Map<string, SummaryRetryJob>();
+        if (persistSummaries && supabase) {
+          retryJobs = await loadSummaryRetryJobs(
+            supabase,
+            jurisdiction.slug,
+            summaryTargets.map((item) => item.id).filter(Boolean)
+          );
+        }
         let consecutiveRateLimitFailures = 0;
         const maxConsecutiveRateLimitFailures = getMaxConsecutiveRateLimitFailures();
 
@@ -515,6 +568,7 @@ export async function runSimpleCityPipeline(
               if (item.sourceHash) {
                 await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
               }
+              await clearSummaryRetryJobs(supabase, jurisdiction.slug, item.id);
               log(
                 `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; official minutes will update those cards without generating duplicates.`
               );
@@ -529,6 +583,9 @@ export async function runSimpleCityPipeline(
                 item.meeting.items?.length || 0
               )
             ) {
+              if (persistSummaries && supabase && item.id) {
+                await clearSummaryRetryJobs(supabase, jurisdiction.slug, item.id);
+              }
               log(
                 item.existingCardCount > 0
                   ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.`
@@ -537,12 +594,48 @@ export async function runSimpleCityPipeline(
               continue;
             }
 
+            const retryJobKey = `${item.id}:${item.sourceHash}`;
+            const retryJob = retryJobs.get(retryJobKey);
+            if (retryJob && !isSummaryRetryDue(retryJob)) {
+              const currentCoverageIntact = Boolean(
+                item.existingCardCount > 0 && item.summarizedSourceHash === item.sourceHash
+              );
+              const message =
+                `Deferring ${item.meeting.title}; its next per-meeting summary attempt is scheduled for ${retryJob.nextAttemptAt}.`;
+              addIssue({
+                code: currentCoverageIntact ? "summary_deferred" : "summary_missing",
+                severity: currentCoverageIntact ? "warning" : "error",
+                message,
+                meetingId: item.id,
+                sourceHash: item.sourceHash
+              });
+              log(message);
+              continue;
+            }
+
             const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
             if ((item.meeting.items?.length || 0) > 0 && summary.cards.length === 0) {
               const message =
                 `Summary coverage incomplete for ${item.meeting.title} ${item.meeting.dateText || ""}: ` +
                 `the model produced zero cards for ${item.meeting.items?.length || 0} official agenda item(s).`;
-              errors.push(message);
+              addIssue({
+                code: "summary_missing",
+                severity: "error",
+                message,
+                meetingId: item.id || item.meeting.id,
+                sourceHash: item.sourceHash
+              });
+              if (persistSummaries && supabase && item.id && item.sourceHash) {
+                const deferred = await deferSummaryRetryJob(
+                  supabase,
+                  jurisdiction.slug,
+                  item.id,
+                  item.sourceHash,
+                  message,
+                  retryJob
+                );
+                retryJobs.set(retryJobKey, deferred);
+              }
               log(message);
               continue;
             }
@@ -582,18 +675,59 @@ export async function runSimpleCityPipeline(
                 summary
               });
             }
+            if (persistSummaries && supabase && item.id) {
+              await clearSummaryRetryJobs(supabase, jurisdiction.slug, item.id);
+              for (const key of retryJobs.keys()) {
+                if (key.startsWith(`${item.id}:`)) retryJobs.delete(key);
+              }
+            }
             consecutiveRateLimitFailures = 0;
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown LLM error";
-            errors.push(`LLM failed for ${item.meeting.title}: ${message}`);
-            log(`LLM failed for ${item.meeting.title}: ${message}`);
+            const issueMessage = `LLM failed for ${item.meeting.title}: ${message}`;
+            const currentCoverageIntact = Boolean(
+              item.existingCardCount > 0 &&
+                item.sourceHash &&
+                item.summarizedSourceHash === item.sourceHash
+            );
+            addIssue({
+              code: currentCoverageIntact && isLlmRateLimitError(error)
+                ? "summary_deferred"
+                : "summary_missing",
+              severity: currentCoverageIntact && isLlmRateLimitError(error) ? "warning" : "error",
+              message: issueMessage,
+              meetingId: item.id || item.meeting.id,
+              sourceHash: item.sourceHash
+            });
+            log(issueMessage);
+
+            if (persistSummaries && supabase && item.id && item.sourceHash) {
+              const retryJobKey = `${item.id}:${item.sourceHash}`;
+              try {
+                const deferred = await deferSummaryRetryJob(
+                  supabase,
+                  jurisdiction.slug,
+                  item.id,
+                  item.sourceHash,
+                  issueMessage,
+                  retryJobs.get(retryJobKey)
+                );
+                retryJobs.set(retryJobKey, deferred);
+              } catch (queueError) {
+                const queueMessage = queueError instanceof Error
+                  ? queueError.message
+                  : "Unknown summary retry queue error";
+                addIssue({ code: "persistence_failed", severity: "error", message: queueMessage });
+                log(queueMessage);
+              }
+            }
 
             if (isLlmRateLimitError(error)) {
               consecutiveRateLimitFailures += 1;
               if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
                 const stopMessage =
-                  "Stopping LLM summaries after repeated provider rate-limit responses; retry later or configure another provider with available quota.";
-                errors.push(stopMessage);
+                  "Stopping LLM summaries after repeated provider rate-limit responses; failed meetings remain in the per-meeting retry queue.";
+                addIssue({ code: "summary_deferred", severity: "warning", message: stopMessage });
                 log(stopMessage);
                 break;
               }
@@ -640,13 +774,26 @@ export async function runSimpleCityPipeline(
           if (!reconciliation.complete && reconciliation.resultCardsFound > 0) {
             const coverageError =
               `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultCardsMatched} of ${reconciliation.resultCardsFound} decision card(s) with official results; ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
-            errors.push(coverageError);
+            addIssue({
+              code: "outcome_incomplete",
+              severity: "error",
+              message: coverageError,
+              meetingId: item.id,
+              sourceHash: item.sourceHash
+            });
             log(coverageError);
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : "Unknown decision outcome error";
-          errors.push(`${item.meeting.title}: ${message}`);
-          log(`Decision outcome reconciliation failed for ${item.meeting.title}: ${message}`);
+          const issueMessage = `Decision outcome reconciliation failed for ${item.meeting.title}: ${message}`;
+          addIssue({
+            code: "outcome_incomplete",
+            severity: "error",
+            message: issueMessage,
+            meetingId: item.id,
+            sourceHash: item.sourceHash
+          });
+          log(issueMessage);
         }
       }
       if (outcomesUpserted > 0) {
@@ -699,7 +846,7 @@ export async function runSimpleCityPipeline(
           .eq("id", runId);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown scraper_runs update error";
-        errors.push(message);
+        addIssue({ code: "persistence_failed", severity: "error", message });
         log(`Failed to update scraper run record: ${message}`);
       }
     }
@@ -709,6 +856,7 @@ export async function runSimpleCityPipeline(
       status,
       logs,
       errors,
+      issues,
       meetingsFound,
       documentsDownloaded,
       cardsGenerated,
@@ -717,7 +865,7 @@ export async function runSimpleCityPipeline(
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown pipeline error";
-    errors.push(message);
+    addIssue({ code: "pipeline_failed", severity: "error", message });
     log(`Pipeline failed: ${message}`);
 
     if (canPersist && supabase && runId) {
@@ -746,6 +894,7 @@ export async function runSimpleCityPipeline(
       status: "failed",
       logs,
       errors,
+      issues,
       meetingsFound,
       documentsDownloaded,
       cardsGenerated,
@@ -766,6 +915,7 @@ export async function runJurisdictionPipelines(
   const results = {} as Record<JurisdictionSlug, PipelineResult>;
   const logs: string[] = [];
   const errors: string[] = [];
+  const issues: PipelineIssue[] = [];
 
   for (const jurisdiction of jurisdictions) {
     try {
@@ -776,6 +926,7 @@ export async function runJurisdictionPipelines(
       results[jurisdiction.slug] = result;
       logs.push(...result.logs);
       errors.push(...result.errors.map((error) => `${jurisdiction.name}: ${error}`));
+      issues.push(...result.issues);
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown jurisdiction pipeline error";
       errors.push(`${jurisdiction.name}: ${message}`);
@@ -785,6 +936,7 @@ export async function runJurisdictionPipelines(
         status: "failed",
         logs: [`${new Date().toISOString()} [${jurisdiction.slug}] ${publicMessage}`],
         errors: [message],
+        issues: [{ code: "pipeline_failed", severity: "error", message }],
         meetingsFound: 0,
         documentsDownloaded: 0,
         cardsGenerated: 0,
@@ -792,6 +944,7 @@ export async function runJurisdictionPipelines(
         generatedSummaries: []
       };
       results[jurisdiction.slug] = failed;
+      issues.push(...failed.issues);
       logs.push(...failed.logs);
     }
   }
@@ -809,6 +962,7 @@ export async function runJurisdictionPipelines(
     status,
     logs,
     errors,
+    issues,
     results,
     meetingsFound: resultList.reduce((sum, result) => sum + result.meetingsFound, 0),
     documentsDownloaded: resultList.reduce((sum, result) => sum + result.documentsDownloaded, 0),
