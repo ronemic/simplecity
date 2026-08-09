@@ -44,7 +44,7 @@ import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
 import type { DecisionResultFilter } from "@/lib/utils/decisionResultFilter";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
-  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status";
+  "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,updated_at";
 const PUBLIC_MEETING_LIST_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,source_type,source_url,scraped_at,created_at,updated_at";
 const PUBLIC_MEETING_DETAIL_COLUMNS =

@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils/cn";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
 import { cardPreviewText, cardSummaryPoints } from "@/lib/utils/cardShare";
 import { isAwaitingDecisionResult } from "@/lib/utils/decisionResultFilter";
+import { SantaBarbaraInterestButton } from "@/components/SantaBarbaraInterestButton";
+import { latestIsoTimestamp, SANTA_BARBARA_INTEREST_JURISDICTION } from "@/lib/interests/santaBarbara";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -214,6 +216,13 @@ export function SummaryCard({
   const meetingPageHref = meetingHref(card);
   const primaryButtonClass = "action-primary-sm font-black";
   const noCommentLabel = t(locale, "noCommentOptionListed");
+  const showSantaBarbaraInterest =
+    (card.jurisdiction_slug || meeting?.jurisdiction_slug) ===
+    SANTA_BARBARA_INTEREST_JURISDICTION;
+  const interestActivityAt = latestIsoTimestamp(
+    card.updated_at,
+    outcome?.updated_at
+  );
 
   return (
     <article
@@ -294,6 +303,17 @@ export function SummaryCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          {showSantaBarbaraInterest ? (
+            <SantaBarbaraInterestButton
+              activityAt={interestActivityAt}
+              cardId={card.id}
+              locale={locale}
+              meetingDate={meetingDate}
+              meetingStatus={meeting?.status || null}
+              showDisclosure={isSharePresentation}
+              title={agendaTitle}
+            />
+          ) : null}
           <CardShareActions
             cardId={card.id}
             compact

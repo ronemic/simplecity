@@ -235,6 +235,7 @@ export default async function DecisionsPage({
             locale={locale}
           />
         }
+        showSantaBarbaraInterestPilot={jurisdiction === "santa-barbara-county"}
       />
     </div>
   );

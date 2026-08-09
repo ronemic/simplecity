@@ -99,6 +99,7 @@
     "pipeline:east-palo-alto": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=east-palo-alto",
     "pipeline:all": "PLAYWRIGHT_BROWSERS_PATH=0 node --import tsx/esm scripts/run-pipeline.ts --jurisdiction=all",
     "email:digests": "node --import tsx/esm scripts/send-weekly-digests.ts",
+    "interests:santa-barbara": "node --import tsx/esm scripts/report-santa-barbara-interests.ts",
     "test": "node --import tsx/esm --test tests/*.test.ts"
   },
   "dependencies": {
