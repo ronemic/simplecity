@@ -51,7 +51,53 @@ type AgendaAvailabilityCard = {
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
 const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
+const MAX_STORED_RAW_AGENDA_ITEM_CHARACTERS = 4_000;
 export const SUMMARY_CARD_WRITE_BATCH_SIZE = 20;
+
+type SupabaseWriteError = {
+  code?: string | null;
+  message?: string | null;
+};
+
+type SupabaseWriteResult<T> = {
+  data: T | null;
+  error: SupabaseWriteError | null;
+};
+
+export function isTransientSupabaseWriteError(error: SupabaseWriteError | null) {
+  if (!error) return false;
+  if (["40P01", "55P03", "57014"].includes(String(error.code || "").toUpperCase())) {
+    return true;
+  }
+
+  return /(?:statement|lock) timeout|canceling statement due to|deadlock detected|connection (?:reset|terminated)|fetch failed|gateway timeout|temporarily unavailable/i.test(
+    error.message || ""
+  );
+}
+
+export async function retryTransientSupabaseWrite<T>(
+  operation: () => PromiseLike<SupabaseWriteResult<T>>,
+  options: {
+    delaysMs?: number[];
+    sleep?: (milliseconds: number) => Promise<void>;
+    onRetry?: (error: SupabaseWriteError, nextAttempt: number, delayMs: number) => void;
+  } = {}
+) {
+  const delaysMs = options.delaysMs || [2_000, 5_000];
+  const wait = options.sleep || ((milliseconds: number) =>
+    new Promise<void>((resolve) => setTimeout(resolve, milliseconds)));
+
+  for (let attempt = 0; ; attempt += 1) {
+    const result = await operation();
+    const delayMs = delaysMs[attempt];
+    if (!result.error || !isTransientSupabaseWriteError(result.error) || delayMs === undefined) {
+      return result;
+    }
+
+    options.onRetry?.(result.error, attempt + 2, delayMs);
+    await wait(delayMs);
+  }
+}
 
 export function summaryCardWriteBatches<T>(rows: T[], batchSize = SUMMARY_CARD_WRITE_BATCH_SIZE) {
   if (!Number.isInteger(batchSize) || batchSize <= 0) {
@@ -328,11 +374,23 @@ export function compactMeetingRawForStorage(meeting: LlmReadyMeeting): LlmReadyM
     // These potentially large fields already live in dedicated meeting/document
     // columns. Keeping a second copy in raw can make historical refreshes exceed
     // the database statement timeout.
+    rowText: "",
+    htmlAgendaText: null,
+    detailText: null,
     llmInputText: "",
     publicCommentsInputText: null,
     documents: meeting.documents.map((document) => ({
       ...document,
       extractedText: null
+    })),
+    items: meeting.items?.map((item) => ({
+      ...item,
+      rowText: item.rowText.slice(0, MAX_STORED_RAW_AGENDA_ITEM_CHARACTERS),
+      legislationText: item.legislationText?.slice(0, MAX_STORED_RAW_AGENDA_ITEM_CHARACTERS) || null,
+      attachments: item.attachments?.map((document) => ({
+        ...document,
+        extractedText: null
+      }))
     }))
   };
 }
@@ -534,57 +592,78 @@ export async function upsertMeetings(
     const regionalDatabase = Boolean(jurisdiction && usesRegionalSupabase(jurisdiction));
     const compactRaw = compactMeetingRawForStorage(safeMeeting);
 
-    const { data, error } = await supabase
-      .from("meetings")
-      .upsert(
-        {
-          ...jurisdictionColumns,
-          external_id: externalId,
-          title: safeMeeting.title,
-          meeting_type: safeMeeting.meetingType,
-          date_text: safeMeeting.dateText,
-          time_text: safeMeeting.timeText || null,
-          meeting_datetime: parseMeetingDate(meetingDateTimeText(safeMeeting)),
-          section: safeMeeting.section,
-          status: safeMeeting.status,
-          source_type: safeMeeting.sourceType,
-          source_url: selectedSourceUrl,
-          row_text: safeMeeting.rowText,
-          has_html_agenda: safeMeeting.hasHtmlAgenda,
-          has_pdf: safeMeeting.hasPdf,
-          llm_input_text: safeMeeting.llmInputText,
-          public_comments_input_text: safeMeeting.publicCommentsInputText,
-          source_hash: sourceHash,
-          extraction_notes: safeMeeting.extractionNotes,
-          raw: compactRaw,
-          scraped_at: scrapedAt || new Date().toISOString()
-        },
-        { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
-      )
-      .select("id,summarized_source_hash")
-      .single();
+    const { data, error } = await retryTransientSupabaseWrite<{
+      id: string;
+      summarized_source_hash: string | null;
+    }>(
+      () => supabase
+        .from("meetings")
+        .upsert(
+          {
+            ...jurisdictionColumns,
+            external_id: externalId,
+            title: safeMeeting.title,
+            meeting_type: safeMeeting.meetingType,
+            date_text: safeMeeting.dateText,
+            time_text: safeMeeting.timeText || null,
+            meeting_datetime: parseMeetingDate(meetingDateTimeText(safeMeeting)),
+            section: safeMeeting.section,
+            status: safeMeeting.status,
+            source_type: safeMeeting.sourceType,
+            source_url: selectedSourceUrl,
+            row_text: safeMeeting.rowText,
+            has_html_agenda: safeMeeting.hasHtmlAgenda,
+            has_pdf: safeMeeting.hasPdf,
+            llm_input_text: safeMeeting.llmInputText,
+            public_comments_input_text: safeMeeting.publicCommentsInputText,
+            source_hash: sourceHash,
+            extraction_notes: safeMeeting.extractionNotes,
+            raw: compactRaw,
+            scraped_at: scrapedAt || new Date().toISOString()
+          },
+          { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
+        )
+        .select("id,summarized_source_hash")
+        .single(),
+      {
+        onRetry: (retryError, nextAttempt, delayMs) => {
+          console.warn(
+            `[SimpleCity] Meeting upsert timed out for ${meeting.title}; retrying attempt ${nextAttempt} in ${delayMs}ms: ${retryError.message || "transient database error"}`
+          );
+        }
+      }
+    );
 
     if (error) throw new Error(`Failed to upsert meeting ${meeting.title}: ${error.message}`);
     if (!data?.id) throw new Error(`Failed to read meeting id for ${meeting.title}.`);
 
     for (const doc of safeMeeting.documents) {
       const storedExtractedText = documentExtractedTextForStorage(doc.type, doc.extractedText);
-      const { error: docError } = await supabase.from("documents").upsert(
+      const { error: docError } = await retryTransientSupabaseWrite(
+        () => supabase.from("documents").upsert(
+          {
+            ...jurisdictionColumns,
+            meeting_id: data.id,
+            type: doc.type,
+            label: doc.label,
+            source_url: doc.url,
+            local_path: doc.localPath || null,
+            storage_path: doc.storagePath || null,
+            bytes: doc.bytes || null,
+            download_error: doc.downloadError || null,
+            extracted_text: storedExtractedText,
+            extraction_character_count: storedExtractedText?.length || null,
+            is_scanned: doc.isScanned || false
+          },
+          { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
+        ),
         {
-          ...jurisdictionColumns,
-          meeting_id: data.id,
-          type: doc.type,
-          label: doc.label,
-          source_url: doc.url,
-          local_path: doc.localPath || null,
-          storage_path: doc.storagePath || null,
-          bytes: doc.bytes || null,
-          download_error: doc.downloadError || null,
-          extracted_text: storedExtractedText,
-          extraction_character_count: storedExtractedText?.length || null,
-          is_scanned: doc.isScanned || false
-        },
-        { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
+          onRetry: (retryError, nextAttempt, delayMs) => {
+            console.warn(
+              `[SimpleCity] Document upsert timed out for ${meeting.title}; retrying attempt ${nextAttempt} in ${delayMs}ms: ${retryError.message || "transient database error"}`
+            );
+          }
+        }
       );
 
       if (docError) {

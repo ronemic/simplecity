@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   compactMeetingRawForStorage,
   documentExtractedTextForStorage,
+  isTransientSupabaseWriteError,
+  retryTransientSupabaseWrite,
   uniqueExistingExternalIdsByMeetingDetailsUrl,
   uniqueMeetingDetailsIdentityUrls
 } from "@/lib/db/upsertMeetings";
@@ -60,14 +62,72 @@ test("stores large extracted source text only in its dedicated database columns"
     }],
     llmInputText: "large LLM input",
     publicCommentsInputText: "large comments input",
-    items: []
+    htmlAgendaText: "large HTML agenda",
+    detailText: "large detail page",
+    items: [{
+      externalId: "item-1",
+      fileNumber: null,
+      agendaNumber: "1",
+      itemType: null,
+      title: "Large item",
+      action: null,
+      result: null,
+      sourceUrl: "https://example.test/item/1",
+      rowText: "r".repeat(8_000),
+      legislationText: "l".repeat(8_000),
+      attachments: [{
+        type: "Staff Report",
+        label: "Staff report",
+        url: "https://example.test/staff-report.pdf",
+        extractedText: "large nested staff report"
+      }]
+    }]
   } as LlmReadyMeeting;
 
   const raw = compactMeetingRawForStorage(meeting);
+  assert.equal(raw.rowText, "");
+  assert.equal(raw.htmlAgendaText, null);
+  assert.equal(raw.detailText, null);
   assert.equal(raw.llmInputText, "");
   assert.equal(raw.publicCommentsInputText, null);
   assert.equal(raw.documents[0].extractedText, null);
+  assert.equal(raw.items?.[0].rowText.length, 4_000);
+  assert.equal(raw.items?.[0].legislationText?.length, 4_000);
+  assert.equal(raw.items?.[0].attachments?.[0].extractedText, null);
   assert.equal(meeting.documents[0].extractedText, "large official minutes");
+  assert.equal(meeting.items?.[0].attachments?.[0].extractedText, "large nested staff report");
+});
+
+test("retries transient Supabase timeouts without retrying permanent errors", async () => {
+  const waits: number[] = [];
+  let attempts = 0;
+  const recovered = await retryTransientSupabaseWrite(
+    async () => {
+      attempts += 1;
+      return attempts < 3
+        ? { data: null, error: { code: "57014", message: "canceling statement due to statement timeout" } }
+        : { data: { id: "meeting-1" }, error: null };
+    },
+    {
+      delaysMs: [10, 20],
+      sleep: async (milliseconds) => { waits.push(milliseconds); }
+    }
+  );
+
+  assert.deepEqual(recovered, { data: { id: "meeting-1" }, error: null });
+  assert.equal(attempts, 3);
+  assert.deepEqual(waits, [10, 20]);
+  assert.equal(isTransientSupabaseWriteError({ message: "permission denied for table meetings" }), false);
+
+  let permanentAttempts = 0;
+  await retryTransientSupabaseWrite(
+    async () => {
+      permanentAttempts += 1;
+      return { data: null, error: { message: "permission denied for table meetings" } };
+    },
+    { delaysMs: [10, 20], sleep: async () => undefined }
+  );
+  assert.equal(permanentAttempts, 1);
 });
 
 test("bounds oversized extracted documents without dropping useful minutes text", () => {
