@@ -143,6 +143,22 @@ test("interest API rejects cross-origin browser writes", () => {
   );
 });
 
+test("interest API accepts the public origin behind a deployment proxy", () => {
+  assert.equal(
+    isAllowedInterestOrigin(
+      new Request("http://127.0.0.1:3000/api/interests/santa-barbara", {
+        headers: {
+          Host: "127.0.0.1:3000",
+          Origin: "https://simplecity.app",
+          "X-Forwarded-Host": "simplecity.app",
+          "X-Forwarded-Proto": "https"
+        }
+      })
+    ),
+    true
+  );
+});
+
 test("interest migration keeps raw signals private and exposes only a service-role aggregate", () => {
   const migration = readFileSync(
     new URL(

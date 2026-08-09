@@ -18,7 +18,26 @@ export function isAllowedInterestOrigin(request: Request) {
   if (!origin) return true;
 
   try {
-    return new URL(origin).origin === new URL(request.url).origin;
+    const originUrl = new URL(origin);
+    const requestUrl = new URL(request.url);
+    if (originUrl.protocol !== "http:" && originUrl.protocol !== "https:") return false;
+
+    const forwardedProtocol =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+      requestUrl.protocol.replace(/:$/, "");
+    const requestHosts = [
+      requestUrl.host,
+      request.headers.get("host")?.split(",")[0]?.trim(),
+      request.headers.get("x-forwarded-host")?.split(",")[0]?.trim()
+    ].filter((host): host is string => Boolean(host));
+
+    return requestHosts.some((host) => {
+      try {
+        return originUrl.origin === new URL(`${forwardedProtocol}://${host}`).origin;
+      } catch {
+        return false;
+      }
+    });
   } catch {
     return false;
   }
