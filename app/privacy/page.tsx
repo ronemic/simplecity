@@ -82,6 +82,30 @@ export default async function PrivacyPage({
             </p>
           </PolicySection>
 
+          <PolicySection
+            title={
+              es
+                ? "Piloto de interés del Condado de Santa Bárbara"
+                : "Santa Barbara County interest pilot"
+            }
+          >
+            <p>
+              {es
+                ? "En las tarjetas del Condado de Santa Bárbara, puedes marcar “Me interesa” sin crear una cuenta ni proporcionar un email. Tu navegador guarda un token aleatorio y una lista local de tus intereses. Para cada tarjeta, nuestro servidor transforma ese token en un código unidireccional diferente. La base de datos guarda el código específico de la tarjeta, pero no el token original, tu identidad, tu email ni tu dirección IP sin codificar."
+                : "On Santa Barbara County cards, you can select “I’m interested” without creating an account or providing an email. Your browser saves a random token and a local list of your interests. For each card, our server transforms that token into a different one-way code. The database stores the card-specific code, but not the original token, your identity, your email, or your raw IP address."}
+            </p>
+            <p className="mt-3">
+              {es
+                ? "SimpleCity puede proporcionar al Condado de Santa Bárbara totales agregados por tarjeta. Esos totales son señales anónimas de navegadores, no residentes verificados, y no son votos, encuestas representativas ni comentarios públicos oficiales. Usamos límites de solicitudes codificados y podemos revisar actividad inusual para reducir la manipulación."
+                : "SimpleCity may provide Santa Barbara County with aggregate totals for each card. Those totals are anonymous browser signals, not verified residents, and are not votes, representative polling, or official public comments. We use encoded request limits and may review unusual activity to reduce manipulation."}
+            </p>
+            <p className="mt-3">
+              {es
+                ? "Puedes retirar una señal desmarcando una tarjeta o usando “Retirar todos” en Mis intereses. Borrar directamente los datos del navegador elimina tu lista local, pero puede impedir que SimpleCity reconozca y retire una señal enviada anteriormente. Conservamos las señales mientras sean necesarias para operar y evaluar el piloto."
+                : "You can withdraw a signal by unselecting a card or using “Withdraw all” in My interests. Directly clearing browser data removes your local list, but may prevent SimpleCity from recognizing and withdrawing a previously submitted signal. We retain signals while needed to operate and evaluate the pilot."}
+            </p>
+          </PolicySection>
+
           <PolicySection title={es ? "Proveedores y divulgación" : "Providers and disclosure"}>
             <p>
               {es

@@ -45,8 +45,8 @@ export function CookiePreferenceControls({ locale }: { locale: Locale }) {
       </h2>
       <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-black/65">
         {locale === "es"
-          ? "Puedes borrar el idioma, la jurisdicción y la vista de reuniones guardados en este dispositivo. SimpleCity volverá a usar sus valores predeterminados. Esto no desactiva Google Analytics."
-          : "You can clear the language, jurisdiction, and meeting-view choices saved on this device. SimpleCity will return to its defaults. This does not disable Google Analytics."}
+          ? "Puedes borrar el idioma, la jurisdicción y la vista de reuniones guardados en este dispositivo. SimpleCity volverá a usar sus valores predeterminados. Esto no desactiva Google Analytics ni retira intereses de Santa Bárbara."
+          : "You can clear the language, jurisdiction, and meeting-view choices saved on this device. SimpleCity will return to its defaults. This does not disable Google Analytics or withdraw Santa Barbara interests."}
       </p>
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button className="action-secondary" onClick={clearPreferences} type="button">

@@ -46,7 +46,7 @@ export default async function CookiesPage({
           <CookiePreferenceControls locale={locale} />
 
           <section className="quiet-card overflow-hidden">
-            <div className="grid gap-px bg-black/10 sm:grid-cols-3">
+            <div className="grid gap-px bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
               <CookieType
                 title={es ? "Preferencias" : "Preferences"}
                 detail={
@@ -64,6 +64,15 @@ export default async function CookiesPage({
                     : "Google Analytics measures visits, sessions, and overall usage. It remains enabled on SimpleCity."
                 }
                 examples="_ga, _ga_*"
+              />
+              <CookieType
+                title={es ? "Intereses de Santa Bárbara" : "Santa Barbara interests"}
+                detail={
+                  es
+                    ? "Un token aleatorio y tu lista de intereses se guardan en este navegador. Usa “Retirar todos” en Mis intereses antes de borrar los datos del navegador."
+                    : "A random token and your interest list are saved in this browser. Use “Withdraw all” in My interests before clearing browser data."
+                }
+                examples="simplecity.santa-barbara.*"
               />
               <CookieType
                 title={es ? "Seguridad y administración" : "Security and administration"}
