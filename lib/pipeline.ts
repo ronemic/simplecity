@@ -15,6 +15,10 @@ import {
   isLlmRateLimitError
 } from "@/lib/llm/groq";
 import {
+  agendaItemsRequiringCards,
+  completeAgendaItemCoverage
+} from "@/lib/llm/agendaItemCoverage";
+import {
   appendSummaryCardsForMeeting,
   replaceSummaryCardsForMeeting,
   setMeetingSummarizedSourceHash,
@@ -537,15 +541,53 @@ export async function runSimpleCityPipeline(
               continue;
             }
 
-            const { summary, raw } = await generateSummaryForMeeting(item.meeting, { log });
-            if ((item.meeting.items?.length || 0) > 0 && summary.cards.length === 0) {
+            let initialSummary: Awaited<ReturnType<typeof generateSummaryForMeeting>> | null = null;
+            let initialSummaryError: unknown = null;
+            try {
+              initialSummary = await generateSummaryForMeeting(item.meeting, { log });
+            } catch (error) {
+              initialSummaryError = error;
+            }
+
+            const coverage = await completeAgendaItemCoverage(
+              item.meeting,
+              initialSummary,
+              {
+                generate: initialSummaryError && isLlmRateLimitError(initialSummaryError)
+                  ? undefined
+                  : (retryMeeting) => generateSummaryForMeeting(retryMeeting, { log })
+              }
+            );
+            const { summary, raw } = coverage;
+            const requiredItemCount = agendaItemsRequiringCards(item.meeting).length;
+
+            if (coverage.retriedItemIds.length > 0) {
+              log(
+                `Retried ${coverage.retriedItemIds.length} uncovered agenda item(s) individually for ${item.meeting.title}.`
+              );
+            }
+            for (const retryError of coverage.retryErrors) {
+              log(`Agenda-item summary retry did not complete for ${item.meeting.title}: ${retryError}`);
+            }
+            if (coverage.fallbackItemIds.length > 0) {
               const message =
-                `Summary coverage incomplete for ${item.meeting.title} ${item.meeting.dateText || ""}: ` +
-                `the model produced zero cards for ${item.meeting.items?.length || 0} official agenda item(s).`;
+                `Published official-source fallback coverage for ${coverage.fallbackItemIds.length} of ${requiredItemCount} required agenda item(s) in ${item.meeting.title}; detailed summaries will be retried on a future run.`;
               errors.push(message);
               log(message);
-              continue;
             }
+            if (initialSummaryError) {
+              const detail = initialSummaryError instanceof Error
+                ? initialSummaryError.message
+                : "Unknown LLM error";
+              const message =
+                `Detailed meeting summary was unavailable for ${item.meeting.title}; item-level coverage recovery continued: ${detail}`;
+              errors.push(message);
+              log(message);
+            }
+
+            const completedSourceHash = coverage.fallbackItemIds.length > 0
+              ? null
+              : item.sourceHash;
             if (persistSummaries && supabase && item.id) {
               const inserted = shouldAppendToExisting
                 ? await appendSummaryCardsForMeeting(
@@ -555,7 +597,7 @@ export async function runSimpleCityPipeline(
                     raw,
                     {
                       jurisdiction,
-                      sourceHash: item.sourceHash
+                      sourceHash: completedSourceHash
                     }
                   )
                 : await replaceSummaryCardsForMeeting(
@@ -566,7 +608,7 @@ export async function runSimpleCityPipeline(
                     {
                       allowEmptyReplacement: true,
                       jurisdiction,
-                      sourceHash: item.sourceHash
+                      sourceHash: completedSourceHash
                     }
                   );
               if (shouldAppendToExisting) {
@@ -582,7 +624,18 @@ export async function runSimpleCityPipeline(
                 summary
               });
             }
-            consecutiveRateLimitFailures = 0;
+            if (initialSummaryError && isLlmRateLimitError(initialSummaryError)) {
+              consecutiveRateLimitFailures += 1;
+              if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
+                const stopMessage =
+                  "Stopping detailed LLM summaries after repeated provider rate-limit responses; official-source fallback cards preserve agenda-item coverage.";
+                errors.push(stopMessage);
+                log(stopMessage);
+                break;
+              }
+            } else {
+              consecutiveRateLimitFailures = 0;
+            }
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown LLM error";
             errors.push(`LLM failed for ${item.meeting.title}: ${message}`);
