@@ -653,7 +653,7 @@ export function MeetingList({
                   </div>
                   <div
                     ref={calendarGridRef}
-                    className="grid auto-rows-[300px] grid-cols-7 bg-[#edf2f5]"
+                    className="grid auto-rows-auto grid-cols-7 bg-[#edf2f5]"
                   >
                     {monthDays.map((day, dayIndex) => {
                       const inMonth = day.startsWith(activeMonth);
@@ -672,7 +672,7 @@ export function MeetingList({
                         <div
                           key={day}
                           className={cn(
-                            "relative flex min-h-0 flex-col border-b border-r border-black/10 bg-white p-2",
+                            "relative flex min-h-[300px] flex-col border-b border-r border-black/10 bg-white p-2",
                             !inMonth && "bg-[#eef1f4] text-black/25",
                             isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]",
                             isPopoverOpen && "z-30"
@@ -710,7 +710,12 @@ export function MeetingList({
                               {Number(day.slice(-2))}
                             </span>
                           </div>
-                          <div className="pointer-events-none relative z-10 mt-2 flex min-h-0 flex-none flex-col gap-1.5 overflow-visible">
+                          <div
+                            className={cn(
+                              "pointer-events-none relative z-10 mt-2 flex flex-none flex-col gap-1.5",
+                              calendarDayLayout.overflowCount > 0 && "pb-8"
+                            )}
+                          >
                             {calendarDayLayout.visibleMeetings.map((meeting) => (
                               <CalendarMeetingLink
                                 key={meeting.id}
