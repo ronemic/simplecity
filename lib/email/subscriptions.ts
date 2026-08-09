@@ -50,6 +50,11 @@ type SubscribeInput = {
   baseUrl?: string;
 };
 
+type UnsubscribeRequestInput = {
+  email: string;
+  baseUrl?: string;
+};
+
 type SubscriptionClient = Pick<SupabaseClient, "from">;
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -216,6 +221,68 @@ function buildConfirmationEmail({
   return { subject, html, text };
 }
 
+function buildUnsubscribeConfirmationEmail({
+  email,
+  token,
+  baseUrl = appUrl()
+}: {
+  email: string;
+  token: string;
+  baseUrl?: string;
+}) {
+  const link = unsubscribeUrl(token, baseUrl);
+  const subject = "Confirm that you want to unsubscribe from SimpleCity";
+  const html = `<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#f7f3eb;color:#111827;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f3eb;padding:24px 12px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5ddcf;border-radius:8px;overflow:hidden;">
+            <tr>
+              <td style="padding:28px;">
+                <div style="font-size:14px;font-weight:900;color:#0f5e7c;">SimpleCity</div>
+                <h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#111827;">Stop all SimpleCity email updates</h1>
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
+                  Confirm that ${escapeHtml(email)} should be removed from all SimpleCity email digests.
+                </p>
+                <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
+                  Confirm unsubscribe
+                </a>
+                <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
+                  If you did not request this, ignore this email and your subscription will not change.
+                </p>
+                <hr style="margin:24px 0;border:0;border-top:1px solid #e5ddcf;" />
+                <h2 style="margin:0 0 8px;font-size:19px;line-height:1.25;color:#111827;">Cancelar todas las actualizaciones por email</h2>
+                <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#52606d;">
+                  Confirma que ${escapeHtml(email)} debe eliminarse de todos los resúmenes de SimpleCity.
+                </p>
+                <a href="${escapeHtml(link)}" style="font-size:14px;font-weight:800;color:#2457a6;">Confirmar cancelación</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`;
+  const text = [
+    "Stop all SimpleCity email updates",
+    "",
+    `Confirm that ${email} should be removed from all SimpleCity email digests:`,
+    link,
+    "",
+    "If you did not request this, ignore this email and your subscription will not change.",
+    "",
+    "Cancelar todas las actualizaciones por email",
+    "",
+    `Confirma que ${email} debe eliminarse de todos los resúmenes de SimpleCity:`,
+    link
+  ].join("\n");
+
+  return { subject, html, text };
+}
+
 async function getSubscriberByEmail(supabase: SubscriptionClient, emailNormalized: string) {
   const { data, error } = await supabase
     .from("email_subscribers")
@@ -320,6 +387,39 @@ export async function createOrRefreshSubscription(
     jurisdictions,
     confirmationToken
   };
+}
+
+export async function requestEmailUnsubscribe(
+  input: UnsubscribeRequestInput,
+  supabase: SubscriptionClient = subscriptionSupabase(),
+  emailSender: typeof sendEmail = sendEmail
+) {
+  const emailNormalized = normalizeSubscriberEmail(input.email);
+  if (!isValidSubscriberEmail(emailNormalized)) {
+    throw new EmailSubscriptionInputError("Enter a valid email address.");
+  }
+
+  const subscriber = await getSubscriberByEmail(supabase, emailNormalized);
+  if (!subscriber || subscriber.status === "unsubscribed") {
+    // Do not reveal whether an address is subscribed.
+    return { requested: false };
+  }
+
+  const email = buildUnsubscribeConfirmationEmail({
+    email: subscriber.email,
+    token: subscriber.unsubscribe_token,
+    baseUrl: input.baseUrl
+  });
+
+  await emailSender({
+    to: subscriber.email,
+    subject: email.subject,
+    html: email.html,
+    text: email.text,
+    tags: [{ name: "kind", value: "unsubscribe_confirmation" }]
+  });
+
+  return { requested: true };
 }
 
 export async function confirmEmailSubscription(

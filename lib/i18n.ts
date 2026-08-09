@@ -95,6 +95,8 @@ type TranslationKey =
   | "subscribeEyebrow"
   | "subscribeFormFallbackError"
   | "subscribeFormSuccess"
+  | "subscribeFormUnsubscribeHelp"
+  | "subscribeFormUnsubscribeSuccess"
   | "subscribeInvalidBody"
   | "subscribeInvalidTitle"
   | "subscribePageDescription"
@@ -102,6 +104,7 @@ type TranslationKey =
   | "subscribeUnsubscribedBody"
   | "subscribeUnsubscribedTitle"
   | "subscribeWeeklyDigestAreas"
+  | "unsubscribe"
   | "submitComment"
   | "summaryCards"
   | "summaryConfidence"
@@ -212,6 +215,10 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeFormFallbackError: "Something went wrong. Please try again.",
     subscribeFormSuccess:
       "Check your inbox to confirm your SimpleCity email updates. If you were already subscribed, your preferences will update after you confirm.",
+    subscribeFormUnsubscribeHelp:
+      "No areas selected. Submit your email to stop all SimpleCity email digests.",
+    subscribeFormUnsubscribeSuccess:
+      "If that email is subscribed, check its inbox to confirm that all SimpleCity email updates should stop.",
     subscribeInvalidBody:
       "If you already confirmed, you are all set. Submit the form again only if you need a fresh confirmation email.",
     subscribeInvalidTitle: "That link is expired or already used",
@@ -221,6 +228,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeUnsubscribedBody: "You will no longer receive SimpleCity email digests.",
     subscribeUnsubscribedTitle: "You are unsubscribed",
     subscribeWeeklyDigestAreas: "Weekly digest areas",
+    unsubscribe: "Unsubscribe",
     submitComment: "Submit comment",
     summaryCards: "Summary cards",
     summaryConfidence: "Summary confidence",
@@ -330,6 +338,10 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeFormFallbackError: "Algo salió mal. Inténtalo de nuevo.",
     subscribeFormSuccess:
       "Revisa tu inbox para confirmar tus actualizaciones de SimpleCity. Si ya estabas suscrito, tus preferencias se actualizarán después de confirmar.",
+    subscribeFormUnsubscribeHelp:
+      "No hay áreas seleccionadas. Envía tu email para dejar de recibir todos los resúmenes de SimpleCity.",
+    subscribeFormUnsubscribeSuccess:
+      "Si ese email está suscrito, revisa su inbox para confirmar que deben detenerse todas las actualizaciones de SimpleCity.",
     subscribeInvalidBody:
       "Si ya confirmaste, todo está listo. Envía el formulario de nuevo solo si necesitas un email de confirmación nuevo.",
     subscribeInvalidTitle: "Ese enlace venció o ya fue usado",
@@ -339,6 +351,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeUnsubscribedBody: "Ya no recibirás resúmenes por email de SimpleCity.",
     subscribeUnsubscribedTitle: "Cancelaste la suscripción",
     subscribeWeeklyDigestAreas: "Áreas del resumen semanal",
+    unsubscribe: "Cancelar suscripción",
     submitComment: "Enviar comentario",
     summaryCards: "Tarjetas de resumen",
     summaryConfidence: "Confianza del resumen",

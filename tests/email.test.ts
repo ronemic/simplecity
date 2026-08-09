@@ -18,6 +18,7 @@ import {
   normalizeSubscriberEmail,
   normalizeSubscriptionJurisdictions,
   publicEmailJurisdictionOptions,
+  requestEmailUnsubscribe,
   unsubscribeEmailSubscriber,
   unsubscribeUrl
 } from "@/lib/email/subscriptions";
@@ -741,6 +742,70 @@ test("unsubscribe token marks the subscriber unsubscribed", async () => {
 
   const invalidResult = await unsubscribeEmailSubscriber("missing-token", supabase as never);
   assert.equal(invalidResult, null);
+});
+
+test("zero-area unsubscribe requests email the existing subscriber without exposing unknown addresses", async () => {
+  const subscriber: EmailSubscriberRow = {
+    id: "subscriber-1",
+    email: "Resident@Example.com",
+    email_normalized: "resident@example.com",
+    status: "active",
+    pending_jurisdiction_slugs: [],
+    confirmation_token_hash: null,
+    unsubscribe_token: "unsubscribe-123",
+    confirmation_sent_at: null,
+    confirmed_at: "2026-07-04T18:00:00.000Z",
+    unsubscribed_at: null,
+    created_at: null,
+    updated_at: null
+  };
+  const sent: Array<{ to: string | string[]; subject: string; html?: string; text?: string }> = [];
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "email_subscribers");
+      return {
+        select() {
+          return {
+            eq(column: string, value: string) {
+              assert.equal(column, "email_normalized");
+              return {
+                maybeSingle: async () => ({
+                  data: value === subscriber.email_normalized ? subscriber : null,
+                  error: null
+                })
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+  const emailSender = async (input: (typeof sent)[number]) => {
+    sent.push(input);
+    return { id: "email-123" };
+  };
+
+  const existing = await requestEmailUnsubscribe(
+    { email: " resident@example.com ", baseUrl: "https://simplecity.example" },
+    supabase as never,
+    emailSender
+  );
+  assert.equal(existing.requested, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, subscriber.email);
+  assert.match(sent[0].subject, /unsubscribe/i);
+  assert.match(
+    sent[0].text || "",
+    /https:\/\/simplecity\.example\/api\/email\/unsubscribe\?token=unsubscribe-123/
+  );
+
+  const unknown = await requestEmailUnsubscribe(
+    { email: "unknown@example.com", baseUrl: "https://simplecity.example" },
+    supabase as never,
+    emailSender
+  );
+  assert.equal(unknown.requested, false);
+  assert.equal(sent.length, 1);
 });
 
 test("uses forwarded public host when configured app URL is local", () => {

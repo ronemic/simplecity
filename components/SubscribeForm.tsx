@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Mail, Send } from "lucide-react";
+import { CheckCircle2, Loader2, Mail, Send, XCircle } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -71,7 +71,6 @@ export function SubscribeForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (selectedJurisdictions.length === 0) return;
 
     const form = event.currentTarget;
     const formData = new FormData(form);
@@ -93,6 +92,7 @@ export function SubscribeForm({
         })
       });
       const result = (await response.json().catch(() => ({}))) as {
+        action?: "subscribe" | "unsubscribe";
         message?: string;
         error?: string;
       };
@@ -108,7 +108,11 @@ export function SubscribeForm({
       }
 
       setStatus("success");
-      setMessage(t(locale, "subscribeFormSuccess"));
+      setMessage(
+        selectedJurisdictions.length === 0
+          ? t(locale, "subscribeFormUnsubscribeSuccess")
+          : t(locale, "subscribeFormSuccess")
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -142,19 +146,27 @@ export function SubscribeForm({
           </div>
           <button
             className="action-primary min-w-44 shrink-0"
-            disabled={isSubmitting || selectedJurisdictions.length === 0}
+            disabled={isSubmitting}
             type="submit"
           >
             {isSubmitting ? (
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
             ) : (
-              <Send aria-hidden className="h-4 w-4" />
+              selectedJurisdictions.length === 0 ? (
+                <XCircle aria-hidden className="h-4 w-4" />
+              ) : (
+                <Send aria-hidden className="h-4 w-4" />
+              )
             )}
-            {t(locale, "subscribe")}
+            {selectedJurisdictions.length === 0
+              ? t(locale, "unsubscribe")
+              : t(locale, "subscribe")}
           </button>
         </div>
         <p className="text-sm font-semibold leading-6 text-black/60">
-          {t(locale, "subscribeAlreadySubscribedHelp")}
+          {selectedJurisdictions.length === 0
+            ? t(locale, "subscribeFormUnsubscribeHelp")
+            : t(locale, "subscribeAlreadySubscribedHelp")}
         </p>
       </div>
 

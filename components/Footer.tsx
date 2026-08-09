@@ -30,6 +30,10 @@ function aboutLabel(locale: Locale) {
   return locale === "es" ? "Acerca de" : "About";
 }
 
+function localizedHref(path: string, locale: Locale) {
+  return `${path}?lang=${locale}`;
+}
+
 export function Footer({ locale = "en" }: { locale?: Locale }) {
   const [currentLocale, setCurrentLocale] = useState(locale);
 
@@ -76,11 +80,17 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
           aria-label={currentLocale === "es" ? "Enlaces del pie de página" : "Footer links"}
           className="flex flex-wrap gap-2 font-bold md:justify-end"
         >
-          <Link className="action-ghost" href="/about">
+          <Link className="action-ghost" href={localizedHref("/about", currentLocale)}>
             {aboutLabel(currentLocale)}
           </Link>
-          <Link className="action-ghost" href="/subscribe">
+          <Link className="action-ghost" href={localizedHref("/subscribe", currentLocale)}>
             {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
+          </Link>
+          <Link className="action-ghost" href={localizedHref("/privacy", currentLocale)}>
+            {currentLocale === "es" ? "Privacidad" : "Privacy"}
+          </Link>
+          <Link className="action-ghost" href={localizedHref("/cookies", currentLocale)}>
+            {currentLocale === "es" ? "Configuración de cookies" : "Cookie settings"}
           </Link>
           <a className="action-ghost" href="mailto:simplecityadmin@gmail.com">
             {t(currentLocale, "contact")}

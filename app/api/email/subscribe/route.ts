@@ -2,7 +2,8 @@ import {
   createOrRefreshSubscription,
   EmailSubscriptionInputError,
   EmailSubscriptionRateLimitError,
-  normalizeSubscriberEmail
+  normalizeSubscriberEmail,
+  requestEmailUnsubscribe
 } from "@/lib/email/subscriptions";
 import { getPublicAppUrlForRequest } from "@/lib/email/config";
 import { consumeRateLimit, getRequestIp, rateLimitedResponse } from "@/lib/security/rateLimit";
@@ -44,6 +45,20 @@ export async function POST(request: Request) {
       ? body.jurisdictions.map(String)
       : [];
 
+    if (jurisdictions.length === 0) {
+      await requestEmailUnsubscribe({
+        email,
+        baseUrl: getPublicAppUrlForRequest(request)
+      });
+
+      return Response.json({
+        ok: true,
+        action: "unsubscribe",
+        message:
+          "If that email is subscribed, check its inbox to confirm that all SimpleCity email updates should stop."
+      });
+    }
+
     await createOrRefreshSubscription({
       email,
       jurisdictions,
@@ -52,6 +67,7 @@ export async function POST(request: Request) {
 
     return Response.json({
       ok: true,
+      action: "subscribe",
       message:
         "Check your inbox to confirm your SimpleCity email updates. If you were already subscribed, your preferences will update after you confirm."
     });
