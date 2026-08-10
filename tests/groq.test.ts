@@ -8,7 +8,9 @@ import {
 } from "@/lib/llm/groq";
 import {
   fetchLlmResponse,
+  formatLlmProcessRunSummary,
   getLlmProcessBudgetUsage,
+  getLlmProcessRunSummary,
   LlmProcessBudgetExceededError,
   resetLlmProcessBudgetForTests
 } from "@/lib/llm/provider";
@@ -176,7 +178,9 @@ test("times out while an LLM response body is still pending", async (t) => {
 
   t.after(() => {
     globalThis.fetch = originalFetch;
+    resetLlmProcessBudgetForTests();
   });
+  resetLlmProcessBudgetForTests();
 
   globalThis.fetch = (async () =>
     new Response(
@@ -201,6 +205,8 @@ test("times out while an LLM response body is still pending", async (t) => {
       /timed out after 20 milliseconds/i.test(error.message)
   );
   assert.ok(logs.some((message) => /Test request failed after \d+ms/i.test(message)));
+  assert.equal(getLlmProcessRunSummary().timedOut, 1);
+  assert.equal(getLlmProcessRunSummary().failed, 0);
 });
 
 test("logs completed LLM request duration and status", async (t) => {
@@ -405,6 +411,17 @@ test("stops outbound LLM requests at the process request budget", async (t) => {
       error.retryable === false
   );
   assert.equal(fetchCalls, 2);
+  assert.deepEqual(getLlmProcessRunSummary().categories, {
+    summaries: 0,
+    repairs: 0,
+    verifications: 0,
+    translations: 0,
+    results: 0,
+    other: 2
+  });
+  assert.equal(getLlmProcessRunSummary().successful, 2);
+  assert.equal(getLlmProcessRunSummary().budgetBlocked, 1);
+  assert.match(formatLlmProcessRunSummary(), /requests 2\/2; HTTP successful 2/);
 });
 
 test("uses provider token usage to stop before the next LLM dispatch", async (t) => {

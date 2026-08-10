@@ -29,6 +29,33 @@ let processRequestLimit = LLM_MAX_PROCESS_REQUESTS;
 let processTokenLimit = LLM_MAX_PROCESS_TOKENS;
 let processRequestCount = 0;
 let processTokenCount = 0;
+type LlmRequestCategory = "summaries" | "repairs" | "verifications" | "translations" | "results" | "other";
+const emptyCategoryCounts = (): Record<LlmRequestCategory, number> => ({
+  summaries: 0,
+  repairs: 0,
+  verifications: 0,
+  translations: 0,
+  results: 0,
+  other: 0
+});
+let processRequestStats = {
+  successful: 0,
+  timedOut: 0,
+  failed: 0,
+  aborted: 0,
+  budgetBlocked: 0,
+  categories: emptyCategoryCounts()
+};
+
+function requestCategory(label?: string): LlmRequestCategory {
+  const normalized = String(label || "").toLowerCase();
+  if (normalized.includes("targeted repair")) return "repairs";
+  if (normalized.includes("topic validation")) return "verifications";
+  if (normalized.includes("translation")) return "translations";
+  if (normalized.includes("decision explanation")) return "results";
+  if (normalized.includes("summary")) return "summaries";
+  return "other";
+}
 
 function bodyWithCompletionLimit(init: RequestInit) {
   if (typeof init.body !== "string") return init;
@@ -90,12 +117,46 @@ export function getLlmProcessBudgetUsage() {
   };
 }
 
+export function getLlmProcessRunSummary() {
+  return {
+    ...getLlmProcessBudgetUsage(),
+    successful: processRequestStats.successful,
+    timedOut: processRequestStats.timedOut,
+    failed: processRequestStats.failed,
+    aborted: processRequestStats.aborted,
+    budgetBlocked: processRequestStats.budgetBlocked,
+    categories: { ...processRequestStats.categories }
+  };
+}
+
+export function formatLlmProcessRunSummary() {
+  const summary = getLlmProcessRunSummary();
+  const categories = Object.entries(summary.categories)
+    .map(([category, count]) => `${category} ${count}`)
+    .join(", ");
+  return (
+    `LLM run summary: requests ${summary.requests}/${summary.requestLimit}; ` +
+    `HTTP successful ${summary.successful}; timed out ${summary.timedOut}; ` +
+    `failed ${summary.failed}; deadline-aborted ${summary.aborted}; ` +
+    `budget-blocked ${summary.budgetBlocked}; estimated/actual tokens ` +
+    `${summary.tokens}/${summary.tokenLimit}; by type: ${categories}.`
+  );
+}
+
 export function resetLlmProcessBudgetForTests(limits?: {
   requests?: number;
   tokens?: number;
 }) {
   processRequestCount = 0;
   processTokenCount = 0;
+  processRequestStats = {
+    successful: 0,
+    timedOut: 0,
+    failed: 0,
+    aborted: 0,
+    budgetBlocked: 0,
+    categories: emptyCategoryCounts()
+  };
   processRequestLimit = limits?.requests ?? LLM_MAX_PROCESS_REQUESTS;
   processTokenLimit = limits?.tokens ?? LLM_MAX_PROCESS_TOKENS;
 }
@@ -203,6 +264,7 @@ export async function fetchLlmResponse(
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let acquiredSlot = false;
   let reservedInputTokens = 0;
+  let timedOut = false;
   const timeoutLabel = timeoutMs >= 1000
     ? `${Math.round(timeoutMs / 1000)} seconds`
     : `${timeoutMs} milliseconds`;
@@ -227,6 +289,7 @@ export async function fetchLlmResponse(
     upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
     const boundedInit = bodyWithCompletionLimit(init);
     reservedInputTokens = reserveProcessBudget(estimateInputTokens(boundedInit.body));
+    processRequestStats.categories[requestCategory(telemetry?.label)] += 1;
     const usage = getLlmProcessBudgetUsage();
     telemetry?.log?.(
       `${telemetry.label} LLM process budget: request ${usage.requests}/${usage.requestLimit}, ` +
@@ -242,11 +305,14 @@ export async function fetchLlmResponse(
     })();
     const deadline = new Promise<never>((_resolve, reject) => {
       timeout = setTimeout(() => {
+        timedOut = true;
         controller.abort();
         reject(timeoutError);
       }, timeoutMs);
     });
     const result = await Promise.race([request, deadline]);
+    if (result.response.ok) processRequestStats.successful += 1;
+    else processRequestStats.failed += 1;
     const actualTokens = reconcileProcessTokenUsage(result.text, reservedInputTokens);
     if (actualTokens !== null) {
       const reconciledUsage = getLlmProcessBudgetUsage();
@@ -261,6 +327,15 @@ export async function fetchLlmResponse(
     );
     return result;
   } catch (error) {
+    if (error instanceof LlmProcessBudgetExceededError) {
+      processRequestStats.budgetBlocked += 1;
+    } else if (reservedInputTokens > 0 && timedOut) {
+      processRequestStats.timedOut += 1;
+    } else if (reservedInputTokens > 0 && upstreamSignal?.aborted) {
+      processRequestStats.aborted += 1;
+    } else if (reservedInputTokens > 0) {
+      processRequestStats.failed += 1;
+    }
     const message = error instanceof Error ? error.message : "Unknown request error";
     telemetry?.log?.(
       `${telemetry.label} failed after ${formatRequestDuration(Date.now() - queuedAt)}: ${message}`

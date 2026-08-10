@@ -44,6 +44,7 @@ import {
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
+import { formatLlmProcessRunSummary } from "@/lib/llm/provider";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -834,6 +835,7 @@ export async function runSimpleCityPipeline(
       : errors.length > 0
         ? "success_with_errors"
         : "success";
+    log(formatLlmProcessRunSummary());
     log(`Pipeline finished with status ${status}.`);
 
     if (canPersist && supabase && runId) {
@@ -874,6 +876,7 @@ export async function runSimpleCityPipeline(
     const message = error instanceof Error ? error.message : "Unknown pipeline error";
     errors.push(message);
     log(`Pipeline failed: ${message}`);
+    log(formatLlmProcessRunSummary());
 
     if (canPersist && supabase && runId) {
       try {
