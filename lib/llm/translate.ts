@@ -1,8 +1,9 @@
 import { jsonrepair } from "jsonrepair";
 import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
 import {
+  fetchLlmResponse,
   getConfiguredLlmProviders,
-  LLM_REQUEST_TIMEOUT_MS,
+  LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
   type LlmProvider
 } from "./provider";
 
@@ -240,17 +241,13 @@ async function requestTranslations(
   const maxAttempts = 3;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
-
-    const response = await fetch(provider.baseUrl, {
+    const { response, text } = await fetchLlmResponse(provider.baseUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${provider.apiKey}`,
         "Content-Type": "application/json",
         ...(provider.headers || {})
       },
-      signal: controller.signal,
       body: JSON.stringify({
         model: provider.model,
         provider: { require_parameters: true },
@@ -269,10 +266,10 @@ async function requestTranslations(
           type: "json_object"
         }
       })
-    }).finally(() => clearTimeout(timeout));
+    }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
 
     if (response.ok) {
-      const raw = (await response.json()) as {
+      const raw = JSON.parse(text) as {
         choices?: Array<{ message?: { content?: string } }>;
       };
       const content = raw.choices?.[0]?.message?.content;
@@ -302,7 +299,7 @@ async function requestTranslations(
       }
     }
 
-    lastErrorText = await response.text();
+    lastErrorText = text;
     const retryable = shouldRetryProviderError(response.status, lastErrorText);
     throw new Error(
       `${provider.label} translation request ${retryable ? "was rate-limited or unavailable" : "failed"} with ${response.status}: ${lastErrorText.slice(0, 500)}`

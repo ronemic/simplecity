@@ -1,8 +1,9 @@
 import { jsonrepair } from "jsonrepair";
 import { z } from "zod";
 import {
+  fetchLlmResponse,
   getConfiguredLlmProviders,
-  LLM_REQUEST_TIMEOUT_MS,
+  LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
   type LlmProvider
 } from "@/lib/llm/provider";
 import type { DecisionOutcomeCanonicalStatus } from "@/lib/outcomes/extractDecisionOutcome";
@@ -165,16 +166,13 @@ async function requestExplanations(
   if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
   lastRequestAtByProvider.set(provider.label, Date.now());
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
-  const response = await fetch(provider.baseUrl, {
+  const { response, text } = await fetchLlmResponse(provider.baseUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
       ...(provider.headers || {})
     },
-    signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
       provider: { require_parameters: true },
@@ -185,12 +183,12 @@ async function requestExplanations(
       temperature: 0,
       response_format: { type: "json_object" }
     })
-  }).finally(() => clearTimeout(timeout));
+  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
 
   if (!response.ok) {
-    throw new Error(`${provider.label} decision explanation failed with ${response.status}: ${(await response.text()).slice(0, 300)}`);
+    throw new Error(`${provider.label} decision explanation failed with ${response.status}: ${text.slice(0, 300)}`);
   }
-  const raw = (await response.json()) as {
+  const raw = JSON.parse(text) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
   const content = raw.choices?.[0]?.message?.content;

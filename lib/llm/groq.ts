@@ -7,8 +7,10 @@ import {
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import {
+  fetchLlmResponse,
   getConfiguredLlmProviders,
   hasConfiguredLlmProvider,
+  LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
   LLM_REQUEST_TIMEOUT_MS,
   type LlmProvider
 } from "./provider";
@@ -330,16 +332,13 @@ ${JSON.stringify(rejectedCards.map(({ card }) => card))}
 Matched agenda-item source:
 ${sourceContext}`;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
-  const response = await fetch(provider.baseUrl, {
+  const { response, text } = await fetchLlmResponse(provider.baseUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
       ...(provider.headers || {})
     },
-    signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
       provider: { require_parameters: true },
@@ -350,10 +349,9 @@ ${sourceContext}`;
       temperature: 0,
       response_format: { type: "json_object" }
     })
-  }).finally(() => clearTimeout(timeout));
+  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
 
   if (!response.ok) {
-    const text = await response.text();
     throw new SummaryProviderRequestError(
       provider.name,
       response.status,
@@ -362,7 +360,7 @@ ${sourceContext}`;
     );
   }
 
-  const raw = (await response.json()) as {
+  const raw = JSON.parse(text) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
   const content = raw.choices?.[0]?.message?.content;
@@ -412,17 +410,13 @@ async function requestSummary(
   options: GenerateSummaryOptions = {},
   regenerationGuidance?: string
 ): Promise<SummaryRequestResult> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
-
-  const response = await fetch(provider.baseUrl, {
+  const { response, text } = await fetchLlmResponse(provider.baseUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
       ...(provider.headers || {})
     },
-    signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
       provider: { require_parameters: true },
@@ -449,10 +443,9 @@ async function requestSummary(
         type: "json_object"
       }
     })
-  }).finally(() => clearTimeout(timeout));
+  }, LLM_REQUEST_TIMEOUT_MS);
 
   if (!response.ok) {
-    const text = await response.text();
     throw new SummaryProviderRequestError(
       provider.name,
       response.status,
@@ -461,7 +454,7 @@ async function requestSummary(
     );
   }
 
-  const raw = (await response.json()) as {
+  const raw = JSON.parse(text) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
 
@@ -532,17 +525,13 @@ async function requestTopicValidation(
   candidates: TopicValidationCandidate[],
   provider: SummaryProvider
 ) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
-
-  const response = await fetch(provider.baseUrl, {
+  const { response, text } = await fetchLlmResponse(provider.baseUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${provider.apiKey}`,
       "Content-Type": "application/json",
       ...(provider.headers || {})
     },
-    signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
       provider: { require_parameters: true },
@@ -553,10 +542,9 @@ async function requestTopicValidation(
       temperature: 0,
       response_format: { type: "json_object" }
     })
-  }).finally(() => clearTimeout(timeout));
+  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
 
   if (!response.ok) {
-    const text = await response.text();
     throw new SummaryProviderRequestError(
       provider.name,
       response.status,
@@ -565,7 +553,7 @@ async function requestTopicValidation(
     );
   }
 
-  const raw = (await response.json()) as {
+  const raw = JSON.parse(text) as {
     choices?: Array<{ message?: { content?: string } }>;
   };
   const content = raw.choices?.[0]?.message?.content;

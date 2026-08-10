@@ -5,6 +5,7 @@ import {
   generateSummaryForMeeting,
   MAX_AGENDA_ITEM_BATCH_CHARS
 } from "@/lib/llm/groq";
+import { fetchLlmResponse } from "@/lib/llm/provider";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 
 const meetingSummary = {
@@ -118,6 +119,32 @@ function setLlmTestEnv() {
   process.env.GROQ_SUMMARY_RETRY_BASE_MS = "0";
   process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS = "0";
 }
+
+test("times out while an LLM response body is still pending", async (t) => {
+  const originalFetch = globalThis.fetch;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async () =>
+    new Response(
+      new ReadableStream({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode('{"partial":'));
+        }
+      }),
+      { status: 200 }
+    )) as typeof fetch;
+
+  await assert.rejects(
+    fetchLlmResponse("https://openrouter.ai/test", { method: "POST" }, 20),
+    (error: unknown) =>
+      error instanceof Error &&
+      error.name === "AbortError" &&
+      /timed out after 20 milliseconds/i.test(error.message)
+  );
+});
 
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {
   const originalFetch = globalThis.fetch;
