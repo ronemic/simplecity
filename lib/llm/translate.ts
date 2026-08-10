@@ -266,7 +266,10 @@ async function requestTranslations(
           type: "json_object"
         }
       })
-    }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
+    }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
+      label: `OpenRouter ${input.locale} translation request`,
+      log: options.log
+    });
 
     if (response.ok) {
       const raw = JSON.parse(text) as {

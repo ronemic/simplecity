@@ -156,7 +156,8 @@ function promptForInputs(inputs: DecisionOutcomeExplanationInput[]) {
 
 async function requestExplanations(
   provider: ExplanationProvider,
-  inputs: DecisionOutcomeExplanationInput[]
+  inputs: DecisionOutcomeExplanationInput[],
+  options: { log?: (message: string) => void }
 ) {
   const minimumInterval = Number(process.env.DECISION_EXPLANATION_MIN_REQUEST_INTERVAL_MS || 0);
   const lastRequestAt = lastRequestAtByProvider.get(provider.label) || 0;
@@ -183,7 +184,10 @@ async function requestExplanations(
       temperature: 0,
       response_format: { type: "json_object" }
     })
-  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
+  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
+    label: `OpenRouter decision explanation request for ${inputs.length} outcome(s)`,
+    log: options.log
+  });
 
   if (!response.ok) {
     throw new Error(`${provider.label} decision explanation failed with ${response.status}: ${text.slice(0, 300)}`);
@@ -210,7 +214,7 @@ export async function generateDecisionOutcomeExplanations(
   for (const provider of providers) {
     try {
       options.log?.(`Writing ${pending.length} grounded decision explanation(s) with ${provider.label}.`);
-      const response = await requestExplanations(provider, pending);
+      const response = await requestExplanations(provider, pending, options);
       const candidates = new Map(response.outcomes.map((outcome) => [outcome.id, outcome]));
       for (const input of pending) {
         const candidate = candidates.get(input.id);

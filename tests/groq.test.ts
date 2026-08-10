@@ -122,6 +122,7 @@ function setLlmTestEnv() {
 
 test("times out while an LLM response body is still pending", async (t) => {
   const originalFetch = globalThis.fetch;
+  const logs: string[] = [];
 
   t.after(() => {
     globalThis.fetch = originalFetch;
@@ -138,12 +139,40 @@ test("times out while an LLM response body is still pending", async (t) => {
     )) as typeof fetch;
 
   await assert.rejects(
-    fetchLlmResponse("https://openrouter.ai/test", { method: "POST" }, 20),
+    fetchLlmResponse(
+      "https://openrouter.ai/test",
+      { method: "POST" },
+      20,
+      { label: "Test request", log: (message) => logs.push(message) }
+    ),
     (error: unknown) =>
       error instanceof Error &&
       error.name === "AbortError" &&
       /timed out after 20 milliseconds/i.test(error.message)
   );
+  assert.match(logs[0] || "", /Test request failed after \d+ms/i);
+});
+
+test("logs completed LLM request duration and status", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const logs: string[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async () =>
+    new Response('{"ok":true}', { status: 200 })) as typeof fetch;
+
+  const result = await fetchLlmResponse(
+    "https://openrouter.ai/test",
+    { method: "POST" },
+    100,
+    { label: "Test request", log: (message) => logs.push(message) }
+  );
+
+  assert.equal(result.text, '{"ok":true}');
+  assert.match(logs[0] || "", /Test request completed in \d+ms \(HTTP 200\)/i);
 });
 
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {

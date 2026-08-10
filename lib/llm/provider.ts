@@ -11,11 +11,24 @@ export const LLM_REQUEST_TIMEOUT_MS = 300_000;
 export const LLM_OPTIONAL_REQUEST_TIMEOUT_MS = 120_000;
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-120b";
 
+type LlmRequestTelemetry = {
+  label: string;
+  log?: (message: string) => void;
+};
+
+function formatRequestDuration(elapsedMs: number) {
+  return elapsedMs < 1000
+    ? `${elapsedMs}ms`
+    : `${(elapsedMs / 1000).toFixed(1)}s`;
+}
+
 export async function fetchLlmResponse(
   url: string,
   init: RequestInit,
-  timeoutMs = LLM_REQUEST_TIMEOUT_MS
+  timeoutMs = LLM_REQUEST_TIMEOUT_MS,
+  telemetry?: LlmRequestTelemetry
 ): Promise<{ response: Response; text: string }> {
+  const startedAt = Date.now();
   const controller = new AbortController();
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timeoutLabel = timeoutMs >= 1000
@@ -40,7 +53,17 @@ export async function fetchLlmResponse(
   });
 
   try {
-    return await Promise.race([request, deadline]);
+    const result = await Promise.race([request, deadline]);
+    telemetry?.log?.(
+      `${telemetry.label} completed in ${formatRequestDuration(Date.now() - startedAt)} (HTTP ${result.response.status}).`
+    );
+    return result;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown request error";
+    telemetry?.log?.(
+      `${telemetry.label} failed after ${formatRequestDuration(Date.now() - startedAt)}: ${message}`
+    );
+    throw error;
   } finally {
     if (timeout) clearTimeout(timeout);
   }

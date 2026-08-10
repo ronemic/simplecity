@@ -301,7 +301,8 @@ async function requestTargetedCardRepairs(
   meeting: LlmReadyMeeting,
   provider: SummaryProvider,
   rejectedCards: Array<{ index: number; card: unknown }>,
-  issues: SummaryValidationIssue[]
+  issues: SummaryValidationIssue[],
+  options: GenerateSummaryOptions
 ): Promise<SummaryRequestResult> {
   const rejectedIds = new Set(
     rejectedCards.flatMap(({ card }) => {
@@ -349,7 +350,10 @@ ${sourceContext}`;
       temperature: 0,
       response_format: { type: "json_object" }
     })
-  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
+  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
+    label: `OpenRouter targeted repair for ${meeting.title}`,
+    log: options.log
+  });
 
   if (!response.ok) {
     throw new SummaryProviderRequestError(
@@ -381,7 +385,8 @@ ${sourceContext}`;
 async function requestTargetedCardRepairsWithFallback(
   meeting: LlmReadyMeeting,
   rejectedCards: Array<{ index: number; card: unknown }>,
-  issues: SummaryValidationIssue[]
+  issues: SummaryValidationIssue[],
+  options: GenerateSummaryOptions
 ) {
   const providers = getRotatedSummaryProviders();
   let lastError: unknown;
@@ -392,7 +397,8 @@ async function requestTargetedCardRepairsWithFallback(
         meeting,
         provider,
         rejectedCards,
-        issues
+        issues,
+        options
       );
     } catch (error) {
       lastError = error;
@@ -443,7 +449,10 @@ async function requestSummary(
         type: "json_object"
       }
     })
-  }, LLM_REQUEST_TIMEOUT_MS);
+  }, LLM_REQUEST_TIMEOUT_MS, {
+    label: `OpenRouter summary for ${meeting.title}`,
+    log: options.log
+  });
 
   if (!response.ok) {
     throw new SummaryProviderRequestError(
@@ -488,7 +497,8 @@ async function requestSummary(
       repairResult = await requestTargetedCardRepairsWithFallback(
         meeting,
         rejectedCards,
-        validationIssues
+        validationIssues,
+        options
       );
       summary = mergeValidatedSummaries(summary, repairResult.summary);
     } catch (error) {
@@ -523,7 +533,8 @@ async function requestSummary(
 
 async function requestTopicValidation(
   candidates: TopicValidationCandidate[],
-  provider: SummaryProvider
+  provider: SummaryProvider,
+  options: GenerateSummaryOptions
 ) {
   const { response, text } = await fetchLlmResponse(provider.baseUrl, {
     method: "POST",
@@ -542,7 +553,10 @@ async function requestTopicValidation(
       temperature: 0,
       response_format: { type: "json_object" }
     })
-  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS);
+  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
+    label: `OpenRouter topic validation for ${candidates.length} card(s)`,
+    log: options.log
+  });
 
   if (!response.ok) {
     throw new SummaryProviderRequestError(
@@ -580,7 +594,7 @@ async function requestTopicValidationWithFallback(
       options.log?.(
         `Verifying ${candidates.length} agenda-card topic and status selection(s) with ${provider.label} (${provider.model}).`
       );
-      return await requestTopicValidation(candidates, provider);
+      return await requestTopicValidation(candidates, provider, options);
     } catch (error) {
       lastError = error;
       const hasNextProvider = index < providers.length - 1;
