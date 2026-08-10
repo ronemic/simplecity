@@ -476,7 +476,7 @@ export async function runSimpleCityPipeline(
     if (shouldSummarize && !recordDeadline("LLM summarization")) {
       if (!hasSummaryProviderConfig()) {
         errors.push("No LLM provider API key is configured; summaries were not generated.");
-        log("Configure GROQ_API_KEY to generate LLM summaries.");
+        log("Configure OPENROUTER_API_KEY to generate LLM summaries.");
       } else if (persist && !persistSummaries) {
         const message =
           "Skipping LLM summaries because database persistence failed; generated cards would not appear on the frontend.";

@@ -1,10 +1,10 @@
 import { jsonrepair } from "jsonrepair";
 import { z } from "zod";
 import {
-  getConfiguredGroqProviders,
-  getRotatedGroqProviders,
-  type GroqProvider
-} from "@/lib/llm/groqProvider";
+  getConfiguredLlmProviders,
+  LLM_REQUEST_TIMEOUT_MS,
+  type LlmProvider
+} from "@/lib/llm/provider";
 import type { DecisionOutcomeCanonicalStatus } from "@/lib/outcomes/extractDecisionOutcome";
 
 export type DecisionOutcomeExplanationInput = {
@@ -22,7 +22,7 @@ export type DecisionOutcomeExplanation = {
   nextStep: string | null;
 };
 
-type ExplanationProvider = GroqProvider;
+type ExplanationProvider = LlmProvider;
 
 const lastRequestAtByProvider = new Map<string, number>();
 
@@ -60,11 +60,11 @@ const OUTCOME_BOILERPLATE_PATTERN =
   /(?:\bpage\s+\d+\s+of\s+\d+\b|\b(?:action|result|decision)\s*:)/i;
 
 function configuredProviders() {
-  return getConfiguredGroqProviders();
+  return getConfiguredLlmProviders();
 }
 
 function rotatedProviders() {
-  return getRotatedGroqProviders();
+  return getConfiguredLlmProviders();
 }
 
 export function hasDecisionOutcomeExplanationProvider() {
@@ -157,7 +157,7 @@ async function requestExplanations(
   provider: ExplanationProvider,
   inputs: DecisionOutcomeExplanationInput[]
 ) {
-  const minimumInterval = Number(process.env.DECISION_EXPLANATION_MIN_REQUEST_INTERVAL_MS || 5000);
+  const minimumInterval = Number(process.env.DECISION_EXPLANATION_MIN_REQUEST_INTERVAL_MS || 0);
   const lastRequestAt = lastRequestAtByProvider.get(provider.label) || 0;
   const waitMs = Number.isFinite(minimumInterval)
     ? Math.max(0, lastRequestAt + Math.max(0, minimumInterval) - Date.now())
@@ -166,7 +166,7 @@ async function requestExplanations(
   lastRequestAtByProvider.set(provider.label, Date.now());
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
   const response = await fetch(provider.baseUrl, {
     method: "POST",
     headers: {
@@ -177,6 +177,7 @@ async function requestExplanations(
     signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
+      provider: { require_parameters: true },
       messages: [
         { role: "system", content: DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT },
         { role: "user", content: promptForInputs(inputs) }

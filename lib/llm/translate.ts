@@ -1,10 +1,10 @@
 import { jsonrepair } from "jsonrepair";
 import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
 import {
-  getConfiguredGroqProviders,
-  getRotatedGroqProviders,
-  type GroqProvider
-} from "./groqProvider";
+  getConfiguredLlmProviders,
+  LLM_REQUEST_TIMEOUT_MS,
+  type LlmProvider
+} from "./provider";
 
 export type TranslationLocale = "es";
 
@@ -57,14 +57,14 @@ export type GenerateTranslationsOptions = {
   log?: (message: string) => void;
 };
 
-type TranslationProvider = GroqProvider;
+type TranslationProvider = LlmProvider;
 
 function configuredTranslationProviders() {
-  return getConfiguredGroqProviders();
+  return getConfiguredLlmProviders();
 }
 
 function rotatedTranslationProviders() {
-  return getRotatedGroqProviders();
+  return getConfiguredLlmProviders();
 }
 
 export function hasTranslationProvider() {
@@ -241,7 +241,7 @@ async function requestTranslations(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
 
     const response = await fetch(provider.baseUrl, {
       method: "POST",
@@ -253,6 +253,7 @@ async function requestTranslations(
       signal: controller.signal,
       body: JSON.stringify({
         model: provider.model,
+        provider: { require_parameters: true },
         messages: [
           {
             role: "system",

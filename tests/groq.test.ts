@@ -82,13 +82,9 @@ function groqResponse(summary: SimpleCitySummary) {
 
 function captureLlmEnv() {
   return {
-    groqApiKey: process.env.GROQ_API_KEY,
-    groqApiKey2: process.env.GROQ_API_KEY_2,
-    groqApiKey3: process.env.GROQ_API_KEY_3,
-    groqApiKey4: process.env.GROQ_API_KEY_4,
-    groqApiKey5: process.env.GROQ_API_KEY_5,
-    groqModel: process.env.GROQ_MODEL,
-    groqMinIntervalMs: process.env.GROQ_MIN_REQUEST_INTERVAL_MS,
+    openRouterApiKey: process.env.OPENROUTER_API_KEY,
+    openRouterModel: process.env.OPENROUTER_MODEL,
+    legacyGroqApiKey: process.env.GROQ_API_KEY,
     groqMaxAttempts: process.env.GROQ_SUMMARY_MAX_ATTEMPTS,
     groqRetryBaseMs: process.env.GROQ_SUMMARY_RETRY_BASE_MS,
     groqRateLimitRetryBaseMs: process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS,
@@ -105,13 +101,9 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
     }
   };
 
-  restore("GROQ_API_KEY", env.groqApiKey);
-  restore("GROQ_API_KEY_2", env.groqApiKey2);
-  restore("GROQ_API_KEY_3", env.groqApiKey3);
-  restore("GROQ_API_KEY_4", env.groqApiKey4);
-  restore("GROQ_API_KEY_5", env.groqApiKey5);
-  restore("GROQ_MODEL", env.groqModel);
-  restore("GROQ_MIN_REQUEST_INTERVAL_MS", env.groqMinIntervalMs);
+  restore("OPENROUTER_API_KEY", env.openRouterApiKey);
+  restore("OPENROUTER_MODEL", env.openRouterModel);
+  restore("GROQ_API_KEY", env.legacyGroqApiKey);
   restore("GROQ_SUMMARY_MAX_ATTEMPTS", env.groqMaxAttempts);
   restore("GROQ_SUMMARY_RETRY_BASE_MS", env.groqRetryBaseMs);
   restore("GROQ_RATE_LIMIT_RETRY_BASE_MS", env.groqRateLimitRetryBaseMs);
@@ -119,13 +111,9 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
 }
 
 function setLlmTestEnv() {
-  process.env.GROQ_API_KEY = "test-groq-key";
-  delete process.env.GROQ_API_KEY_2;
-  delete process.env.GROQ_API_KEY_3;
-  delete process.env.GROQ_API_KEY_4;
-  delete process.env.GROQ_API_KEY_5;
-  process.env.GROQ_MODEL = "test-groq-model";
-  process.env.GROQ_MIN_REQUEST_INTERVAL_MS = "0";
+  process.env.OPENROUTER_API_KEY = "test-openrouter-key";
+  process.env.OPENROUTER_MODEL = "openai/gpt-oss-120b";
+  delete process.env.GROQ_API_KEY;
   process.env.GROQ_SUMMARY_MAX_ATTEMPTS = "3";
   process.env.GROQ_SUMMARY_RETRY_BASE_MS = "0";
   process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS = "0";
@@ -281,12 +269,14 @@ test("regenerates an empty summary when agenda source text is usable", async (t)
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("falls back to the next Groq key when the selected key is rate-limited", async (t) => {
+test("uses only the configured OpenRouter key and regular GPT-OSS route", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
   const authorizations: Array<string | null> = [];
   const models: string[] = [];
+  const referers: Array<string | null> = [];
+  const titles: Array<string | null> = [];
 
   t.after(() => {
     globalThis.fetch = originalFetch;
@@ -294,18 +284,17 @@ test("falls back to the next Groq key when the selected key is rate-limited", as
   });
 
   setLlmTestEnv();
-  process.env.GROQ_API_KEY_2 = "test-groq-key-2";
+  process.env.GROQ_API_KEY = "legacy-key-that-must-not-be-used";
 
   globalThis.fetch = (async (url, init) => {
     urls.push(String(url));
-    const authorization = new Headers(init?.headers).get("Authorization");
+    const headers = new Headers(init?.headers);
+    const authorization = headers.get("Authorization");
     authorizations.push(authorization);
+    referers.push(headers.get("HTTP-Referer"));
+    titles.push(headers.get("X-Title"));
     const body = JSON.parse(String(init?.body || "{}")) as { model?: string };
     models.push(body.model || "");
-
-    if (authorization === "Bearer test-groq-key") {
-      return new Response("temporarily rate-limited upstream", { status: 429 });
-    }
 
     return groqResponse({
       meetingSummary,
@@ -316,79 +305,13 @@ test("falls back to the next Groq key when the selected key is rate-limited", as
   const result = await generateSummaryForMeeting(meeting());
 
   assert.deepEqual(urls, [
-    "https://api.groq.com/openai/v1/chat/completions",
-    "https://api.groq.com/openai/v1/chat/completions"
+    "https://openrouter.ai/api/v1/chat/completions"
   ]);
-  assert.deepEqual(authorizations, ["Bearer test-groq-key", "Bearer test-groq-key-2"]);
-  assert.deepEqual(models, ["test-groq-model", "test-groq-model"]);
+  assert.deepEqual(authorizations, ["Bearer test-openrouter-key"]);
+  assert.deepEqual(models, ["openai/gpt-oss-120b"]);
+  assert.deepEqual(referers, ["https://simplecity.app"]);
+  assert.deepEqual(titles, ["SimpleCity"]);
   assert.equal(result.summary.cards.length, 1);
-});
-
-test("tries all five Groq keys when earlier keys are rate-limited", async (t) => {
-  const originalFetch = globalThis.fetch;
-  const originalEnv = captureLlmEnv();
-  const authorizations: Array<string | null> = [];
-
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-    restoreLlmEnv(originalEnv);
-  });
-
-  setLlmTestEnv();
-  process.env.GROQ_API_KEY_2 = "test-groq-key-2";
-  process.env.GROQ_API_KEY_3 = "test-groq-key-3";
-  process.env.GROQ_API_KEY_4 = "test-groq-key-4";
-  process.env.GROQ_API_KEY_5 = "test-groq-key-5";
-
-  globalThis.fetch = (async (_url, init) => {
-    const authorization = new Headers(init?.headers).get("Authorization");
-    authorizations.push(authorization);
-
-    if (authorization !== "Bearer test-groq-key-5") {
-      return new Response("temporarily rate-limited", { status: 429 });
-    }
-
-    return groqResponse({ meetingSummary, cards: [card()] });
-  }) as typeof fetch;
-
-  const result = await generateSummaryForMeeting(meeting());
-
-  assert.deepEqual(authorizations, [
-    "Bearer test-groq-key",
-    "Bearer test-groq-key-2",
-    "Bearer test-groq-key-3",
-    "Bearer test-groq-key-4",
-    "Bearer test-groq-key-5"
-  ]);
-  assert.equal(result.summary.cards.length, 1);
-});
-
-test("rotates the starting Groq key across successive summaries", async (t) => {
-  const originalFetch = globalThis.fetch;
-  const originalEnv = captureLlmEnv();
-  const authorizations: Array<string | null> = [];
-
-  t.after(() => {
-    globalThis.fetch = originalFetch;
-    restoreLlmEnv(originalEnv);
-  });
-
-  setLlmTestEnv();
-  process.env.GROQ_API_KEY = "rotation-key-1";
-  process.env.GROQ_API_KEY_2 = "rotation-key-2";
-  process.env.GROQ_API_KEY_3 = "rotation-key-3";
-  process.env.GROQ_API_KEY_4 = "rotation-key-4";
-  process.env.GROQ_API_KEY_5 = "rotation-key-5";
-
-  globalThis.fetch = (async (_url, init) => {
-    authorizations.push(new Headers(init?.headers).get("Authorization"));
-    return groqResponse({ meetingSummary, cards: [card()] });
-  }) as typeof fetch;
-
-  await generateSummaryForMeeting(meeting());
-  await generateSummaryForMeeting(meeting());
-
-  assert.deepEqual(authorizations, ["Bearer rotation-key-1", "Bearer rotation-key-2"]);
 });
 
 test("does not sleep on an impractical provider retry-after", async (t) => {
@@ -535,7 +458,7 @@ test("verifies topics and status using only matched agenda-item context", async 
   assert.doesNotMatch(topicPrompt, /FLAT_PACKET_SENTINEL/);
 });
 
-test("rotates Groq keys and falls back during isolated topic verification", async (t) => {
+test("uses the same OpenRouter key during isolated topic verification", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
@@ -547,8 +470,6 @@ test("rotates Groq keys and falls back during isolated topic verification", asyn
   });
 
   setLlmTestEnv();
-  process.env.GROQ_API_KEY = "topic-key-1";
-  process.env.GROQ_API_KEY_2 = "topic-key-2";
   const preparedMeeting = meeting();
   preparedMeeting.items = [
     {
@@ -569,9 +490,6 @@ test("rotates Groq keys and falls back during isolated topic verification", asyn
     authorizations.push(new Headers(init?.headers).get("Authorization"));
     if (urls.length === 1) {
       return groqResponse({ meetingSummary, cards: [card()] });
-    }
-    if (urls.length === 2) {
-      return new Response("topic verifier rate limited", { status: 429 });
     }
     return new Response(
       JSON.stringify({
@@ -598,14 +516,12 @@ test("rotates Groq keys and falls back during isolated topic verification", asyn
   const result = await generateSummaryForMeeting(preparedMeeting);
 
   assert.deepEqual(urls, [
-    "https://api.groq.com/openai/v1/chat/completions",
-    "https://api.groq.com/openai/v1/chat/completions",
-    "https://api.groq.com/openai/v1/chat/completions"
+    "https://openrouter.ai/api/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions"
   ]);
   assert.deepEqual(authorizations, [
-    "Bearer topic-key-1",
-    "Bearer topic-key-2",
-    "Bearer topic-key-1"
+    "Bearer test-openrouter-key",
+    "Bearer test-openrouter-key"
   ]);
   assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
 });

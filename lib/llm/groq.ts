@@ -7,10 +7,11 @@ import {
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import {
-  getRotatedGroqProviders,
-  hasConfiguredGroqProvider,
-  type GroqProvider
-} from "./groqProvider";
+  getConfiguredLlmProviders,
+  hasConfiguredLlmProvider,
+  LLM_REQUEST_TIMEOUT_MS,
+  type LlmProvider
+} from "./provider";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
 import {
   parseAndValidateSummary,
@@ -38,9 +39,7 @@ type SummaryRequestResult = {
   validationIssues: SummaryValidationIssue[];
 };
 
-type SummaryProvider = GroqProvider & {
-  minIntervalEnv: string;
-};
+type SummaryProvider = LlmProvider;
 
 class SummaryProviderRequestError extends Error {
   provider: SummaryProvider["name"];
@@ -58,7 +57,6 @@ class SummaryProviderRequestError extends Error {
   }
 }
 
-const lastSummaryRequestAtByProvider = new Map<string, number>();
 const MAX_TOPIC_VALIDATION_PROMPT_CHARS = 60_000;
 export const MAX_AGENDA_ITEM_BATCH_CHARS = 18_000;
 
@@ -151,35 +149,15 @@ function parseRetryAfterMs(headers: Headers) {
 }
 
 function getRotatedSummaryProviders() {
-  const providers = getRotatedGroqProviders().map((provider) => ({
-    ...provider,
-    minIntervalEnv: "GROQ_MIN_REQUEST_INTERVAL_MS"
-  }));
+  const providers = getConfiguredLlmProviders();
   if (providers.length === 0) {
-    throw new Error("Missing LLM provider API key. Configure a Groq API key.");
+    throw new Error("Missing LLM provider API key. Configure OPENROUTER_API_KEY.");
   }
   return providers;
 }
 
 export function hasSummaryProviderConfig() {
-  return hasConfiguredGroqProvider();
-}
-
-async function waitForProviderSlot(provider: SummaryProvider, options: GenerateSummaryOptions) {
-  const fallbackMs = 5_000;
-  const minIntervalMs = parseNonNegativeEnv(provider.minIntervalEnv, fallbackMs);
-  if (minIntervalMs <= 0) return;
-
-  const lastRequestAt = lastSummaryRequestAtByProvider.get(provider.label) || 0;
-  const waitMs = lastRequestAt + minIntervalMs - Date.now();
-  if (waitMs > 0) {
-    options.log?.(
-      `Waiting ${Math.ceil(waitMs / 1000)}s before the next ${provider.label} summary request.`
-    );
-    await (options.sleep || sleep)(waitMs);
-  }
-
-  lastSummaryRequestAtByProvider.set(provider.label, Date.now());
+  return hasConfiguredLlmProvider();
 }
 
 function canTryNextProvider(error: unknown) {
@@ -321,8 +299,7 @@ async function requestTargetedCardRepairs(
   meeting: LlmReadyMeeting,
   provider: SummaryProvider,
   rejectedCards: Array<{ index: number; card: unknown }>,
-  issues: SummaryValidationIssue[],
-  options: GenerateSummaryOptions
+  issues: SummaryValidationIssue[]
 ): Promise<SummaryRequestResult> {
   const rejectedIds = new Set(
     rejectedCards.flatMap(({ card }) => {
@@ -354,9 +331,7 @@ Matched agenda-item source:
 ${sourceContext}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
-  await waitForProviderSlot(provider, options);
-
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
   const response = await fetch(provider.baseUrl, {
     method: "POST",
     headers: {
@@ -367,6 +342,7 @@ ${sourceContext}`;
     signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
+      provider: { require_parameters: true },
       messages: [
         { role: "system", content: SIMPLECITY_SYSTEM_PROMPT },
         { role: "user", content: repairPrompt }
@@ -407,8 +383,7 @@ ${sourceContext}`;
 async function requestTargetedCardRepairsWithFallback(
   meeting: LlmReadyMeeting,
   rejectedCards: Array<{ index: number; card: unknown }>,
-  issues: SummaryValidationIssue[],
-  options: GenerateSummaryOptions
+  issues: SummaryValidationIssue[]
 ) {
   const providers = getRotatedSummaryProviders();
   let lastError: unknown;
@@ -419,8 +394,7 @@ async function requestTargetedCardRepairsWithFallback(
         meeting,
         provider,
         rejectedCards,
-        issues,
-        options
+        issues
       );
     } catch (error) {
       lastError = error;
@@ -439,9 +413,7 @@ async function requestSummary(
   regenerationGuidance?: string
 ): Promise<SummaryRequestResult> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
-
-  await waitForProviderSlot(provider, options);
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
 
   const response = await fetch(provider.baseUrl, {
     method: "POST",
@@ -453,6 +425,7 @@ async function requestSummary(
     signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
+      provider: { require_parameters: true },
       messages: [
         {
           role: "system",
@@ -522,8 +495,7 @@ async function requestSummary(
       repairResult = await requestTargetedCardRepairsWithFallback(
         meeting,
         rejectedCards,
-        validationIssues,
-        options
+        validationIssues
       );
       summary = mergeValidatedSummaries(summary, repairResult.summary);
     } catch (error) {
@@ -558,13 +530,10 @@ async function requestSummary(
 
 async function requestTopicValidation(
   candidates: TopicValidationCandidate[],
-  provider: SummaryProvider,
-  options: GenerateSummaryOptions = {}
+  provider: SummaryProvider
 ) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120_000);
-
-  await waitForProviderSlot(provider, options);
+  const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
 
   const response = await fetch(provider.baseUrl, {
     method: "POST",
@@ -576,6 +545,7 @@ async function requestTopicValidation(
     signal: controller.signal,
     body: JSON.stringify({
       model: provider.model,
+      provider: { require_parameters: true },
       messages: [
         { role: "system", content: TOPIC_VALIDATION_SYSTEM_PROMPT },
         { role: "user", content: buildTopicValidationPrompt(candidates) }
@@ -622,7 +592,7 @@ async function requestTopicValidationWithFallback(
       options.log?.(
         `Verifying ${candidates.length} agenda-card topic and status selection(s) with ${provider.label} (${provider.model}).`
       );
-      return await requestTopicValidation(candidates, provider, options);
+      return await requestTopicValidation(candidates, provider);
     } catch (error) {
       lastError = error;
       const hasNextProvider = index < providers.length - 1;
