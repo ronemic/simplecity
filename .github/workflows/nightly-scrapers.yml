@@ -183,7 +183,7 @@ jobs:
   santa-clara-county:
     name: Santa Clara County scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 210
+    timeout-minutes: 45
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')) ||
@@ -210,12 +210,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Santa Clara County pipeline
-        run: |
-          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage)
-          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}" && exit 0
-          echo "Santa Clara County pipeline stopped; waiting two minutes before one safe retry."
-          sleep 120
-          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}"
+        run: npm run pipeline:santa-clara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=30 --require-results-coverage
 
   mountain-view:
     name: Mountain View scraper
