@@ -24,7 +24,7 @@ const GROUNDABLE_VALUE_PATTERNS = [
   /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi,
   /\b(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]\d{4}\b/g,
   /\b\d{1,4}:\d{2}-[A-Z]{1,6}-\d{3,}(?:-[A-Z]+)?\b/gi,
-  /\b\d{1,6}\s+(?:[A-Z0-9.'-]+\s+){1,6}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl)\b/gi,
+  /\b\d{1,6}\s+(?:[A-Z0-9][A-Za-z0-9.'-]*\s+){1,6}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl)\b/g,
   /\$\s?\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?/gi,
   /\b\d+(?:\.\d+)?\s?%/gi,
   /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}\b/gi,
@@ -286,11 +286,15 @@ function extractGroundableValues(text: string) {
               other.value.length > match.value.length
           )
       )
-      .map((match) =>
-        /^https?:\/\//i.test(match.value)
-          ? match.value.replace(/[.,;:!?]+$/, "")
-          : match.value
-      )
+      .map((match) => {
+        if (/^https?:\/\//i.test(match.value)) {
+          return match.value.replace(/[.,;:!?]+$/, "");
+        }
+        if (/^(?:agenda\s+item|item|resolution|ordinance)\b/i.test(match.value)) {
+          return match.value.replace(/[.,;:!?]+$/, "");
+        }
+        return match.value;
+      })
   );
 }
 
@@ -518,7 +522,7 @@ function buildAgendaItemSourceText(item: NonNullable<LlmReadyMeeting["items"]>[n
   return [
     item.externalId,
     item.fileNumber,
-    item.agendaNumber,
+    item.agendaNumber ? `Agenda item ${item.agendaNumber}` : null,
     item.itemType,
     item.title,
     item.action,

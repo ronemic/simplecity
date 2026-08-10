@@ -58,6 +58,69 @@ test("drops cards with exact values that are not grounded in the source text", (
   assert.equal(issues[0]?.value, "$250");
 });
 
+test("accepts a grounded agenda identifier with sentence punctuation", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Review Seaport assessment, agenda item 7.B."
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Agenda item 7.B\nThe council will consider a $100 contract at 7:00 PM for park maintenance."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("still rejects a mismatched agenda identifier", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Review Seaport assessment, agenda item 7.C."
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Agenda item 7.B\nThe council will consider a $100 contract at 7:00 PM for park maintenance."
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+});
+
+test("does not mistake a numbered assessment phrase for a street address", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "500 assessment for Seaport Boulevard"
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4. The assessment covers 500 properties along Seaport Boulevard. The council will consider a $100 contract at 7:00 PM for park maintenance."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
 test("drops cards containing leaked JSON braces or degenerate repeated text", () => {
   for (const agendaItem of [
     "Approve minutes from April 8, {{{{{{{{{{{{",

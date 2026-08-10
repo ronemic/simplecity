@@ -495,13 +495,17 @@ export async function runSimpleCityPipeline(
             }));
         let consecutiveRateLimitFailures = 0;
         const maxConsecutiveRateLimitFailures = getMaxConsecutiveRateLimitFailures();
+        const summaryConcurrency = Math.min(2, Math.max(1, summaryTargets.length));
+        if (summaryConcurrency > 1) {
+          log(`Summarizing up to ${summaryConcurrency} meetings concurrently.`);
+        }
 
-        for (const item of summaryTargets) {
-          if (recordDeadline("LLM summarization")) break;
-
+        const summarizeTarget = async (
+          item: (typeof summaryTargets)[number]
+        ): Promise<boolean | null> => {
           if (!item.meeting.llmInputText) {
             log(`Skipping ${item.meeting.title}; no LLM input text.`);
-            continue;
+            return null;
           }
 
           try {
@@ -522,7 +526,7 @@ export async function runSimpleCityPipeline(
               log(
                 `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; official minutes will update those cards without generating duplicates.`
               );
-              continue;
+              return null;
             }
 
             if (
@@ -538,7 +542,7 @@ export async function runSimpleCityPipeline(
                   ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.`
                   : `Skipping ${item.meeting.title}; source unchanged and the prior summary produced no cards.`
               );
-              continue;
+              return null;
             }
 
             let initialSummary: Awaited<ReturnType<typeof generateSummaryForMeeting>> | null = null;
@@ -624,37 +628,45 @@ export async function runSimpleCityPipeline(
                 summary
               });
             }
-            if (initialSummaryError && isLlmRateLimitError(initialSummaryError)) {
-              consecutiveRateLimitFailures += 1;
-              if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
-                const stopMessage =
-                  "Stopping detailed LLM summaries after repeated provider rate-limit responses; official-source fallback cards preserve agenda-item coverage.";
-                errors.push(stopMessage);
-                log(stopMessage);
-                break;
-              }
-            } else {
-              consecutiveRateLimitFailures = 0;
-            }
+            return Boolean(initialSummaryError && isLlmRateLimitError(initialSummaryError));
           } catch (error) {
             const message = error instanceof Error ? error.message : "Unknown LLM error";
             errors.push(`LLM failed for ${item.meeting.title}: ${message}`);
             log(`LLM failed for ${item.meeting.title}: ${message}`);
+            return isLlmRateLimitError(error);
+          }
+        };
 
-            if (isLlmRateLimitError(error)) {
-              consecutiveRateLimitFailures += 1;
-              if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
-                const stopMessage =
-                  "Stopping LLM summaries after repeated provider rate-limit responses; retry later or configure another provider with available quota.";
-                errors.push(stopMessage);
-                log(stopMessage);
-                break;
-              }
-            } else {
-              consecutiveRateLimitFailures = 0;
+        let stopSummaries = false;
+        let nextSummaryIndex = 0;
+        const runSummaryWorker = async () => {
+          while (!stopSummaries) {
+            if (recordDeadline("LLM summarization")) {
+              stopSummaries = true;
+              return;
+            }
+            const item = summaryTargets[nextSummaryIndex];
+            nextSummaryIndex += 1;
+            if (!item) return;
+
+            const rateLimited = await summarizeTarget(item);
+            if (rateLimited === null) continue;
+            consecutiveRateLimitFailures = rateLimited
+              ? consecutiveRateLimitFailures + 1
+              : 0;
+            if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
+              const stopMessage =
+                "Stopping detailed LLM summaries after repeated provider rate-limit responses; official-source fallback cards preserve agenda-item coverage.";
+              errors.push(stopMessage);
+              log(stopMessage);
+              stopSummaries = true;
+              return;
             }
           }
-        }
+        };
+        await Promise.all(
+          Array.from({ length: summaryConcurrency }, () => runSummaryWorker())
+        );
       }
     }
 
