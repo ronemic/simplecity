@@ -5,7 +5,7 @@ on:
     - cron: "0 10 * * *"
     - cron: "30 10 * * *"
     - cron: "0 11 * * *"
-    - cron: "15 11 * * *"
+    - cron: "30 11 * * *"
     - cron: "20 12 * * *"
     - cron: "40 12 * * *"
     - cron: "30 13 * * *"
@@ -118,7 +118,7 @@ jobs:
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'san-mateo-county')) ||
-      (github.event_name == 'schedule' && github.event.schedule == '15 11 * * *')
+      (github.event_name == 'schedule' && github.event.schedule == '30 11 * * *')
     concurrency:
       group: nightly-scraper-san-mateo-county
       cancel-in-progress: false
@@ -183,7 +183,7 @@ jobs:
   santa-clara-county:
     name: Santa Clara County scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 210
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'santa-clara-county')) ||
@@ -210,7 +210,12 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Santa Clara County pipeline
-        run: npm run pipeline:santa-clara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=30 --require-results-coverage
+        run: |
+          pipeline_args=(--months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage)
+          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}" && exit 0
+          echo "Santa Clara County pipeline stopped; waiting two minutes before one safe retry."
+          sleep 120
+          npm run pipeline:santa-clara-county -- "${pipeline_args[@]}"
 
   mountain-view:
     name: Mountain View scraper
