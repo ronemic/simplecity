@@ -175,6 +175,75 @@ test("logs completed LLM request duration and status", async (t) => {
   assert.match(logs[0] || "", /Test request completed in \d+ms \(HTTP 200\)/i);
 });
 
+test("never runs more than two LLM requests at once", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let active = 0;
+  let maximumActive = 0;
+  const releases: Array<() => void> = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async () => {
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise<void>((resolve) => releases.push(resolve));
+    active -= 1;
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  const requests = Array.from({ length: 4 }, (_, index) =>
+    fetchLlmResponse(
+      "https://openrouter.ai/test",
+      { method: "POST" },
+      1000,
+      { label: `Concurrent request ${index + 1}` }
+    )
+  );
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(active, 2);
+  assert.equal(maximumActive, 2);
+
+  while (releases.length > 0) {
+    releases.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  await Promise.all(requests);
+  assert.equal(maximumActive, 2);
+});
+
+test("request timeout includes time waiting behind the two-request ceiling", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const releases: Array<() => void> = [];
+  let fetchCalls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    await new Promise<void>((resolve) => releases.push(resolve));
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  const first = fetchLlmResponse("https://openrouter.ai/test", {}, 1000, { label: "First" });
+  const second = fetchLlmResponse("https://openrouter.ai/test", {}, 1000, { label: "Second" });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  await assert.rejects(
+    fetchLlmResponse("https://openrouter.ai/test", {}, 20, { label: "Queued" }),
+    /timed out after 20 milliseconds/i
+  );
+  assert.equal(fetchCalls, 2);
+
+  releases.shift()?.();
+  releases.shift()?.();
+  await Promise.all([first, second]);
+});
+
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();

@@ -473,6 +473,56 @@ export async function runSimpleCityPipeline(
       log("Skipping Supabase persistence.");
     }
 
+    let outcomesUpserted = 0;
+    let outcomesRejectedAmbiguous = 0;
+    let resultItemsFound = 0;
+    let resultItemsMatched = 0;
+    let resultItemsUnmatched = 0;
+    let resultCardsFound = 0;
+    let resultCardsMatched = 0;
+    let resultCardsUnmatched = 0;
+    let duplicateCardsDetected = 0;
+    let duplicateCardsResolved = 0;
+    let requiredAgendaItems = 0;
+    let detailedAgendaItems = 0;
+    let fallbackAgendaItems = 0;
+    const reconciledOutcomeMeetingIds = new Set<string>();
+    const reconcileOutcomesForItem = async (item: { id: string; meeting: LlmReadyMeeting }) => {
+      if (!canPersist || !supabase || !item.id || reconciledOutcomeMeetingIds.has(item.id)) {
+        return;
+      }
+      try {
+        const reconciliation = await reconcileDecisionOutcomesForMeeting(
+          supabase,
+          item.id,
+          item.meeting,
+          jurisdiction,
+          { explainWithLlm: true, translateWithLlm: true, log }
+        );
+        outcomesUpserted += reconciliation.outcomesUpserted;
+        outcomesRejectedAmbiguous += reconciliation.outcomesRejectedAmbiguous;
+        resultItemsFound += reconciliation.resultItemsFound;
+        resultItemsMatched += reconciliation.resultItemsMatched;
+        resultItemsUnmatched += reconciliation.resultItemsUnmatched;
+        resultCardsFound += reconciliation.resultCardsFound;
+        resultCardsMatched += reconciliation.resultCardsMatched;
+        resultCardsUnmatched += reconciliation.resultCardsUnmatched;
+        duplicateCardsDetected += reconciliation.duplicateCardsDetected;
+        duplicateCardsResolved += reconciliation.duplicateCardsResolved;
+        reconciledOutcomeMeetingIds.add(item.id);
+        if (!reconciliation.complete && reconciliation.resultCardsFound > 0) {
+          const coverageError =
+            `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultCardsMatched} of ${reconciliation.resultCardsFound} decision card(s) with official results; ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
+          errors.push(coverageError);
+          log(coverageError);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Unknown decision outcome error";
+        errors.push(`${item.meeting.title}: ${message}`);
+        log(`Decision outcome reconciliation failed for ${item.meeting.title}: ${message}`);
+      }
+    };
+
     if (shouldSummarize && !recordDeadline("LLM summarization")) {
       if (!hasSummaryProviderConfig()) {
         errors.push("No LLM provider API key is configured; summaries were not generated.");
@@ -505,6 +555,7 @@ export async function runSimpleCityPipeline(
         ): Promise<boolean | null> => {
           if (!item.meeting.llmInputText) {
             log(`Skipping ${item.meeting.title}; no LLM input text.`);
+            if (persistSummaries) await reconcileOutcomesForItem(item);
             return null;
           }
 
@@ -526,6 +577,7 @@ export async function runSimpleCityPipeline(
               log(
                 `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; official minutes will update those cards without generating duplicates.`
               );
+              await reconcileOutcomesForItem(item);
               return null;
             }
 
@@ -542,6 +594,7 @@ export async function runSimpleCityPipeline(
                   ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.`
                   : `Skipping ${item.meeting.title}; source unchanged and the prior summary produced no cards.`
               );
+              if (persistSummaries) await reconcileOutcomesForItem(item);
               return null;
             }
 
@@ -564,6 +617,17 @@ export async function runSimpleCityPipeline(
             );
             const { summary, raw } = coverage;
             const requiredItemCount = agendaItemsRequiringCards(item.meeting).length;
+            requiredAgendaItems += requiredItemCount;
+            fallbackAgendaItems += coverage.fallbackItemIds.length;
+            detailedAgendaItems += Math.max(
+              0,
+              requiredItemCount - coverage.fallbackItemIds.length
+            );
+            if (requiredItemCount > 0) {
+              log(
+                `Summary coverage for ${item.meeting.title}: ${requiredItemCount - coverage.fallbackItemIds.length} detailed, ${coverage.fallbackItemIds.length} official-source fallback, ${requiredItemCount} required.`
+              );
+            }
 
             if (coverage.retriedItemIds.length > 0) {
               log(
@@ -619,6 +683,7 @@ export async function runSimpleCityPipeline(
                 log(`Reconciled ${inserted.length} source-identified card(s) while retaining unmatched existing cards for ${item.meeting.title}.`);
               }
               cardsGenerated += inserted.length;
+              await reconcileOutcomesForItem(item);
             } else {
               cardsGenerated += summary.cards.length;
               generatedSummaries.push({
@@ -633,6 +698,9 @@ export async function runSimpleCityPipeline(
             const message = error instanceof Error ? error.message : "Unknown LLM error";
             errors.push(`LLM failed for ${item.meeting.title}: ${message}`);
             log(`LLM failed for ${item.meeting.title}: ${message}`);
+            if (persistSummaries && item.existingCardCount > 0) {
+              await reconcileOutcomesForItem(item);
+            }
             return isLlmRateLimitError(error);
           }
         };
@@ -670,49 +738,16 @@ export async function runSimpleCityPipeline(
       }
     }
 
-    if (canPersist && supabase && upserted.length > 0 && !recordDeadline("decision outcome reconciliation")) {
-      let outcomesUpserted = 0;
-      let outcomesRejectedAmbiguous = 0;
-      let resultItemsFound = 0;
-      let resultItemsMatched = 0;
-      let resultItemsUnmatched = 0;
-      let resultCardsFound = 0;
-      let resultCardsMatched = 0;
-      let resultCardsUnmatched = 0;
-      let duplicateCardsDetected = 0;
-      let duplicateCardsResolved = 0;
+    if (requiredAgendaItems > 0) {
+      log(
+        `Decision-card coverage: ${detailedAgendaItems} detailed and ${fallbackAgendaItems} official-source fallback card(s) across ${requiredAgendaItems} required agenda item(s).`
+      );
+    }
+
+    if (canPersist && supabase && upserted.length > 0) {
       for (const item of upserted) {
         if (recordDeadline("decision outcome reconciliation")) break;
-
-        try {
-          const reconciliation = await reconcileDecisionOutcomesForMeeting(
-            supabase,
-            item.id,
-            item.meeting,
-            jurisdiction,
-            { explainWithLlm: true, translateWithLlm: true, log }
-          );
-          outcomesUpserted += reconciliation.outcomesUpserted;
-          outcomesRejectedAmbiguous += reconciliation.outcomesRejectedAmbiguous;
-          resultItemsFound += reconciliation.resultItemsFound;
-          resultItemsMatched += reconciliation.resultItemsMatched;
-          resultItemsUnmatched += reconciliation.resultItemsUnmatched;
-          resultCardsFound += reconciliation.resultCardsFound;
-          resultCardsMatched += reconciliation.resultCardsMatched;
-          resultCardsUnmatched += reconciliation.resultCardsUnmatched;
-          duplicateCardsDetected += reconciliation.duplicateCardsDetected;
-          duplicateCardsResolved += reconciliation.duplicateCardsResolved;
-          if (!reconciliation.complete && reconciliation.resultCardsFound > 0) {
-            const coverageError =
-              `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultCardsMatched} of ${reconciliation.resultCardsFound} decision card(s) with official results; ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
-            errors.push(coverageError);
-            log(coverageError);
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "Unknown decision outcome error";
-          errors.push(`${item.meeting.title}: ${message}`);
-          log(`Decision outcome reconciliation failed for ${item.meeting.title}: ${message}`);
-        }
+        await reconcileOutcomesForItem(item);
       }
       if (outcomesUpserted > 0) {
         log(`Published ${outcomesUpserted} verified decision outcome update(s) from official meeting records.`);

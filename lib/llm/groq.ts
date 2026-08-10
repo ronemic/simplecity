@@ -33,6 +33,7 @@ import {
 export type GenerateSummaryOptions = {
   log?: (message: string) => void;
   sleep?: (ms: number) => Promise<void>;
+  requestGroup?: string;
 };
 
 type SummaryRequestResult = {
@@ -215,8 +216,12 @@ function summarizeValidationIssues(issues: SummaryValidationIssue[]) {
     .join("\n");
 }
 
+function validationRejections(issues: SummaryValidationIssue[]) {
+  return issues.filter((issue) => issue.outcome !== "warning");
+}
+
 function shouldRegenerateSummary(meeting: LlmReadyMeeting, result: SummaryRequestResult) {
-  if (result.validationIssues.length > 0) return false;
+  if (validationRejections(result.validationIssues).length > 0) return false;
   return result.summary.cards.length === 0 && hasUsableSourceText(meeting);
 }
 
@@ -240,7 +245,10 @@ function isBetterSummaryResult(candidate: SummaryRequestResult, current: Summary
     return candidate.summary.cards.length > current.summary.cards.length;
   }
 
-  return candidate.validationIssues.length < current.validationIssues.length;
+  return (
+    validationRejections(candidate.validationIssues).length <
+    validationRejections(current.validationIssues).length
+  );
 }
 
 function mergeValidatedSummaries(
@@ -352,6 +360,7 @@ ${sourceContext}`;
     })
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `OpenRouter targeted repair for ${meeting.title}`,
+    group: options.requestGroup || meeting.id,
     log: options.log
   });
 
@@ -451,6 +460,7 @@ async function requestSummary(
     })
   }, LLM_REQUEST_TIMEOUT_MS, {
     label: `OpenRouter summary for ${meeting.title}`,
+    group: options.requestGroup || meeting.id,
     log: options.log
   });
 
@@ -480,8 +490,9 @@ async function requestSummary(
   );
 
   for (const issue of validationIssues) {
+    const disposition = issue.outcome === "warning" ? "warning" : "rejection";
     options.log?.(
-      `Summary validation issue for ${meeting.title}: ${issue.reason}${
+      `Summary validation ${disposition} for ${meeting.title}: ${issue.reason}${
         issue.value ? ` (${issue.value})` : ""
       }`
     );
@@ -555,6 +566,7 @@ async function requestTopicValidation(
     })
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `OpenRouter topic validation for ${candidates.length} card(s)`,
+    group: options.requestGroup,
     log: options.log
   });
 
@@ -815,6 +827,10 @@ export async function generateSummaryForMeeting(
   meeting: LlmReadyMeeting,
   options: GenerateSummaryOptions = {}
 ): Promise<{ summary: SimpleCitySummary; raw: unknown }> {
+  options = {
+    ...options,
+    requestGroup: options.requestGroup || meeting.id
+  };
   options.log?.(`Starting LLM summary for ${meeting.title}.`);
   const batches = buildAgendaItemSummaryBatches(meeting);
 
@@ -825,11 +841,14 @@ export async function generateSummaryForMeeting(
   options.log?.(
     `Summarizing ${meeting.items?.length || 0} structured agenda item(s) in ${batches.length} bounded batch(es).`
   );
-  const results = [];
-  for (const [index, batch] of batches.entries()) {
-    options.log?.(`Starting agenda-item batch ${index + 1} of ${batches.length} for ${meeting.title}.`);
-    results.push(await generateSummaryForInput(batch, options));
-  }
+  const results = await Promise.all(
+    batches.map(async (batch, index) => {
+      options.log?.(
+        `Queueing agenda-item batch ${index + 1} of ${batches.length} for ${meeting.title}.`
+      );
+      return generateSummaryForInput(batch, options);
+    })
+  );
 
   const combined = combineBatchSummaries(results);
   options.log?.(

@@ -189,17 +189,32 @@ export async function completeAgendaItemCoverage(
   const retryErrors: string[] = [];
   const retriedItemIds: string[] = [];
 
-  for (const item of uncoveredAgendaItems(meeting, summary)) {
-    if (!options.generate) break;
-    retriedItemIds.push(item.externalId);
-    try {
-      const result = await options.generate(agendaItemRetryMeeting(meeting, item));
-      retryRaw.push(result.raw);
-      summary = appendSummary(summary, result.summary);
-    } catch (error) {
-      retryErrors.push(
-        `${item.externalId}: ${error instanceof Error ? error.message : "Unknown item-summary error"}`
-      );
+  const uncovered = uncoveredAgendaItems(meeting, summary);
+  if (options.generate) {
+    const retries = await Promise.all(
+      uncovered.map(async (item) => {
+        retriedItemIds.push(item.externalId);
+        try {
+          return {
+            item,
+            result: await options.generate!(agendaItemRetryMeeting(meeting, item)),
+            error: null
+          };
+        } catch (error) {
+          return { item, result: null, error };
+        }
+      })
+    );
+
+    for (const retry of retries) {
+      if (retry.result) {
+        retryRaw.push(retry.result.raw);
+        summary = appendSummary(summary, retry.result.summary);
+      } else {
+        retryErrors.push(
+          `${retry.item.externalId}: ${retry.error instanceof Error ? retry.error.message : "Unknown item-summary error"}`
+        );
+      }
     }
   }
 

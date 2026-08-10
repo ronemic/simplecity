@@ -100,6 +100,41 @@ test("still rejects a mismatched agenda identifier", () => {
   assert.equal(result.cards.length, 0);
 });
 
+test("normalizes an LLM agenda identifier from structured source metadata without requesting repair", () => {
+  const issues: Array<{ reason: string; repairable?: boolean; outcome?: string }> = [];
+  const sourceText =
+    "Agenda item 4. Contract approval. The council will consider a $100 contract at 7:00 PM for park maintenance.";
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          sourceItemId: "official-item-4",
+          agendaItem: "Contract approval, agenda item 79"
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      allowedSourceItemIds: ["official-item-4"],
+      sourceText,
+      sourceTextForCard: () => sourceText,
+      sourceIdentityForCard: () => ({
+        title: "Contract approval",
+        agendaNumber: "4"
+      }),
+      onIssue: (issue) => issues.push(issue)
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.cards[0].agendaItem, "Contract approval, Agenda item 4");
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].repairable, false);
+  assert.equal(issues[0].outcome, "warning");
+});
+
 test("does not mistake a numbered assessment phrase for a street address", () => {
   const result = validateSimpleCitySummary(
     {

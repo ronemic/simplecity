@@ -149,6 +149,10 @@ export type SummaryValidationOptions = {
   meetingStatus?: MeetingStatus;
   allowedSourceItemIds?: string[];
   sourceTextForCard?: (sourceItemId: string | null, agendaItem: string) => string | null;
+  sourceIdentityForCard?: (
+    sourceItemId: string | null,
+    agendaItem: string
+  ) => { title: string; agendaNumber: string | null } | null;
   meetingWideParticipationText?: string;
   onIssue?: (issue: SummaryValidationIssue) => void;
 };
@@ -459,6 +463,38 @@ function cardParticipationGroundingText(card: z.infer<typeof CardSchema>) {
     .join(" ");
 }
 
+const EXPLICIT_AGENDA_IDENTIFIER_PATTERN =
+  /\b(?:agenda\s+item|item)\s+(?:no\.?\s*)?([A-Z]?\d[\w.-]*)\b/gi;
+
+function canonicalizeAgendaItemLabel(
+  label: string,
+  identity: { title: string; agendaNumber: string | null } | null
+) {
+  if (!identity) return { label, changed: false };
+
+  let changed = false;
+  const canonicalNumber = identity.agendaNumber?.trim() || null;
+  const normalized = label.replace(
+    EXPLICIT_AGENDA_IDENTIFIER_PATTERN,
+    (match, identifier: string) => {
+      if (canonicalNumber && normalizeEvidenceText(identifier) === normalizeEvidenceText(canonicalNumber)) {
+        return match;
+      }
+      changed = true;
+      return canonicalNumber ? `Agenda item ${canonicalNumber}` : "";
+    }
+  )
+    .replace(/\s{2,}/g, " ")
+    .replace(/^\s*(?:-|:|–|—)\s*/, "")
+    .replace(/\s*(?:-|:|–|—)\s*$/, "")
+    .trim();
+
+  return {
+    label: normalized || identity.title.trim() || label,
+    changed
+  };
+}
+
 function cleanCardTranslation(
   translation: z.infer<typeof CardTranslationSchema> | null | undefined,
   sourceStatus: string,
@@ -565,6 +601,12 @@ export function validationOptionsForMeeting(
   const meetingWideParticipationText = extractMeetingWideParticipationContext(
     meeting.llmInputText
   );
+  const resolveItem = (sourceItemId: string | null, agendaItem: string) => {
+    const exactItem = sourceItemId && uniqueIds.has(sourceItemId)
+      ? items.find((item) => item.externalId === sourceItemId)
+      : null;
+    return exactItem || findAgendaItemForCard(agendaItem, items) || null;
+  };
   return {
     fallbackSource: meeting.sourceUrl || "",
     allowedSourceUrls: [
@@ -579,13 +621,18 @@ export function validationOptionsForMeeting(
     meetingStatus: meeting.status,
     allowedSourceItemIds: Array.from(uniqueIds),
     sourceTextForCard: (sourceItemId, agendaItem) => {
-      const exactItem = sourceItemId && uniqueIds.has(sourceItemId)
-        ? items.find((item) => item.externalId === sourceItemId)
-        : null;
-      const matchedItem = exactItem || findAgendaItemForCard(agendaItem, items);
+      const matchedItem = resolveItem(sourceItemId, agendaItem);
       return matchedItem
         ? [meetingMetadataText, buildAgendaItemSourceText(matchedItem)].join("\n")
         : null;
+    },
+    sourceIdentityForCard: (sourceItemId, agendaItem) => {
+      const matchedItem = resolveItem(sourceItemId, agendaItem);
+      if (!matchedItem) return null;
+      return {
+        title: String(matchedItem.title || matchedItem.rowText || "").trim(),
+        agendaNumber: matchedItem.agendaNumber?.trim() || null
+      };
     },
     onIssue
   };
@@ -630,6 +677,22 @@ export function validateSimpleCitySummary(
 
   const cards = parsed.cards
     .map((card, index) => {
+      const sourceItemId = card.sourceItemId?.trim() || null;
+      const canonicalAgendaItem = canonicalizeAgendaItemLabel(
+        card.agendaItem,
+        options.sourceIdentityForCard?.(sourceItemId, card.agendaItem) || null
+      );
+      if (canonicalAgendaItem.changed) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem.slice(0, 120),
+          reason: "Agenda identifier was normalized from structured official-source metadata.",
+          cardIndex: index,
+          repairable: false,
+          outcome: "warning"
+        });
+        card.agendaItem = canonicalAgendaItem.label;
+      }
+
       const corruptedField = findCardTextCorruption(card);
       if (corruptedField) {
         options.onIssue?.({
@@ -657,7 +720,6 @@ export function validateSimpleCitySummary(
       });
       const status = cleanStatus(card.status);
       const source = resolveOfficialSource(card.source, options);
-      const sourceItemId = card.sourceItemId?.trim() || null;
       const groundingSourceText =
         options.sourceTextForCard?.(sourceItemId, card.agendaItem) || sourceText;
       const itemUnsupportedValues = groundingSourceText
