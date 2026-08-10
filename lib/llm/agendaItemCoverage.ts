@@ -49,22 +49,27 @@ export function uncoveredAgendaItems(
 
 export function agendaItemRetryMeeting(
   meeting: LlmReadyMeeting,
-  item: AgendaItem
+  items: AgendaItem | AgendaItem[]
 ): LlmReadyMeeting {
+  const retryItems = Array.isArray(items) ? items : [items];
   const participationContext = extractMeetingWideParticipationContext(meeting.llmInputText);
   return {
     ...meeting,
-    items: [item],
+    items: retryItems,
     llmInputText: [
-      "Generate a card for this one official agenda item if it is substantive. Do not summarize any other item.",
-      formatAgendaItemContexts([item]),
+      retryItems.length === 1
+        ? "Generate a card for this one official agenda item if it is substantive. Do not summarize any other item."
+        : "Generate one card for each substantive official agenda item in this recovery batch. Do not summarize any other item.",
+      formatAgendaItemContexts(retryItems),
       participationContext
         ? `${MEETING_WIDE_CONTEXT_HEADING}\n${participationContext}`
         : ""
     ].filter(Boolean).join("\n\n"),
     extractionNotes: [
       ...meeting.extractionNotes,
-      `Retrying uncovered official agenda item ${item.agendaNumber || item.externalId}.`
+      `Recovering ${retryItems.length} uncovered official agenda item(s): ${retryItems
+        .map((item) => item.agendaNumber || item.externalId)
+        .join(", ")}.`
     ]
   };
 }
@@ -190,31 +195,21 @@ export async function completeAgendaItemCoverage(
   const retriedItemIds: string[] = [];
 
   const uncovered = uncoveredAgendaItems(meeting, summary);
-  if (options.generate) {
-    const retries = await Promise.all(
-      uncovered.map(async (item) => {
-        retriedItemIds.push(item.externalId);
-        try {
-          return {
-            item,
-            result: await options.generate!(agendaItemRetryMeeting(meeting, item)),
-            error: null
-          };
-        } catch (error) {
-          return { item, result: null, error };
-        }
-      })
-    );
-
-    for (const retry of retries) {
-      if (retry.result) {
-        retryRaw.push(retry.result.raw);
-        summary = appendSummary(summary, retry.result.summary);
-      } else {
-        retryErrors.push(
-          `${retry.item.externalId}: ${retry.error instanceof Error ? retry.error.message : "Unknown item-summary error"}`
-        );
-      }
+  if (options.generate && uncovered.length > 0) {
+    // Recover all missing items as one logical request. generateSummaryForMeeting
+    // will split this meeting into bounded source-size batches when necessary. This
+    // avoids launching one paid request per missing card after a partial response.
+    retriedItemIds.push(...uncovered.map((item) => item.externalId));
+    try {
+      const retry = await options.generate(agendaItemRetryMeeting(meeting, uncovered));
+      retryRaw.push(retry.raw);
+      summary = appendSummary(summary, retry.summary);
+    } catch (error) {
+      retryErrors.push(
+        `${uncovered.map((item) => item.externalId).join(", ")}: ${
+          error instanceof Error ? error.message : "Unknown item-summary error"
+        }`
+      );
     }
   }
 

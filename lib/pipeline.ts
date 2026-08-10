@@ -163,6 +163,9 @@ function createDeadline(maxRuntimeMinutes?: number) {
     exceeded() {
       return Date.now() >= deadlineAt;
     },
+    remainingMilliseconds() {
+      return Math.max(0, deadlineAt - Date.now());
+    },
     remainingMinutes() {
       return Math.max(0, Math.ceil((deadlineAt - Date.now()) / 60_000));
     }
@@ -176,6 +179,11 @@ function getMaxConsecutiveRateLimitFailures() {
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2;
 }
+
+// These are deliberately code defaults rather than environment knobs: a bad
+// recovery run must have a finite paid-work ceiling even when CI is misconfigured.
+const MAX_SUMMARY_GENERATIONS_PER_PIPELINE = 30;
+const MAX_AGENDA_ITEM_RECOVERIES_PER_PIPELINE = 8;
 
 export function shouldReconcileMinutesWithoutGeneratingCards(
   meeting: LlmReadyMeeting,
@@ -210,6 +218,9 @@ export async function runSimpleCityPipeline(
   const jurisdiction = resolvePipelineJurisdiction(options.jurisdiction);
   const deadline = createDeadline(options.maxRuntimeMinutes);
   let deadlineRecorded = false;
+  let summaryGenerationAttempts = 0;
+  let agendaItemRecoveryAttempts = 0;
+  let summaryBudgetRecorded = false;
   const logs: string[] = [];
   const errors: string[] = [];
   const log = (message: string) => {
@@ -230,6 +241,43 @@ export async function runSimpleCityPipeline(
     }
 
     return true;
+  };
+  const generateWithinPipelineBudget = async (
+    meeting: LlmReadyMeeting,
+    kind: "meeting" | "agenda-item-recovery"
+  ) => {
+    if (recordDeadline("LLM summarization")) {
+      throw new Error("Pipeline deadline reached before this LLM request started.");
+    }
+
+    const pipelineBudgetExhausted =
+      summaryGenerationAttempts >= MAX_SUMMARY_GENERATIONS_PER_PIPELINE;
+    const recoveryBudgetExhausted =
+      kind === "agenda-item-recovery" &&
+      agendaItemRecoveryAttempts >= MAX_AGENDA_ITEM_RECOVERIES_PER_PIPELINE;
+    if (pipelineBudgetExhausted || recoveryBudgetExhausted) {
+      if (!summaryBudgetRecorded) {
+        const message =
+          `Stopped starting new LLM summary work after reaching the safe per-run budget ` +
+          `(${summaryGenerationAttempts} total generation(s), ${agendaItemRecoveryAttempts} agenda-item recovery generation(s)).`;
+        errors.push(message);
+        log(message);
+        summaryBudgetRecorded = true;
+      }
+      throw new Error("Per-run LLM summary budget exhausted before this request started.");
+    }
+
+    summaryGenerationAttempts += 1;
+    if (kind === "agenda-item-recovery") agendaItemRecoveryAttempts += 1;
+    const remainingMs = deadline?.remainingMilliseconds();
+    const signal = remainingMs === undefined
+      ? undefined
+      : AbortSignal.timeout(Math.max(1, remainingMs));
+    return generateSummaryForMeeting(meeting, {
+      log,
+      signal,
+      shouldStop: deadlineExceeded
+    });
   };
 
   const persist = options.persist ?? true;
@@ -488,7 +536,13 @@ export async function runSimpleCityPipeline(
     let fallbackAgendaItems = 0;
     const reconciledOutcomeMeetingIds = new Set<string>();
     const reconcileOutcomesForItem = async (item: { id: string; meeting: LlmReadyMeeting }) => {
-      if (!canPersist || !supabase || !item.id || reconciledOutcomeMeetingIds.has(item.id)) {
+      if (
+        deadlineExceeded() ||
+        !canPersist ||
+        !supabase ||
+        !item.id ||
+        reconciledOutcomeMeetingIds.has(item.id)
+      ) {
         return;
       }
       try {
@@ -601,7 +655,7 @@ export async function runSimpleCityPipeline(
             let initialSummary: Awaited<ReturnType<typeof generateSummaryForMeeting>> | null = null;
             let initialSummaryError: unknown = null;
             try {
-              initialSummary = await generateSummaryForMeeting(item.meeting, { log });
+              initialSummary = await generateWithinPipelineBudget(item.meeting, "meeting");
             } catch (error) {
               initialSummaryError = error;
             }
@@ -612,7 +666,8 @@ export async function runSimpleCityPipeline(
               {
                 generate: initialSummaryError && isLlmRateLimitError(initialSummaryError)
                   ? undefined
-                  : (retryMeeting) => generateSummaryForMeeting(retryMeeting, { log })
+                  : (retryMeeting) =>
+                      generateWithinPipelineBudget(retryMeeting, "agenda-item-recovery")
               }
             );
             const { summary, raw } = coverage;
@@ -631,7 +686,7 @@ export async function runSimpleCityPipeline(
 
             if (coverage.retriedItemIds.length > 0) {
               log(
-                `Retried ${coverage.retriedItemIds.length} uncovered agenda item(s) individually for ${item.meeting.title}.`
+                `Retried ${coverage.retriedItemIds.length} uncovered agenda item(s) in bounded recovery batches for ${item.meeting.title}.`
               );
             }
             for (const retryError of coverage.retryErrors) {

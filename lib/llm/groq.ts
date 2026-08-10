@@ -34,6 +34,8 @@ export type GenerateSummaryOptions = {
   log?: (message: string) => void;
   sleep?: (ms: number) => Promise<void>;
   requestGroup?: string;
+  signal?: AbortSignal;
+  shouldStop?: () => boolean;
 };
 
 type SummaryRequestResult = {
@@ -357,7 +359,8 @@ ${sourceContext}`;
       ],
       temperature: 0,
       response_format: { type: "json_object" }
-    })
+    }),
+    signal: options.signal
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `OpenRouter targeted repair for ${meeting.title}`,
     group: options.requestGroup || meeting.id,
@@ -457,7 +460,8 @@ async function requestSummary(
       response_format: {
         type: "json_object"
       }
-    })
+    }),
+    signal: options.signal
   }, LLM_REQUEST_TIMEOUT_MS, {
     label: `OpenRouter summary for ${meeting.title}`,
     group: options.requestGroup || meeting.id,
@@ -563,7 +567,8 @@ async function requestTopicValidation(
       ],
       temperature: 0,
       response_format: { type: "json_object" }
-    })
+    }),
+    signal: options.signal
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `OpenRouter topic validation for ${candidates.length} card(s)`,
     group: options.requestGroup,
@@ -823,6 +828,36 @@ function combineBatchSummaries(
   };
 }
 
+export async function runSummaryBatchesSequentially<T>(
+  batches: T[],
+  generate: (batch: T, index: number) => Promise<{
+    summary: SimpleCitySummary;
+    raw: unknown;
+  }>,
+  options: {
+    shouldStop?: () => boolean;
+    onStopped?: () => void;
+  } = {}
+) {
+  const results: Array<{ summary: SimpleCitySummary; raw: unknown }> = [];
+  for (const [index, batch] of batches.entries()) {
+    if (options.shouldStop?.()) {
+      options.onStopped?.();
+      break;
+    }
+    try {
+      results.push(await generate(batch, index));
+    } catch (error) {
+      if (results.length > 0 && options.shouldStop?.()) {
+        options.onStopped?.();
+        break;
+      }
+      throw error;
+    }
+  }
+  return results;
+}
+
 export async function generateSummaryForMeeting(
   meeting: LlmReadyMeeting,
   options: GenerateSummaryOptions = {}
@@ -841,14 +876,27 @@ export async function generateSummaryForMeeting(
   options.log?.(
     `Summarizing ${meeting.items?.length || 0} structured agenda item(s) in ${batches.length} bounded batch(es).`
   );
-  const results = await Promise.all(
-    batches.map(async (batch, index) => {
+  const results = await runSummaryBatchesSequentially(
+    batches,
+    async (batch, index) => {
       options.log?.(
-        `Queueing agenda-item batch ${index + 1} of ${batches.length} for ${meeting.title}.`
+        `Starting agenda-item batch ${index + 1} of ${batches.length} for ${meeting.title}.`
       );
       return generateSummaryForInput(batch, options);
-    })
+    },
+    {
+      shouldStop: () => Boolean(options.signal?.aborted || options.shouldStop?.()),
+      onStopped: () => options.log?.(
+        `Stopped starting agenda-item batches for ${meeting.title} at the pipeline deadline; completed batches will be retained.`
+      )
+    }
   );
+
+  if (results.length === 0) {
+    throw options.signal?.reason instanceof Error
+      ? options.signal.reason
+      : new Error(`Pipeline deadline reached before an LLM batch completed for ${meeting.title}.`);
+  }
 
   const combined = combineBatchSummaries(results);
   options.log?.(

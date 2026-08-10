@@ -3,9 +3,15 @@ import test from "node:test";
 import {
   buildAgendaItemSummaryBatches,
   generateSummaryForMeeting,
-  MAX_AGENDA_ITEM_BATCH_CHARS
+  MAX_AGENDA_ITEM_BATCH_CHARS,
+  runSummaryBatchesSequentially
 } from "@/lib/llm/groq";
-import { fetchLlmResponse } from "@/lib/llm/provider";
+import {
+  fetchLlmResponse,
+  getLlmProcessBudgetUsage,
+  LlmProcessBudgetExceededError,
+  resetLlmProcessBudgetForTests
+} from "@/lib/llm/provider";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 
 const meetingSummary = {
@@ -111,6 +117,50 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
   restore("LLM_MAX_RETRY_DELAY_MS", env.llmMaxRetryDelayMs);
 }
 
+test("starts summary batches lazily and preserves source order", async () => {
+  let active = 0;
+  let maximumActive = 0;
+  const started: number[] = [];
+
+  const results = await runSummaryBatchesSequentially([1, 2, 3], async (batch) => {
+    started.push(batch);
+    active += 1;
+    maximumActive = Math.max(maximumActive, active);
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    active -= 1;
+    return { summary: { meetingSummary, cards: [] }, raw: batch };
+  });
+
+  assert.equal(maximumActive, 1);
+  assert.deepEqual(started, [1, 2, 3]);
+  assert.deepEqual(results.map((result) => result.raw), [1, 2, 3]);
+});
+
+test("stops lazy summary batches at a deadline while retaining completed work", async () => {
+  let stopped = false;
+  let stopLogged = false;
+  const started: number[] = [];
+
+  const results = await runSummaryBatchesSequentially(
+    [1, 2, 3],
+    async (batch) => {
+      started.push(batch);
+      stopped = true;
+      return { summary: { meetingSummary, cards: [] }, raw: batch };
+    },
+    {
+      shouldStop: () => stopped,
+      onStopped: () => {
+        stopLogged = true;
+      }
+    }
+  );
+
+  assert.deepEqual(started, [1]);
+  assert.deepEqual(results.map((result) => result.raw), [1]);
+  assert.equal(stopLogged, true);
+});
+
 function setLlmTestEnv() {
   process.env.OPENROUTER_API_KEY = "test-openrouter-key";
   process.env.OPENROUTER_MODEL = "openai/gpt-oss-120b";
@@ -150,7 +200,7 @@ test("times out while an LLM response body is still pending", async (t) => {
       error.name === "AbortError" &&
       /timed out after 20 milliseconds/i.test(error.message)
   );
-  assert.match(logs[0] || "", /Test request failed after \d+ms/i);
+  assert.ok(logs.some((message) => /Test request failed after \d+ms/i.test(message)));
 });
 
 test("logs completed LLM request duration and status", async (t) => {
@@ -172,7 +222,9 @@ test("logs completed LLM request duration and status", async (t) => {
   );
 
   assert.equal(result.text, '{"ok":true}');
-  assert.match(logs[0] || "", /Test request completed in \d+ms \(HTTP 200\)/i);
+  assert.ok(logs.some((message) =>
+    /Test request completed in \d+ms \(HTTP 200\)/i.test(message)
+  ));
 });
 
 test("never runs more than two LLM requests at once", async (t) => {
@@ -214,7 +266,7 @@ test("never runs more than two LLM requests at once", async (t) => {
   assert.equal(maximumActive, 2);
 });
 
-test("request timeout includes time waiting behind the two-request ceiling", async (t) => {
+test("request timeout starts after waiting behind the two-request ceiling", async (t) => {
   const originalFetch = globalThis.fetch;
   const releases: Array<() => void> = [];
   let fetchCalls = 0;
@@ -233,15 +285,152 @@ test("request timeout includes time waiting behind the two-request ceiling", asy
   const second = fetchLlmResponse("https://openrouter.ai/test", {}, 1000, { label: "Second" });
   await new Promise((resolve) => setTimeout(resolve, 10));
 
-  await assert.rejects(
-    fetchLlmResponse("https://openrouter.ai/test", {}, 20, { label: "Queued" }),
-    /timed out after 20 milliseconds/i
+  const queued = fetchLlmResponse(
+    "https://openrouter.ai/test",
+    {},
+    20,
+    { label: "Queued" }
   );
+  await new Promise((resolve) => setTimeout(resolve, 30));
   assert.equal(fetchCalls, 2);
 
   releases.shift()?.();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(fetchCalls, 3);
   releases.shift()?.();
-  await Promise.all([first, second]);
+  releases.shift()?.();
+  await Promise.all([first, second, queued]);
+});
+
+test("removes an aborted request from the LLM slot queue", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const releases: Array<() => void> = [];
+  const labels: string[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async (_url, init) => {
+    labels.push(String(init?.headers && (init.headers as Record<string, string>)["x-label"]));
+    await new Promise<void>((resolve) => releases.push(resolve));
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  const first = fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "first" } });
+  const second = fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "second" } });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const controller = new AbortController();
+  const aborted = fetchLlmResponse(
+    "https://openrouter.ai/test",
+    { headers: { "x-label": "aborted" }, signal: controller.signal }
+  );
+  const survivor = fetchLlmResponse(
+    "https://openrouter.ai/test",
+    { headers: { "x-label": "survivor" } }
+  );
+  controller.abort();
+  await assert.rejects(aborted, (error: unknown) =>
+    error instanceof Error && error.name === "AbortError"
+  );
+
+  releases.shift()?.();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(labels, ["first", "second", "survivor"]);
+
+  while (releases.length > 0) {
+    releases.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  await Promise.all([first, second, survivor]);
+});
+
+test("gives another LLM request group the next available slot", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const releases: Array<() => void> = [];
+  const started: string[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async (_url, init) => {
+    started.push(String(init?.headers && (init.headers as Record<string, string>)["x-label"]));
+    await new Promise<void>((resolve) => releases.push(resolve));
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  const requests = [
+    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "a1" } }, 1000, { label: "a1", group: "a" }),
+    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "a2" } }, 1000, { label: "a2", group: "a" }),
+    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "a3" } }, 1000, { label: "a3", group: "a" }),
+    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "b1" } }, 1000, { label: "b1", group: "b" })
+  ];
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(started, ["a1", "a2"]);
+
+  releases.shift()?.();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(started, ["a1", "a2", "b1"]);
+
+  while (releases.length > 0) {
+    releases.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  await Promise.all(requests);
+});
+
+test("stops outbound LLM requests at the process request budget", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    resetLlmProcessBudgetForTests();
+  });
+  resetLlmProcessBudgetForTests({ requests: 2, tokens: 10_000 });
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  await fetchLlmResponse("https://openrouter.ai/test", { body: "{}" });
+  await fetchLlmResponse("https://openrouter.ai/test", { body: "{}" });
+  await assert.rejects(
+    fetchLlmResponse("https://openrouter.ai/test", { body: "{}" }),
+    (error: unknown) =>
+      error instanceof LlmProcessBudgetExceededError &&
+      error.code === "LLM_PROCESS_BUDGET_EXCEEDED" &&
+      error.retryable === false
+  );
+  assert.equal(fetchCalls, 2);
+});
+
+test("uses provider token usage to stop before the next LLM dispatch", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    resetLlmProcessBudgetForTests();
+  });
+  resetLlmProcessBudgetForTests({ requests: 10, tokens: 30 });
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return new Response(
+      JSON.stringify({ usage: { prompt_tokens: 10, completion_tokens: 19, total_tokens: 29 } }),
+      { status: 200 }
+    );
+  }) as typeof fetch;
+
+  await fetchLlmResponse("https://openrouter.ai/test", { body: "{}" });
+  assert.equal(getLlmProcessBudgetUsage().tokens, 29);
+  await assert.rejects(
+    fetchLlmResponse("https://openrouter.ai/test", { body: "{}" }),
+    LlmProcessBudgetExceededError
+  );
+  assert.equal(fetchCalls, 1);
 });
 
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {

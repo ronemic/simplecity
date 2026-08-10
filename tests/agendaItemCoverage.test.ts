@@ -103,3 +103,27 @@ test("retries only uncovered items and publishes an official-source fallback whe
   assert.equal(completed.summary.cards[1].confidence, "low");
   assert.equal(completed.summary.translations?.es?.cards.length, 2);
 });
+
+test("recovers all uncovered items in one bounded generation instead of one request per item", async () => {
+  const source = meeting([
+    item("4A", "First application"),
+    item("4B", "Second application"),
+    item("4C", "Third application")
+  ]);
+  const generatedItemGroups: string[][] = [];
+
+  const completed = await completeAgendaItemCoverage(source, null, {
+    generate: async (retryMeeting) => {
+      generatedItemGroups.push(retryMeeting.items!.map((agendaItem) => agendaItem.externalId));
+      return {
+        summary: officialSourceFallbackSummary(retryMeeting, retryMeeting.items!.slice(0, 2)),
+        raw: { recovered: true }
+      };
+    }
+  });
+
+  assert.deepEqual(generatedItemGroups, [["4A", "4B", "4C"]]);
+  assert.deepEqual(completed.retriedItemIds, ["4A", "4B", "4C"]);
+  assert.deepEqual(completed.fallbackItemIds, ["4C"]);
+  assert.deepEqual(completed.summary.cards.map((card) => card.sourceItemId), ["4A", "4B", "4C"]);
+});
