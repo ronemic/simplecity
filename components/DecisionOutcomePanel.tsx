@@ -61,6 +61,10 @@ const outcomeStyles: Record<
   }
 };
 
+export function isLongDecisionOutcomeSummary(summary: string) {
+  return summary.trim().length > 240;
+}
+
 export function DecisionOutcomePanel({
   outcome,
   locale = "en",
@@ -71,8 +75,10 @@ export function DecisionOutcomePanel({
   defaultExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
+  const [summaryExpanded, setSummaryExpanded] = useState(defaultExpanded);
   const style = outcomeStyles[outcome.kind];
   const OutcomeIcon = style.Icon;
+  const hasLongSummary = isLongDecisionOutcomeSummary(outcome.summary);
   const hasDetails = Boolean(outcome.vote || outcome.next_step || outcome.source_url);
   const updateLabel = locale === "es" ? "Actualización de la decisión" : "Decision update";
   const detailLabel = expanded
@@ -111,9 +117,29 @@ export function DecisionOutcomePanel({
             <h4 className={cn("mt-0.5 text-lg font-black leading-tight sm:text-xl", style.label)}>
               {outcome.headline}
             </h4>
-            <p className="mt-1 max-w-3xl text-sm font-semibold leading-6 text-black/70">
+            <p
+              className={cn(
+                "mt-1 max-w-3xl text-sm font-semibold leading-6 text-black/70",
+                hasLongSummary && !summaryExpanded && "line-clamp-3"
+              )}
+            >
               {outcome.summary}
             </p>
+            {hasLongSummary ? (
+              <button
+                type="button"
+                className={cn(
+                  "mt-1 text-sm font-bold underline decoration-current/30 underline-offset-4 hover:decoration-current",
+                  style.label
+                )}
+                onClick={() => setSummaryExpanded((value) => !value)}
+                aria-expanded={summaryExpanded}
+              >
+                {summaryExpanded
+                  ? locale === "es" ? "Mostrar menos" : "Show less"
+                  : locale === "es" ? "Mostrar resultado completo" : "Show full result"}
+              </button>
+            ) : null}
           </div>
           {outcome.decided_at ? (
             <p className="shrink-0 text-xs font-bold text-black/50 sm:pt-0.5">
