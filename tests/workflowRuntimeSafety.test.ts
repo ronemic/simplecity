@@ -7,6 +7,11 @@ const nightlyWorkflow = readFileSync(
   "utf8"
 );
 const pipeline = readFileSync(new URL("../lib/pipeline.ts", import.meta.url), "utf8");
+const dedicatedWorkflows = [
+  nightlyWorkflow,
+  readFileSync(new URL("../.github/workflows/menlo-park-pipeline.yml", import.meta.url), "utf8"),
+  readFileSync(new URL("../.github/workflows/santa-barbara-county-pipeline.yml", import.meta.url), "utf8")
+];
 
 test("nightly workflows do not rerun an entire paid pipeline after failure", () => {
   assert.doesNotMatch(nightlyWorkflow, /pipeline_args=/);
@@ -35,4 +40,13 @@ test("pipeline exposes summary queue progress and live LLM usage", () => {
   assert.match(pipeline, /meeting\(s\) processed/);
   assert.match(pipeline, /LLM budget: requests/);
   assert.match(pipeline, /estimated\/actual tokens/);
+});
+
+test("every scraper workflow exposes all five Groq keys for hybrid routing", () => {
+  for (const workflow of dedicatedWorkflows) {
+    for (const suffix of ["", "_2", "_3", "_4", "_5"]) {
+      assert.match(workflow, new RegExp(`GROQ_API_KEY${suffix}:`));
+    }
+    assert.match(workflow, /GROQ_MODEL:/);
+  }
 });

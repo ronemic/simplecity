@@ -8,11 +8,12 @@ import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import {
   fetchLlmResponse,
-  getConfiguredLlmProviders,
+  getLlmProvidersForInput,
   hasConfiguredLlmProvider,
   LlmProcessBudgetExceededError,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
   LLM_REQUEST_TIMEOUT_MS,
+  providerSpecificRequestFields,
   type LlmProvider
 } from "./provider";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
@@ -173,10 +174,10 @@ function parseRetryAfterMs(headers: Headers) {
   return null;
 }
 
-function getRotatedSummaryProviders() {
-  const providers = getConfiguredLlmProviders();
+function getRotatedSummaryProviders(input: unknown) {
+  const providers = getLlmProvidersForInput(input);
   if (providers.length === 0) {
-    throw new Error("Missing LLM provider API key. Configure OPENROUTER_API_KEY.");
+    throw new Error("Missing LLM provider API key. Configure OpenRouter or Groq.");
   }
   return providers;
 }
@@ -391,7 +392,7 @@ ${sourceContext}`;
     },
     body: JSON.stringify({
       model: provider.model,
-      provider: { require_parameters: true },
+      ...providerSpecificRequestFields(provider),
       messages: [
         { role: "system", content: SIMPLECITY_SYSTEM_PROMPT },
         { role: "user", content: repairPrompt }
@@ -401,7 +402,7 @@ ${sourceContext}`;
     }),
     signal: options.signal
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
-    label: `OpenRouter targeted repair for ${meeting.title}`,
+    label: `${provider.label} targeted repair for ${meeting.title}`,
     group: options.requestGroup || meeting.id,
     log: options.log
   });
@@ -439,7 +440,12 @@ async function requestTargetedCardRepairsWithFallback(
   issues: SummaryValidationIssue[],
   options: GenerateSummaryOptions
 ) {
-  const providers = getRotatedSummaryProviders();
+  const providers = getRotatedSummaryProviders([
+    SIMPLECITY_SYSTEM_PROMPT,
+    meeting.llmInputText,
+    JSON.stringify(rejectedCards),
+    JSON.stringify(issues)
+  ].join("\n"));
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {
@@ -481,7 +487,7 @@ async function requestSummary(
     },
     body: JSON.stringify({
       model: provider.model,
-      provider: { require_parameters: true },
+      ...providerSpecificRequestFields(provider),
       messages: [
         {
           role: "system",
@@ -507,7 +513,7 @@ async function requestSummary(
     }),
     signal: options.signal
   }, LLM_REQUEST_TIMEOUT_MS, {
-    label: `OpenRouter summary for ${meeting.title}`,
+    label: `${provider.label} summary for ${meeting.title}`,
     group: options.requestGroup || meeting.id,
     log: options.log
   });
@@ -604,7 +610,7 @@ async function requestTopicValidation(
     },
     body: JSON.stringify({
       model: provider.model,
-      provider: { require_parameters: true },
+      ...providerSpecificRequestFields(provider),
       messages: [
         { role: "system", content: TOPIC_VALIDATION_SYSTEM_PROMPT },
         { role: "user", content: buildTopicValidationPrompt(candidates) }
@@ -614,7 +620,7 @@ async function requestTopicValidation(
     }),
     signal: options.signal
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
-    label: `OpenRouter topic validation for ${candidates.length} card(s)`,
+    label: `${provider.label} topic validation for ${candidates.length} card(s)`,
     group: options.requestGroup,
     log: options.log
   });
@@ -647,7 +653,10 @@ async function requestTopicValidationWithFallback(
   candidates: TopicValidationCandidate[],
   options: GenerateSummaryOptions = {}
 ) {
-  const providers = getRotatedSummaryProviders();
+  const providers = getRotatedSummaryProviders([
+    TOPIC_VALIDATION_SYSTEM_PROMPT,
+    buildTopicValidationPrompt(candidates)
+  ].join("\n"));
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {
@@ -749,7 +758,11 @@ async function requestSummaryWithFallback(
   options: GenerateSummaryOptions = {},
   regenerationGuidance?: string
 ) {
-  const providers = getRotatedSummaryProviders();
+  const providers = getRotatedSummaryProviders([
+    SIMPLECITY_SYSTEM_PROMPT,
+    buildSimpleCityUserPrompt(meeting),
+    regenerationGuidance || ""
+  ].join("\n"));
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {

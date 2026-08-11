@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 
 export type LlmProvider = {
-  name: "OpenRouter";
+  name: "OpenRouter" | "Groq";
   label: string;
   apiKey: string;
   baseUrl: string;
@@ -16,6 +16,9 @@ export const LLM_MAX_PROCESS_REQUESTS = 40;
 export const LLM_MAX_PROCESS_TOKENS = 200_000;
 export const LLM_MAX_COMPLETION_TOKENS = 8_000;
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-120b";
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+export const GROQ_MAX_ESTIMATED_INPUT_TOKENS = 6_000;
+export const GROQ_MAX_FAILOVER_KEYS_PER_REQUEST = 2;
 
 export class LlmProcessBudgetExceededError extends Error {
   readonly code = "LLM_PROCESS_BUDGET_EXCEEDED";
@@ -411,7 +414,7 @@ export async function fetchLlmResponse(
   }
 }
 
-export function getConfiguredLlmProviders(): LlmProvider[] {
+function getConfiguredOpenRouterProviders(): LlmProvider[] {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return [];
 
@@ -428,6 +431,80 @@ export function getConfiguredLlmProviders(): LlmProvider[] {
       }
     }
   ];
+}
+
+let groqRotationSignature = "";
+let nextGroqProviderIndex = 0;
+
+export function getConfiguredGroqProviders(): LlmProvider[] {
+  const apiKeys = [
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+    process.env.GROQ_API_KEY_4,
+    process.env.GROQ_API_KEY_5
+  ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
+
+  return apiKeys.map((apiKey, index) => ({
+    name: "Groq",
+    label: apiKeys.length > 1 ? `Groq key ${index + 1}` : "Groq",
+    apiKey,
+    baseUrl: "https://api.groq.com/openai/v1/chat/completions",
+    model: process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL
+  }));
+}
+
+function getRotatedGroqProviders() {
+  const providers = getConfiguredGroqProviders();
+  if (providers.length === 0) return providers;
+
+  const signature = providers.map((provider) => provider.apiKey).join("\u0000");
+  if (signature !== groqRotationSignature) {
+    groqRotationSignature = signature;
+    nextGroqProviderIndex = 0;
+  }
+
+  const startIndex = nextGroqProviderIndex % providers.length;
+  nextGroqProviderIndex = (startIndex + 1) % providers.length;
+  return [...providers.slice(startIndex), ...providers.slice(0, startIndex)];
+}
+
+export function estimateLlmInputTokens(input: unknown) {
+  const text = typeof input === "string" ? input : JSON.stringify(input);
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+/**
+ * Short prompts use one rotating Groq key with one bounded Groq failover, then
+ * OpenRouter. Large prompts stay on OpenRouter. Across logical requests the
+ * rotation advances through every configured Groq key without fanning one
+ * failure out across all five accounts.
+ */
+export function getLlmProvidersForInput(input: unknown): LlmProvider[] {
+  const openRouter = getConfiguredOpenRouterProviders();
+  const configuredGroq = getConfiguredGroqProviders();
+  const shortRequest = estimateLlmInputTokens(input) <= GROQ_MAX_ESTIMATED_INPUT_TOKENS;
+
+  if (shortRequest && configuredGroq.length > 0) {
+    const groq = getRotatedGroqProviders();
+    return [
+      ...groq.slice(0, GROQ_MAX_FAILOVER_KEYS_PER_REQUEST),
+      ...openRouter
+    ];
+  }
+
+  if (openRouter.length > 0) return openRouter;
+  return getRotatedGroqProviders().slice(0, GROQ_MAX_FAILOVER_KEYS_PER_REQUEST);
+}
+
+export function getConfiguredLlmProviders(): LlmProvider[] {
+  return [...getConfiguredGroqProviders(), ...getConfiguredOpenRouterProviders()];
+}
+
+export function providerSpecificRequestFields(provider: LlmProvider) {
+  return provider.name === "OpenRouter"
+    ? { provider: { require_parameters: true } }
+    : {};
 }
 
 export function hasConfiguredLlmProvider() {

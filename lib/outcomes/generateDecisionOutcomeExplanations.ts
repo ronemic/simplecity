@@ -3,7 +3,9 @@ import { z } from "zod";
 import {
   fetchLlmResponse,
   getConfiguredLlmProviders,
+  getLlmProvidersForInput,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
+  providerSpecificRequestFields,
   type LlmProvider
 } from "@/lib/llm/provider";
 import type { DecisionOutcomeCanonicalStatus } from "@/lib/outcomes/extractDecisionOutcome";
@@ -64,8 +66,11 @@ function configuredProviders() {
   return getConfiguredLlmProviders();
 }
 
-function rotatedProviders() {
-  return getConfiguredLlmProviders();
+function rotatedProviders(inputs: DecisionOutcomeExplanationInput[]) {
+  return getLlmProvidersForInput([
+    DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT,
+    promptForInputs(inputs)
+  ].join("\n"));
 }
 
 export function hasDecisionOutcomeExplanationProvider() {
@@ -181,7 +186,7 @@ async function requestExplanations(
     },
     body: JSON.stringify({
       model: provider.model,
-      provider: { require_parameters: true },
+      ...providerSpecificRequestFields(provider),
       messages: [
         { role: "system", content: DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT },
         { role: "user", content: promptForInputs(inputs) }
@@ -190,7 +195,7 @@ async function requestExplanations(
       response_format: { type: "json_object" }
     })
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
-    label: `OpenRouter decision explanation request for ${inputs.length} outcome(s)`,
+    label: `${provider.label} decision explanation request for ${inputs.length} outcome(s)`,
     log: options.log
   });
 
@@ -210,7 +215,7 @@ export async function generateDecisionOutcomeExplanations(
   options: { log?: (message: string) => void } = {}
 ) {
   if (inputs.length === 0) return new Map<string, DecisionOutcomeExplanation>();
-  const providers = rotatedProviders();
+  const providers = rotatedProviders(inputs);
   if (providers.length === 0) throw new Error("No LLM provider is configured for decision explanations.");
 
   let lastError: unknown;

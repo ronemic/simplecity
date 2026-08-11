@@ -124,7 +124,14 @@ function captureLlmEnv() {
   return {
     openRouterApiKey: process.env.OPENROUTER_API_KEY,
     openRouterModel: process.env.OPENROUTER_MODEL,
-    legacyGroqApiKey: process.env.GROQ_API_KEY,
+    groqApiKeys: [
+      process.env.GROQ_API_KEY,
+      process.env.GROQ_API_KEY_2,
+      process.env.GROQ_API_KEY_3,
+      process.env.GROQ_API_KEY_4,
+      process.env.GROQ_API_KEY_5
+    ],
+    groqModel: process.env.GROQ_MODEL,
     groqMaxAttempts: process.env.GROQ_SUMMARY_MAX_ATTEMPTS,
     groqRetryBaseMs: process.env.GROQ_SUMMARY_RETRY_BASE_MS,
     groqRateLimitRetryBaseMs: process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS,
@@ -143,7 +150,10 @@ function restoreLlmEnv(env: ReturnType<typeof captureLlmEnv>) {
 
   restore("OPENROUTER_API_KEY", env.openRouterApiKey);
   restore("OPENROUTER_MODEL", env.openRouterModel);
-  restore("GROQ_API_KEY", env.legacyGroqApiKey);
+  env.groqApiKeys.forEach((value, index) => {
+    restore(index === 0 ? "GROQ_API_KEY" : `GROQ_API_KEY_${index + 1}`, value);
+  });
+  restore("GROQ_MODEL", env.groqModel);
   restore("GROQ_SUMMARY_MAX_ATTEMPTS", env.groqMaxAttempts);
   restore("GROQ_SUMMARY_RETRY_BASE_MS", env.groqRetryBaseMs);
   restore("GROQ_RATE_LIMIT_RETRY_BASE_MS", env.groqRateLimitRetryBaseMs);
@@ -198,6 +208,11 @@ function setLlmTestEnv() {
   process.env.OPENROUTER_API_KEY = "test-openrouter-key";
   process.env.OPENROUTER_MODEL = "openai/gpt-oss-120b";
   delete process.env.GROQ_API_KEY;
+  delete process.env.GROQ_API_KEY_2;
+  delete process.env.GROQ_API_KEY_3;
+  delete process.env.GROQ_API_KEY_4;
+  delete process.env.GROQ_API_KEY_5;
+  delete process.env.GROQ_MODEL;
   process.env.GROQ_SUMMARY_MAX_ATTEMPTS = "3";
   process.env.GROQ_SUMMARY_RETRY_BASE_MS = "0";
   process.env.GROQ_RATE_LIMIT_RETRY_BASE_MS = "0";
@@ -752,7 +767,7 @@ test("regenerates an empty summary when agenda source text is usable", async (t)
   assert.equal(result.summary.cards.length, 1);
 });
 
-test("uses only the configured OpenRouter key and regular GPT-OSS route", async (t) => {
+test("routes a short summary through Groq without OpenRouter-only fields", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
   const urls: string[] = [];
@@ -767,7 +782,8 @@ test("uses only the configured OpenRouter key and regular GPT-OSS route", async 
   });
 
   setLlmTestEnv();
-  process.env.GROQ_API_KEY = "legacy-key-that-must-not-be-used";
+  process.env.GROQ_API_KEY = "test-groq-key";
+  process.env.GROQ_MODEL = "openai/gpt-oss-120b";
 
   globalThis.fetch = (async (url, init) => {
     urls.push(String(url));
@@ -776,8 +792,12 @@ test("uses only the configured OpenRouter key and regular GPT-OSS route", async 
     authorizations.push(authorization);
     referers.push(headers.get("HTTP-Referer"));
     titles.push(headers.get("X-Title"));
-    const body = JSON.parse(String(init?.body || "{}")) as { model?: string };
+    const body = JSON.parse(String(init?.body || "{}")) as {
+      model?: string;
+      provider?: unknown;
+    };
     models.push(body.model || "");
+    assert.equal(body.provider, undefined);
 
     return groqResponse({
       meetingSummary,
@@ -788,12 +808,12 @@ test("uses only the configured OpenRouter key and regular GPT-OSS route", async 
   const result = await generateSummaryForMeeting(meeting());
 
   assert.deepEqual(urls, [
-    "https://openrouter.ai/api/v1/chat/completions"
+    "https://api.groq.com/openai/v1/chat/completions"
   ]);
-  assert.deepEqual(authorizations, ["Bearer test-openrouter-key"]);
+  assert.deepEqual(authorizations, ["Bearer test-groq-key"]);
   assert.deepEqual(models, ["openai/gpt-oss-120b"]);
-  assert.deepEqual(referers, ["https://simplecity.app"]);
-  assert.deepEqual(titles, ["SimpleCity"]);
+  assert.deepEqual(referers, [null]);
+  assert.deepEqual(titles, [null]);
   assert.equal(result.summary.cards.length, 1);
 });
 

@@ -3,7 +3,9 @@ import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
 import {
   fetchLlmResponse,
   getConfiguredLlmProviders,
+  getLlmProvidersForInput,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
+  providerSpecificRequestFields,
   type LlmProvider
 } from "./provider";
 
@@ -64,8 +66,11 @@ function configuredTranslationProviders() {
   return getConfiguredLlmProviders();
 }
 
-function rotatedTranslationProviders() {
-  return getConfiguredLlmProviders();
+function rotatedTranslationProviders(input: TranslationPayload) {
+  return getLlmProvidersForInput([
+    TRANSLATION_SYSTEM_PROMPT,
+    JSON.stringify(input)
+  ].join("\n"));
 }
 
 export function hasTranslationProvider() {
@@ -250,7 +255,7 @@ async function requestTranslations(
       },
       body: JSON.stringify({
         model: provider.model,
-        provider: { require_parameters: true },
+        ...providerSpecificRequestFields(provider),
         messages: [
           {
             role: "system",
@@ -267,7 +272,7 @@ async function requestTranslations(
         }
       })
     }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
-      label: `OpenRouter ${input.locale} translation request`,
+      label: `${provider.label} ${input.locale} translation request`,
       log: options.log
     });
 
@@ -316,7 +321,7 @@ export async function generateTranslations(
   input: TranslationPayload,
   options: GenerateTranslationsOptions = {}
 ): Promise<{ translations: TranslationResult; raw: unknown }> {
-  const providers = rotatedTranslationProviders();
+  const providers = rotatedTranslationProviders(input);
   if (providers.length === 0) throw new Error("No translation provider is configured.");
 
   options.log?.(
