@@ -27,7 +27,10 @@ import {
 import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
-import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
+import {
+  isMeetingCancelled,
+  prepareLlmInput
+} from "@/lib/scraper/prepareLlmInput";
 import {
   isUsablePrimeGovHtmlAgendaText,
   scrapePortal,
@@ -54,6 +57,7 @@ import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 import {
   formatLlmProcessRunSummary,
+  getLlmProcessBudgetUsage,
   runWithLlmProcessBudget
 } from "@/lib/llm/provider";
 
@@ -184,6 +188,10 @@ export function agendaIngestionErrors(meetings: PrimeGovMeeting[]) {
   const errors: string[] = [];
 
   for (const meeting of meetings) {
+    // A stale agenda or packet may remain published after the cancellation notice.
+    // That is not an ingestion failure and must not trigger recovery/LLM work.
+    if (isMeetingCancelled(meeting)) continue;
+
     const agendaDocuments = meeting.documents.filter(
       (document) =>
         AGENDA_DOCUMENT_TYPES.has(document.type) &&
@@ -242,11 +250,6 @@ function getMaxConsecutiveRateLimitFailures() {
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2;
 }
 
-// These are deliberately code defaults rather than environment knobs: a bad
-// recovery run must have a finite paid-work ceiling even when CI is misconfigured.
-const MAX_SUMMARY_GENERATIONS_PER_PIPELINE = 30;
-const MAX_AGENDA_ITEM_RECOVERIES_PER_PIPELINE = 8;
-
 export function shouldReconcileMinutesWithoutGeneratingCards(
   meeting: LlmReadyMeeting,
   existingCardCount: number
@@ -265,11 +268,14 @@ export function shouldSkipUnchangedSummary(
   sourceHash: string | null,
   summarizedSourceHash: string | null,
   existingCardCount = 1,
-  agendaItemCount = 0
+  agendaItemCount = 0,
+  compatibleSourceHashes: string[] = []
 ) {
   return Boolean(
     sourceHash &&
-      summarizedSourceHash === sourceHash &&
+      summarizedSourceHash &&
+      (summarizedSourceHash === sourceHash ||
+        compatibleSourceHashes.includes(summarizedSourceHash)) &&
       (existingCardCount > 0 || agendaItemCount === 0)
   );
 }
@@ -295,7 +301,37 @@ export function filterResultsCoverageErrors(
 export function runSimpleCityPipeline(
   options: RunSimpleCityPipelineOptions = {}
 ): Promise<PipelineResult> {
-  return runWithLlmProcessBudget(() => runSimpleCityPipelineInternal(options));
+  const jurisdiction = resolvePipelineJurisdiction(options.jurisdiction);
+  return runWithLlmProcessBudget(
+    () => runSimpleCityPipelineInternal(options),
+    getPipelineLlmBudgetLimits(jurisdiction.slug, options.monthsBack)
+  );
+}
+
+const HIGH_VOLUME_LLM_JURISDICTIONS = new Set<JurisdictionSlug>([
+  "san-francisco",
+  "san-mateo-county",
+  "santa-clara-county",
+  "santa-barbara-county"
+]);
+
+/**
+ * These are safety ceilings, not quotas. Normal incremental runs should finish
+ * far below them. Longer lookbacks get extra headroom because they intentionally
+ * inspect more meetings, while high-volume county/large-city sources commonly
+ * contain more agenda items and attachments per meeting.
+ */
+export function getPipelineLlmBudgetLimits(
+  jurisdiction: JurisdictionSlug,
+  monthsBack = 1
+) {
+  const highVolume = HIGH_VOLUME_LLM_JURISDICTIONS.has(jurisdiction);
+  const extendedLookback = monthsBack >= 2;
+
+  if (highVolume && extendedLookback) return { requests: 120, tokens: 750_000 };
+  if (extendedLookback) return { requests: 90, tokens: 550_000 };
+  if (highVolume) return { requests: 80, tokens: 500_000 };
+  return { requests: 60, tokens: 350_000 };
 }
 
 async function runSimpleCityPipelineInternal(
@@ -306,7 +342,6 @@ async function runSimpleCityPipelineInternal(
   let deadlineRecorded = false;
   let summaryGenerationAttempts = 0;
   let agendaItemRecoveryAttempts = 0;
-  let summaryBudgetRecorded = false;
   const logs: string[] = [];
   const errors: string[] = [];
   const log = (message: string) => {
@@ -334,23 +369,6 @@ async function runSimpleCityPipelineInternal(
   ) => {
     if (recordDeadline("LLM summarization")) {
       throw new Error("Pipeline deadline reached before this LLM request started.");
-    }
-
-    const pipelineBudgetExhausted =
-      summaryGenerationAttempts >= MAX_SUMMARY_GENERATIONS_PER_PIPELINE;
-    const recoveryBudgetExhausted =
-      kind === "agenda-item-recovery" &&
-      agendaItemRecoveryAttempts >= MAX_AGENDA_ITEM_RECOVERIES_PER_PIPELINE;
-    if (pipelineBudgetExhausted || recoveryBudgetExhausted) {
-      if (!summaryBudgetRecorded) {
-        const message =
-          `Stopped starting new LLM summary work after reaching the safe per-run budget ` +
-          `(${summaryGenerationAttempts} total generation(s), ${agendaItemRecoveryAttempts} agenda-item recovery generation(s)).`;
-        errors.push(message);
-        log(message);
-        summaryBudgetRecorded = true;
-      }
-      throw new Error("Per-run LLM summary budget exhausted before this request started.");
     }
 
     summaryGenerationAttempts += 1;
@@ -686,12 +704,28 @@ async function runSimpleCityPipelineInternal(
               id: "",
               meeting,
               sourceHash: null,
+              compatibleSourceHashes: [],
               summarizedSourceHash: null,
               existingCardCount: 0
             }));
         let consecutiveRateLimitFailures = 0;
         const maxConsecutiveRateLimitFailures = getMaxConsecutiveRateLimitFailures();
         const summaryConcurrency = Math.min(2, Math.max(1, summaryTargets.length));
+        const summaryProgress = {
+          completed: 0,
+          generated: 0,
+          cancelled: 0,
+          unchanged: 0,
+          minutesOnly: 0,
+          noInput: 0,
+          failed: 0
+        };
+        const initialLlmBudget = getLlmProcessBudgetUsage();
+        log(
+          `Summary queue: ${summaryTargets.length} meeting(s); ` +
+          `LLM safety ceiling ${initialLlmBudget.requestLimit} requests and ` +
+          `${initialLlmBudget.tokenLimit} estimated/actual tokens for this jurisdiction run.`
+        );
         if (summaryConcurrency > 1) {
           log(`Summarizing up to ${summaryConcurrency} meetings concurrently.`);
         }
@@ -699,7 +733,18 @@ async function runSimpleCityPipelineInternal(
         const summarizeTarget = async (
           item: (typeof summaryTargets)[number]
         ): Promise<boolean | null> => {
+          if (isMeetingCancelled(item.meeting)) {
+            summaryProgress.cancelled += 1;
+            log(
+              item.existingCardCount > 0
+                ? `Skipping ${item.meeting.title}; meeting is cancelled and ${item.existingCardCount} existing historical card(s) were retained.`
+                : `Skipping ${item.meeting.title}; meeting is cancelled and no decision cards will be generated.`
+            );
+            return null;
+          }
+
           if (!item.meeting.llmInputText) {
+            summaryProgress.noInput += 1;
             log(`Skipping ${item.meeting.title}; no LLM input text.`);
             if (persistSummaries) await reconcileOutcomesForItem(item);
             return null;
@@ -723,6 +768,7 @@ async function runSimpleCityPipelineInternal(
               log(
                 `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; official minutes will update those cards without generating duplicates.`
               );
+              summaryProgress.minutesOnly += 1;
               await reconcileOutcomesForItem(item);
               return null;
             }
@@ -732,14 +778,29 @@ async function runSimpleCityPipelineInternal(
                 item.sourceHash,
                 item.summarizedSourceHash,
                 item.existingCardCount,
-                item.meeting.items?.length || 0
+                item.meeting.items?.length || 0,
+                item.compatibleSourceHashes
               )
             ) {
+              let migratedLegacyHash = false;
+              if (
+                persistSummaries &&
+                  supabase &&
+                  item.id &&
+                  item.sourceHash &&
+                  item.summarizedSourceHash &&
+                  item.summarizedSourceHash !== item.sourceHash &&
+                  item.compatibleSourceHashes.includes(item.summarizedSourceHash)
+              ) {
+                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
+                migratedLegacyHash = true;
+              }
               log(
                 item.existingCardCount > 0
-                  ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.`
+                  ? `Skipping ${item.meeting.title}; source unchanged and cards already exist.${migratedLegacyHash ? " Upgraded its legacy source hash." : ""}`
                   : `Skipping ${item.meeting.title}; source unchanged and the prior summary produced no cards.`
               );
+              summaryProgress.unchanged += 1;
               if (persistSummaries) await reconcileOutcomesForItem(item);
               return null;
             }
@@ -840,8 +901,10 @@ async function runSimpleCityPipelineInternal(
                 summary
               });
             }
+            summaryProgress.generated += 1;
             return Boolean(initialSummaryError && isLlmRateLimitError(initialSummaryError));
           } catch (error) {
+            summaryProgress.failed += 1;
             const message = error instanceof Error ? error.message : "Unknown LLM error";
             errors.push(`LLM failed for ${item.meeting.title}: ${message}`);
             log(`LLM failed for ${item.meeting.title}: ${message}`);
@@ -864,7 +927,22 @@ async function runSimpleCityPipelineInternal(
             nextSummaryIndex += 1;
             if (!item) return;
 
-            const rateLimited = await summarizeTarget(item);
+            let rateLimited: boolean | null = null;
+            try {
+              rateLimited = await summarizeTarget(item);
+            } finally {
+              summaryProgress.completed += 1;
+              const usage = getLlmProcessBudgetUsage();
+              log(
+                `Summary progress: ${summaryProgress.completed}/${summaryTargets.length} meeting(s) processed; ` +
+                `${Math.max(0, summaryTargets.length - summaryProgress.completed)} remaining ` +
+                `(generated ${summaryProgress.generated}, cancelled ${summaryProgress.cancelled}, ` +
+                `unchanged ${summaryProgress.unchanged}, minutes-only ${summaryProgress.minutesOnly}, ` +
+                `no-input ${summaryProgress.noInput}, failed ${summaryProgress.failed}). ` +
+                `LLM budget: requests ${usage.requests}/${usage.requestLimit}; ` +
+                `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`
+              );
+            }
             if (rateLimited === null) continue;
             consecutiveRateLimitFailures = rateLimited
               ? consecutiveRateLimitFailures + 1
@@ -882,6 +960,12 @@ async function runSimpleCityPipelineInternal(
         await Promise.all(
           Array.from({ length: summaryConcurrency }, () => runSummaryWorker())
         );
+        if (summaryProgress.completed < summaryTargets.length) {
+          log(
+            `Summary queue stopped with ${summaryTargets.length - summaryProgress.completed} meeting(s) still pending; ` +
+            "they remain eligible for a future pipeline run."
+          );
+        }
       }
     }
 
@@ -926,6 +1010,10 @@ async function runSimpleCityPipelineInternal(
       : errors.length > 0
         ? "success_with_errors"
         : "success";
+    log(
+      `Summary generation work: ${summaryGenerationAttempts} request group(s), ` +
+      `including ${agendaItemRecoveryAttempts} agenda-item recovery group(s).`
+    );
     log(formatLlmProcessRunSummary());
     log(`Pipeline finished with status ${status}.`);
 
@@ -1008,9 +1096,7 @@ export function runJurisdictionPipelines(
   selection: JurisdictionSelection = ALL_JURISDICTIONS_SLUG,
   options: Omit<RunSimpleCityPipelineOptions, "jurisdiction"> = {}
 ): Promise<MultiJurisdictionPipelineResult> {
-  return runWithLlmProcessBudget(
-    () => runJurisdictionPipelinesInternal(selection, options)
-  );
+  return runJurisdictionPipelinesInternal(selection, options);
 }
 
 async function runJurisdictionPipelinesInternal(

@@ -51,6 +51,50 @@ test("falls back to packet text when the agenda document is unreadable", async (
   );
 });
 
+test("cancelled meetings never expose stale agenda or packet text to the LLM", async () => {
+  const meeting: PrimeGovMeeting = {
+    section: "Upcoming Meetings",
+    title: "Cancelled City Council",
+    dateText: "August 12, 2026",
+    timeText: "7:00 PM",
+    meetingType: "City Council",
+    rowText: "City Council August 12, 2026 - Cancelled",
+    status: "Cancelled",
+    sourceUrl: "https://city.example/meeting",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda Packet",
+        label: "Agenda Packet",
+        url: "https://city.example/stale-packet.pdf",
+        extractedText: repeatSentence(
+          "Approve a contract that is no longer scheduled for consideration.",
+          20
+        )
+      },
+      {
+        type: "Notice of Cancellation",
+        label: "Notice of Cancellation",
+        url: "https://city.example/cancellation.pdf",
+        extractedText: "The August 12 City Council meeting has been cancelled."
+      }
+    ]
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.equal(prepared.status, "Cancelled");
+  assert.equal(prepared.sourceType, "Notice of Cancellation");
+  assert.equal(prepared.sourceUrl, "https://city.example/cancellation.pdf");
+  assert.equal(prepared.llmInputText, "");
+  assert.ok(
+    prepared.extractionNotes.some((note) =>
+      note.includes("not sent for decision-card summarization")
+    )
+  );
+});
+
 test("uses a valid packet instead of a challenge-page agenda", async () => {
   const challengeText = repeatSentence(
     "Access denied. Verify that you are human before continuing to the requested agenda.",

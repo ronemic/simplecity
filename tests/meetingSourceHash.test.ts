@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  compatibleLegacyMeetingSourceHashes,
+  legacyMeetingSourceHashV1,
   meetingSourceHash,
   SIMPLECITY_SUMMARIZER_VERSION
 } from "@/lib/db/meetingSourceHash";
@@ -87,4 +89,20 @@ test("source hash excludes public-comment bodies and local storage paths", () =>
   commentsChanged.items![0].attachments![0].storagePath = "other/contract.pdf";
 
   assert.equal(meetingSourceHash(original), meetingSourceHash(commentsChanged));
+});
+
+test("legacy hash compatibility exactly reproduces the pre-item-scoped algorithm", () => {
+  const original = meeting();
+  const legacyHash = legacyMeetingSourceHashV1(original);
+
+  assert.deepEqual(compatibleLegacyMeetingSourceHashes(original), [legacyHash]);
+  assert.notEqual(legacyHash, meetingSourceHash(original));
+
+  const officialTextChanged = meeting();
+  officialTextChanged.llmInputText = "Official agenda item text with an amendment.";
+  assert.notEqual(legacyMeetingSourceHashV1(officialTextChanged), legacyHash);
+
+  const documentChanged = meeting();
+  documentChanged.documents[0].bytes = 42_000;
+  assert.notEqual(legacyMeetingSourceHashV1(documentChanged), legacyHash);
 });

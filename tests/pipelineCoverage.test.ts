@@ -4,10 +4,30 @@ import type { LlmReadyMeeting, PrimeGovMeeting } from "@/lib/types";
 import {
   agendaIngestionErrors,
   filterResultsCoverageErrors,
+  getPipelineLlmBudgetLimits,
   minutesIngestionErrors,
   shouldReconcileMinutesWithoutGeneratingCards,
   shouldSkipUnchangedSummary
 } from "@/lib/pipeline";
+
+test("LLM safety ceilings account for source volume and extended lookbacks", () => {
+  assert.deepEqual(getPipelineLlmBudgetLimits("foster-city", 1), {
+    requests: 60,
+    tokens: 350_000
+  });
+  assert.deepEqual(getPipelineLlmBudgetLimits("foster-city", 3), {
+    requests: 90,
+    tokens: 550_000
+  });
+  assert.deepEqual(getPipelineLlmBudgetLimits("santa-clara-county", 1), {
+    requests: 80,
+    tokens: 500_000
+  });
+  assert.deepEqual(getPipelineLlmBudgetLimits("santa-clara-county", 3), {
+    requests: 120,
+    tokens: 750_000
+  });
+});
 
 function meeting(
   documents: PrimeGovMeeting["documents"],
@@ -227,6 +247,28 @@ test("agenda coverage does not require an agenda that was not discovered", () =>
   assert.deepEqual(agendaIngestionErrors([meeting([])]), []);
 });
 
+test("agenda coverage ignores stale unusable agendas for cancelled meetings", () => {
+  assert.deepEqual(
+    agendaIngestionErrors([
+      meeting(
+        [
+          {
+            type: "Agenda",
+            label: "Agenda PDF",
+            url: "https://example.com/stale-agenda.pdf",
+            downloadError: "HTTP 500"
+          }
+        ],
+        {
+          status: "Cancelled",
+          rowText: "City Council - Cancelled"
+        }
+      )
+    ]),
+    []
+  );
+});
+
 test("challenge, short, and failed minutes cannot bypass card generation", () => {
   const usableMinutes =
     "The City Council approved the annual pavement contract by a unanimous vote of the members.";
@@ -281,6 +323,18 @@ test("unchanged source hashes retry structured meetings whose prior summary prod
   assert.equal(shouldSkipUnchangedSummary("same-hash", "same-hash"), true);
   assert.equal(shouldSkipUnchangedSummary("same-hash", "same-hash", 0, 2), false);
   assert.equal(shouldSkipUnchangedSummary("same-hash", "same-hash", 0, 0), true);
+  assert.equal(
+    shouldSkipUnchangedSummary("new-hash", "legacy-hash", 1, 1, ["legacy-hash"]),
+    true
+  );
+  assert.equal(
+    shouldSkipUnchangedSummary("new-hash", "other-old-hash", 1, 1, ["legacy-hash"]),
+    false
+  );
+  assert.equal(
+    shouldSkipUnchangedSummary("new-hash", "legacy-hash", 0, 2, ["legacy-hash"]),
+    false
+  );
   assert.equal(shouldSkipUnchangedSummary("new-hash", "old-hash"), false);
   assert.equal(shouldSkipUnchangedSummary(null, null), false);
 });

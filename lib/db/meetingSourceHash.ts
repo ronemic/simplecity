@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import type { LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
+import { MEETING_WIDE_CONTEXT_HEADING } from "@/lib/scraper/agendaItemContext";
 
 export const SIMPLECITY_SUMMARIZER_VERSION = "item-scoped-no-public-comments-v2";
 const PUBLIC_COMMENT_DOCUMENT_TYPES = new Set(["Public Comment", "Public Comments"]);
@@ -27,6 +28,50 @@ function stableDocuments(documents: PrimeGovDocument[]) {
 
 function stableDocumentShape(meeting: LlmReadyMeeting) {
   return stableDocuments(meeting.documents);
+}
+
+/**
+ * Reproduce the source hash written before the item-scoped hash was introduced.
+ *
+ * This is intentionally kept separate from the current hash. A stored legacy
+ * hash is only considered compatible when the current scrape still produces
+ * exactly the source shape that the old algorithm hashed. That lets us migrate
+ * unchanged rows without treating an algorithm/version bump as an official
+ * source change, while real text, metadata, or document changes still miss the
+ * compatibility check and get summarized again.
+ */
+export function legacyMeetingSourceHashV1(meeting: LlmReadyMeeting) {
+  const source = {
+    ...(meeting.llmInputText.includes(MEETING_WIDE_CONTEXT_HEADING)
+      ? { summaryInputVersion: "meeting-wide-participation-v1" }
+      : {}),
+    title: meeting.title,
+    meetingType: meeting.meetingType,
+    dateText: meeting.dateText,
+    timeText: meeting.timeText,
+    location: meeting.location,
+    status: meeting.status,
+    sourceType: meeting.sourceType,
+    sourceUrl: meeting.sourceUrl,
+    llmInputText: meeting.llmInputText,
+    publicCommentsInputText: meeting.publicCommentsInputText,
+    documents: meeting.documents
+      .map((doc) => ({
+        type: doc.type,
+        label: doc.label,
+        url: doc.url,
+        bytes: doc.bytes || null,
+        extractionCharacterCount: doc.extractionCharacterCount || null,
+        isScanned: Boolean(doc.isScanned)
+      }))
+      .sort((left, right) => left.url.localeCompare(right.url))
+  };
+
+  return crypto.createHash("sha256").update(JSON.stringify(source)).digest("hex");
+}
+
+export function compatibleLegacyMeetingSourceHashes(meeting: LlmReadyMeeting) {
+  return [legacyMeetingSourceHashV1(meeting)];
 }
 
 function stableAgendaItemShape(meeting: LlmReadyMeeting) {

@@ -12,7 +12,8 @@ test("summarizer prompt includes transparency-worthy routine items", () => {
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /Consent calendar summary/);
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /public comment periods/);
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /closed session items/);
-  assert.match(SIMPLECITY_SYSTEM_PROMPT, /meeting cancellations, continuances, and special meeting notices/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Include continuances and special meeting notices/);
+  assert.match(SIMPLECITY_SYSTEM_PROMPT, /Cancelled meetings are filtered before this prompt/);
   assert.match(
     SIMPLECITY_SYSTEM_PROMPT,
     /If no non-routine or transparency-worthy source-supported agenda items are visible/

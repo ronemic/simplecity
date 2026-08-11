@@ -52,13 +52,13 @@ export function truncateForLLM(text?: string | null) {
 }
 
 export function isMeetingCancelled(meeting: PrimeGovMeeting) {
+  const cancellationText = `${String(meeting.title || "")} ${String(
+    meeting.rowText || ""
+  )}`;
   return (
     meeting.status === "Cancelled" ||
-    meeting.title.toLowerCase().includes("cancelled") ||
-    meeting.title.toLowerCase().includes("canceled") ||
-    meeting.rowText.toLowerCase().includes("cancelled") ||
-    meeting.rowText.toLowerCase().includes("canceled") ||
-    meeting.documents.some((doc) => doc.type === "Notice of Cancellation")
+    /\b(?:cancell?ed|cancellation)\b/i.test(cancellationText) ||
+    Boolean(meeting.documents?.some((doc) => doc.type === "Notice of Cancellation"))
   );
 }
 
@@ -285,7 +285,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   let selectedText = "";
   const extractionNotes = [...(meeting.extractionNotes || [])];
 
-  if (isCancelled && !htmlAgenda && !agendaPdf && !packetPdf) {
+  if (isCancelled) {
     selectedSourceType = cancellationPdf ? "Notice of Cancellation" : "Cancellation";
     selectedSourceUrl = cancellationPdf?.url || fallbackSourceUrl;
 
@@ -302,6 +302,10 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
           : "No cancellation document was available; used source row text."
       );
     }
+
+    extractionNotes.push(
+      "Cancelled meetings are retained as official records but are not sent for decision-card summarization."
+    );
   } else if (isMenloParkMeeting && meeting.status === "Notice" && specialEventNotice) {
     selectedSourceType = "Special Event Notice";
     selectedSourceUrl = specialEventNotice.url || fallbackSourceUrl;
@@ -553,7 +557,10 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     sourceType: selectedSourceType,
     sourceUrl: selectedSourceUrl || fallbackSourceUrl,
     extractionNotes,
-    llmInputText: truncateForLLM(selectedText),
+    // Cancellation notices are useful meeting metadata, not decisions. Keeping the
+    // prepared input empty also protects non-pipeline callers from sending a stale
+    // agenda or packet to an LLM after a meeting is cancelled.
+    llmInputText: isCancelled ? "" : truncateForLLM(selectedText),
     publicCommentsInputText: publicCommentsSummaryInput
   };
 }

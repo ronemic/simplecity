@@ -936,6 +936,25 @@ export async function generateSummaryForMeeting(
   meeting: LlmReadyMeeting,
   options: GenerateSummaryOptions = {}
 ): Promise<{ summary: SimpleCitySummary; raw: unknown }> {
+  if (meeting.status === "Cancelled") {
+    options.log?.(`Skipping LLM summary for ${meeting.title}; meeting is cancelled.`);
+    return {
+      summary: {
+        meetingSummary: {
+          title: meeting.title,
+          date: meeting.dateText || "Not listed in the source document.",
+          status: "Cancelled",
+          oneSentenceSummary: "This meeting was cancelled."
+        },
+        cards: []
+      },
+      raw: {
+        skipped: true,
+        reason: "meeting_cancelled"
+      }
+    };
+  }
+
   options = {
     ...options,
     requestGroup: options.requestGroup || meeting.id

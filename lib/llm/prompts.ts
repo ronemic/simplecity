@@ -117,10 +117,10 @@ Rules:
 - Skip routine items like call to order, roll call, pledge, adjournment, generic approval of minutes, and generic staff reports unless there is a meaningful action or public impact.
 - Include transparency routine cards when the source gives enough detail for residents to verify the record or understand participation, such as consequential minutes approvals, grouped Consent calendar summary cards, agenda changes, public-comment instructions, meaningful staff updates, decision-making appointments, listed closed-session topics, relevant proclamations, cancellations, continuances, special meeting notices, and named ceremonial adjournments.
 - Include closed session items only when the agenda lists a meaningful public topic, such as labor negotiations, litigation, property acquisition, or public employee appointment or dismissal.
-- Include meeting cancellations, continuances, and special meeting notices because they affect public participation.
+- Include continuances and special meeting notices because they affect public participation.
 - Include public comment periods when the agenda gives concrete instructions, deadlines, time limits, remote participation options, or online submission details.
 - Consent calendar items can be summarized if they involve money, contracts, infrastructure, public safety, housing, parks, transportation, taxes, youth, or public services.
-- If the meeting is cancelled, return exactly one card explaining the cancellation.
+- Cancelled meetings are filtered before this prompt and must not produce decision cards.
 - If an item is a public hearing, mark status as “Upcoming vote” or “Under discussion” depending on source wording.
 - If the source only says receive report or presentation, mark status as “Information only.” If the complete recommendation also asks the current body to discuss, direct, select, approve, adopt, or make another decision, do not reduce the item to that opening informational clause.
 - Determine status from the agenda item's own recommended action and description. Do not use meeting-wide participation or public-comment instructions to decide whether an item is informational, under discussion, or an upcoming vote.

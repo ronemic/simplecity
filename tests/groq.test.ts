@@ -11,6 +11,7 @@ import {
   formatLlmProcessRunSummary,
   getLlmProcessBudgetUsage,
   getLlmProcessRunSummary,
+  LLM_REQUEST_TIMEOUT_MS,
   LlmProcessBudgetExceededError,
   resetLlmProcessBudgetForTests,
   runWithLlmProcessBudget
@@ -23,6 +24,10 @@ const meetingSummary = {
   status: "Upcoming",
   oneSentenceSummary: "A regular meeting."
 };
+
+test("bounds primary LLM requests at three minutes", () => {
+  assert.equal(LLM_REQUEST_TIMEOUT_MS, 180_000);
+});
 
 function card(overrides: Partial<SimpleCitySummary["cards"][number]> = {}) {
   return {
@@ -69,6 +74,31 @@ function meeting(): LlmReadyMeeting {
     publicCommentsInputText: null
   };
 }
+
+test("cancelled meetings return no cards without dispatching an LLM request", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    throw new Error("A cancelled meeting must not reach the provider.");
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting({
+    ...meeting(),
+    status: "Cancelled",
+    llmInputText: "A stale agenda remains on the official website."
+  });
+
+  assert.equal(fetchCalls, 0);
+  assert.deepEqual(result.summary.cards, []);
+  assert.deepEqual(result.raw, {
+    skipped: true,
+    reason: "meeting_cancelled"
+  });
+});
 
 function groqResponse(summary: SimpleCitySummary) {
   return new Response(

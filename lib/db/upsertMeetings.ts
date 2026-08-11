@@ -4,7 +4,10 @@ import {
   usesRegionalSupabase,
   type JurisdictionConfig
 } from "@/lib/config/jurisdictions";
-import { meetingSourceHash } from "@/lib/db/meetingSourceHash";
+import {
+  compatibleLegacyMeetingSourceHashes,
+  meetingSourceHash
+} from "@/lib/db/meetingSourceHash";
 import {
   meetingTranslationFingerprint,
   summaryCardTranslationFingerprint
@@ -19,6 +22,7 @@ type UpsertedMeeting = {
   id: string;
   meeting: LlmReadyMeeting;
   sourceHash: string;
+  compatibleSourceHashes: string[];
   summarizedSourceHash: string | null;
   existingCardCount: number;
 };
@@ -617,6 +621,7 @@ export async function upsertMeetings(
       safeMeeting.externalId ||
       externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
+    const compatibleSourceHashes = compatibleLegacyMeetingSourceHashes(safeMeeting);
     const jurisdictionColumns = jurisdiction
       ? {
           jurisdiction_name: jurisdiction.name,
@@ -751,6 +756,7 @@ export async function upsertMeetings(
       id: data.id,
       meeting: safeMeeting,
       sourceHash,
+      compatibleSourceHashes,
       summarizedSourceHash: data.summarized_source_hash || null,
       existingCardCount
     });
