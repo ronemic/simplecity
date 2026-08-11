@@ -5,6 +5,7 @@ import {
   getConfiguredLlmProviders,
   getLlmProvidersForInput,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
+  providerCompletionTokenLimit,
   providerSpecificRequestFields,
   type LlmProvider
 } from "@/lib/llm/provider";
@@ -70,8 +71,10 @@ function rotatedProviders(inputs: DecisionOutcomeExplanationInput[]) {
   return getLlmProvidersForInput([
     DECISION_OUTCOME_EXPLANATION_SYSTEM_PROMPT,
     promptForInputs(inputs)
-  ].join("\n"));
+  ].join("\n"), GROQ_OUTCOME_MAX_COMPLETION_TOKENS);
 }
+
+const GROQ_OUTCOME_MAX_COMPLETION_TOKENS = 2_000;
 
 export function hasDecisionOutcomeExplanationProvider() {
   return configuredProviders().length > 0;
@@ -192,6 +195,10 @@ async function requestExplanations(
         { role: "user", content: promptForInputs(inputs) }
       ],
       temperature: 0,
+      max_tokens: providerCompletionTokenLimit(
+        provider,
+        GROQ_OUTCOME_MAX_COMPLETION_TOKENS
+      ),
       response_format: { type: "json_object" }
     })
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {

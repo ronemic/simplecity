@@ -5,6 +5,7 @@ import {
   getConfiguredLlmProviders,
   getLlmProvidersForInput,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
+  providerCompletionTokenLimit,
   providerSpecificRequestFields,
   type LlmProvider
 } from "./provider";
@@ -70,8 +71,10 @@ function rotatedTranslationProviders(input: TranslationPayload) {
   return getLlmProvidersForInput([
     TRANSLATION_SYSTEM_PROMPT,
     JSON.stringify(input)
-  ].join("\n"));
+  ].join("\n"), GROQ_TRANSLATION_MAX_COMPLETION_TOKENS);
 }
+
+const GROQ_TRANSLATION_MAX_COMPLETION_TOKENS = 3_500;
 
 export function hasTranslationProvider() {
   return configuredTranslationProviders().length > 0;
@@ -267,6 +270,10 @@ async function requestTranslations(
           }
         ],
         temperature: 0.1,
+        max_tokens: providerCompletionTokenLimit(
+          provider,
+          GROQ_TRANSLATION_MAX_COMPLETION_TOKENS
+        ),
         response_format: {
           type: "json_object"
         }

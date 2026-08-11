@@ -836,9 +836,11 @@ test("routes a short summary through Groq without OpenRouter-only fields", async
     const body = JSON.parse(String(init?.body || "{}")) as {
       model?: string;
       provider?: unknown;
+      max_tokens?: number;
     };
     models.push(body.model || "");
     assert.equal(body.provider, undefined);
+    assert.equal(body.max_tokens, 3_000);
 
     return groqResponse({
       meetingSummary,
@@ -934,6 +936,7 @@ test("verifies topics and status using only matched agenda-item context", async 
   const originalEnv = captureLlmEnv();
   let calls = 0;
   let topicPrompt = "";
+  let topicMaxTokens = 0;
 
   t.after(() => {
     globalThis.fetch = originalFetch;
@@ -941,6 +944,8 @@ test("verifies topics and status using only matched agenda-item context", async 
   });
 
   setLlmTestEnv();
+  process.env.GROQ_API_KEY = "test-groq-key";
+  process.env.GROQ_MODEL = "openai/gpt-oss-120b";
   const preparedMeeting = meeting();
   preparedMeeting.llmInputText += " FLAT_PACKET_SENTINEL unrelated police material.";
   preparedMeeting.items = [
@@ -961,6 +966,7 @@ test("verifies topics and status using only matched agenda-item context", async 
     calls += 1;
     const body = JSON.parse(String(init?.body || "{}")) as {
       messages?: Array<{ role?: string; content?: string }>;
+      max_tokens?: number;
     };
 
     if (calls === 1) {
@@ -971,6 +977,7 @@ test("verifies topics and status using only matched agenda-item context", async 
     }
 
     topicPrompt = body.messages?.find((message) => message.role === "user")?.content || "";
+    topicMaxTokens = body.max_tokens || 0;
     return new Response(
       JSON.stringify({
         choices: [
@@ -998,6 +1005,7 @@ test("verifies topics and status using only matched agenda-item context", async 
   assert.equal(calls, 2);
   assert.deepEqual(result.summary.cards[0].categoryTags, ["Parks & Environment"]);
   assert.equal(result.summary.cards[0].status, "Upcoming vote");
+  assert.equal(topicMaxTokens, 2_000);
   assert.match(topicPrompt, /maintenance for city parks and recreation spaces/);
   assert.doesNotMatch(topicPrompt, /FLAT_PACKET_SENTINEL/);
 });

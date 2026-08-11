@@ -18,6 +18,7 @@ export const LLM_MAX_COMPLETION_TOKENS = 8_000;
 const DEFAULT_OPENROUTER_MODEL = "openai/gpt-oss-120b";
 const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
 export const GROQ_MAX_ESTIMATED_INPUT_TOKENS = 6_000;
+export const GROQ_SAFE_TOTAL_TOKENS = 7_500;
 export const GROQ_MAX_FAILOVER_KEYS_PER_REQUEST = 2;
 
 export class LlmProcessBudgetExceededError extends Error {
@@ -510,10 +511,16 @@ export function estimateLlmInputTokens(input: unknown) {
  * rotation advances through every configured Groq key without fanning one
  * failure out across all five accounts.
  */
-export function getLlmProvidersForInput(input: unknown): LlmProvider[] {
+export function getLlmProvidersForInput(
+  input: unknown,
+  groqMaxCompletionTokens: number
+): LlmProvider[] {
   const openRouter = getConfiguredOpenRouterProviders();
   const configuredGroq = getConfiguredGroqProviders();
-  const shortRequest = estimateLlmInputTokens(input) <= GROQ_MAX_ESTIMATED_INPUT_TOKENS;
+  const estimatedInputTokens = estimateLlmInputTokens(input);
+  const shortRequest =
+    estimatedInputTokens <= GROQ_MAX_ESTIMATED_INPUT_TOKENS &&
+    estimatedInputTokens + groqMaxCompletionTokens <= GROQ_SAFE_TOTAL_TOKENS;
 
   if (shortRequest && configuredGroq.length > 0) {
     const groq = getRotatedGroqProviders();
@@ -525,6 +532,15 @@ export function getLlmProvidersForInput(input: unknown): LlmProvider[] {
 
   if (openRouter.length > 0) return openRouter;
   return getRotatedGroqProviders().slice(0, GROQ_MAX_FAILOVER_KEYS_PER_REQUEST);
+}
+
+export function providerCompletionTokenLimit(
+  provider: LlmProvider,
+  groqMaxCompletionTokens: number
+) {
+  return provider.name === "Groq"
+    ? groqMaxCompletionTokens
+    : LLM_MAX_COMPLETION_TOKENS;
 }
 
 export function getConfiguredLlmProviders(): LlmProvider[] {

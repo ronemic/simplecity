@@ -44,7 +44,7 @@ test("rotates short requests across all five Groq keys with bounded failover", (
   configureHybridProviders();
 
   const primaryLabels = Array.from({ length: 5 }, () =>
-    getLlmProvidersForInput("short civic prompt").map((provider) => provider.label)
+    getLlmProvidersForInput("short civic prompt", 1_000).map((provider) => provider.label)
   );
 
   assert.deepEqual(primaryLabels.map((labels) => labels[0]), [
@@ -66,7 +66,7 @@ test("keeps requests above the Groq threshold on regular OpenRouter", (t) => {
   configureHybridProviders();
 
   const largeInput = "x".repeat(GROQ_MAX_ESTIMATED_INPUT_TOKENS * 4 + 1);
-  const providers = getLlmProvidersForInput(largeInput);
+  const providers = getLlmProvidersForInput(largeInput, 1_000);
 
   assert.deepEqual(providers.map((provider) => provider.label), ["OpenRouter"]);
   assert.equal(providers[0].model, "openai/gpt-oss-120b");
@@ -76,9 +76,19 @@ test("uses provider routing fields only for OpenRouter", (t) => {
   preserveProviderEnv(t);
   configureHybridProviders();
 
-  const providers = getLlmProvidersForInput("short civic prompt");
+  const providers = getLlmProvidersForInput("short civic prompt", 1_000);
   assert.deepEqual(providerSpecificRequestFields(providers[0]), {});
   assert.deepEqual(providerSpecificRequestFields(providers.at(-1)!), {
     provider: { require_parameters: true }
   });
+});
+
+test("keeps a request on OpenRouter when input plus reserved output exceeds Groq TPM", (t) => {
+  preserveProviderEnv(t);
+  configureHybridProviders();
+
+  const inputWithinOldThreshold = "x".repeat(5_000 * 4);
+  const providers = getLlmProvidersForInput(inputWithinOldThreshold, 3_000);
+
+  assert.deepEqual(providers.map((provider) => provider.label), ["OpenRouter"]);
 });

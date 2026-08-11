@@ -13,6 +13,7 @@ import {
   LlmProcessBudgetExceededError,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
   LLM_REQUEST_TIMEOUT_MS,
+  providerCompletionTokenLimit,
   providerSpecificRequestFields,
   type LlmProvider
 } from "./provider";
@@ -174,8 +175,12 @@ function parseRetryAfterMs(headers: Headers) {
   return null;
 }
 
-function getRotatedSummaryProviders(input: unknown) {
-  const providers = getLlmProvidersForInput(input);
+const GROQ_SUMMARY_MAX_COMPLETION_TOKENS = 3_000;
+const GROQ_REPAIR_MAX_COMPLETION_TOKENS = 2_500;
+const GROQ_TOPIC_MAX_COMPLETION_TOKENS = 2_000;
+
+function getRotatedSummaryProviders(input: unknown, groqMaxCompletionTokens: number) {
+  const providers = getLlmProvidersForInput(input, groqMaxCompletionTokens);
   if (providers.length === 0) {
     throw new Error("Missing LLM provider API key. Configure OpenRouter or Groq.");
   }
@@ -398,6 +403,10 @@ ${sourceContext}`;
         { role: "user", content: repairPrompt }
       ],
       temperature: 0,
+      max_tokens: providerCompletionTokenLimit(
+        provider,
+        GROQ_REPAIR_MAX_COMPLETION_TOKENS
+      ),
       response_format: { type: "json_object" }
     }),
     signal: options.signal
@@ -446,7 +455,7 @@ async function requestTargetedCardRepairsWithFallback(
     meeting.llmInputText,
     JSON.stringify(rejectedCards),
     JSON.stringify(issues)
-  ].join("\n"));
+  ].join("\n"), GROQ_REPAIR_MAX_COMPLETION_TOKENS);
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {
@@ -508,6 +517,10 @@ async function requestSummary(
           : [])
       ],
       temperature: 0,
+      max_tokens: providerCompletionTokenLimit(
+        provider,
+        GROQ_SUMMARY_MAX_COMPLETION_TOKENS
+      ),
       response_format: {
         type: "json_object"
       }
@@ -618,6 +631,10 @@ async function requestTopicValidation(
         { role: "user", content: buildTopicValidationPrompt(candidates) }
       ],
       temperature: 0,
+      max_tokens: providerCompletionTokenLimit(
+        provider,
+        GROQ_TOPIC_MAX_COMPLETION_TOKENS
+      ),
       response_format: { type: "json_object" }
     }),
     signal: options.signal
@@ -659,7 +676,7 @@ async function requestTopicValidationWithFallback(
   const providers = getRotatedSummaryProviders([
     TOPIC_VALIDATION_SYSTEM_PROMPT,
     buildTopicValidationPrompt(candidates)
-  ].join("\n"));
+  ].join("\n"), GROQ_TOPIC_MAX_COMPLETION_TOKENS);
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {
@@ -765,7 +782,7 @@ async function requestSummaryWithFallback(
     SIMPLECITY_SYSTEM_PROMPT,
     buildSimpleCityUserPrompt(meeting),
     regenerationGuidance || ""
-  ].join("\n"));
+  ].join("\n"), GROQ_SUMMARY_MAX_COMPLETION_TOKENS);
   let lastError: unknown;
 
   for (const [index, provider] of providers.entries()) {
