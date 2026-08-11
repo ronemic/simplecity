@@ -50,11 +50,13 @@ type LlmProcessBudgetState = {
   requestCount: number;
   tokenCount: number;
   requestStats: {
+    dispatched: number;
     successful: number;
     timedOut: number;
     failed: number;
     aborted: number;
     budgetBlocked: number;
+    providers: Record<LlmProvider["name"], number>;
     categories: Record<LlmRequestCategory, number>;
   };
 };
@@ -68,11 +70,13 @@ function createLlmProcessBudgetState(
     requestCount: 0,
     tokenCount: 0,
     requestStats: {
+      dispatched: 0,
       successful: 0,
       timedOut: 0,
       failed: 0,
       aborted: 0,
       budgetBlocked: 0,
+      providers: { OpenRouter: 0, Groq: 0 },
       categories: emptyCategoryCounts()
     }
   };
@@ -164,6 +168,18 @@ function reconcileProcessTokenUsage(
   return null;
 }
 
+function providerReportedTokenUsage(text: string) {
+  try {
+    const parsed = JSON.parse(text) as { usage?: { total_tokens?: unknown } };
+    const total = parsed.usage?.total_tokens;
+    return typeof total === "number" && Number.isFinite(total) && total >= 0
+      ? Math.ceil(total)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getLlmProcessBudgetUsage() {
   const state = currentLlmProcessBudgetState();
   return {
@@ -178,11 +194,13 @@ export function getLlmProcessRunSummary() {
   const state = currentLlmProcessBudgetState();
   return {
     ...getLlmProcessBudgetUsage(),
+    dispatched: state.requestStats.dispatched,
     successful: state.requestStats.successful,
     timedOut: state.requestStats.timedOut,
     failed: state.requestStats.failed,
     aborted: state.requestStats.aborted,
     budgetBlocked: state.requestStats.budgetBlocked,
+    providers: { ...state.requestStats.providers },
     categories: { ...state.requestStats.categories }
   };
 }
@@ -193,11 +211,12 @@ export function formatLlmProcessRunSummary() {
     .map(([category, count]) => `${category} ${count}`)
     .join(", ");
   return (
-    `LLM run summary: requests ${summary.requests}/${summary.requestLimit}; ` +
+    `LLM run summary: OpenRouter budget requests ${summary.requests}/${summary.requestLimit}; ` +
+    `tokens ${summary.tokens}/${summary.tokenLimit}; all-provider attempts ${summary.dispatched} ` +
+    `(Groq ${summary.providers.Groq}, OpenRouter ${summary.providers.OpenRouter}); ` +
     `HTTP successful ${summary.successful}; timed out ${summary.timedOut}; ` +
     `failed ${summary.failed}; deadline-aborted ${summary.aborted}; ` +
-    `budget-blocked ${summary.budgetBlocked}; estimated/actual tokens ` +
-    `${summary.tokens}/${summary.tokenLimit}; by type: ${categories}.`
+    `budget-blocked ${summary.budgetBlocked}; by type: ${categories}.`
   );
 }
 
@@ -280,6 +299,7 @@ function releaseLlmRequestSlot() {
 
 type LlmRequestTelemetry = {
   label: string;
+  provider?: LlmProvider["name"];
   group?: string;
   log?: (message: string) => void;
 };
@@ -315,6 +335,7 @@ export async function fetchLlmResponse(
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let acquiredSlot = false;
   let reservedInputTokens = 0;
+  let requestDispatched = false;
   let timedOut = false;
   const timeoutLabel = timeoutMs >= 1000
     ? `${Math.round(timeoutMs / 1000)} seconds`
@@ -339,10 +360,18 @@ export async function fetchLlmResponse(
     }
     upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
     const boundedInit = bodyWithCompletionLimit(init);
-    reservedInputTokens = reserveProcessBudget(
-      budgetState,
-      estimateInputTokens(boundedInit.body)
-    );
+    const providerName = telemetry?.provider ||
+      (url.includes("openrouter.ai") ? "OpenRouter" : "Groq");
+    const consumesBudget = providerName === "OpenRouter";
+    if (consumesBudget) {
+      reservedInputTokens = reserveProcessBudget(
+        budgetState,
+        estimateInputTokens(boundedInit.body)
+      );
+    }
+    requestDispatched = true;
+    budgetState.requestStats.dispatched += 1;
+    budgetState.requestStats.providers[providerName] += 1;
     budgetState.requestStats.categories[requestCategory(telemetry?.label)] += 1;
     const usage = {
       requests: budgetState.requestCount,
@@ -350,10 +379,12 @@ export async function fetchLlmResponse(
       tokens: budgetState.tokenCount,
       tokenLimit: budgetState.tokenLimit
     };
-    telemetry?.log?.(
-      `${telemetry.label} LLM process budget: request ${usage.requests}/${usage.requestLimit}, ` +
-      `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`
-    );
+    telemetry?.log?.(consumesBudget
+      ? `${telemetry.label} OpenRouter budget: request ${usage.requests}/${usage.requestLimit}, ` +
+        `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`
+      : `${telemetry.label} uses Groq and does not consume the OpenRouter budget ` +
+        `(currently ${usage.requests}/${usage.requestLimit} requests, ` +
+        `${usage.tokens}/${usage.tokenLimit} tokens).`);
     const request = (async () => {
       const response = await fetch(url, {
         ...boundedInit,
@@ -372,20 +403,19 @@ export async function fetchLlmResponse(
     const result = await Promise.race([request, deadline]);
     if (result.response.ok) budgetState.requestStats.successful += 1;
     else budgetState.requestStats.failed += 1;
-    const actualTokens = reconcileProcessTokenUsage(
-      budgetState,
-      result.text,
-      reservedInputTokens
-    );
+    const actualTokens = consumesBudget
+      ? reconcileProcessTokenUsage(budgetState, result.text, reservedInputTokens)
+      : providerReportedTokenUsage(result.text);
     if (actualTokens !== null) {
       const reconciledUsage = {
         tokens: budgetState.tokenCount,
         tokenLimit: budgetState.tokenLimit
       };
-      telemetry?.log?.(
-        `${telemetry.label} used ${actualTokens} provider-reported tokens; ` +
-        `process total ${reconciledUsage.tokens}/${reconciledUsage.tokenLimit}.`
-      );
+      telemetry?.log?.(consumesBudget
+        ? `${telemetry.label} used ${actualTokens} provider-reported tokens; ` +
+          `OpenRouter budget total ${reconciledUsage.tokens}/${reconciledUsage.tokenLimit}.`
+        : `${telemetry.label} used ${actualTokens} provider-reported Groq tokens; ` +
+          `OpenRouter budget remains ${reconciledUsage.tokens}/${reconciledUsage.tokenLimit}.`);
     }
     const responseProvider = responseProviderLabel(result.text);
     telemetry?.log?.(
@@ -395,11 +425,11 @@ export async function fetchLlmResponse(
   } catch (error) {
     if (error instanceof LlmProcessBudgetExceededError) {
       budgetState.requestStats.budgetBlocked += 1;
-    } else if (reservedInputTokens > 0 && timedOut) {
+    } else if (requestDispatched && timedOut) {
       budgetState.requestStats.timedOut += 1;
-    } else if (reservedInputTokens > 0 && upstreamSignal?.aborted) {
+    } else if (requestDispatched && upstreamSignal?.aborted) {
       budgetState.requestStats.aborted += 1;
-    } else if (reservedInputTokens > 0) {
+    } else if (requestDispatched) {
       budgetState.requestStats.failed += 1;
     }
     const message = error instanceof Error ? error.message : "Unknown request error";

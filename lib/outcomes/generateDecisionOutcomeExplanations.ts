@@ -196,6 +196,7 @@ async function requestExplanations(
     })
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `${provider.label} decision explanation request for ${inputs.length} outcome(s)`,
+    provider: provider.name,
     log: options.log
   });
 

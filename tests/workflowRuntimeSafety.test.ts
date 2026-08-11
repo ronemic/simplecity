@@ -38,7 +38,7 @@ test("pipeline exposes summary queue progress and live LLM usage", () => {
   assert.match(pipeline, /Summary queue:/);
   assert.match(pipeline, /Summary progress:/);
   assert.match(pipeline, /meeting\(s\) processed/);
-  assert.match(pipeline, /LLM budget: requests/);
+  assert.match(pipeline, /OpenRouter budget: requests/);
   assert.match(pipeline, /estimated\/actual tokens/);
 });
 

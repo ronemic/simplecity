@@ -467,7 +467,48 @@ test("stops outbound LLM requests at the process request budget", async (t) => {
   });
   assert.equal(getLlmProcessRunSummary().successful, 2);
   assert.equal(getLlmProcessRunSummary().budgetBlocked, 1);
-  assert.match(formatLlmProcessRunSummary(), /requests 2\/2; HTTP successful 2/);
+  assert.match(
+    formatLlmProcessRunSummary(),
+    /OpenRouter budget requests 2\/2;.*all-provider attempts 2.*HTTP successful 2/
+  );
+});
+
+test("Groq attempts do not consume the OpenRouter request or token budget", async (t) => {
+  const originalFetch = globalThis.fetch;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    resetLlmProcessBudgetForTests();
+  });
+  resetLlmProcessBudgetForTests({ requests: 1, tokens: 10 });
+  globalThis.fetch = (async () => new Response(
+    JSON.stringify({ usage: { total_tokens: 500 } }),
+    { status: 200 }
+  )) as typeof fetch;
+
+  await fetchLlmResponse(
+    "https://api.groq.com/openai/v1/chat/completions",
+    { body: JSON.stringify({ prompt: "x".repeat(1_000) }) },
+    1_000,
+    { label: "Groq summary", provider: "Groq" }
+  );
+  await fetchLlmResponse(
+    "https://api.groq.com/openai/v1/chat/completions",
+    { body: JSON.stringify({ prompt: "x".repeat(1_000) }) },
+    1_000,
+    { label: "Groq translation", provider: "Groq" }
+  );
+
+  assert.deepEqual(getLlmProcessBudgetUsage(), {
+    requests: 0,
+    requestLimit: 1,
+    tokens: 0,
+    tokenLimit: 10
+  });
+  const summary = getLlmProcessRunSummary();
+  assert.equal(summary.dispatched, 2);
+  assert.deepEqual(summary.providers, { OpenRouter: 0, Groq: 2 });
+  assert.equal(summary.successful, 2);
 });
 
 test("uses provider token usage to stop before the next LLM dispatch", async (t) => {

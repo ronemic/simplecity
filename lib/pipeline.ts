@@ -723,7 +723,7 @@ async function runSimpleCityPipelineInternal(
         const initialLlmBudget = getLlmProcessBudgetUsage();
         log(
           `Summary queue: ${summaryTargets.length} meeting(s); ` +
-          `LLM safety ceiling ${initialLlmBudget.requestLimit} requests and ` +
+          `OpenRouter safety ceiling ${initialLlmBudget.requestLimit} requests and ` +
           `${initialLlmBudget.tokenLimit} estimated/actual tokens for this jurisdiction run.`
         );
         if (summaryConcurrency > 1) {
@@ -939,7 +939,7 @@ async function runSimpleCityPipelineInternal(
                 `(generated ${summaryProgress.generated}, cancelled ${summaryProgress.cancelled}, ` +
                 `unchanged ${summaryProgress.unchanged}, minutes-only ${summaryProgress.minutesOnly}, ` +
                 `no-input ${summaryProgress.noInput}, failed ${summaryProgress.failed}). ` +
-                `LLM budget: requests ${usage.requests}/${usage.requestLimit}; ` +
+                `OpenRouter budget: requests ${usage.requests}/${usage.requestLimit}; ` +
                 `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`
               );
             }

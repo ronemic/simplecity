@@ -403,6 +403,7 @@ ${sourceContext}`;
     signal: options.signal
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `${provider.label} targeted repair for ${meeting.title}`,
+    provider: provider.name,
     group: options.requestGroup || meeting.id,
     log: options.log
   });
@@ -514,6 +515,7 @@ async function requestSummary(
     signal: options.signal
   }, LLM_REQUEST_TIMEOUT_MS, {
     label: `${provider.label} summary for ${meeting.title}`,
+    provider: provider.name,
     group: options.requestGroup || meeting.id,
     log: options.log
   });
@@ -621,6 +623,7 @@ async function requestTopicValidation(
     signal: options.signal
   }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
     label: `${provider.label} topic validation for ${candidates.length} card(s)`,
+    provider: provider.name,
     group: options.requestGroup,
     log: options.log
   });
