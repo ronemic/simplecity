@@ -25,8 +25,8 @@ const meetingSummary = {
   oneSentenceSummary: "A regular meeting."
 };
 
-test("bounds primary LLM requests at three minutes", () => {
-  assert.equal(LLM_REQUEST_TIMEOUT_MS, 180_000);
+test("bounds primary LLM requests at five minutes", () => {
+  assert.equal(LLM_REQUEST_TIMEOUT_MS, 300_000);
 });
 
 function card(overrides: Partial<SimpleCitySummary["cards"][number]> = {}) {

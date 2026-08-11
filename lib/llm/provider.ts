@@ -9,8 +9,8 @@ export type LlmProvider = {
   headers?: Record<string, string>;
 };
 
-export const LLM_REQUEST_TIMEOUT_MS = 180_000;
-export const LLM_OPTIONAL_REQUEST_TIMEOUT_MS = 180_000;
+export const LLM_REQUEST_TIMEOUT_MS = 300_000;
+export const LLM_OPTIONAL_REQUEST_TIMEOUT_MS = 300_000;
 export const LLM_MAX_CONCURRENT_REQUESTS = 2;
 export const LLM_MAX_PROCESS_REQUESTS = 40;
 export const LLM_MAX_PROCESS_TOKENS = 200_000;
