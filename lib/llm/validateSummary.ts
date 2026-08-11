@@ -611,7 +611,7 @@ function buildMeetingSourceText(meeting: LlmReadyMeeting) {
 }
 
 function derivedParticipationDateEvidence(
-  meetingDateText: string,
+  meetingDateText: string | null | undefined,
   participationText: string
 ) {
   if (
