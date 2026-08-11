@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { validateSimpleCitySummary } from "@/lib/llm/validateSummary";
+import {
+  validateSimpleCitySummary,
+  validationOptionsForMeeting
+} from "@/lib/llm/validateSummary";
+import type { LlmReadyMeeting } from "@/lib/types";
 
 const baseSummary = {
   meetingSummary: {
@@ -34,6 +38,53 @@ function groundedCard(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function itemScopedMeeting(): LlmReadyMeeting {
+  return {
+    id: "meeting-item-grounding",
+    section: "Upcoming Meetings",
+    title: "Council Meeting",
+    dateText: "June 13, 2026",
+    timeText: "7:00 PM",
+    meetingType: "City Council",
+    rowText: "",
+    status: "Upcoming",
+    sourceType: "Agenda PDF",
+    sourceUrl: "https://city.example/agendas/4",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [],
+    extractionNotes: [],
+    llmInputText:
+      "Park maintenance contract costs $100. Road paving contract costs $250.",
+    publicCommentsInputText:
+      "A commenter requested a different park maintenance contract costing $250.",
+    items: [
+      {
+        externalId: "item-parks",
+        fileNumber: null,
+        agendaNumber: "4",
+        itemType: "Business",
+        title: "Park maintenance contract",
+        action: "Approve a $100 park maintenance contract.",
+        result: null,
+        sourceUrl: "https://city.example/agendas/4",
+        rowText: "The park maintenance contract costs $100."
+      },
+      {
+        externalId: "item-roads",
+        fileNumber: null,
+        agendaNumber: "5",
+        itemType: "Business",
+        title: "Road paving contract",
+        action: "Approve a $250 road paving contract.",
+        result: null,
+        sourceUrl: "https://city.example/agendas/4",
+        rowText: "The road paving contract costs $250."
+      }
+    ]
+  };
+}
+
 test("drops cards with exact values that are not grounded in the source text", () => {
   const issues: Array<{ reason: string; value?: string }> = [];
   const result = validateSimpleCitySummary(
@@ -56,6 +107,65 @@ test("drops cards with exact values that are not grounded in the source text", (
   assert.equal(result.cards.length, 0);
   assert.match(issues[0]?.reason || "", /exact values/);
   assert.equal(issues[0]?.value, "$250");
+});
+
+test("resolves a missing item ID before grounding against exact item evidence", () => {
+  const meeting = itemScopedMeeting();
+  const issues: Array<{ reason: string; value?: string }> = [];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Park maintenance contract",
+          whatIsHappening: ["The park maintenance contract would cost $250."]
+        })
+      ]
+    },
+    validationOptionsForMeeting(meeting, (issue) => issues.push(issue))
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.ok(issues.some((issue) => issue.value === "$250"));
+});
+
+test("attaches a resolved exact item ID before accepting an item-scoped card", () => {
+  const meeting = itemScopedMeeting();
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Park maintenance contract",
+          whatIsHappening: ["The park maintenance contract would cost $100."]
+        })
+      ]
+    },
+    validationOptionsForMeeting(meeting)
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.cards[0].sourceItemId, "item-parks");
+});
+
+test("does not use a public-comment body as decision-card grounding", () => {
+  const meeting = itemScopedMeeting();
+  meeting.items = meeting.items?.slice(0, 1);
+  meeting.llmInputText = "The park maintenance contract costs $100.";
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          agendaItem: "Park maintenance contract",
+          whatIsHappening: ["The park maintenance contract would cost $250."]
+        })
+      ]
+    },
+    validationOptionsForMeeting(meeting)
+  );
+
+  assert.equal(result.cards.length, 0);
 });
 
 test("accepts a grounded agenda identifier with sentence punctuation", () => {
@@ -395,7 +505,7 @@ for (const scenario of [
   });
 }
 
-test("grounds matching ordinary numbers without comparing unit wording", () => {
+test("rejects matching ordinary numbers when their units are incompatible", () => {
   const result = validateSimpleCitySummary(
     {
       ...baseSummary,
@@ -412,7 +522,7 @@ test("grounds matching ordinary numbers without comparing unit wording", () => {
     }
   );
 
-  assert.equal(result.cards.length, 1);
+  assert.equal(result.cards.length, 0);
 });
 
 test("grounds participation details against shared meeting-wide context", () => {

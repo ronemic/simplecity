@@ -155,7 +155,8 @@ create index if not exists decision_outcomes_updated_at_idx on public.decision_o
 create unique index if not exists decision_outcomes_meeting_item_idx on public.decision_outcomes(meeting_id, matched_item_key);
 create index if not exists announcements_is_published_idx on public.announcements(is_published);
 create unique index if not exists documents_source_url_idx on public.documents(source_url);
-create unique index if not exists summary_cards_regeneration_idx on public.summary_cards(meeting_id, agenda_item, source_url);
+create unique index if not exists summary_cards_regeneration_idx on public.summary_cards(meeting_id, agenda_item, source_url)
+where source_item_id is null;
 create unique index if not exists summary_cards_source_item_idx
 on public.summary_cards(meeting_id, source_item_id)
 where source_item_id is not null;

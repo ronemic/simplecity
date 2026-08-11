@@ -1,3 +1,5 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 export type LlmProvider = {
   name: "OpenRouter";
   label: string;
@@ -25,10 +27,6 @@ export class LlmProcessBudgetExceededError extends Error {
   }
 }
 
-let processRequestLimit = LLM_MAX_PROCESS_REQUESTS;
-let processTokenLimit = LLM_MAX_PROCESS_TOKENS;
-let processRequestCount = 0;
-let processTokenCount = 0;
 type LlmRequestCategory = "summaries" | "repairs" | "verifications" | "translations" | "results" | "other";
 const emptyCategoryCounts = (): Record<LlmRequestCategory, number> => ({
   summaries: 0,
@@ -38,14 +36,59 @@ const emptyCategoryCounts = (): Record<LlmRequestCategory, number> => ({
   results: 0,
   other: 0
 });
-let processRequestStats = {
-  successful: 0,
-  timedOut: 0,
-  failed: 0,
-  aborted: 0,
-  budgetBlocked: 0,
-  categories: emptyCategoryCounts()
+type LlmProcessBudgetLimits = {
+  requests?: number;
+  tokens?: number;
 };
+
+type LlmProcessBudgetState = {
+  requestLimit: number;
+  tokenLimit: number;
+  requestCount: number;
+  tokenCount: number;
+  requestStats: {
+    successful: number;
+    timedOut: number;
+    failed: number;
+    aborted: number;
+    budgetBlocked: number;
+    categories: Record<LlmRequestCategory, number>;
+  };
+};
+
+function createLlmProcessBudgetState(
+  limits?: LlmProcessBudgetLimits
+): LlmProcessBudgetState {
+  return {
+    requestLimit: limits?.requests ?? LLM_MAX_PROCESS_REQUESTS,
+    tokenLimit: limits?.tokens ?? LLM_MAX_PROCESS_TOKENS,
+    requestCount: 0,
+    tokenCount: 0,
+    requestStats: {
+      successful: 0,
+      timedOut: 0,
+      failed: 0,
+      aborted: 0,
+      budgetBlocked: 0,
+      categories: emptyCategoryCounts()
+    }
+  };
+}
+
+const llmProcessBudgetStorage = new AsyncLocalStorage<LlmProcessBudgetState>();
+let defaultLlmProcessBudgetState = createLlmProcessBudgetState();
+
+function currentLlmProcessBudgetState() {
+  return llmProcessBudgetStorage.getStore() || defaultLlmProcessBudgetState;
+}
+
+export function runWithLlmProcessBudget<T>(
+  operation: () => T,
+  limits?: LlmProcessBudgetLimits
+): T {
+  if (llmProcessBudgetStorage.getStore()) return operation();
+  return llmProcessBudgetStorage.run(createLlmProcessBudgetState(limits), operation);
+}
 
 function requestCategory(label?: string): LlmRequestCategory {
   const normalized = String(label || "").toLowerCase();
@@ -76,30 +119,40 @@ function estimateInputTokens(body: RequestInit["body"]) {
   return 1;
 }
 
-function reserveProcessBudget(estimatedInputTokens: number) {
-  const nextRequestCount = processRequestCount + 1;
-  const nextTokenCount = processTokenCount + estimatedInputTokens;
-  if (nextRequestCount > processRequestLimit || nextTokenCount > processTokenLimit) {
+function reserveProcessBudget(
+  state: LlmProcessBudgetState,
+  estimatedInputTokens: number
+) {
+  const nextRequestCount = state.requestCount + 1;
+  const nextTokenCount = state.tokenCount + estimatedInputTokens;
+  if (nextRequestCount > state.requestLimit || nextTokenCount > state.tokenLimit) {
     throw new LlmProcessBudgetExceededError(
       `LLM process budget exhausted before dispatch ` +
-      `(requests ${processRequestCount}/${processRequestLimit}, ` +
-      `estimated/actual tokens ${processTokenCount}/${processTokenLimit}; ` +
+      `(requests ${state.requestCount}/${state.requestLimit}, ` +
+      `estimated/actual tokens ${state.tokenCount}/${state.tokenLimit}; ` +
       `next request estimated at ${estimatedInputTokens} input tokens).`
     );
   }
-  processRequestCount = nextRequestCount;
-  processTokenCount = nextTokenCount;
+  state.requestCount = nextRequestCount;
+  state.tokenCount = nextTokenCount;
   return estimatedInputTokens;
 }
 
-function reconcileProcessTokenUsage(text: string, reservedInputTokens: number) {
+function reconcileProcessTokenUsage(
+  state: LlmProcessBudgetState,
+  text: string,
+  reservedInputTokens: number
+) {
   try {
     const parsed = JSON.parse(text) as {
       usage?: { prompt_tokens?: unknown; completion_tokens?: unknown; total_tokens?: unknown };
     };
     const total = parsed.usage?.total_tokens;
     if (typeof total === "number" && Number.isFinite(total) && total >= 0) {
-      processTokenCount = Math.max(0, processTokenCount - reservedInputTokens + Math.ceil(total));
+      state.tokenCount = Math.max(
+        0,
+        state.tokenCount - reservedInputTokens + Math.ceil(total)
+      );
       return Math.ceil(total);
     }
   } catch {
@@ -109,23 +162,25 @@ function reconcileProcessTokenUsage(text: string, reservedInputTokens: number) {
 }
 
 export function getLlmProcessBudgetUsage() {
+  const state = currentLlmProcessBudgetState();
   return {
-    requests: processRequestCount,
-    requestLimit: processRequestLimit,
-    tokens: processTokenCount,
-    tokenLimit: processTokenLimit
+    requests: state.requestCount,
+    requestLimit: state.requestLimit,
+    tokens: state.tokenCount,
+    tokenLimit: state.tokenLimit
   };
 }
 
 export function getLlmProcessRunSummary() {
+  const state = currentLlmProcessBudgetState();
   return {
     ...getLlmProcessBudgetUsage(),
-    successful: processRequestStats.successful,
-    timedOut: processRequestStats.timedOut,
-    failed: processRequestStats.failed,
-    aborted: processRequestStats.aborted,
-    budgetBlocked: processRequestStats.budgetBlocked,
-    categories: { ...processRequestStats.categories }
+    successful: state.requestStats.successful,
+    timedOut: state.requestStats.timedOut,
+    failed: state.requestStats.failed,
+    aborted: state.requestStats.aborted,
+    budgetBlocked: state.requestStats.budgetBlocked,
+    categories: { ...state.requestStats.categories }
   };
 }
 
@@ -143,22 +198,14 @@ export function formatLlmProcessRunSummary() {
   );
 }
 
-export function resetLlmProcessBudgetForTests(limits?: {
-  requests?: number;
-  tokens?: number;
-}) {
-  processRequestCount = 0;
-  processTokenCount = 0;
-  processRequestStats = {
-    successful: 0,
-    timedOut: 0,
-    failed: 0,
-    aborted: 0,
-    budgetBlocked: 0,
-    categories: emptyCategoryCounts()
-  };
-  processRequestLimit = limits?.requests ?? LLM_MAX_PROCESS_REQUESTS;
-  processTokenLimit = limits?.tokens ?? LLM_MAX_PROCESS_TOKENS;
+export function resetLlmProcessBudgetForTests(limits?: LlmProcessBudgetLimits) {
+  const resetState = createLlmProcessBudgetState(limits);
+  const currentState = llmProcessBudgetStorage.getStore();
+  if (currentState) {
+    Object.assign(currentState, resetState);
+    return;
+  }
+  defaultLlmProcessBudgetState = resetState;
 }
 
 let activeLlmRequests = 0;
@@ -257,6 +304,7 @@ export async function fetchLlmResponse(
   timeoutMs = LLM_REQUEST_TIMEOUT_MS,
   telemetry?: LlmRequestTelemetry
 ): Promise<{ response: Response; text: string }> {
+  const budgetState = currentLlmProcessBudgetState();
   const queuedAt = Date.now();
   const controller = new AbortController();
   const upstreamSignal = init.signal;
@@ -288,9 +336,17 @@ export async function fetchLlmResponse(
     }
     upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
     const boundedInit = bodyWithCompletionLimit(init);
-    reservedInputTokens = reserveProcessBudget(estimateInputTokens(boundedInit.body));
-    processRequestStats.categories[requestCategory(telemetry?.label)] += 1;
-    const usage = getLlmProcessBudgetUsage();
+    reservedInputTokens = reserveProcessBudget(
+      budgetState,
+      estimateInputTokens(boundedInit.body)
+    );
+    budgetState.requestStats.categories[requestCategory(telemetry?.label)] += 1;
+    const usage = {
+      requests: budgetState.requestCount,
+      requestLimit: budgetState.requestLimit,
+      tokens: budgetState.tokenCount,
+      tokenLimit: budgetState.tokenLimit
+    };
     telemetry?.log?.(
       `${telemetry.label} LLM process budget: request ${usage.requests}/${usage.requestLimit}, ` +
       `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`
@@ -311,11 +367,18 @@ export async function fetchLlmResponse(
       }, timeoutMs);
     });
     const result = await Promise.race([request, deadline]);
-    if (result.response.ok) processRequestStats.successful += 1;
-    else processRequestStats.failed += 1;
-    const actualTokens = reconcileProcessTokenUsage(result.text, reservedInputTokens);
+    if (result.response.ok) budgetState.requestStats.successful += 1;
+    else budgetState.requestStats.failed += 1;
+    const actualTokens = reconcileProcessTokenUsage(
+      budgetState,
+      result.text,
+      reservedInputTokens
+    );
     if (actualTokens !== null) {
-      const reconciledUsage = getLlmProcessBudgetUsage();
+      const reconciledUsage = {
+        tokens: budgetState.tokenCount,
+        tokenLimit: budgetState.tokenLimit
+      };
       telemetry?.log?.(
         `${telemetry.label} used ${actualTokens} provider-reported tokens; ` +
         `process total ${reconciledUsage.tokens}/${reconciledUsage.tokenLimit}.`
@@ -328,13 +391,13 @@ export async function fetchLlmResponse(
     return result;
   } catch (error) {
     if (error instanceof LlmProcessBudgetExceededError) {
-      processRequestStats.budgetBlocked += 1;
+      budgetState.requestStats.budgetBlocked += 1;
     } else if (reservedInputTokens > 0 && timedOut) {
-      processRequestStats.timedOut += 1;
+      budgetState.requestStats.timedOut += 1;
     } else if (reservedInputTokens > 0 && upstreamSignal?.aborted) {
-      processRequestStats.aborted += 1;
+      budgetState.requestStats.aborted += 1;
     } else if (reservedInputTokens > 0) {
-      processRequestStats.failed += 1;
+      budgetState.requestStats.failed += 1;
     }
     const message = error instanceof Error ? error.message : "Unknown request error";
     telemetry?.log?.(

@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { SIMPLECITY_SYSTEM_PROMPT } from "@/lib/llm/prompts";
+import {
+  buildSimpleCityUserPrompt,
+  SIMPLECITY_SYSTEM_PROMPT
+} from "@/lib/llm/prompts";
+import type { LlmReadyMeeting } from "@/lib/types";
 
 test("summarizer prompt includes transparency-worthy routine items", () => {
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /Include transparency routine cards/);
@@ -40,4 +44,29 @@ test("summarizer prompt separates item status from participation and historical 
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /Use “Routine approval” only for approval of meeting minutes/);
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /Do not use it for a substantive contract, budget, permit/);
   assert.match(SIMPLECITY_SYSTEM_PROMPT, /even if the agenda does not mention a roll-call vote/);
+});
+
+test("decision-card prompts exclude submitted public-comment bodies", () => {
+  const meeting: LlmReadyMeeting = {
+    id: "meeting-1",
+    section: "Upcoming Meetings",
+    title: "Council Meeting",
+    dateText: "June 13, 2026",
+    meetingType: "City Council",
+    rowText: "",
+    status: "Upcoming",
+    sourceType: "Agenda PDF",
+    sourceUrl: "https://city.example/agenda",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [],
+    extractionNotes: [],
+    llmInputText: "Official agenda item text.",
+    publicCommentsInputText: "PUBLIC_COMMENT_BODY_SENTINEL"
+  };
+
+  const prompt = buildSimpleCityUserPrompt(meeting);
+  assert.match(prompt, /Official agenda item text/);
+  assert.doesNotMatch(prompt, /PUBLIC_COMMENT_BODY_SENTINEL/);
+  assert.doesNotMatch(SIMPLECITY_SYSTEM_PROMPT, /optional public-comment text/i);
 });

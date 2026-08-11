@@ -28,8 +28,16 @@ import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import { prepareLlmInput } from "@/lib/scraper/prepareLlmInput";
-import { scrapePortal, type ScrapePortalOptions } from "@/lib/scraper/primegov";
+import {
+  isUsablePrimeGovHtmlAgendaText,
+  scrapePortal,
+  type ScrapePortalOptions
+} from "@/lib/scraper/primegov";
 import { getJurisdictionDocumentsDir } from "@/lib/scraper/downloadDocuments";
+import {
+  hasUsableOfficialDocumentText,
+  isUsableOfficialSourceText
+} from "@/lib/scraper/documentUsability";
 import { scrapeIqm2Meetings } from "@/lib/sources/iqm2";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
 import {
@@ -44,7 +52,10 @@ import {
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
-import { formatLlmProcessRunSummary } from "@/lib/llm/provider";
+import {
+  formatLlmProcessRunSummary,
+  runWithLlmProcessBudget
+} from "@/lib/llm/provider";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
@@ -116,28 +127,29 @@ export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
   const errors: string[] = [];
 
   for (const meeting of meetings) {
-    const minutes = Array.from(
-      new Map(
-        meeting.documents
-          .filter((document) => ["Minutes", "Accessible Minutes"].includes(document.type))
-          .filter(
-            (document) =>
-              !/empty unpublished placeholder/i.test(String(document.downloadError || ""))
-          )
-          .map((document) => [document.url, document])
-      ).values()
+    const minutesByUrl = new Map<string, PrimeGovMeeting["documents"]>();
+    for (const document of meeting.documents) {
+      if (!["Minutes", "Accessible Minutes"].includes(document.type)) continue;
+      if (/empty unpublished placeholder/i.test(String(document.downloadError || ""))) {
+        continue;
+      }
+      minutesByUrl.set(document.url, [
+        ...(minutesByUrl.get(document.url) || []),
+        document
+      ]);
+    }
+    const minutes = Array.from(minutesByUrl.values());
+    const failed = minutes.filter((documents) =>
+      documents.every((document) => Boolean(document.downloadError))
     );
-    const failed = minutes.filter((document) => Boolean(document.downloadError));
     const unreadable = minutes.filter(
-      (document) =>
-        !document.downloadError &&
-        String(document.extractedText || "").trim().length < 40
+      (documents) =>
+        documents.some((document) => !document.downloadError) &&
+        !documents.some((document) => hasUsableOfficialDocumentText(document))
     );
 
-    const hasUsableMinutes = minutes.some(
-      (document) =>
-        !document.downloadError &&
-        String(document.extractedText || "").trim().length >= 40
+    const hasUsableMinutes = minutes.some((documents) =>
+      documents.some((document) => hasUsableOfficialDocumentText(document))
     );
     if (hasUsableMinutes) continue;
 
@@ -151,6 +163,55 @@ export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
         `Minutes ingestion incomplete for ${meeting.title}: ${unreadable.length} published minutes document(s) had no usable extracted text.`
       );
     }
+  }
+
+  return errors;
+}
+
+const AGENDA_DOCUMENT_TYPES = new Set([
+  "HTML Agenda",
+  "Agenda",
+  "Accessible Agenda",
+  "Agenda Packet",
+  "Packet"
+]);
+
+function agendaDocumentMinimumCharacters(type: string) {
+  return type === "Accessible Agenda" ? 500 : 300;
+}
+
+export function agendaIngestionErrors(meetings: PrimeGovMeeting[]) {
+  const errors: string[] = [];
+
+  for (const meeting of meetings) {
+    const agendaDocuments = meeting.documents.filter(
+      (document) =>
+        AGENDA_DOCUMENT_TYPES.has(document.type) &&
+        !/empty unpublished placeholder/i.test(String(document.downloadError || ""))
+    );
+    const hasDiscoveredAgenda = meeting.hasHtmlAgenda || agendaDocuments.length > 0;
+    if (!hasDiscoveredAgenda) continue;
+
+    const hasStructuredOfficialItems = Boolean(meeting.items?.length);
+    const hasUsableHtmlAgenda =
+      isUsablePrimeGovHtmlAgendaText(meeting.htmlAgendaText || "") &&
+      isUsableOfficialSourceText(meeting.htmlAgendaText, 500);
+    const hasUsableAgendaDocument = agendaDocuments.some(
+      (document) =>
+        document.type !== "HTML Agenda" &&
+        hasUsableOfficialDocumentText(
+          document,
+          agendaDocumentMinimumCharacters(document.type)
+        )
+    );
+    if (hasStructuredOfficialItems || hasUsableHtmlAgenda || hasUsableAgendaDocument) {
+      continue;
+    }
+
+    const documentCount = Math.max(agendaDocuments.length, 1);
+    errors.push(
+      `Agenda ingestion incomplete for ${meeting.title}: ${documentCount} published agenda document(s) had no usable official text.`
+    );
   }
 
   return errors;
@@ -195,7 +256,7 @@ export function shouldReconcileMinutesWithoutGeneratingCards(
     meeting.documents.some(
       (document) =>
         ["Minutes", "Accessible Minutes"].includes(document.type) &&
-        Boolean(document.extractedText)
+        hasUsableOfficialDocumentText(document)
     )
   );
 }
@@ -213,7 +274,31 @@ export function shouldSkipUnchangedSummary(
   );
 }
 
-export async function runSimpleCityPipeline(
+const RESULTS_COVERAGE_ERROR_PATTERN =
+  /Outcome coverage incomplete|Decision outcome reconciliation failed|Agenda ingestion incomplete|Minutes ingestion incomplete|Summary coverage incomplete|LLM failed for|official-source fallback coverage|Detailed meeting summary was unavailable|Pipeline stopped early/i;
+const MISSING_SUMMARY_PROVIDER_ERROR_PATTERN =
+  /No LLM provider API key is configured; summaries were not generated/i;
+
+export function filterResultsCoverageErrors(
+  errors: string[],
+  options: Pick<RunSimpleCityPipelineOptions, "persist" | "summarize">
+) {
+  return errors.filter(
+    (error) =>
+      RESULTS_COVERAGE_ERROR_PATTERN.test(error) ||
+      (options.persist !== false &&
+        options.summarize !== false &&
+        MISSING_SUMMARY_PROVIDER_ERROR_PATTERN.test(error))
+  );
+}
+
+export function runSimpleCityPipeline(
+  options: RunSimpleCityPipelineOptions = {}
+): Promise<PipelineResult> {
+  return runWithLlmProcessBudget(() => runSimpleCityPipelineInternal(options));
+}
+
+async function runSimpleCityPipelineInternal(
   options: RunSimpleCityPipelineOptions = {}
 ): Promise<PipelineResult> {
   const jurisdiction = resolvePipelineJurisdiction(options.jurisdiction);
@@ -480,6 +565,10 @@ export async function runSimpleCityPipeline(
       }
     }
 
+    for (const agendaError of agendaIngestionErrors(scrapeResult.meetings)) {
+      errors.push(agendaError);
+      log(agendaError);
+    }
     for (const minutesError of minutesIngestionErrors(scrapeResult.meetings)) {
       errors.push(minutesError);
       log(minutesError);
@@ -501,11 +590,13 @@ export async function runSimpleCityPipeline(
         const reconciliation = await reconcileMeetingRecords(supabase, jurisdiction);
         if (
           reconciliation.staleStatusesUpdated > 0 ||
+          reconciliation.futurePastStatusesUpdated > 0 ||
           reconciliation.orphanDuplicatesDeleted > 0 ||
           reconciliation.protectedDuplicatesSkipped > 0
         ) {
           log(
             `Reconciled meetings: ${reconciliation.staleStatusesUpdated} stale status(es) updated, ` +
+              `${reconciliation.futurePastStatusesUpdated} future meeting(s) corrected from past to upcoming, ` +
               `${reconciliation.orphanDuplicatesDeleted} orphan duplicate(s) deleted, ` +
               `${reconciliation.protectedDuplicatesSkipped} duplicate(s) retained because they own published data.`
           );
@@ -913,7 +1004,16 @@ export async function runSimpleCityPipeline(
   }
 }
 
-export async function runJurisdictionPipelines(
+export function runJurisdictionPipelines(
+  selection: JurisdictionSelection = ALL_JURISDICTIONS_SLUG,
+  options: Omit<RunSimpleCityPipelineOptions, "jurisdiction"> = {}
+): Promise<MultiJurisdictionPipelineResult> {
+  return runWithLlmProcessBudget(
+    () => runJurisdictionPipelinesInternal(selection, options)
+  );
+}
+
+async function runJurisdictionPipelinesInternal(
   selection: JurisdictionSelection = ALL_JURISDICTIONS_SLUG,
   options: Omit<RunSimpleCityPipelineOptions, "jurisdiction"> = {}
 ): Promise<MultiJurisdictionPipelineResult> {

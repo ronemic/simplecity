@@ -33,6 +33,7 @@ type StoredDocument = {
   label: string | null;
   source_url: string;
   extracted_text: string | null;
+  download_error: string | null;
 };
 
 function argument(name: string) {
@@ -70,7 +71,8 @@ function mergeDocuments(meeting: StoredMeeting, documents: StoredDocument[]) {
       type: document.type,
       label: document.label || existing?.label || document.type,
       url: document.source_url,
-      extractedText: document.extracted_text || existing?.extractedText || null
+      extractedText: document.extracted_text || existing?.extractedText || null,
+      downloadError: document.download_error
     });
   }
 
@@ -159,7 +161,7 @@ async function backfillJurisdiction(
     const meetingIds = batch.map((meeting) => meeting.id);
     const { data: documents, error } = await supabase
       .from("documents")
-      .select("meeting_id,type,label,source_url,extracted_text")
+      .select("meeting_id,type,label,source_url,extracted_text,download_error")
       .in("meeting_id", meetingIds)
       .in("type", ["Minutes", "Accessible Minutes"]);
     if (error) throw new Error(`Failed to load ${jurisdiction.name} minutes: ${error.message}`);

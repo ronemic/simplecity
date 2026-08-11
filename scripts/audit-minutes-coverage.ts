@@ -3,6 +3,7 @@ import {
   getJurisdictions,
   getServiceSupabaseClientForJurisdiction
 } from "@/lib/config/jurisdictions";
+import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 
 const PAGE_SIZE = 500;
 
@@ -80,7 +81,18 @@ async function main() {
     );
     const extractedMeetingIds = new Set(
       relevantDocuments.flatMap((document) =>
-        document.meeting_id && (document.extracted_text || "").trim().length >= 40
+        document.meeting_id &&
+        !document.download_error &&
+        isUsableOfficialSourceText(document.extracted_text)
+          ? [document.meeting_id]
+          : []
+      )
+    );
+    const preservedMeetingIds = new Set(
+      relevantDocuments.flatMap((document) =>
+        document.meeting_id &&
+        Boolean(document.download_error) &&
+        isUsableOfficialSourceText(document.extracted_text)
           ? [document.meeting_id]
           : []
       )
@@ -102,6 +114,7 @@ async function main() {
         ? Math.round((minutesMeetingIds.size / meetings.length) * 1000) / 10
         : null,
       meetingsWithExtractedMinutes: extractedMeetingIds.size,
+      meetingsWithArchivedMinutesPreservedAfterError: preservedMeetingIds.size,
       meetingsWithMinuteDownloadErrors: failedMeetingIds.size,
       latestMinutesMeetingDate:
         latestMinutesMeeting?.meeting_datetime || latestMinutesMeeting?.date_text || null,
@@ -114,7 +127,19 @@ async function main() {
           error: document.download_error
         })),
       extractedExamples: relevantDocuments
-        .filter((document) => (document.extracted_text || "").trim().length >= 40)
+        .filter(
+          (document) =>
+            !document.download_error &&
+            isUsableOfficialSourceText(document.extracted_text)
+        )
+        .slice(0, 3)
+        .map((document) => document.source_url),
+      preservedAfterErrorExamples: relevantDocuments
+        .filter(
+          (document) =>
+            Boolean(document.download_error) &&
+            isUsableOfficialSourceText(document.extracted_text)
+        )
         .slice(0, 3)
         .map((document) => document.source_url)
     });

@@ -1,6 +1,7 @@
-import fs from "node:fs/promises";
-import pdfParse from "pdf-parse";
+import pdfParse, { type PdfPageData } from "pdf-parse";
 import type { PrimeGovDocument } from "@/lib/types";
+
+export const MAX_EXTRACTED_PDF_TEXT_CHARACTERS = 2_000_000;
 
 export type PdfTextResult = {
   pages: number | null;
@@ -25,23 +26,73 @@ export function isLikelyReadablePdfText(text = "") {
   if (!trimmed) return false;
 
   const length = trimmed.length;
-  const c1ControlCharacters = trimmed.match(/[\u0080-\u009F]/g)?.length || 0;
+  let c1ControlCharacters = 0;
+  let letters = 0;
+  let words = 0;
+  let consecutiveLetters = 0;
+
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const code = trimmed.charCodeAt(index);
+    if (code >= 0x80 && code <= 0x9f) c1ControlCharacters += 1;
+
+    const isAsciiLetter =
+      (code >= 0x41 && code <= 0x5a) ||
+      (code >= 0x61 && code <= 0x7a);
+    if (isAsciiLetter) {
+      letters += 1;
+      consecutiveLetters += 1;
+    } else {
+      if (consecutiveLetters >= 2) words += 1;
+      consecutiveLetters = 0;
+    }
+  }
+  if (consecutiveLetters >= 2) words += 1;
+
   if (length >= 200 && c1ControlCharacters / length > 0.02) return false;
 
-  const letters = trimmed.match(/[A-Za-z]/g)?.length || 0;
-  const words = trimmed.match(/[A-Za-z]{2,}/g)?.length || 0;
   if (length >= 200 && letters / length < 0.2) return false;
   if (length >= 500 && words < 20) return false;
 
   return true;
 }
 
-export async function extractPdfText(localPath?: string | null): Promise<PdfTextResult | null> {
+export async function extractPdfText(
+  localPath?: string | null,
+  parsePdf: typeof pdfParse = pdfParse,
+  maxCharacters = MAX_EXTRACTED_PDF_TEXT_CHARACTERS
+): Promise<PdfTextResult | null> {
   if (!localPath) return null;
 
   try {
-    const buffer = await fs.readFile(localPath);
-    const parsed = await pdfParse(buffer);
+    let remainingCharacters = Math.max(1, Math.floor(maxCharacters));
+    const parsed = await parsePdf(localPath, {
+      version: "v2.0.550",
+      pagerender: async (page: PdfPageData) => {
+        try {
+          if (remainingCharacters <= 0) return "";
+          const textContent = await page.getTextContent({
+            normalizeWhitespace: false,
+            disableCombineTextItems: false
+          });
+          const chunks: string[] = [];
+          let lastY: number | undefined;
+
+          for (const item of textContent.items) {
+            if (remainingCharacters <= 0) break;
+            const y = item.transform?.[5];
+            const separator = lastY === undefined || lastY === y ? "" : "\n";
+            const value = `${separator}${item.str}`.slice(0, remainingCharacters);
+            chunks.push(value);
+            remainingCharacters -= value.length;
+            lastY = y;
+          }
+
+          return chunks.join("");
+        } finally {
+          page.cleanup?.();
+        }
+      }
+    });
     const text = cleanPdfText(parsed.text);
     const isReadable =
       isLikelyReadablePdfText(parsed.text) && isLikelyReadablePdfText(text);

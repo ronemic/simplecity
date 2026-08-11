@@ -15,7 +15,6 @@ import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import { getVideoEmbedUrl } from "@/lib/utils/videoEmbed";
 import { cleanText, slugify } from "@/lib/utils/slug";
 
-const DEFAULT_MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 60_000;
 
 export type CivicClerkEventCard = {
@@ -555,7 +554,6 @@ export async function scrapeCivicClerkMeetings(
         outputDir: options.documentOutputDir,
         log,
         shouldStop: options.shouldStop,
-        maxBytes: DEFAULT_MAX_DOCUMENT_BYTES,
         timeoutMs: DEFAULT_DOCUMENT_TIMEOUT_MS,
         documentFilter: (document) =>
           isOfficialCivicClerkUrl(document.url, portalUrl) &&

@@ -5,6 +5,7 @@ import type {
   PrimeGovMeeting
 } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { canonicalAgendaNumber } from "@/lib/utils/agendaItemIdentity";
 
 export type DiscoveredAttachment = {
   label: string;
@@ -33,16 +34,12 @@ export function classifyAgendaItemAttachment(label = "", url = ""): DocumentType
   return "Attachment";
 }
 
-function normalizedAgendaNumber(value: string | null | undefined) {
-  return cleanText(value || "").replace(/[.\s]+$/g, "").toUpperCase();
-}
-
 function itemMatches(
   item: AgendaItem,
   discovery: DiscoveredAgendaItemAttachments
 ) {
-  const itemNumber = normalizedAgendaNumber(item.agendaNumber);
-  const discoveryNumber = normalizedAgendaNumber(discovery.agendaNumber);
+  const itemNumber = canonicalAgendaNumber(item.agendaNumber);
+  const discoveryNumber = canonicalAgendaNumber(discovery.agendaNumber);
   if (itemNumber && discoveryNumber) return itemNumber === discoveryNumber;
 
   const itemTitle = cleanText(item.title || "").toLowerCase();

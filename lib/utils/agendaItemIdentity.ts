@@ -19,6 +19,14 @@ function normalizeAgendaItemText(value: string) {
     .trim();
 }
 
+export function canonicalAgendaNumber(value: string | null | undefined) {
+  return (value || "")
+    .normalize("NFKC")
+    .trim()
+    .replace(/[.\s]+$/g, "")
+    .toUpperCase();
+}
+
 const NON_IDENTITY_WORDS = new Set([
   "a",
   "ad",

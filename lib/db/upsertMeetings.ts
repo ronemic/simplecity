@@ -177,6 +177,26 @@ export function documentExtractedTextForStorage(
   return extractedText.slice(0, limit);
 }
 
+export function documentExtractionFieldsForStorage(
+  type: string,
+  extractedText?: string | null,
+  archived?: {
+    extracted_text?: string | null;
+    extraction_character_count?: number | null;
+  }
+) {
+  const storedExtractedText = documentExtractedTextForStorage(
+    type,
+    extractedText || archived?.extracted_text
+  );
+  if (!storedExtractedText) return {};
+
+  return {
+    extracted_text: storedExtractedText,
+    extraction_character_count: storedExtractedText.length
+  };
+}
+
 function normalizeCardKey(value?: string | null) {
   return String(value || "")
     .trim()
@@ -482,14 +502,29 @@ async function writeSpanishCardTranslations(
   const translations = summary.translations?.es?.cards;
   if (!translations?.length || insertedCards.length === 0) return;
 
-  const insertedByKey = new Map(
-    insertedCards.map((card) => [exactCardKey(card.agenda_item, card.source_url), card])
+  const insertedBySourceItemId = new Map(
+    insertedCards.flatMap((card) =>
+      card.source_item_id ? [[card.source_item_id, card] as const] : []
+    )
   );
+  const uniqueLegacyInsertedByKey = new Map<string, InsertedCardIdentity | null>();
+  for (const inserted of insertedCards) {
+    if (inserted.source_item_id) continue;
+    const key = exactCardKey(inserted.agenda_item, inserted.source_url);
+    uniqueLegacyInsertedByKey.set(
+      key,
+      uniqueLegacyInsertedByKey.has(key) ? null : inserted
+    );
+  }
   const now = new Date().toISOString();
   const translationRows = cards
     .map(({ card, summaryIndex }) => {
       const translation = translations[summaryIndex];
-      const inserted = insertedByKey.get(exactCardKey(card.agendaItem, card.source));
+      const inserted =
+        (card.sourceItemId
+          ? insertedBySourceItemId.get(card.sourceItemId)
+          : null) ||
+        uniqueLegacyInsertedByKey.get(exactCardKey(card.agendaItem, card.source));
       if (!translation || !inserted?.id) return null;
 
       return {
@@ -637,8 +672,43 @@ export async function upsertMeetings(
     if (error) throw new Error(`Failed to upsert meeting ${meeting.title}: ${error.message}`);
     if (!data?.id) throw new Error(`Failed to read meeting id for ${meeting.title}.`);
 
+    const minutesWithoutCurrentText = safeMeeting.documents
+      .filter((doc) => /minutes/i.test(doc.type) && !doc.extractedText)
+      .map((doc) => doc.url);
+    const archivedExtractions = new Map<
+      string,
+      { extracted_text?: string | null; extraction_character_count?: number | null }
+    >();
+    if (minutesWithoutCurrentText.length > 0) {
+      const { data: archivedDocuments, error: archivedDocumentsError } =
+        await retryTransientSupabaseWrite(
+          () => supabase
+            .from("documents")
+            .select("source_url,extracted_text,extraction_character_count")
+            .eq("meeting_id", data.id)
+            .in("source_url", [...new Set(minutesWithoutCurrentText)]),
+          {
+            onRetry: (retryError, nextAttempt, delayMs) => {
+              console.warn(
+                `[SimpleCity] Archived minutes lookup timed out for ${meeting.title}; retrying attempt ${nextAttempt} in ${delayMs}ms: ${retryError.message || "transient database error"}`
+              );
+            }
+          }
+        );
+
+      if (archivedDocumentsError) {
+        throw new Error(
+          `Failed to preserve archived minutes text for ${meeting.title}: ${archivedDocumentsError.message}`
+        );
+      }
+      for (const archived of archivedDocuments || []) {
+        if (archived.source_url && archived.extracted_text) {
+          archivedExtractions.set(archived.source_url, archived);
+        }
+      }
+    }
+
     for (const doc of safeMeeting.documents) {
-      const storedExtractedText = documentExtractedTextForStorage(doc.type, doc.extractedText);
       const { error: docError } = await retryTransientSupabaseWrite(
         () => supabase.from("documents").upsert(
           {
@@ -651,8 +721,11 @@ export async function upsertMeetings(
             storage_path: doc.storagePath || null,
             bytes: doc.bytes || null,
             download_error: doc.downloadError || null,
-            extracted_text: storedExtractedText,
-            extraction_character_count: storedExtractedText?.length || null,
+            ...documentExtractionFieldsForStorage(
+              doc.type,
+              doc.extractedText,
+              archivedExtractions.get(doc.url)
+            ),
             is_scanned: doc.isScanned || false
           },
           { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
@@ -823,28 +896,41 @@ export async function appendSummaryCardsForMeeting(
   const retainedExistingCards = existingCardRows.filter(
     (card) => !placeholderIdsToDelete.includes(card.id)
   );
-  const existingExactKeys = new Set<string>();
-  const existingAgendaKeys = new Set<string>();
-  const existingAgendaItems: string[] = [];
   const existingBySourceItemId = new Map(
     retainedExistingCards
       .filter((card) => Boolean(card.source_item_id))
       .map((card) => [card.source_item_id as string, card])
   );
-  const existingByExactKey = new Map(
-    retainedExistingCards.map((card) => [
-      exactCardKey(card.agenda_item, card.source_url),
-      card
-    ])
+  const legacyExistingCards = retainedExistingCards.filter(
+    (card) => !card.source_item_id
   );
+  const uniqueExistingMatch = (
+    card: SimpleCityCard,
+    excludedIds: ReadonlySet<string>
+  ) => {
+    const availableLegacyCards = legacyExistingCards.filter(
+      (existing) => !excludedIds.has(existing.id)
+    );
+    const exactMatches = availableLegacyCards.filter(
+      (existing) =>
+        exactCardKey(existing.agenda_item, existing.source_url) ===
+        exactCardKey(card.agendaItem, card.source)
+    );
+    if (exactMatches.length === 1) return exactMatches[0];
 
-  for (const card of retainedExistingCards) {
-    existingExactKeys.add(exactCardKey(card.agenda_item, card.source_url));
-    existingAgendaKeys.add(normalizeCardKey(card.agenda_item));
-    if (card.agenda_item) existingAgendaItems.push(card.agenda_item);
-  }
+    const agendaMatches = availableLegacyCards.filter(
+      (existing) => normalizeCardKey(existing.agenda_item) === normalizeCardKey(card.agendaItem)
+    );
+    if (agendaMatches.length === 1) return agendaMatches[0];
+
+    const fuzzyMatches = availableLegacyCards.filter(
+      (existing) => areLikelySameAgendaItem(existing.agenda_item || "", card.agendaItem)
+    );
+    return fuzzyMatches.length === 1 ? fuzzyMatches[0] : null;
+  };
 
   const seenSourceItemIds = new Set<string>();
+  const seenLegacyKeys = new Set<string>();
   const cardsToPersist = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
     .filter(
@@ -858,14 +944,9 @@ export async function appendSummaryCardsForMeeting(
         return true;
       }
       const exactKey = exactCardKey(card.agendaItem, card.source);
-      const agendaKey = normalizeCardKey(card.agendaItem);
-      return (
-        !existingExactKeys.has(exactKey) &&
-        !existingAgendaKeys.has(agendaKey) &&
-        !existingAgendaItems.some((existing) =>
-          areLikelySameAgendaItem(existing, card.agendaItem)
-        )
-      );
+      if (seenLegacyKeys.has(exactKey)) return false;
+      seenLegacyKeys.add(exactKey);
+      return true;
     });
 
   if (placeholderIdsToDelete.length > 0) {
@@ -887,6 +968,7 @@ export async function appendSummaryCardsForMeeting(
 
   const updatedCards: InsertedCardIdentity[] = [];
   const cardsToInsert: CardWithSummaryIndex[] = [];
+  const claimedExistingIds = new Set<string>();
   let rawPayloadAssigned = false;
   for (const entry of cardsToPersist) {
     const existingByIdentity = entry.card.sourceItemId
@@ -897,13 +979,13 @@ export async function appendSummaryCardsForMeeting(
     // attach the stable source ID instead of attempting a conflicting insert.
     const existing =
       existingByIdentity ||
-      existingByExactKey.get(
-        exactCardKey(entry.card.agendaItem, entry.card.source)
-      );
+      uniqueExistingMatch(entry.card, claimedExistingIds);
     if (!existing) {
       cardsToInsert.push(entry);
       continue;
     }
+    if (claimedExistingIds.has(existing.id)) continue;
+    claimedExistingIds.add(existing.id);
 
     const row = cardInsertRow(
       meetingId,

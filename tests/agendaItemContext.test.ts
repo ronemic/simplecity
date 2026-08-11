@@ -3,9 +3,10 @@ import test from "node:test";
 import {
   extractMeetingWideParticipationContext,
   extractAgendaItemsFromText,
-  formatAgendaItemContexts
+  formatAgendaItemContexts,
+  mergeAgendaItems
 } from "../lib/scraper/agendaItemContext";
-import type { PrimeGovMeeting } from "../lib/types";
+import type { AgendaItem, PrimeGovMeeting } from "../lib/types";
 
 const meeting: PrimeGovMeeting = {
   externalId: "epa-pwtc-2026-07-15",
@@ -39,6 +40,62 @@ Recommendation: Receive a general informational presentation from Canopy.
 Background: Canopy will explain its tree and environmental services.
 `;
 
+function mergeItem(
+  agendaNumber: string,
+  externalId: string,
+  rowText: string,
+  attachmentUrls: string[]
+): AgendaItem {
+  return {
+    externalId,
+    fileNumber: null,
+    agendaNumber,
+    itemType: "Business",
+    title: "Library renovation contract",
+    action: null,
+    result: null,
+    sourceUrl: "https://city.example/agenda",
+    rowText,
+    attachments: attachmentUrls.map((url) => ({
+      type: "Staff Report",
+      label: "Staff Report",
+      url
+    }))
+  };
+}
+
+test("merges equivalent agenda-number punctuation and deduplicates attachment URLs", () => {
+  const merged = mergeAgendaItems(
+    [
+      mergeItem(
+        "7.A.",
+        "existing-7a",
+        "Short row",
+        ["https://city.example/report.pdf"]
+      )
+    ],
+    [
+      mergeItem(
+        "7.A",
+        "extracted-7a",
+        "Longer official agenda row with the recommended action",
+        [
+          "https://CITY.example/report.pdf",
+          "https://city.example/exhibit.pdf"
+        ]
+      )
+    ]
+  );
+
+  assert.equal(merged.length, 1);
+  assert.equal(merged[0].agendaNumber, "7.A.");
+  assert.match(merged[0].rowText, /Longer official agenda row/);
+  assert.deepEqual(
+    merged[0].attachments?.map((document) => document.url),
+    ["https://city.example/report.pdf", "https://city.example/exhibit.pdf"]
+  );
+});
+
 test("extracts shared participation instructions without leaking agenda items", () => {
   const context = extractMeetingWideParticipationContext(`
 Current meeting agenda items (use each block only for its named item):
@@ -55,6 +112,37 @@ Email comments to planning.commission@menlopark.gov.
   assert.match(context, /846 9472 6242/);
   assert.match(context, /planning\.commission@menlopark\.gov/);
   assert.doesNotMatch(context, /Contract approval for \$250/);
+});
+
+test("does not treat an opening item at offset zero as shared participation context", () => {
+  const context = extractMeetingWideParticipationContext(`
+Current agenda and meeting-wide participation context:
+1. CALL TO ORDER
+2. Contract approval for $250
+  `);
+
+  assert.equal(context, "");
+});
+
+test("stops shared participation context before structured item blocks", () => {
+  const context = extractMeetingWideParticipationContext(`
+Current agenda and meeting-wide participation context:
+Join online with meeting ID 846 9472 6242.
+Current meeting agenda items (use each block only for its named item):
+Official title: Contract approval for $250
+  `);
+
+  assert.match(context, /846 9472 6242/);
+  assert.doesNotMatch(context, /Contract approval for \$250/);
+});
+
+test("does not expose unbounded agenda text as meeting-wide participation", () => {
+  const context = extractMeetingWideParticipationContext(`
+Current agenda and meeting-wide participation context:
+Contract approval for $250 with no opening section marker.
+  `);
+
+  assert.equal(context, "");
 });
 
 test("extracts current numbered agenda items and their recommendations", () => {
@@ -82,6 +170,62 @@ test("supports common whole-number and Item-prefixed agenda formats", () => {
   assert.match(items[1].action || "", /Receive the update/);
 });
 
+test("extracts PrimeGov whole-number items rendered on lines after an unnumbered opening", () => {
+  const items = extractAgendaItemsFromText(
+    meeting,
+    `
+CITY COUNCIL REGULAR MEETING AGENDA
+CALL TO ORDER
+
+Pledge of Allegiance
+
+CEREMONIAL
+
+1.
+
+Pride Month – Proclamation
+
+DOWNLOAD
+2.
+
+Community Access Update – Presentation
+
+DOWNLOAD
+CONSENT CALENDAR
+
+3.
+
+Library Renovation Contract
+
+Approve the agreement for library renovation services.
+
+DOWNLOAD
+4.
+
+445 South B Street Mixed-Use Development
+
+Adopt the development agreement ordinance.
+
+DOWNLOAD
+5.
+
+2026 Transportation Program Annual Review
+
+Receive the annual progress update.
+
+DOWNLOAD
+ADJOURNMENT
+`
+  );
+
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["1", "2", "3", "4", "5"]);
+  assert.equal(items[0].title, "Pride Month – Proclamation");
+  assert.equal(items[2].title, "Library Renovation Contract");
+  assert.match(items[2].rowText, /Approve the agreement/);
+  assert.equal(items[3].title, "445 South B Street Mixed-Use Development");
+  assert.equal(items[4].title, "2026 Transportation Program Annual Review");
+});
+
 test("uses lettered call-to-order and adjournment sections as current-agenda boundaries", () => {
   const items = extractAgendaItemsFromText(
     meeting,
@@ -99,7 +243,7 @@ Recommendation: Approve the historical contract.
   );
 
   assert.deepEqual(items.map((item) => item.agendaNumber), ["F1"]);
-  assert.match(items[0].title, /Current contract/);
+  assert.match(items[0].title ?? "", /Current contract/);
   assert.doesNotMatch(items[0].rowText, /Historical contract/);
 });
 
@@ -110,8 +254,8 @@ test("does not split legal chapter numbers out of numbered agenda-item titles", 
   );
 
   assert.deepEqual(items.map((item) => item.agendaNumber), ["2.1", "2.2"]);
-  assert.match(items[0].title, /Chapter 11\.87/);
-  assert.match(items[1].title, /Chapter 17\.78/);
+  assert.match(items[0].title ?? "", /Chapter 11\.87/);
+  assert.match(items[1].title ?? "", /Chapter 17\.78/);
 });
 
 test("keeps numbered items whose official title starts with a lettered action", () => {
@@ -121,7 +265,7 @@ test("keeps numbered items whose official title starts with a lettered action", 
   );
 
   assert.deepEqual(items.map((item) => item.agendaNumber), ["2.1", "2.2"]);
-  assert.match(items[1].title, /^a\) A Resolution approving/);
+  assert.match(items[1].title ?? "", /^a\) A Resolution approving/);
 });
 
 test("extracts unnumbered agenda items without treating legal references as item numbers", () => {

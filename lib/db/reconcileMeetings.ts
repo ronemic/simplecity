@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
+import { civicDayBounds } from "@/lib/utils/meetingStatus";
 
 type ReconciliationMeeting = {
   id: string;
@@ -17,6 +18,8 @@ export type DuplicateMeetingPair = {
 export type MeetingReconciliationReport = {
   staleStatusesFound: number;
   staleStatusesUpdated: number;
+  futurePastStatusesFound: number;
+  futurePastStatusesUpdated: number;
   duplicateCandidatesFound: number;
   orphanDuplicatesDeleted: number;
   protectedDuplicatesSkipped: number;
@@ -145,7 +148,9 @@ export async function reconcileMeetingRecords(
   jurisdiction: JurisdictionConfig,
   options: { dryRun?: boolean; now?: Date } = {}
 ): Promise<MeetingReconciliationReport> {
-  const nowIso = (options.now || new Date()).toISOString();
+  const now = options.now || new Date();
+  const { startIso: currentCivicDayStartIso, nextStartIso: nextCivicDayStartIso } =
+    civicDayBounds(now);
   const calendarUrl = jurisdiction.legistarUrl || jurisdiction.sourceUrl;
   let duplicateCandidates: ReconciliationMeeting[] = [];
   let duplicatePairs: DuplicateMeetingPair[] = [];
@@ -209,7 +214,7 @@ export async function reconcileMeetingRecords(
     .select("id", { count: "exact", head: true })
     .eq("jurisdiction_slug", jurisdiction.slug)
     .eq("status", "Upcoming")
-    .lt("meeting_datetime", nowIso);
+    .lt("meeting_datetime", currentCivicDayStartIso);
 
   if (staleCountError) throw new Error(`Failed to count stale meeting statuses: ${staleCountError.message}`);
 
@@ -220,16 +225,43 @@ export async function reconcileMeetingRecords(
       .update({ status: "Past", section: "Past Meetings" })
       .eq("jurisdiction_slug", jurisdiction.slug)
       .eq("status", "Upcoming")
-      .lt("meeting_datetime", nowIso)
+      .lt("meeting_datetime", currentCivicDayStartIso)
       .select("id");
 
     if (error) throw new Error(`Failed to update stale meeting statuses: ${error.message}`);
     staleStatusesUpdated = data?.length || 0;
   }
 
+  const { count: futurePastStatusesFound, error: futurePastCountError } = await supabase
+    .from("meetings")
+    .select("id", { count: "exact", head: true })
+    .eq("jurisdiction_slug", jurisdiction.slug)
+    .eq("status", "Past")
+    .gte("meeting_datetime", nextCivicDayStartIso);
+
+  if (futurePastCountError) {
+    throw new Error(`Failed to count future meetings marked past: ${futurePastCountError.message}`);
+  }
+
+  let futurePastStatusesUpdated = 0;
+  if (!options.dryRun && (futurePastStatusesFound || 0) > 0) {
+    const { data, error } = await supabase
+      .from("meetings")
+      .update({ status: "Upcoming", section: "Upcoming Meetings" })
+      .eq("jurisdiction_slug", jurisdiction.slug)
+      .eq("status", "Past")
+      .gte("meeting_datetime", nextCivicDayStartIso)
+      .select("id");
+
+    if (error) throw new Error(`Failed to correct future meetings marked past: ${error.message}`);
+    futurePastStatusesUpdated = data?.length || 0;
+  }
+
   return {
     staleStatusesFound: staleStatusesFound || 0,
     staleStatusesUpdated,
+    futurePastStatusesFound: futurePastStatusesFound || 0,
+    futurePastStatusesUpdated,
     duplicateCandidatesFound: duplicateCandidates.length,
     orphanDuplicatesDeleted: options.dryRun ? 0 : duplicatePairs.length,
     protectedDuplicatesSkipped,

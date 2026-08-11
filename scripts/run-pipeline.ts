@@ -1,7 +1,11 @@
 import "@/lib/env/bootstrap";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { runJurisdictionPipelines, runSimpleCityPipeline } from "@/lib/pipeline";
+import {
+  filterResultsCoverageErrors,
+  runJurisdictionPipelines,
+  runSimpleCityPipeline
+} from "@/lib/pipeline";
 import { SCRAPED_DIR, getJurisdictionScrapedDir } from "@/lib/scraper/downloadDocuments";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -10,6 +14,7 @@ import {
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { publicErrorMessage, redactPublicLogMessage } from "@/lib/logging/publicLog";
+import { serializePipelineResult } from "@/lib/pipelineResultSerialization";
 
 function getArgValue(name: string) {
   const prefix = `--${name}=`;
@@ -95,14 +100,12 @@ async function main() {
           jurisdiction
         });
 
-  await fs.writeFile(outputJson, JSON.stringify(result, null, 2));
+  await fs.writeFile(outputJson, serializePipelineResult(result));
   console.log(redactPublicLogMessage(`Saved pipeline result to ${outputJson}`));
 
   if (result.status === "failed") process.exit(1);
   if (process.argv.includes("--require-results-coverage")) {
-    const coverageErrors = result.errors.filter((error) =>
-      /Outcome coverage incomplete|Decision outcome reconciliation failed|Minutes ingestion incomplete|Summary coverage incomplete|LLM failed for|official-source fallback coverage|Detailed meeting summary was unavailable|Pipeline stopped early/i.test(error)
-    );
+    const coverageErrors = filterResultsCoverageErrors(result.errors, sharedOptions);
     if (coverageErrors.length > 0) {
       console.error(
         `Results coverage gate failed with ${coverageErrors.length} ingestion or matching error(s).`

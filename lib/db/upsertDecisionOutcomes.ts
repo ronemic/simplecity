@@ -209,6 +209,35 @@ function isMissingSourceItemIdColumn(error: { code?: string; message?: string } 
   return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
 }
 
+export function isDecisionOutcomeMeetingItemConflict(
+  error: { code?: string; message?: string; details?: string } | null
+) {
+  if (!error || error.code !== "23505") return false;
+  return /decision_outcomes_meeting_item_idx|meeting_id[^\n]*matched_item_key|matched_item_key[^\n]*meeting_id/i.test(
+    `${error.message || ""}\n${error.details || ""}`
+  );
+}
+
+export async function upsertDecisionOutcomeRows(
+  supabase: SupabaseClient,
+  rows: Array<Record<string, unknown>>
+) {
+  const byCard = await supabase
+    .from("decision_outcomes")
+    .upsert(rows, { onConflict: "summary_card_id" })
+    .select("id,summary_card_id");
+
+  if (!isDecisionOutcomeMeetingItemConflict(byCard.error)) return byCard;
+
+  // A stronger current match can move one official result from a legacy card
+  // to another. The first statement is atomic, so retrying on the official
+  // meeting/item identity is safe after that specific uniqueness conflict.
+  return supabase
+    .from("decision_outcomes")
+    .upsert(rows, { onConflict: "meeting_id,matched_item_key" })
+    .select("id,summary_card_id");
+}
+
 export function canReuseDecisionOutcomeExplanation(
   existing: Pick<CachedOutcomeExplanation, "source_hash" | "summary"> | null | undefined,
   sourceHash: string,
@@ -455,10 +484,7 @@ export async function reconcileDecisionOutcomesForMeeting(
     };
   }
 
-  const { data, error } = await supabase
-    .from("decision_outcomes")
-    .upsert(rows, { onConflict: "summary_card_id" })
-    .select("id,summary_card_id");
+  const { data, error } = await upsertDecisionOutcomeRows(supabase, rows);
 
   if (isMissingOutcomeTable(error)) {
     return {

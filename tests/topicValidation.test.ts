@@ -103,6 +103,51 @@ test("builds topic verification from only the matched agenda-item context", () =
   assert.doesNotMatch(prompt, /Current card status/);
 });
 
+test("uses an exact unique source item ID before fuzzy topic matching", () => {
+  const similarMeeting: LlmReadyMeeting = {
+    ...meeting,
+    items: [
+      {
+        externalId: "item-east",
+        fileNumber: null,
+        agendaNumber: "7.1",
+        itemType: "Business",
+        title: "Library renovation contract on East Avenue",
+        action: "Approve the east-side contract.",
+        result: null,
+        sourceUrl: meeting.sourceUrl || "",
+        rowText: "EAST_ITEM_SENTINEL"
+      },
+      {
+        externalId: "item-west",
+        fileNumber: null,
+        agendaNumber: "7.2",
+        itemType: "Business",
+        title: "Library renovation contract on West Avenue",
+        action: "Approve the west-side contract.",
+        result: null,
+        sourceUrl: meeting.sourceUrl || "",
+        rowText: "WEST_ITEM_SENTINEL"
+      }
+    ]
+  };
+  const exactSummary: SimpleCitySummary = {
+    ...summary,
+    cards: [
+      {
+        ...summary.cards[0],
+        sourceItemId: "item-west",
+        agendaItem: "Library renovation contract"
+      }
+    ]
+  };
+
+  const [candidate] = topicValidationCandidates(similarMeeting, exactSummary);
+  assert.equal(candidate.item.externalId, "item-west");
+  assert.match(candidate.context, /WEST_ITEM_SENTINEL/);
+  assert.doesNotMatch(candidate.context, /EAST_ITEM_SENTINEL/);
+});
+
 test("applies one or two verified topics and requires every matched card", () => {
   const candidates = topicValidationCandidates(meeting, summary);
   const verified = parseTopicValidation(

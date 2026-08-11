@@ -109,7 +109,7 @@ Rules:
 - Topic meanings: Housing covers homes, rent, zoning, and housing affordability; Transportation covers streets, bridges, parking, transit, traffic, and mobility; Public Safety covers police, fire, emergency response, and concrete safety measures; Parks & Environment covers parks, trees, solid waste, recycling, water or sewer infrastructure and operations, climate, and environmental quality; Budget & Taxes covers budgets, taxes, rates, fees, service charges, tax-roll collection, revenue, and broad fiscal policy; Business & Development covers economic development and commercial activity only when that is central to the item; Schools & Youth covers education, childcare, and youth programs; City Services covers government operations, commissions, administration, and resident services.
 - Add a second topic only when the agenda item itself gives that second subject comparable weight. Incidental examples, subprojects, businesses, development, contracts, or funding mentioned in supporting text do not justify an extra topic.
 - Classify a work plan by the substantive service area it governs when the item context identifies one. Use City Services only when the work plan is centrally about general governance or administration. When the current action centrally concerns a budget, tax, rate, fee, service charge, revenue, or tax-roll collection, use Budget & Taxes even if the money funds a more specific service.
-- Every factual claim must be directly supported by the provided meeting metadata, raw agenda text, or optional public-comment text.
+- Every factual claim must be directly supported by the provided meeting metadata or raw agenda text.
 - Treat each labeled “Linked agenda-item context” block as evidence only for the agenda item named in that block. Never transfer facts, amounts, dates, or actions from one item’s linked document to another item.
 - If a fact is not clearly supported, omit it or write “Not listed in the source document.”
 - If the provided source text is short, noisy, scanned, or truncated, only summarize items that are visible in the provided text.
@@ -169,9 +169,6 @@ Source quality notes: ${
 
 Raw agenda text:
 ${meeting.llmInputText}
-
-Optional public comments:
-${meeting.publicCommentsInputText || "None"}
 
 Generate SimpleCity summary cards from this meeting.`;
 }

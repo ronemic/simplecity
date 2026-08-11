@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const LOCKOUT_STORAGE_KEY = "simplecity-admin-lockout-until";
 
@@ -12,6 +13,7 @@ function formatLockoutMessage(lockedUntil: number) {
 }
 
 export function AdminLoginForm() {
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -83,7 +85,8 @@ export function AdminLoginForm() {
       }
 
       window.localStorage.removeItem(LOCKOUT_STORAGE_KEY);
-      window.location.href = "/admin";
+      router.replace("/admin");
+      router.refresh();
     } catch {
       setMessage("Unable to reach the admin login endpoint.");
     } finally {

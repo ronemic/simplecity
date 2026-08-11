@@ -12,7 +12,8 @@ import {
   getLlmProcessBudgetUsage,
   getLlmProcessRunSummary,
   LlmProcessBudgetExceededError,
-  resetLlmProcessBudgetForTests
+  resetLlmProcessBudgetForTests,
+  runWithLlmProcessBudget
 } from "@/lib/llm/provider";
 import type { LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 
@@ -448,6 +449,127 @@ test("uses provider token usage to stop before the next LLM dispatch", async (t)
     LlmProcessBudgetExceededError
   );
   assert.equal(fetchCalls, 1);
+});
+
+test("shares one LLM budget across nested work while isolating independent runs", async (t) => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  const firstRun = runWithLlmProcessBudget(async () => {
+    await fetchLlmResponse("https://openrouter.ai/test", { body: "{}" });
+    await runWithLlmProcessBudget(
+      () => fetchLlmResponse("https://openrouter.ai/test", { body: "{}" }),
+      { requests: 99 }
+    );
+    await assert.rejects(
+      fetchLlmResponse("https://openrouter.ai/test", { body: "{}" }),
+      LlmProcessBudgetExceededError
+    );
+    return getLlmProcessRunSummary();
+  }, { requests: 2, tokens: 10_000 });
+
+  const secondRun = runWithLlmProcessBudget(async () => {
+    await fetchLlmResponse("https://openrouter.ai/test", { body: "{}" });
+    return getLlmProcessRunSummary();
+  }, { requests: 1, tokens: 10_000 });
+
+  const [firstSummary, secondSummary] = await Promise.all([firstRun, secondRun]);
+  assert.equal(firstSummary.requests, 2);
+  assert.equal(firstSummary.budgetBlocked, 1);
+  assert.equal(secondSummary.requests, 1);
+  assert.equal(secondSummary.budgetBlocked, 0);
+  assert.equal(fetchCalls, 3);
+});
+
+test("does not retry or sleep after the run budget or upstream deadline stops work", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let fetchCalls = 0;
+  const sleepDelays: number[] = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+  setLlmTestEnv();
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return new Response("temporary failure", { status: 500 });
+  }) as typeof fetch;
+
+  await assert.rejects(
+    runWithLlmProcessBudget(
+      () => generateSummaryForMeeting(meeting(), {
+        sleep: async (ms) => {
+          sleepDelays.push(ms);
+        }
+      }),
+      { requests: 0, tokens: 10_000 }
+    ),
+    LlmProcessBudgetExceededError
+  );
+  assert.equal(fetchCalls, 0);
+
+  const controller = new AbortController();
+  const deadlineError = new DOMException("Pipeline deadline reached.", "TimeoutError");
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    controller.abort(deadlineError);
+    return new Response("temporary failure", { status: 500 });
+  }) as typeof fetch;
+  await assert.rejects(
+    runWithLlmProcessBudget(() => generateSummaryForMeeting(meeting(), {
+      signal: controller.signal,
+      sleep: async (ms) => {
+        sleepDelays.push(ms);
+      }
+    })),
+    (error: unknown) => error === deadlineError
+  );
+  assert.equal(fetchCalls, 1);
+  assert.deepEqual(sleepDelays, []);
+});
+
+test("interrupts the default retry delay when the upstream deadline expires", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let fetchCalls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+  setLlmTestEnv();
+  process.env.GROQ_SUMMARY_MAX_ATTEMPTS = "2";
+  process.env.GROQ_SUMMARY_RETRY_BASE_MS = "10000";
+  globalThis.fetch = (async () => {
+    fetchCalls += 1;
+    return new Response("temporary failure", { status: 500 });
+  }) as typeof fetch;
+
+  const controller = new AbortController();
+  const deadlineError = new DOMException("Pipeline deadline reached.", "TimeoutError");
+  const abortTimer = setTimeout(() => controller.abort(deadlineError), 20);
+  const startedAt = Date.now();
+  try {
+    await assert.rejects(
+      generateSummaryForMeeting(meeting(), { signal: controller.signal }),
+      (error: unknown) => error === deadlineError
+    );
+  } finally {
+    clearTimeout(abortTimer);
+  }
+
+  assert.equal(fetchCalls, 1);
+  assert.ok(Date.now() - startedAt < 1_000);
 });
 
 test("repairs only source-unsupported cards without regenerating the meeting", async (t) => {

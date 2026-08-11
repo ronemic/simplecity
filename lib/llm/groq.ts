@@ -10,6 +10,7 @@ import {
   fetchLlmResponse,
   getConfiguredLlmProviders,
   hasConfiguredLlmProvider,
+  LlmProcessBudgetExceededError,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
   LLM_REQUEST_TIMEOUT_MS,
   type LlmProvider
@@ -120,8 +121,27 @@ function hasUsableSourceText(meeting: LlmReadyMeeting) {
   return meeting.status === "Cancelled" ? input.length > 0 : input.length >= 300;
 }
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function sleep(ms: number, signal?: AbortSignal) {
+  if (signal?.aborted) {
+    return Promise.reject(
+      signal.reason ?? new DOMException("The operation was aborted.", "AbortError")
+    );
+  }
+  return new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
+      resolve();
+    }, ms);
+    const abort = () => {
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abort);
+      reject(
+        signal?.reason ?? new DOMException("The operation was aborted.", "AbortError")
+      );
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+    if (signal?.aborted) abort();
+  });
 }
 
 function parseNonNegativeEnv(name: string, fallback: number) {
@@ -166,12 +186,26 @@ export function hasSummaryProviderConfig() {
 }
 
 function canTryNextProvider(error: unknown) {
+  if (error instanceof LlmProcessBudgetExceededError) return false;
+  if (
+    error &&
+    typeof error === "object" &&
+    "retryable" in error &&
+    error.retryable === false
+  ) return false;
   if (error instanceof SummaryProviderRequestError) return error.retryable;
   if (error instanceof Error && error.name === "AbortError") return true;
   return true;
 }
 
 function isRetryableSummaryError(error: unknown) {
+  if (error instanceof LlmProcessBudgetExceededError) return false;
+  if (
+    error &&
+    typeof error === "object" &&
+    "retryable" in error &&
+    error.retryable === false
+  ) return false;
   if (error instanceof SummaryProviderRequestError) {
     if (!error.retryable) return false;
     if (/tokens per day limit exceeded|daily (?:token |request )?(?:limit|quota)/i.test(error.message)) {
@@ -205,6 +239,11 @@ function retryDelayMs(error: unknown, attempt: number) {
   );
 
   return baseMs * attempt;
+}
+
+function summaryStopError(options: GenerateSummaryOptions) {
+  if (options.signal?.reason instanceof Error) return options.signal.reason;
+  return new Error("Pipeline deadline reached before the next LLM summary attempt.");
 }
 
 function summarizeValidationIssues(issues: SummaryValidationIssue[]) {
@@ -414,7 +453,12 @@ async function requestTargetedCardRepairsWithFallback(
       );
     } catch (error) {
       lastError = error;
-      if (index < providers.length - 1 && canTryNextProvider(error)) continue;
+      if (
+        index < providers.length - 1 &&
+        !options.signal?.aborted &&
+        !options.shouldStop?.() &&
+        canTryNextProvider(error)
+      ) continue;
       throw error;
     }
   }
@@ -615,7 +659,12 @@ async function requestTopicValidationWithFallback(
     } catch (error) {
       lastError = error;
       const hasNextProvider = index < providers.length - 1;
-      if (hasNextProvider) {
+      if (
+        hasNextProvider &&
+        !options.signal?.aborted &&
+        !options.shouldStop?.() &&
+        canTryNextProvider(error)
+      ) {
         options.log?.(
           `${provider.label} topic/status verification failed; trying ${providers[index + 1].label}.`
         );
@@ -659,6 +708,9 @@ async function verifySummaryTopics(
 
   const topicResults = [];
   for (const batch of batches) {
+    if (options.signal?.aborted || options.shouldStop?.()) {
+      throw summaryStopError(options);
+    }
     topicResults.push(await requestTopicValidationWithFallback(batch, options));
   }
   const verified = topicResults.flatMap((topicResult) => topicResult.verified);
@@ -709,7 +761,12 @@ async function requestSummaryWithFallback(
       const message = error instanceof Error ? error.message : "Unknown LLM error";
       const hasNextProvider = index < providers.length - 1;
 
-      if (hasNextProvider && canTryNextProvider(error)) {
+      if (
+        hasNextProvider &&
+        !options.signal?.aborted &&
+        !options.shouldStop?.() &&
+        canTryNextProvider(error)
+      ) {
         options.log?.(
           `${provider.label} failed for ${meeting.title}; trying ${providers[index + 1].label}: ${message}`
         );
@@ -735,6 +792,10 @@ async function generateSummaryForInput(
   const maxAttempts = getSummaryMaxAttempts();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    if (options.signal?.aborted || options.shouldStop?.()) {
+      lastError = summaryStopError(options);
+      break;
+    }
     try {
       const result = await requestSummaryWithFallback(meeting, options, regenerationGuidance);
       if (!bestResult || isBetterSummaryResult(result, bestResult)) {
@@ -758,12 +819,25 @@ async function generateSummaryForInput(
     } catch (error) {
       lastError = error;
       const message = error instanceof Error ? error.message : "Unknown LLM error";
+      if (options.signal?.aborted || options.shouldStop?.()) {
+        lastError = summaryStopError(options);
+        break;
+      }
       if (attempt < maxAttempts && isRetryableSummaryError(error)) {
         const delayMs = retryDelayMs(error, attempt);
+        if (options.signal?.aborted || options.shouldStop?.()) {
+          lastError = summaryStopError(options);
+          break;
+        }
         options.log?.(
           `Retrying LLM summary for ${meeting.title} in ${Math.round(delayMs / 1000)}s: ${message}`
         );
-        await (options.sleep || sleep)(delayMs);
+        if (options.sleep) await options.sleep(delayMs);
+        else await sleep(delayMs, options.signal);
+        if (options.signal?.aborted || options.shouldStop?.()) {
+          lastError = summaryStopError(options);
+          break;
+        }
       } else {
         break;
       }

@@ -1,11 +1,14 @@
 import type { AgendaItem, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
-import { agendaItemSimilarity } from "@/lib/utils/agendaItemIdentity";
+import {
+  agendaItemSimilarity,
+  canonicalAgendaNumber
+} from "@/lib/utils/agendaItemIdentity";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const AGENDA_NUMBER_SOURCE = "[A-Za-z]?\\d{1,2}(?:\\.\\d{1,3})?";
 const ITEM_START = new RegExp(
-  `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)((?:[a-z]\\)\\s*)?[A-Z][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)(?:[a-z]\\)\\s*)?[A-Z])|$)`,
+  `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)((?:[a-z]\\)\\s*)?[A-Z0-9][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)(?:[a-z]\\)\\s*)?[A-Z0-9])|$)`,
   "g"
 );
 const RECOMMENDATION = /\b(?:recommendation|recommended action|action requested)\s*:?\s*([\s\S]*)/i;
@@ -14,6 +17,8 @@ const SECTION_TITLE = /^(?:call to order(?: and roll call)?|roll call|opening re
 const RECOMMENDATION_END = /\s+\b(?:background|analysis|discussion|fiscal impact|financial impact|public notice|attachments?|conclusion)\s*:?/i;
 export const MEETING_WIDE_CONTEXT_HEADING =
   "Current agenda and meeting-wide participation context:";
+export const STRUCTURED_AGENDA_ITEMS_HEADING =
+  "Current meeting agenda items (use each block only for its named item):";
 export const MAX_MEETING_WIDE_CONTEXT_CHARS = 8000;
 
 export function extractMeetingWideParticipationContext(text: string) {
@@ -26,7 +31,15 @@ export function extractMeetingWideParticipationContext(text: string) {
   const agendaStart = sourceText.search(
     /(?:^|\n)\s*(?:1\s*[.):-]\s*)?(?:call to order|roll call|opening remarks?)\b/im
   );
-  const participationText = agendaStart > 0 ? sourceText.slice(0, agendaStart) : sourceText;
+  const structuredItemsStart = sourceText.indexOf(STRUCTURED_AGENDA_ITEMS_HEADING);
+  const boundary = [agendaStart, structuredItemsStart]
+    .filter((index) => index >= 0)
+    .sort((left, right) => left - right)[0];
+  const participationText = boundary === undefined
+    ? text.slice(0, headingIndex).includes(STRUCTURED_AGENDA_ITEMS_HEADING)
+      ? sourceText
+      : ""
+    : sourceText.slice(0, boundary);
   return participationText.slice(0, MAX_MEETING_WIDE_CONTEXT_CHARS).trim();
 }
 
@@ -210,6 +223,8 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
   const hasNumberedOpening = /\b1\s*[.):-]\s*(?:call to order|roll call|opening remarks?)\b/i.test(
     agendaText
   );
+  const hasStandaloneWholeNumberItems =
+    (agendaText.match(/(?:^|\n)\s*\d{1,2}\s*[.):-]\s*(?=\n)/g) || []).length >= 2;
   let lastWholeNumber = 0;
   ITEM_START.lastIndex = 0;
 
@@ -217,7 +232,19 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
   const acceptedMatches: Array<{ match: RegExpMatchArray; rawBlock: string }> = [];
   for (const match of matches) {
     const agendaNumber = match[1].toUpperCase();
-    if (!/^(?:[a-z]\)\s*)?[A-Z]/.test(match[2].trimStart())) continue;
+    const rawTitle = match[2].trimStart();
+    if (!/^(?:[a-z]\)\s*)?[A-Z0-9]/.test(rawTitle)) continue;
+    if (/^\d/.test(rawTitle)) {
+      const matchSource = agendaText.slice(match.index || 0, (match.index || 0) + 40);
+      const standaloneNumber = new RegExp(
+        `^\\s*${agendaNumber.replace(".", "\\.")}\\s*[.):-]\\s*\\n`
+      ).test(matchSource);
+      if (!standaloneNumber) {
+        const previous = acceptedMatches.at(-1);
+        if (previous) previous.rawBlock += ` ${agendaNumber}.${match[2]}`;
+        continue;
+      }
+    }
     const numericParts = agendaNumber.match(/^(\d{1,2})(?:\.(\d{1,3}))?$/);
     if (numericParts?.[2]) {
       const sectionNumber = Number(numericParts[1]);
@@ -235,7 +262,7 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
     }
     if (/^\d+$/.test(agendaNumber)) {
       const wholeNumber = Number(agendaNumber);
-      if (!hasNumberedOpening) {
+      if (!hasNumberedOpening && !hasStandaloneWholeNumberItems) {
         // Even when whole-number items are too ambiguous to emit, numbered
         // section headings provide sequence context for their decimal children.
         if (isSectionTitle(cleanItemTitle(match[2])) && wholeNumber > lastWholeNumber) {
@@ -281,51 +308,106 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
 export function mergeAgendaItems(existing: AgendaItem[] = [], extracted: AgendaItem[] = []) {
   const merged = new Map<string, AgendaItem>();
   for (const item of [...existing, ...extracted]) {
-    const key = item.agendaNumber || item.externalId;
+    const key = canonicalAgendaNumber(item.agendaNumber) || item.externalId;
     const prior = merged.get(key);
     if (!prior) {
       merged.set(key, item);
       continue;
     }
+    const seenAttachmentUrls = new Set<string>();
+    const attachments = [...(prior.attachments || []), ...(item.attachments || [])].filter(
+      (document) => {
+        const url = document.url.trim().toLowerCase();
+        if (!url || seenAttachmentUrls.has(url)) return false;
+        seenAttachmentUrls.add(url);
+        return true;
+      }
+    );
     merged.set(key, {
       ...prior,
       title: prior.title || item.title,
       action: prior.action || item.action,
       result: prior.result || item.result,
       rowText: prior.rowText.length >= item.rowText.length ? prior.rowText : item.rowText,
-      attachments: [...(prior.attachments || []), ...(item.attachments || [])]
+      attachments
     });
   }
   return Array.from(merged.values());
 }
 
-export function formatAgendaItemContexts(items: AgendaItem[]) {
+function fairlyTruncateBlocks(blocks: string[], maxCharacters: number) {
+  if (blocks.length === 0 || maxCharacters <= 0) return [];
+  const separatorCharacters = Math.max(0, blocks.length - 1) * 2;
+  const contentBudget = Math.max(0, maxCharacters - separatorCharacters);
+  const lengths = blocks.map((block) => block.length);
+  const budgets = blocks.map(() => 0);
+  let remaining = contentBudget;
+  let active = blocks.map((_, index) => index);
+
+  while (remaining > 0 && active.length > 0) {
+    const share = Math.max(1, Math.floor(remaining / active.length));
+    let distributed = 0;
+    const stillActive: number[] = [];
+
+    for (const index of active) {
+      if (remaining <= 0) {
+        stillActive.push(index);
+        continue;
+      }
+      const available = lengths[index] - budgets[index];
+      const addition = Math.min(available, share, remaining);
+      budgets[index] += addition;
+      remaining -= addition;
+      distributed += addition;
+      if (budgets[index] < lengths[index]) stillActive.push(index);
+    }
+
+    if (distributed === 0) break;
+    active = stillActive;
+  }
+
+  return blocks.map((block, index) => block.slice(0, budgets[index]).trimEnd());
+}
+
+export function formatAgendaItemContexts(items: AgendaItem[], maxCharacters?: number) {
   if (!items.length) return "";
   const safeSourceItemIds = uniqueSourceItemIds(items);
-  return [
-    "Current meeting agenda items (use each block only for its named item):",
-    ...items.map((item) => {
-      const title = cleanText(item.title || "").slice(0, 500);
-      const action = cleanText(item.action || item.recommendedAction || "").slice(0, 2500);
-      const itemContext = cleanText(item.rowText || "").slice(0, 7000);
-      const linkedContext = cleanText(
-        (item.attachments || [])
-          .map((document) => document.extractedText || "")
-          .filter(Boolean)
-          .join(" ")
-      ).slice(0, 2500);
-      return [
-        `Source item ID: ${safeSourceItemIds.has(item.externalId) ? item.externalId : "Not available"}`,
-        `Agenda item ${item.agendaNumber || "Unnumbered"}`,
-        `Agenda section: ${item.itemType || "Not listed in the source document."}`,
-        `Official title: ${title || "Not listed in the source document."}`,
-        `Recommended action: ${action || "Not listed in the source document."}`,
-        `Item context: ${itemContext || "Not listed in the source document."}`,
-        ...(linkedContext ? [`Linked supporting-report context: ${linkedContext}`] : []),
-        `Official source: ${item.sourceUrl}`
-      ].join("\n");
-    })
-  ].join("\n\n");
+  const heading = STRUCTURED_AGENDA_ITEMS_HEADING;
+  const blocks = items.map((item) => {
+    const title = cleanText(item.title || "").slice(0, 500);
+    const action = cleanText(item.action || item.recommendedAction || "").slice(0, 2500);
+    const itemContext = cleanText(item.rowText || "").slice(0, 7000);
+    const linkedContext = cleanText(
+      (item.attachments || [])
+        .filter(
+          (document) =>
+            document.type !== "Public Comment" &&
+            document.type !== "Public Comments"
+        )
+        .map((document) => document.extractedText || "")
+        .filter(Boolean)
+        .join(" ")
+    ).slice(0, 2500);
+    return [
+      `Source item ID: ${safeSourceItemIds.has(item.externalId) ? item.externalId.slice(0, 200) : "Not available"}`,
+      `Agenda item ${cleanText(item.agendaNumber || "Unnumbered").slice(0, 80)}`,
+      `Official title: ${title || "Not listed in the source document."}`,
+      `Agenda section: ${item.itemType || "Not listed in the source document."}`,
+      `Recommended action: ${action || "Not listed in the source document."}`,
+      `Item context: ${itemContext || "Not listed in the source document."}`,
+      ...(linkedContext ? [`Linked supporting-report context: ${linkedContext}`] : []),
+      `Official source: ${item.sourceUrl}`
+    ].join("\n");
+  });
+
+  if (maxCharacters === undefined) return [heading, ...blocks].join("\n\n");
+  if (maxCharacters <= heading.length) return heading.slice(0, Math.max(0, maxCharacters));
+
+  const fittedBlocks = fairlyTruncateBlocks(
+    blocks,
+    maxCharacters - heading.length - 2
+  );
+  return [heading, ...fittedBlocks].join("\n\n").slice(0, maxCharacters);
 }
 
 export function findAgendaItemForCard(title: string, items: AgendaItem[] = []) {
