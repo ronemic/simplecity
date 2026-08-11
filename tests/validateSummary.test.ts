@@ -109,6 +109,63 @@ test("drops cards with exact values that are not grounded in the source text", (
   assert.equal(issues[0]?.value, "$250");
 });
 
+test("accepts an explicitly day-prior comment deadline derived from the meeting date", () => {
+  const meeting = itemScopedMeeting();
+  const issues: Array<{ reason: string; value?: string }> = [];
+  meeting.dateText = "August 11, 2026";
+  meeting.llmInputText = [
+    "Current agenda and meeting-wide participation context:",
+    "Written comments may be emailed by 5:00 PM on the day prior to the meeting.",
+    "Current meeting agenda items (use each block only for its named item):",
+    meeting.llmInputText
+  ].join("\n");
+
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({
+        sourceItemId: "item-parks",
+        commentWindow: {
+          opens: "Not listed in the source document.",
+          closes: "5:00 PM on August 10, 2026"
+        }
+      })]
+    },
+    validationOptionsForMeeting(meeting, (issue) => issues.push(issue))
+  );
+
+  assert.equal(result.cards.length, 1, JSON.stringify(issues));
+});
+
+test("does not use a derived comment deadline to ground item claims", () => {
+  const meeting = itemScopedMeeting();
+  meeting.dateText = "August 11, 2026";
+  meeting.llmInputText = [
+    "Current agenda and meeting-wide participation context:",
+    "Written comments may be emailed by 5:00 PM on the day prior to the meeting.",
+    "Current meeting agenda items (use each block only for its named item):",
+    meeting.llmInputText
+  ].join("\n");
+  const issues: Array<{ value?: string }> = [];
+
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({
+        sourceItemId: "item-parks",
+        whatIsHappening: ["The contract will take effect on August 10, 2026."]
+      })]
+    },
+    validationOptionsForMeeting(meeting, (issue) => issues.push(issue))
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.ok(
+    issues.some((issue) => issue.value?.includes("August 10, 2026")),
+    JSON.stringify(issues)
+  );
+});
+
 test("resolves a missing item ID before grounding against exact item evidence", () => {
   const meeting = itemScopedMeeting();
   const issues: Array<{ reason: string; value?: string }> = [];

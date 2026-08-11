@@ -8,6 +8,7 @@ import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { resolveCardSourceItemId } from "@/lib/utils/cardSourceIdentity";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 import { extractMeetingWideParticipationContext } from "@/lib/scraper/agendaItemContext";
+import { parseMeetingDate } from "@/lib/utils/date";
 
 const allowedCategories = new Set<string>(CATEGORIES);
 const allowedStatuses = new Set<string>(CARD_STATUSES);
@@ -609,6 +610,31 @@ function buildMeetingSourceText(meeting: LlmReadyMeeting) {
     .join("\n");
 }
 
+function derivedParticipationDateEvidence(
+  meetingDateText: string,
+  participationText: string
+) {
+  if (
+    !/\b(?:the\s+)?day\s+(?:before|prior\s+to)\s+(?:the\s+)?meeting\b/i.test(
+      participationText
+    )
+  ) return "";
+
+  const meetingIso = parseMeetingDate(meetingDateText);
+  if (!meetingIso) return "";
+  const priorDate = new Date(meetingIso);
+  priorDate.setUTCDate(priorDate.getUTCDate() - 1);
+  return [
+    new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC"
+    }).format(priorDate),
+    `${priorDate.getUTCMonth() + 1}/${priorDate.getUTCDate()}/${priorDate.getUTCFullYear()}`
+  ].join("\n");
+}
+
 function buildAgendaItemSourceText(item: NonNullable<LlmReadyMeeting["items"]>[number]) {
   return [
     item.externalId,
@@ -659,9 +685,16 @@ export function validationOptionsForMeeting(
   const items = meeting.items || [];
   const uniqueIds = uniqueSourceItemIds(items);
   const meetingMetadataText = buildMeetingMetadataText(meeting);
-  const meetingWideParticipationText = extractMeetingWideParticipationContext(
+  const extractedMeetingWideParticipationText = extractMeetingWideParticipationContext(
     meeting.llmInputText
   );
+  const meetingWideParticipationText = [
+    extractedMeetingWideParticipationText,
+    derivedParticipationDateEvidence(
+      meeting.dateText,
+      extractedMeetingWideParticipationText
+    )
+  ].filter(Boolean).join("\n");
   const resolveItem = (sourceItemId: string | null) => {
     return sourceItemId && uniqueIds.has(sourceItemId)
       ? items.find((item) => item.externalId === sourceItemId)
