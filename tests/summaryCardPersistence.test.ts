@@ -18,6 +18,21 @@ const placeholderCleanupMigration = readFileSync(
   ),
   "utf8"
 );
+const scopedLegacyIdentityMigration = readFileSync(
+  new URL(
+    "../supabase/migrations/20260810000000_scope_summary_card_legacy_identity.sql",
+    import.meta.url
+  ),
+  "utf8"
+);
+const fullBootstrapSchema = readFileSync(
+  new URL("../supabase/bootstrap_full.sql", import.meta.url),
+  "utf8"
+);
+const countyBootstrapSchema = readFileSync(
+  new URL("../supabase/bootstrap_county.sql", import.meta.url),
+  "utf8"
+);
 
 function card(index: number): SimpleCityCard {
   return {
@@ -111,6 +126,18 @@ test("cleanup migration protects identified or curated cards and audits every de
   assert.match(placeholderCleanupMigration, /public\.decision_outcomes/i);
   assert.match(placeholderCleanupMigration, /insert into public\.admin_audit_log/i);
   assert.match(placeholderCleanupMigration, /to_jsonb\(deleted\)/i);
+});
+
+test("legacy title identity no longer blocks distinct source-identified cards", () => {
+  assert.match(scopedLegacyIdentityMigration, /drop index if exists public\.summary_cards_regeneration_idx/i);
+  assert.match(scopedLegacyIdentityMigration, /where source_item_id is null/i);
+  assert.match(scopedLegacyIdentityMigration, /unique index/i);
+  for (const bootstrap of [fullBootstrapSchema, countyBootstrapSchema]) {
+    assert.match(
+      bootstrap,
+      /summary_cards_regeneration_idx[\s\S]*?where source_item_id is null/i
+    );
+  }
 });
 
 test("removes an obsolete agenda placeholder when real agenda cards are appended", async () => {
@@ -322,6 +349,449 @@ test("adopts a legacy exact-key card when appending a stable source item id", as
   assert.equal(updatedRows[0].admin_notes, legacyCard.admin_notes);
   assert.equal(persisted[0].id, legacyCard.id);
   assert.equal(meetingUpdates[0].summarized_source_hash, "legacy-upgraded");
+});
+
+test("updates changed content on a uniquely matched legacy card before marking the source complete", async () => {
+  const updatedRows: Array<Record<string, unknown>> = [];
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const meetingUpdates: Array<Record<string, unknown>> = [];
+  const incomingCard = {
+    ...card(9),
+    sourceItemId: null,
+    whatIsHappening: ["The revised park contract costs $250."]
+  };
+  const legacyCard = {
+    id: "legacy-without-source-id",
+    source_item_id: null,
+    agenda_item: incomingCard.agendaItem,
+    source_url: incomingCard.source,
+    is_published: true,
+    is_featured: false,
+    admin_notes: null
+  };
+
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return {
+          update(values: Record<string, unknown>) {
+            meetingUpdates.push(values);
+            return { async eq() { return { error: null }; } };
+          }
+        };
+      }
+
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [legacyCard], error: null }; } };
+        },
+        update(values: Record<string, unknown>) {
+          updatedRows.push(values);
+          return {
+            eq() {
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id: legacyCard.id,
+                          source_item_id: values.source_item_id,
+                          agenda_item: values.agenda_item,
+                          source_url: values.source_url
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return { async select() { return { data: [], error: null }; } };
+        }
+      };
+    }
+  };
+
+  const persisted = await appendSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-legacy-change",
+    { ...summary(0), cards: [incomingCard] },
+    { response: "updated summary" },
+    { sourceHash: "new-source-hash" }
+  );
+
+  assert.equal(insertedRows.length, 0);
+  assert.equal(updatedRows.length, 1);
+  assert.equal(updatedRows[0].what_is_happening, incomingCard.whatIsHappening[0]);
+  assert.equal(persisted[0].id, legacyCard.id);
+  assert.equal(meetingUpdates[0].summarized_source_hash, "new-source-hash");
+});
+
+test("does not treat a shared meeting source URL as legacy card identity", async () => {
+  const sharedSource = "https://example.test/meeting/agenda";
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const incomingCards = [
+    { ...card(10), sourceItemId: null, source: sharedSource },
+    { ...card(11), sourceItemId: null, source: sharedSource }
+  ];
+  const existing = {
+    id: "old-unrelated-card",
+    source_item_id: null,
+    agenda_item: "Approve the prior library contract",
+    source_url: sharedSource,
+    is_published: true,
+    is_featured: false,
+    admin_notes: null
+  };
+
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [existing], error: null }; } };
+        },
+        update() {
+          throw new Error("A shared meeting URL must not update an unrelated card");
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return {
+            async select() {
+              return {
+                data: rows.map((row, index) => ({
+                  id: `inserted-${index}`,
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const persisted = await appendSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-shared-source",
+    { ...summary(0), cards: incomingCards },
+    { response: "new cards" },
+    { sourceHash: "shared-source-hash" }
+  );
+
+  assert.equal(insertedRows.length, 2);
+  assert.deepEqual(
+    insertedRows.map((row) => row.agenda_item),
+    incomingCards.map((incoming) => incoming.agendaItem)
+  );
+  assert.equal(persisted.length, 2);
+});
+
+test("does not overwrite a modern card when a distinct source id has the same public title", async () => {
+  const updatedIds: string[] = [];
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const existing = {
+    id: "existing-item-a",
+    source_item_id: "item-a",
+    agenda_item: "Neighborhood park maintenance contract",
+    source_url: "https://example.test/meeting/agenda",
+    is_published: true,
+    is_featured: false,
+    admin_notes: null
+  };
+  const incomingCards = [
+    {
+      ...card(20),
+      sourceItemId: "item-a",
+      agendaItem: existing.agenda_item,
+      source: existing.source_url
+    },
+    {
+      ...card(21),
+      sourceItemId: "item-b",
+      agendaItem: existing.agenda_item,
+      source: existing.source_url
+    }
+  ];
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [existing], error: null }; } };
+        },
+        update(values: Record<string, unknown>) {
+          return {
+            eq(_column: string, id: string) {
+              updatedIds.push(id);
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id,
+                          source_item_id: values.source_item_id,
+                          agenda_item: values.agenda_item,
+                          source_url: values.source_url
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return {
+            async select() {
+              return {
+                data: rows.map((row) => ({
+                  id: "inserted-item-b",
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const persisted = await appendSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-modern-identities",
+    { ...summary(0), cards: incomingCards },
+    { response: "two official items" },
+    { sourceHash: "modern-identities-hash" }
+  );
+
+  assert.deepEqual(updatedIds, [existing.id]);
+  assert.equal(insertedRows.length, 1);
+  assert.equal(insertedRows[0].source_item_id, "item-b");
+  assert.equal(persisted.length, 2);
+});
+
+test("writes distinct Spanish translations for source-identified cards sharing a legacy key", async () => {
+  const sharedTitle = "Neighborhood park maintenance contract";
+  const sharedSource = "https://example.test/meeting/agenda";
+  const incomingCards = ["translation-item-a", "translation-item-b"].map(
+    (sourceItemId, index) => ({
+      ...card(40 + index),
+      sourceItemId,
+      agendaItem: sharedTitle,
+      source: sharedSource,
+      whatIsHappening: [`The city will consider contract option ${index + 1}.`]
+    })
+  );
+  const translatedSummary: SimpleCitySummary = {
+    ...summary(0),
+    cards: incomingCards,
+    translations: {
+      es: {
+        cards: incomingCards.map((incoming, index) => ({
+          agendaItem: `${incoming.agendaItem} — opción ${index + 1}`,
+          whatIsHappening: [`La ciudad considerará la opción ${index + 1}.`],
+          whyItMatters: "Afecta los servicios de la ciudad.",
+          whoItAffects: ["Residentes"],
+          status: "Votación programada",
+          commentWindow: { opens: "No indicado", closes: "No indicado" },
+          howToAct: {
+            attend: "Consulta la agenda oficial.",
+            email: "No indicado",
+            submitComment: "No indicado"
+          }
+        }))
+      }
+    }
+  };
+  const translationRows: Array<Record<string, unknown>> = [];
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      if (table === "summary_card_translations") {
+        return {
+          async upsert(
+            rows: Array<Record<string, unknown>>,
+            options: { onConflict: string }
+          ) {
+            assert.equal(options.onConflict, "summary_card_id,locale");
+            translationRows.push(...rows);
+            return { error: null };
+          }
+        };
+      }
+
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [], error: null }; } };
+        },
+        delete() {
+          return { async eq() { return { error: null }; } };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          return {
+            async select() {
+              return {
+                data: rows.map((row) => ({
+                  id: `persisted-${row.source_item_id}`,
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const persisted = await replaceSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-translated-identities",
+    translatedSummary,
+    { response: "translated summary" },
+    { sourceHash: "translated-identities-hash" }
+  );
+
+  assert.equal(persisted.length, 2);
+  assert.equal(translationRows.length, 2);
+  assert.equal(new Set(translationRows.map((row) => row.summary_card_id)).size, 2);
+  assert.equal(
+    new Set(translationRows.map((row) => `${row.summary_card_id}:${row.locale}`)).size,
+    2
+  );
+  assert.deepEqual(
+    translationRows.map((row) => row.summary_card_id),
+    ["persisted-translation-item-a", "persisted-translation-item-b"]
+  );
+});
+
+test("adopts one collapsed legacy row without dropping a second distinct source item", async () => {
+  const updatedIds: string[] = [];
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const existing = {
+    id: "collapsed-legacy-row",
+    source_item_id: null,
+    agenda_item: "Neighborhood park maintenance contract",
+    source_url: "https://example.test/meeting/agenda",
+    is_published: true,
+    is_featured: false,
+    admin_notes: null
+  };
+  const incomingCards = ["item-a", "item-b"].map((sourceItemId, index) => ({
+    ...card(30 + index),
+    sourceItemId,
+    agendaItem: existing.agenda_item,
+    source: existing.source_url
+  }));
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [existing], error: null }; } };
+        },
+        update(values: Record<string, unknown>) {
+          return {
+            eq(_column: string, id: string) {
+              updatedIds.push(id);
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id,
+                          source_item_id: values.source_item_id,
+                          agenda_item: values.agenda_item,
+                          source_url: values.source_url
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return {
+            async select() {
+              return {
+                data: rows.map((row) => ({
+                  id: "inserted-second-source-item",
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const persisted = await appendSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-collapsed-legacy-row",
+    { ...summary(0), cards: incomingCards },
+    { response: "two recovered official items" },
+    { sourceHash: "collapsed-legacy-reconciled" }
+  );
+
+  assert.deepEqual(updatedIds, [existing.id]);
+  assert.equal(insertedRows.length, 1);
+  assert.equal(insertedRows[0].source_item_id, "item-b");
+  assert.equal(persisted.length, 2);
 });
 
 test("persists a large meeting in batches and marks it summarized after all writes", async () => {

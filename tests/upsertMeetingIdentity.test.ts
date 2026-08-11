@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   compactMeetingRawForStorage,
+  documentExtractionFieldsForStorage,
   documentExtractedTextForStorage,
   isTransientSupabaseWriteError,
   retryTransientSupabaseWrite,
@@ -135,6 +136,24 @@ test("bounds oversized extracted documents without dropping useful minutes text"
   assert.equal(documentExtractedTextForStorage("Agenda", oversized)?.length, 500_000);
   assert.equal(documentExtractedTextForStorage("Minutes", oversized)?.length, 2_000_000);
   assert.equal(documentExtractedTextForStorage("Minutes", null), null);
+});
+
+test("omits empty extraction fields so a transient failure cannot erase archived text", () => {
+  assert.deepEqual(documentExtractionFieldsForStorage("Minutes", null), {});
+  assert.deepEqual(
+    documentExtractionFieldsForStorage("Minutes", null, {
+      extracted_text: "Archived approval text.",
+      extraction_character_count: 23
+    }),
+    {
+      extracted_text: "Archived approval text.",
+      extraction_character_count: 23
+    }
+  );
+  assert.deepEqual(documentExtractionFieldsForStorage("Minutes", "Approved 5-0."), {
+    extracted_text: "Approved 5-0.",
+    extraction_character_count: 13
+  });
 });
 
 test("does not select an arbitrary external id when stored rows share a details URL", () => {

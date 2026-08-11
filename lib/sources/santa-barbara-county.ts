@@ -10,6 +10,10 @@ import type {
   ScrapePortalResult
 } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
+import {
+  createStreamDownloadBudget,
+  streamDownloadToTemp
+} from "@/lib/scraper/streamDownload";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
@@ -20,7 +24,6 @@ export const SANTA_BARBARA_PLANNING_COMMISSION_URL =
 export const SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL =
   "https://cosantabarbara.app.box.com/s/q97rv82305oyfnbdjhcyxrrdhu3dgkqy";
 
-const BOX_DOWNLOAD_MAX_BYTES = 50 * 1024 * 1024;
 const BOX_REQUEST_TIMEOUT_MS = 60_000;
 
 type SantaBarbaraCountyOptions = ScrapePortalOptions & {
@@ -341,13 +344,30 @@ function parseBoxFileDownloadMetadata(html: string, fileId: number): BoxFileDown
   return { downloadUrl, token };
 }
 
-async function downloadPlanningCommissionDocuments(
+function isAllowedBoxDownloadUrl(value: string) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    return (
+      url.protocol === "https:" &&
+      (hostname === "box.com" ||
+        hostname.endsWith(".box.com") ||
+        hostname === "boxcloud.com" ||
+        hostname.endsWith(".boxcloud.com"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+export async function downloadSantaBarbaraPlanningCommissionDocuments(
   meetings: PrimeGovMeeting[],
   outputDir: string,
   log: (message: string) => void,
   shouldStop?: () => boolean
 ) {
   await fs.mkdir(outputDir, { recursive: true });
+  const downloadBudget = createStreamDownloadBudget();
   let downloaded = 0;
   let failed = 0;
 
@@ -357,41 +377,34 @@ async function downloadPlanningCommissionDocuments(
       const match = document.url.match(/\/file\/(\d+)/);
       if (!match || document.type === "Notice of Cancellation") continue;
       const fileId = Number(match[1]);
+      const sourceHash = crypto
+        .createHash("sha256")
+        .update(document.url)
+        .digest("hex")
+        .slice(0, 10);
+      const filename = [
+        slugify(meeting.externalId || meeting.title).slice(0, 80),
+        slugify(document.type),
+        `${fileId}-${sourceHash}.pdf`
+      ].join("__");
+      const filePath = path.join(outputDir, filename);
+      let transfer: Awaited<ReturnType<typeof streamDownloadToTemp>> | null = null;
       try {
         const metadata = parseBoxFileDownloadMetadata(await fetchBoxHtml(document.url), fileId);
         const downloadUrl = new URL(metadata.downloadUrl);
         downloadUrl.searchParams.set("shared_link", SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL);
-        const response = await fetch(downloadUrl, {
+        transfer = await streamDownloadToTemp(null, downloadUrl.toString(), filePath, {
           headers: { Authorization: `Bearer ${metadata.token}` },
-          redirect: "follow",
-          signal: AbortSignal.timeout(BOX_REQUEST_TIMEOUT_MS)
+          validateUrl: isAllowedBoxDownloadUrl,
+          shouldStop,
+          budget: downloadBudget
         });
-        if (!response.ok) throw new Error(`Box download returned HTTP ${response.status}.`);
-        const contentLength = Number(response.headers.get("content-length") || 0);
-        if (contentLength > BOX_DOWNLOAD_MAX_BYTES) {
-          throw new Error(`Box document exceeded the ${BOX_DOWNLOAD_MAX_BYTES}-byte limit.`);
-        }
-        const buffer = Buffer.from(await response.arrayBuffer());
-        if (buffer.length > BOX_DOWNLOAD_MAX_BYTES) {
-          throw new Error(`Box document exceeded the ${BOX_DOWNLOAD_MAX_BYTES}-byte limit.`);
-        }
-        if (buffer.subarray(0, 5).toString() !== "%PDF-") {
+        if (transfer.prefix.subarray(0, 5).toString() !== "%PDF-") {
           throw new Error("Box document response was not a PDF.");
         }
-        const sourceHash = crypto
-          .createHash("sha256")
-          .update(document.url)
-          .digest("hex")
-          .slice(0, 10);
-        const filename = [
-          slugify(meeting.externalId || meeting.title).slice(0, 80),
-          slugify(document.type),
-          `${fileId}-${sourceHash}.pdf`
-        ].join("__");
-        const filePath = path.join(outputDir, filename);
-        await fs.writeFile(filePath, buffer);
+        await transfer.commit(filePath);
         document.localPath = filePath;
-        document.bytes = buffer.length;
+        document.bytes = transfer.bytes;
         document.downloadError = null;
         downloaded += 1;
         log(`Downloaded Santa Barbara Planning Commission document: ${filePath}`);
@@ -401,6 +414,8 @@ async function downloadPlanningCommissionDocuments(
           error instanceof Error ? error.message : "Unknown Box document download error";
         failed += 1;
         log(`Santa Barbara Planning Commission download failed for ${document.url}: ${document.downloadError}`);
+      } finally {
+        await transfer?.cleanup();
       }
     }
   }
@@ -506,7 +521,7 @@ export async function scrapeSantaBarbaraPlanningCommissionMeetings(
 
   if (options.downloadDocuments) {
     log("Downloading Santa Barbara County Planning Commission agendas and results from Box.");
-    const result = await downloadPlanningCommissionDocuments(
+    const result = await downloadSantaBarbaraPlanningCommissionDocuments(
       meetings,
       options.documentOutputDir || path.join(process.cwd(), "scraped-primegov", options.jurisdiction.slug, "documents"),
       log,

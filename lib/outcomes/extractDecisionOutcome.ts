@@ -7,6 +7,7 @@ import type {
   SummaryCardRow
 } from "@/lib/types";
 import { extractAgendaItemsFromText } from "@/lib/scraper/agendaItemContext";
+import { hasUsableOfficialDocumentText } from "@/lib/scraper/documentUsability";
 import { normalizeSourceText } from "@/lib/scraper/prepareLlmInput";
 import { cleanText } from "@/lib/utils/slug";
 import {
@@ -42,6 +43,8 @@ const DIRECTION_RESULT_PATTERN =
 const MIN_FUZZY_MATCH_SCORE = 0.72;
 const MIN_FUZZY_MATCH_MARGIN = 0.15;
 const MIN_SHARED_IDENTITY_TOKENS = 3;
+const DECISION_OUTCOME_EXPLANATION_FINGERPRINT_VERSION =
+  "decision-outcome-explanation-v1";
 
 export type DecisionOutcomeMatchMethod =
   | "source_item_id"
@@ -211,6 +214,7 @@ export function interpretOfficialAction(
   const resultText = compactOutcomeText(result);
   const sourceText = [actionText, resultText].filter(Boolean).join(" | ");
   const lowerAction = actionText.toLowerCase();
+  const lowerResult = resultText.toLowerCase();
   const lowerSource = sourceText.toLowerCase();
   const failed = /\b(?:fail(?:ed)?|denied|rejected|defeated)\b/.test(lowerSource);
 
@@ -232,6 +236,20 @@ export function interpretOfficialAction(
       kind: "other",
       canonicalStatus: "heard_and_filed",
       headline: "Heard and filed",
+      nextStep: null
+    };
+  }
+
+  if (
+    /\b(?:amend(?:ed|ment|ments)?|continued|postponed|tabled|deferred|referred)\b/.test(
+      lowerSource
+    ) &&
+    /\b(?:fail(?:ed)?|denied|rejected|defeated)\b/.test(lowerResult)
+  ) {
+    return {
+      kind: "rejected",
+      canonicalStatus: "rejected",
+      headline: outcomeHeadline("rejected", resultText),
       nextStep: null
     };
   }
@@ -323,7 +341,9 @@ function minutesLabelMatchesMeeting(
 }
 
 function minutesDocuments(meeting: LlmReadyMeeting) {
-  return officialMinutesDocuments(meeting).filter((document) => Boolean(document.extractedText));
+  return officialMinutesDocuments(meeting).filter((document) =>
+    hasUsableOfficialDocumentText(document)
+  );
 }
 
 function normalizedIdentifier(value?: string | null) {
@@ -345,8 +365,10 @@ function hasConflictingNumericIdentity(left: string, right: string) {
   const leftNumbers = numericIdentityTokens(left);
   const rightNumbers = numericIdentityTokens(right);
   if (leftNumbers.length === 0 || rightNumbers.length === 0) return false;
-  const sharedNumbers = leftNumbers.filter((token) => rightNumbers.includes(token));
-  return sharedNumbers.length === 0;
+  return (
+    leftNumbers.some((token) => !rightNumbers.includes(token)) ||
+    rightNumbers.some((token) => !leftNumbers.includes(token))
+  );
 }
 
 function sharedIdentityTokenCount(left: string, right: string) {
@@ -850,15 +872,42 @@ export function extractDecisionOutcome(
     minutesDocument?.url || meeting.meetingDetailsUrl || item.sourceUrl || meeting.sourceUrl || "";
   if (!sourceUrl) return null;
 
+  const summary = officialSummary(item, canonical);
+  const normalizedAction = normalizeSourceText(sourceText);
+  const normalizedItemContext = normalizeSourceText(item.rowText || "");
+  const sourceContext = [
+    "Official action/result:",
+    normalizedAction,
+    ...(normalizedItemContext && normalizedItemContext !== normalizedAction
+      ? ["Official item context:", normalizedItemContext]
+      : [])
+  ]
+    .join("\n\n")
+    .slice(0, 6000);
   const sourceHash = crypto
     .createHash("sha256")
-    .update(JSON.stringify({ cardId: card.id, sourceUrl, sourceText }))
+    .update(
+      JSON.stringify({
+        version: DECISION_OUTCOME_EXPLANATION_FINGERPRINT_VERSION,
+        cardId: card.id,
+        cardTitle: cleanText(String(card.agenda_item || "")),
+        jurisdictionSlug: meeting.jurisdictionSlug,
+        meetingTitle: meeting.title,
+        canonicalStatus: canonical.canonicalStatus,
+        canonicalHeadline: canonical.headline,
+        fallbackSummary: summary,
+        fallbackNextStep: canonical.nextStep,
+        sourceUrl,
+        sourceText,
+        sourceContext
+      })
+    )
     .digest("hex");
 
   return {
     kind: canonical.kind,
     headline: canonical.headline,
-    summary: officialSummary(item, canonical),
+    summary,
     decidedAt: meetingDecisionDate(meeting),
     vote: extractVoteDetail(sourceText),
     nextStep: canonical.nextStep,
@@ -870,6 +919,6 @@ export function extractDecisionOutcome(
     matchMethod: match?.method || "title",
     matchScore: match?.score || 0,
     canonicalStatus: canonical.canonicalStatus,
-    sourceContext: normalizeSourceText(item.rowText || sourceText).slice(0, 6000)
+    sourceContext
   };
 }

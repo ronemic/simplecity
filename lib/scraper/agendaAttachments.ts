@@ -1,4 +1,3 @@
-import fs from "node:fs/promises";
 import path from "node:path";
 import pdfParse, {
   type PdfAnnotation,
@@ -9,8 +8,6 @@ import type { AgendaItem, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
 
 export const MENLO_PARK_ATTACHMENT_MAX_ITEMS = 12;
-export const MENLO_PARK_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
-export const MENLO_PARK_ATTACHMENT_TIMEOUT_MS = 20_000;
 
 export type PositionedPdfText = Pick<PdfTextItem, "str" | "transform" | "width" | "height">;
 
@@ -251,27 +248,43 @@ export function selectAllAgendaItemAttachments(
   return Array.from(grouped.values());
 }
 
-export async function extractAgendaPdfPages(localPath: string): Promise<AgendaPdfPage[]> {
-  const buffer = await fs.readFile(localPath);
-  const pages: AgendaPdfPage[] = [];
+export async function visitAgendaPdfPages(
+  localPath: string,
+  visitPage: (page: AgendaPdfPage) => Promise<void> | void,
+  parsePdf: typeof pdfParse = pdfParse
+) {
   let pageNumber = 0;
 
-  await pdfParse(buffer, {
+  await parsePdf(localPath, {
     version: "v2.0.550",
     pagerender: async (page: PdfPageData) => {
       pageNumber += 1;
-      const [textContent, annotations] = await Promise.all([
-        page.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false }),
-        page.getAnnotations()
-      ]);
-      pages.push({
-        pageNumber,
-        textItems: textContent.items,
-        links: annotations
-      });
-      return textContent.items.map((item) => item.str).join(" ");
+      try {
+        const [textContent, annotations] = await Promise.all([
+          page.getTextContent({ normalizeWhitespace: false, disableCombineTextItems: false }),
+          page.getAnnotations()
+        ]);
+        await visitPage({
+          pageNumber,
+          textItems: textContent.items,
+          links: annotations
+        });
+        return "";
+      } finally {
+        page.cleanup?.();
+      }
     }
   });
+}
+
+export async function extractAgendaPdfPages(
+  localPath: string,
+  parsePdf: typeof pdfParse = pdfParse
+): Promise<AgendaPdfPage[]> {
+  const pages: AgendaPdfPage[] = [];
+  await visitAgendaPdfPages(localPath, (page) => {
+    pages.push(page);
+  }, parsePdf);
 
   return pages;
 }
@@ -307,13 +320,12 @@ export async function discoverMenloParkAgendaAttachments(
     for (const agendaDocument of agendaDocumentCandidates(meeting)) {
       if (!agendaDocument.localPath) continue;
       try {
-        const pages = await extractAgendaPdfPages(agendaDocument.localPath);
-        for (const page of pages) {
+        await visitAgendaPdfPages(agendaDocument.localPath, (page) => {
           for (const item of associatePdfLinksWithAgendaItems(page)) {
             foundItems.push(item);
             parentByItem.set(item.agendaNumber, agendaDocument.url);
           }
-        }
+        });
       } catch (error) {
         skipped += 1;
         const message = error instanceof Error ? error.message : "Unknown PDF link extraction error";

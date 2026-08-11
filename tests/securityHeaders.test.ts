@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import nextConfig, { buildContentSecurityPolicy } from "@/next.config.mjs";
+import type { NextConfig } from "next";
+
+const nextConfigModule = await import(
+  new URL("../next.config.mjs", import.meta.url).href
+) as {
+  default: NextConfig;
+  buildContentSecurityPolicy: (environment?: string) => string;
+};
+const { default: nextConfig, buildContentSecurityPolicy } = nextConfigModule;
 
 test("all application routes receive baseline browser security headers", async () => {
   assert.equal(typeof nextConfig.headers, "function");

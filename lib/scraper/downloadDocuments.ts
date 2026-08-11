@@ -3,16 +3,27 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import type { BrowserContext } from "playwright";
 import type { PrimeGovDocument, PrimeGovMeeting } from "@/lib/types";
+import { isUsableOfficialSourceText } from "./documentUsability";
 import {
   buildDownloadFilename,
+  isUsablePrimeGovHtmlAgendaText,
   resolvePrimeGovAttachmentDownloadUrl
 } from "./primegov";
+import {
+  createStreamDownloadBudget,
+  streamDownloadToTemp,
+  STREAM_DOWNLOAD_MAX_FILE_BYTES,
+  type StreamDownloadBudget
+} from "./streamDownload";
 import { slugify } from "@/lib/utils/slug";
 
 export const SCRAPED_DIR = path.join(process.cwd(), "scraped-primegov");
 export const DOCUMENTS_DIR = path.join(SCRAPED_DIR, "documents");
 export const EMPTY_OFFICIAL_DOCUMENT_ERROR =
   "Official document endpoint returned an empty unpublished placeholder.";
+const DOCUMENT_REQUEST_TIMEOUT_MS = 60_000;
+const MAX_BUFFERED_TEXT_DOCUMENT_BYTES = 50 * 1024 * 1024;
+const OFFICIAL_TEXT_FALLBACK_MAX_BYTES = 10 * 1024 * 1024;
 
 export function getJurisdictionScrapedDir(jurisdictionSlug: string) {
   return path.join(SCRAPED_DIR, jurisdictionSlug);
@@ -27,13 +38,60 @@ export type DownloadDocumentsOptions = {
   log?: (message: string) => void;
   shouldStop?: () => boolean;
   onlyPending?: boolean;
+  /** Explicit operator/test hard override. Production callers use the 1 GiB streaming ceiling. */
   maxBytes?: number;
+  maxTotalBytes?: number;
+  minFreeBytes?: number;
   timeoutMs?: number;
+  idleTimeoutMs?: number;
+  totalTimeoutMs?: number;
   validateFinalUrl?: (url: string) => boolean;
   documentFilter?: (document: PrimeGovDocument) => boolean;
   userAgent?: string;
   plainTextFallbackUrl?: (documentUrl: string) => string | null;
+  fetchImpl?: typeof fetch;
+  statfsImpl?: (directory: string) => Promise<{ bavail: number | bigint; bsize: number | bigint }>;
+  downloadBudget?: StreamDownloadBudget;
 };
+
+const PRIMARY_DOCUMENT_TYPES = new Set<PrimeGovDocument["type"]>([
+  "Agenda",
+  "Accessible Agenda",
+  "Minutes",
+  "Accessible Minutes"
+]);
+const ITEM_ATTACHMENT_TYPES = new Set<PrimeGovDocument["type"]>([
+  "Attachment",
+  "Staff Report",
+  "Resolution",
+  "Ordinance",
+  "Contract",
+  "Exhibit",
+  "Public Comment"
+]);
+
+function documentRequestTimeout(options: DownloadDocumentsOptions) {
+  return Math.min(
+    options.timeoutMs && options.timeoutMs > 0
+      ? options.timeoutMs
+      : DOCUMENT_REQUEST_TIMEOUT_MS,
+    DOCUMENT_REQUEST_TIMEOUT_MS
+  );
+}
+
+function documentDownloadPriority(document: PrimeGovDocument) {
+  if (PRIMARY_DOCUMENT_TYPES.has(document.type)) return 0;
+  if (document.type === "Notice of Cancellation") return 1;
+  if (document.type === "Agenda Packet" || document.type === "Packet") return 2;
+  if (document.isAgendaItemAttachment || ITEM_ATTACHMENT_TYPES.has(document.type)) return 4;
+  return 3;
+}
+
+function prioritizedDocuments(documents: PrimeGovDocument[]) {
+  return [...documents].sort(
+    (left, right) => documentDownloadPriority(left) - documentDownloadPriority(right)
+  );
+}
 
 function decodeBasicHtmlEntities(text: string) {
   return text
@@ -61,22 +119,28 @@ function htmlToText(html: string) {
     .trim();
 }
 
-function decodedPlainText(buffer: Buffer) {
+function decodedOfficialPlainText(buffer: Buffer, contentType: string) {
   const raw = buffer.toString("utf8").trim();
   if (!raw || raw.includes("\u0000")) return "";
 
-  try {
-    const parsed = JSON.parse(raw);
-    if (typeof parsed === "string") return parsed.trim();
-    if (parsed && typeof parsed === "object") {
-      const candidate = (parsed as Record<string, unknown>).plainText;
-      if (typeof candidate === "string") return candidate.trim();
+  let text = "";
+  const isJson = /\bjson\b/i.test(contentType);
+  const isPlainText = /^(?:text\/plain|application\/octet-stream)\b/i.test(contentType);
+  if (isJson || (isPlainText && raw.startsWith("{"))) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        const candidate = (parsed as Record<string, unknown>).plainText;
+        if (typeof candidate === "string") text = candidate.trim();
+      }
+    } catch {
+      return "";
     }
-  } catch {
-    // The fallback commonly returns text/plain rather than JSON.
+  } else if (isPlainText) {
+    text = raw;
   }
 
-  return raw;
+  return isUsableOfficialSourceText(text) ? text : "";
 }
 
 function isIqm2ErrorHtml(text: string) {
@@ -195,38 +259,97 @@ function isOfficialSiteDownloadCandidate(doc: PrimeGovDocument) {
   return true;
 }
 
-async function requestOfficialSiteDocument(
-  context: BrowserContext,
-  url: string,
+function downloadBudget(options: DownloadDocumentsOptions) {
+  return options.downloadBudget || createStreamDownloadBudget(options.maxTotalBytes);
+}
+
+function streamingOptions(
   options: DownloadDocumentsOptions,
+  budget: StreamDownloadBudget,
+  headers: Record<string, string>,
+  maxFileBytes = options.maxBytes || STREAM_DOWNLOAD_MAX_FILE_BYTES
+) {
+  return {
+    headers,
+    validateUrl: options.validateFinalUrl,
+    shouldStop: options.shouldStop,
+    budget,
+    maxFileBytes: Math.min(maxFileBytes, STREAM_DOWNLOAD_MAX_FILE_BYTES),
+    minFreeBytes: options.minFreeBytes,
+    headerTimeoutMs: documentRequestTimeout(options),
+    idleTimeoutMs: options.idleTimeoutMs,
+    totalTimeoutMs: options.totalTimeoutMs,
+    fetchImpl: options.fetchImpl,
+    statfsImpl: options.statfsImpl
+  };
+}
+
+function streamedContentType(headers: Headers) {
+  return headers.get("content-type") || "";
+}
+
+function streamedPrefixIsHtml(prefix: Buffer) {
+  return /^\s*</.test(prefix.toString("utf8"));
+}
+
+function responsePrefixMetadata(prefix: Buffer) {
+  const text = prefix
+    .toString("utf8")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
+  return text ? ` Response prefix: ${JSON.stringify(text)}.` : "";
+}
+
+async function readBufferedTextDocument(tempPath: string, bytes: number) {
+  if (bytes > MAX_BUFFERED_TEXT_DOCUMENT_BYTES) return null;
+  return fs.readFile(tempPath);
+}
+
+async function downloadOfficialPlainTextFallback(
+  context: BrowserContext,
+  fallbackUrl: string,
+  targetPath: string,
+  finalPath: string,
+  options: DownloadDocumentsOptions,
+  budget: StreamDownloadBudget,
   headers: Record<string, string>
 ) {
-  if (!options.validateFinalUrl) {
-    return context.request.get(url, {
-      headers,
-      timeout: options.timeoutMs || 60000
-    });
-  }
+  const fallbackMaxBytes = Math.min(
+    options.maxBytes && options.maxBytes > 0
+      ? options.maxBytes
+      : OFFICIAL_TEXT_FALLBACK_MAX_BYTES,
+    OFFICIAL_TEXT_FALLBACK_MAX_BYTES
+  );
+  const fallback = await streamDownloadToTemp(
+    context,
+    fallbackUrl,
+    targetPath,
+    streamingOptions(options, budget, headers, fallbackMaxBytes)
+  );
 
-  let requestUrl = url;
-  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
-    if (!options.validateFinalUrl(requestUrl)) {
-      throw new Error(`Redirected to a disallowed URL: ${requestUrl}`);
+  try {
+    if (fallback.bytes === 0) {
+      throw new Error("Plain-text fallback returned an empty response.");
+    }
+    const fallbackBuffer = await fs.readFile(fallback.tempPath);
+    const text = decodedOfficialPlainText(
+      fallbackBuffer,
+      streamedContentType(fallback.headers)
+    );
+    if (!text) {
+      throw new Error(
+        `Plain-text fallback did not return usable official text.${responsePrefixMetadata(fallback.prefix)}`
+      );
     }
 
-    const response = await context.request.get(requestUrl, {
-      headers,
-      timeout: options.timeoutMs || 60000,
-      maxRedirects: 0
-    });
-    if (response.status() < 300 || response.status() >= 400) return response;
-
-    const location = response.headers().location;
-    if (!location) return response;
-    requestUrl = new URL(location, requestUrl).toString();
+    await fs.writeFile(fallback.tempPath, text, "utf8");
+    await fallback.commit(finalPath);
+    return { bytes: Buffer.byteLength(text), text };
+  } finally {
+    await fallback.cleanup();
   }
-
-  throw new Error("Document exceeded the three-redirect limit.");
 }
 
 export async function downloadCompiledDocuments(
@@ -236,15 +359,29 @@ export async function downloadCompiledDocuments(
 ) {
   const docsDir = options.outputDir || DOCUMENTS_DIR;
   const log = options.log || (() => undefined);
+  const budget = downloadBudget(options);
   let downloaded = 0;
   let failed = 0;
 
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const compiledDocs = meeting.documents.filter((doc) =>
-      doc.url.includes("/Public/CompiledDocument") || doc.isAgendaItemAttachment
+    const hasUsableHtmlAgenda = isUsablePrimeGovHtmlAgendaText(meeting.htmlAgendaText || "");
+    const compiledDocs = prioritizedDocuments(
+      meeting.documents.filter(
+        (doc) =>
+          (doc.url.includes("/Public/CompiledDocument") || doc.isAgendaItemAttachment) &&
+          !(hasUsableHtmlAgenda && doc.type === "Packet")
+      )
     );
+    if (
+      hasUsableHtmlAgenda &&
+      meeting.documents.some(
+        (doc) => doc.type === "Packet" && doc.url.includes("/Public/CompiledDocument")
+      )
+    ) {
+      log(`Skipped PrimeGov packet for ${meeting.title}; a structured HTML agenda is available.`);
+    }
 
     for (const doc of compiledDocs) {
       if (options.shouldStop?.()) {
@@ -267,44 +404,34 @@ export async function downloadCompiledDocuments(
           continue;
         }
 
-        const response = await context.request.get(downloadUrl, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper"
-          },
-          timeout: 60000
-        });
+        const requestHeaders = {
+          "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper"
+        };
+        const streamed = await streamDownloadToTemp(
+          context,
+          downloadUrl,
+          filePath,
+          streamingOptions(options, budget, requestHeaders)
+        );
+        try {
+          if (streamed.prefix.subarray(0, 5).toString() !== "%PDF-") {
+            failed += 1;
+            doc.localPath = null;
+            doc.bytes = streamed.bytes;
+            doc.downloadError = `Downloaded file was not a PDF.${responsePrefixMetadata(streamed.prefix)}`;
+            log(`Not a PDF: ${doc.url}`);
+            continue;
+          }
 
-        if (!response.ok()) {
-          failed += 1;
-          doc.localPath = null;
-          doc.downloadError = `HTTP ${response.status()}`;
-          log(`Failed download ${doc.url}: ${response.status()}`);
-          continue;
+          await streamed.commit(filePath);
+          downloaded += 1;
+          doc.localPath = filePath;
+          doc.bytes = streamed.bytes;
+          doc.downloadError = null;
+          log(`Downloaded: ${filePath}`);
+        } finally {
+          await streamed.cleanup();
         }
-
-        const buffer = await response.body();
-        const firstBytes = buffer.subarray(0, 5).toString();
-
-        if (firstBytes !== "%PDF-") {
-          const errorPath = filePath.replace(".pdf", ".error.html");
-          await fs.writeFile(errorPath, buffer);
-
-          failed += 1;
-          doc.localPath = null;
-          doc.downloadError = `Downloaded file was not a PDF. Saved response to ${errorPath}`;
-
-          log(`Not a PDF: ${doc.url}`);
-          continue;
-        }
-
-        await fs.writeFile(filePath, buffer);
-
-        downloaded += 1;
-        doc.localPath = filePath;
-        doc.bytes = buffer.length;
-        doc.downloadError = null;
-
-        log(`Downloaded: ${filePath}`);
       } catch (error) {
         failed += 1;
         doc.localPath = null;
@@ -324,16 +451,19 @@ export async function downloadIqm2Documents(
 ) {
   const docsDir = options.outputDir || DOCUMENTS_DIR;
   const log = options.log || (() => undefined);
+  const budget = downloadBudget(options);
   let downloaded = 0;
   let failed = 0;
 
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const iqm2Docs = meeting.documents.filter(
-      (doc) =>
-        isIqm2DownloadCandidate(doc) &&
-        (options.documentFilter?.(doc) ?? true)
+    const iqm2Docs = prioritizedDocuments(
+      meeting.documents.filter(
+        (doc) =>
+          isIqm2DownloadCandidate(doc) &&
+          (options.documentFilter?.(doc) ?? true)
+      )
     );
 
     for (const doc of iqm2Docs) {
@@ -343,86 +473,82 @@ export async function downloadIqm2Documents(
       }
 
       const baseFilename = iqm2DocumentFilename(meeting, doc.type, doc.url);
+      const targetPath = path.join(docsDir, `${baseFilename}.download`);
 
       try {
-        const response = await context.request.get(doc.url, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 SimpleCity IQM2 scraper",
-            Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
-          },
-          timeout: 60000
-        });
+        const requestHeaders = {
+          "User-Agent": "Mozilla/5.0 SimpleCity IQM2 scraper",
+          Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
+        };
+        const streamed = await streamDownloadToTemp(
+          context,
+          doc.url,
+          targetPath,
+          streamingOptions(options, budget, requestHeaders)
+        );
+        try {
+          if (streamed.prefix.subarray(0, 5).toString() === "%PDF-") {
+            const filePath = path.join(docsDir, `${baseFilename}.pdf`);
+            await streamed.commit(filePath);
 
-        if (!response.ok()) {
-          failed += 1;
-          doc.localPath = null;
-          doc.downloadError = `HTTP ${response.status()}`;
-          log(`Failed download ${doc.url}: ${response.status()}`);
-          continue;
-        }
-
-        const buffer = await response.body();
-        const contentType = response.headers()["content-type"] || "";
-        const firstBytes = buffer.subarray(0, 5).toString();
-
-        if (firstBytes === "%PDF-") {
-          const filePath = path.join(docsDir, `${baseFilename}.pdf`);
-          await fs.writeFile(filePath, buffer);
-
-          downloaded += 1;
-          doc.localPath = filePath;
-          doc.bytes = buffer.length;
-          doc.downloadError = null;
-
-          log(`Downloaded: ${filePath}`);
-          continue;
-        }
-
-        const bodyText = buffer.toString("utf8");
-        if (contentType.includes("text/html") || /^\s*</.test(bodyText)) {
-          const extractedText = htmlToText(bodyText);
-
-          if (isIqm2ErrorHtml(extractedText)) {
-            const errorPath = path.join(docsDir, `${baseFilename}.error.html`);
-            await fs.writeFile(errorPath, buffer);
-
-            failed += 1;
-            doc.localPath = null;
-            doc.bytes = buffer.length;
-            doc.downloadError = `IQM2 returned an error HTML page. Saved response to ${errorPath}`;
-            log(`IQM2 returned error HTML: ${doc.url}`);
+            downloaded += 1;
+            doc.localPath = filePath;
+            doc.bytes = streamed.bytes;
+            doc.downloadError = null;
+            log(`Downloaded: ${filePath}`);
             continue;
           }
 
-          const filePath = path.join(docsDir, `${baseFilename}.html`);
-          await fs.writeFile(filePath, buffer);
+          const contentType = streamedContentType(streamed.headers);
+          if (/\btext\/html\b/i.test(contentType) || streamedPrefixIsHtml(streamed.prefix)) {
+            const buffer = await readBufferedTextDocument(streamed.tempPath, streamed.bytes);
+            const extractedText = buffer ? htmlToText(buffer.toString("utf8")) : null;
 
-          downloaded += 1;
-          doc.localPath = filePath;
-          doc.bytes = buffer.length;
-          doc.extractedText = extractedText;
-          doc.extractionCharacterCount = extractedText.length;
-          doc.downloadError = null;
+            const validationText =
+              extractedText || htmlToText(streamed.prefix.toString("utf8"));
+            if (
+              isIqm2ErrorHtml(validationText) ||
+              extractedText === null ||
+              !isUsableOfficialSourceText(extractedText)
+            ) {
+              failed += 1;
+              doc.localPath = null;
+              doc.bytes = streamed.bytes;
+              doc.downloadError = extractedText === null
+                ? `IQM2 HTML exceeded the ${MAX_BUFFERED_TEXT_DOCUMENT_BYTES}-byte validation limit.`
+                : `IQM2 returned unusable HTML.${responsePrefixMetadata(streamed.prefix)}`;
+              log(`IQM2 returned unusable HTML: ${doc.url}`);
+              continue;
+            }
 
-          if (extractedText.length < 200) {
-            meeting.extractionNotes = [
-              ...(meeting.extractionNotes || []),
-              `${doc.type} HTML had little extractable text.`
-            ];
+            const filePath = path.join(docsDir, `${baseFilename}.html`);
+            await streamed.commit(filePath);
+            downloaded += 1;
+            doc.localPath = filePath;
+            doc.bytes = streamed.bytes;
+            doc.extractedText = extractedText;
+            doc.extractionCharacterCount = extractedText.length;
+            doc.downloadError = null;
+
+            if (extractedText.length < 200) {
+              meeting.extractionNotes = [
+                ...(meeting.extractionNotes || []),
+                `${doc.type} HTML had little extractable text.`
+              ];
+            }
+
+            log(`Saved HTML document text: ${filePath}`);
+            continue;
           }
 
-          log(`Saved HTML document text: ${filePath}`);
-          continue;
+          failed += 1;
+          doc.localPath = null;
+          doc.bytes = streamed.bytes;
+          doc.downloadError = `Downloaded file was not a PDF or usable HTML document.${responsePrefixMetadata(streamed.prefix)}`;
+          log(`Unsupported IQM2 document response: ${doc.url}`);
+        } finally {
+          await streamed.cleanup();
         }
-
-        const errorPath = path.join(docsDir, `${baseFilename}.download`);
-        await fs.writeFile(errorPath, buffer);
-
-        failed += 1;
-        doc.localPath = null;
-        doc.bytes = buffer.length;
-        doc.downloadError = `Downloaded file was not a PDF or HTML document. Saved response to ${errorPath}`;
-        log(`Unsupported IQM2 document response: ${doc.url}`);
       } catch (error) {
         failed += 1;
         doc.localPath = null;
@@ -442,16 +568,19 @@ export async function downloadOfficialSiteDocuments(
 ) {
   const docsDir = options.outputDir || DOCUMENTS_DIR;
   const log = options.log || (() => undefined);
+  const budget = downloadBudget(options);
   let downloaded = 0;
   let failed = 0;
 
   await fs.mkdir(docsDir, { recursive: true });
 
   for (const meeting of meetings) {
-    const officialDocs = meeting.documents.filter(
-      (doc) =>
-        (options.documentFilter?.(doc) ?? isOfficialSiteDownloadCandidate(doc)) &&
-        (!options.onlyPending || (!doc.localPath && !doc.downloadError))
+    const officialDocs = prioritizedDocuments(
+      meeting.documents.filter(
+        (doc) =>
+          (options.documentFilter?.(doc) ?? isOfficialSiteDownloadCandidate(doc)) &&
+          (!options.onlyPending || (!doc.localPath && !doc.downloadError))
+      )
     );
 
     for (const doc of officialDocs) {
@@ -461,153 +590,100 @@ export async function downloadOfficialSiteDocuments(
       }
 
       const baseFilename = officialSiteDocumentFilename(meeting, doc.type, doc.url);
+      const targetPath = path.join(docsDir, `${baseFilename}.download`);
+
+      const requestHeaders = {
+        "User-Agent": options.userAgent || "Mozilla/5.0 SimpleCity official-site agenda scraper",
+        Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
+      };
+      let primaryError: string | null = null;
 
       try {
-        const response = await requestOfficialSiteDocument(context, doc.url, options, {
-            "User-Agent": options.userAgent || "Mozilla/5.0 SimpleCity official-site agenda scraper",
-            Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
-        });
-
-        const finalUrl = response.url();
-        if (options.validateFinalUrl && !options.validateFinalUrl(finalUrl)) {
-          failed += 1;
-          doc.localPath = null;
-          doc.downloadError = `Redirected to a disallowed URL: ${finalUrl}`;
-          log(`Rejected redirected document URL: ${finalUrl}`);
-          continue;
-        }
-
-        if (!response.ok()) {
-          failed += 1;
-          doc.localPath = null;
-          doc.downloadError = `HTTP ${response.status()}`;
-          log(`Failed download ${doc.url}: ${response.status()}`);
-          continue;
-        }
-
-        const contentType = response.headers()["content-type"] || "";
-        const contentLength = Number(response.headers()["content-length"] || 0);
-        if (
-          options.maxBytes &&
-          Number.isFinite(contentLength) &&
-          contentLength > options.maxBytes
-        ) {
-          failed += 1;
-          doc.localPath = null;
-          doc.bytes = contentLength;
-          doc.downloadError = `Document exceeded the ${options.maxBytes}-byte download limit.`;
-          log(`Skipped oversized document (${contentLength} bytes): ${doc.url}`);
-          continue;
-        }
-
-        const buffer = await response.body();
-        if (buffer.length === 0) {
-          failed += 1;
-          doc.localPath = null;
-          doc.bytes = 0;
-          doc.downloadError = EMPTY_OFFICIAL_DOCUMENT_ERROR;
-          log(`Ignored empty official-document placeholder: ${doc.url}`);
-          continue;
-        }
-        if (options.maxBytes && buffer.length > options.maxBytes) {
-          failed += 1;
-          doc.localPath = null;
-          doc.bytes = buffer.length;
-          doc.downloadError = `Document exceeded the ${options.maxBytes}-byte download limit.`;
-          log(`Discarded oversized document (${buffer.length} bytes): ${doc.url}`);
-          continue;
-        }
-
-        const firstBytes = buffer.subarray(0, 5).toString();
-
-        if (firstBytes === "%PDF-") {
-          const filePath = path.join(docsDir, `${baseFilename}.pdf`);
-          await fs.writeFile(filePath, buffer);
-
-          downloaded += 1;
-          doc.localPath = filePath;
-          doc.bytes = buffer.length;
-          doc.downloadError = null;
-          log(`Downloaded: ${filePath}`);
-          continue;
-        }
-
-        const bodyText = buffer.toString("utf8");
-        if (contentType.includes("text/html") || /^\s*</.test(bodyText)) {
-          const extractedText = htmlToText(bodyText);
-          const filePath = path.join(docsDir, `${baseFilename}.html`);
-          await fs.writeFile(filePath, buffer);
-
-          downloaded += 1;
-          doc.localPath = filePath;
-          doc.bytes = buffer.length;
-          doc.extractedText = extractedText;
-          doc.extractionCharacterCount = extractedText.length;
-          doc.downloadError = null;
-
-          if (extractedText.length < 200) {
-            meeting.extractionNotes = [
-              ...(meeting.extractionNotes || []),
-              `${doc.type} HTML had little extractable text.`
-            ];
-          }
-
-          log(`Saved HTML document text: ${filePath}`);
-          continue;
-        }
-
-        const plainTextFallbackUrl = options.plainTextFallbackUrl?.(doc.url);
-        if (plainTextFallbackUrl) {
-          try {
-            const fallbackResponse = await requestOfficialSiteDocument(
-              context,
-              plainTextFallbackUrl,
-              options,
-              {
-                "User-Agent":
-                  options.userAgent || "Mozilla/5.0 SimpleCity official-site agenda scraper",
-                Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
+        const streamed = await streamDownloadToTemp(
+          context,
+          doc.url,
+          targetPath,
+          streamingOptions(options, budget, requestHeaders)
+        );
+        try {
+          doc.bytes = streamed.bytes;
+          if (streamed.bytes === 0) {
+            primaryError = EMPTY_OFFICIAL_DOCUMENT_ERROR;
+          } else if (streamed.prefix.subarray(0, 5).toString() === "%PDF-") {
+            const filePath = path.join(docsDir, `${baseFilename}.pdf`);
+            await streamed.commit(filePath);
+            downloaded += 1;
+            doc.localPath = filePath;
+            doc.downloadError = null;
+            log(`Downloaded: ${filePath}`);
+            continue;
+          } else {
+            const contentType = streamedContentType(streamed.headers);
+            if (/\btext\/html\b/i.test(contentType) || streamedPrefixIsHtml(streamed.prefix)) {
+              const buffer = await readBufferedTextDocument(streamed.tempPath, streamed.bytes);
+              const extractedText = buffer ? htmlToText(buffer.toString("utf8")) : null;
+              if (extractedText && isUsableOfficialSourceText(extractedText)) {
+                const filePath = path.join(docsDir, `${baseFilename}.html`);
+                await streamed.commit(filePath);
+                downloaded += 1;
+                doc.localPath = filePath;
+                doc.extractedText = extractedText;
+                doc.extractionCharacterCount = extractedText.length;
+                doc.downloadError = null;
+                log(`Saved HTML document text: ${filePath}`);
+                continue;
               }
-            );
-            const fallbackText = fallbackResponse.ok()
-              ? decodedPlainText(await fallbackResponse.body())
-              : "";
-            if (fallbackText) {
-              const filePath = path.join(docsDir, `${baseFilename}.txt`);
-              await fs.writeFile(filePath, fallbackText, "utf8");
 
-              downloaded += 1;
-              doc.localPath = filePath;
-              doc.bytes = Buffer.byteLength(fallbackText);
-              doc.extractedText = fallbackText;
-              doc.extractionCharacterCount = fallbackText.length;
-              doc.downloadError = null;
-              log(`Saved official plain-text fallback: ${filePath}`);
-              continue;
+              primaryError = extractedText === null
+                ? `Official HTML exceeded the ${MAX_BUFFERED_TEXT_DOCUMENT_BYTES}-byte validation limit.`
+                : `Official site returned unusable HTML.${responsePrefixMetadata(streamed.prefix)}`;
+            } else {
+              primaryError =
+                `Downloaded file was not a PDF or usable HTML document.${responsePrefixMetadata(streamed.prefix)}`;
             }
-          } catch (error) {
-            log(
-              `Plain-text fallback failed for ${doc.url}: ${
-                error instanceof Error ? error.message : "Unknown fallback error"
-              }`
-            );
           }
+        } finally {
+          await streamed.cleanup();
         }
-
-        const errorPath = path.join(docsDir, `${baseFilename}.download`);
-        await fs.writeFile(errorPath, buffer);
-
-        failed += 1;
-        doc.localPath = null;
-        doc.bytes = buffer.length;
-        doc.downloadError = `Downloaded file was not a PDF or HTML document. Saved response to ${errorPath}`;
-        log(`Unsupported official-site document response: ${doc.url}`);
       } catch (error) {
-        failed += 1;
-        doc.localPath = null;
-        doc.downloadError = error instanceof Error ? error.message : "Unknown download error";
-        log(`Download error for ${doc.url}: ${doc.downloadError}`);
+        primaryError = error instanceof Error ? error.message : "Unknown primary download error";
       }
+
+      const fallbackUrl = options.plainTextFallbackUrl?.(doc.url);
+      let fallbackError: string | null = null;
+      if (fallbackUrl && !options.shouldStop?.()) {
+        try {
+          const filePath = path.join(docsDir, `${baseFilename}.txt`);
+          const fallback = await downloadOfficialPlainTextFallback(
+            context,
+            fallbackUrl,
+            targetPath,
+            filePath,
+            options,
+            budget,
+            requestHeaders
+          );
+          downloaded += 1;
+          doc.localPath = filePath;
+          doc.bytes = fallback.bytes;
+          doc.extractedText = fallback.text;
+          doc.extractionCharacterCount = fallback.text.length;
+          doc.downloadError = null;
+          log(`Saved official plain-text fallback: ${filePath}`);
+          continue;
+        } catch (error) {
+          fallbackError = error instanceof Error ? error.message : "Unknown fallback error";
+          log(`Plain-text fallback failed for ${doc.url}: ${fallbackError}`);
+        }
+      }
+
+      failed += 1;
+      doc.localPath = null;
+      const primaryMessage = `Primary document failed: ${primaryError || "unusable response"}`;
+      doc.downloadError = fallbackError
+        ? `${primaryMessage} Plain-text fallback failed: ${fallbackError}`
+        : primaryMessage;
+      log(`Download error for ${doc.url}: ${doc.downloadError}`);
     }
   }
 

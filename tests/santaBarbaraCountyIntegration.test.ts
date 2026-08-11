@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import { scrapeLegistarApiMeetings } from "@/lib/sources/legistar";
+import type { PrimeGovMeeting } from "@/lib/types";
 import {
   classifyPlanningCommissionDocument,
+  downloadSantaBarbaraPlanningCommissionDocuments,
   enrichSantaBarbaraPlanningCommissionItems,
   parseBoxSharedFolderHtml,
   parsePlanningCommissionFolder,
@@ -41,6 +46,31 @@ const pipelineRunner = readFileSync(
   "utf8"
 );
 
+function boxDownloadMeeting(): PrimeGovMeeting {
+  return {
+    externalId: "santa-barbara-county:box-planning-commission:456",
+    section: "Past Meetings",
+    title: "County Planning Commission",
+    dateText: "8/12/2026",
+    meetingType: "County Planning Commission",
+    rowText: "County Planning Commission | 8/12/2026",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [{
+      type: "Agenda",
+      label: "Agenda.pdf",
+      url: `${SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL}/file/123`
+    }]
+  };
+}
+
+function boxDownloadMetadata(downloadUrl: string) {
+  return `<script>Box.prefetchedData = ${JSON.stringify({
+    preview_metadata: { authenticated_download_url: downloadUrl },
+    preview_prefetch_token_map: { "123": { read: "public-read-token" } }
+  })};</script>`;
+}
+
 test("Santa Barbara County migration and complete bootstrap target its regional database", () => {
   for (const sql of [migration, bootstrap]) {
     assert.match(
@@ -70,8 +100,9 @@ test("Santa Barbara County has scraper, pipeline, and scheduled workflow entry p
   assert.doesNotMatch(nightlyWorkflow, /santa-barbara-county/);
   assert.match(pipeline, /scrapeSantaBarbaraCountyMeetings/);
   assert.match(standaloneScraper, /scrapeSantaBarbaraCountyMeetings/);
-  assert.match(pipelineRunner, /Summary coverage incomplete/);
-  assert.match(pipelineRunner, /LLM failed for/);
+  assert.match(pipeline, /Summary coverage incomplete/);
+  assert.match(pipeline, /LLM failed for/);
+  assert.match(pipelineRunner, /filterResultsCoverageErrors/);
 });
 
 test("Santa Barbara County Planning Commission uses the official county and Box sources", () => {
@@ -132,8 +163,153 @@ test("classifies marked agendas as official Planning Commission result documents
   );
 });
 
+test("streams Box PDFs beyond the old cap and strips authorization on the CDN redirect", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-santa-barbara-box-"));
+  const meeting = boxDownloadMeeting();
+  const originalFetch = globalThis.fetch;
+  const requests: Array<{ url: string; authorization: string | null }> = [];
+  const apiDownloadUrl = "https://api.box.com/2.0/files/123/content";
+  const cdnDownloadUrl = "https://public.boxcloud.com/d/1/agenda/download";
+  const pdf = "%PDF-streamed-santa-barbara";
+
+  globalThis.fetch = (async (input, init) => {
+    const url = String(input);
+    requests.push({
+      url,
+      authorization: new Headers(init?.headers).get("authorization")
+    });
+    if (url === meeting.documents[0].url) {
+      return new Response(boxDownloadMetadata(apiDownloadUrl));
+    }
+    if (url.startsWith(apiDownloadUrl)) {
+      return new Response(null, {
+        status: 302,
+        headers: { location: cdnDownloadUrl }
+      });
+    }
+    if (url === cdnDownloadUrl) {
+      return new Response(pdf, {
+        headers: {
+          "content-length": String(50 * 1024 * 1024 + 1),
+          "content-type": "application/pdf"
+        }
+      });
+    }
+    throw new Error(`Unexpected Box test URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const result = await downloadSantaBarbaraPlanningCommissionDocuments(
+      [meeting],
+      outputDir,
+      () => undefined
+    );
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(
+      requests.find((request) => request.url.startsWith(apiDownloadUrl))?.authorization,
+      "Bearer public-read-token"
+    );
+    assert.equal(
+      requests.find((request) => request.url === cdnDownloadUrl)?.authorization,
+      null
+    );
+    assert.ok(meeting.documents[0].localPath);
+    assert.equal(await fs.readFile(meeting.documents[0].localPath, "utf8"), pdf);
+    assert.equal(meeting.documents[0].bytes, Buffer.byteLength(pdf));
+    assert.ok((await fs.readdir(outputDir)).every((name) => !name.endsWith(".part")));
+  } finally {
+    globalThis.fetch = originalFetch;
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("keeps the prior Box PDF and cleans partial files when a refresh is invalid", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-santa-barbara-box-"));
+  const meeting = boxDownloadMeeting();
+  const originalFetch = globalThis.fetch;
+  const apiDownloadUrl = "https://api.box.com/2.0/files/123/content";
+  const originalPdf = "%PDF-prior-official-copy";
+  let payload = originalPdf;
+
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    if (url === meeting.documents[0].url) {
+      return new Response(boxDownloadMetadata(apiDownloadUrl));
+    }
+    if (url.startsWith(apiDownloadUrl)) return new Response(payload);
+    throw new Error(`Unexpected Box test URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    assert.deepEqual(
+      await downloadSantaBarbaraPlanningCommissionDocuments(
+        [meeting],
+        outputDir,
+        () => undefined
+      ),
+      { downloaded: 1, failed: 0 }
+    );
+    const priorPath = meeting.documents[0].localPath;
+    assert.ok(priorPath);
+
+    payload = "<html><body>Box access error</body></html>";
+    assert.deepEqual(
+      await downloadSantaBarbaraPlanningCommissionDocuments(
+        [meeting],
+        outputDir,
+        () => undefined
+      ),
+      { downloaded: 0, failed: 1 }
+    );
+    assert.match(meeting.documents[0].downloadError || "", /not a PDF/);
+    assert.equal(await fs.readFile(priorPath, "utf8"), originalPdf);
+    assert.deepEqual(await fs.readdir(outputDir), [path.basename(priorPath)]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("rejects a Box redirect to an untrusted host before requesting it", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-santa-barbara-box-"));
+  const meeting = boxDownloadMeeting();
+  const originalFetch = globalThis.fetch;
+  const apiDownloadUrl = "https://api.box.com/2.0/files/123/content";
+  const requestedUrls: string[] = [];
+
+  globalThis.fetch = (async (input) => {
+    const url = String(input);
+    requestedUrls.push(url);
+    if (url === meeting.documents[0].url) {
+      return new Response(boxDownloadMetadata(apiDownloadUrl));
+    }
+    if (url.startsWith(apiDownloadUrl)) {
+      return new Response(null, {
+        status: 302,
+        headers: { location: "https://attacker.example/stolen.pdf" }
+      });
+    }
+    throw new Error(`Unexpected Box test URL: ${url}`);
+  }) as typeof fetch;
+
+  try {
+    const result = await downloadSantaBarbaraPlanningCommissionDocuments(
+      [meeting],
+      outputDir,
+      () => undefined
+    );
+    assert.deepEqual(result, { downloaded: 0, failed: 1 });
+    assert.match(meeting.documents[0].downloadError || "", /disallowed URL/);
+    assert.ok(!requestedUrls.some((url) => url.startsWith("https://attacker.example")));
+    assert.deepEqual(await fs.readdir(outputDir), []);
+  } finally {
+    globalThis.fetch = originalFetch;
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("parses Planning Commission agenda items and attaches marked-agenda results", () => {
-  const meeting = {
+  const meeting: PrimeGovMeeting = {
     externalId: "santa-barbara-county:box-planning-commission:123",
     jurisdictionName: "Santa Barbara County",
     jurisdictionSlug: "santa-barbara-county",

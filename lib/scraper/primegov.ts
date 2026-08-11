@@ -4,7 +4,7 @@ import {
   mergeDiscoveredAgendaItemAttachments,
   type DiscoveredAgendaItemAttachments
 } from "@/lib/scraper/itemAttachments";
-import { cleanText, slugify } from "@/lib/utils/slug";
+import { slugify } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 
 export const DEFAULT_PORTAL_URL =
@@ -24,9 +24,14 @@ export type ScrapePortalOptions = {
   monthsBack?: number;
   monthsForward?: number;
   allVisible?: boolean;
+  limit?: number;
   log?: (message: string) => void;
   shouldStop?: () => boolean;
 };
+
+export function limitPrimeGovMeetings(meetings: PrimeGovMeeting[], limit?: number) {
+  return typeof limit === "number" && limit > 0 ? meetings.slice(0, limit) : meetings;
+}
 
 export function getMeetingTemplateId(url: string) {
   try {
@@ -302,6 +307,37 @@ export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeetin
   )) as PrimeGovMeeting[];
 }
 
+export function normalizePrimeGovHtmlAgendaText(text = "") {
+  return text
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+export function isUsablePrimeGovHtmlAgendaText(text = "") {
+  const normalized = normalizePrimeGovHtmlAgendaText(text);
+  if (normalized.length < 300) return false;
+
+  const lines = normalized.split("\n").map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 3 || !/\b(?:agenda|recommendation|recommended action)\b/i.test(normalized)) {
+    return false;
+  }
+
+  const structuralLines = lines.filter((line) =>
+    /^(?:(?:[A-Z]|\d{1,3}(?:\.\d{1,3})*)\s*[.):-]\s*)?(?:call to order|roll call|approval of (?:the )?agenda|public comments?|consent calendar|public hearings?|study sessions?|regular business|new business|adjournment)\b/i.test(
+      line
+    )
+  ).length;
+  const numberedItemLines = lines.filter((line) =>
+    /^(?:[A-Z]?\d{1,3}(?:\.\d{1,3})*|[A-Z])\s*[.):-]\s+\S/.test(line)
+  ).length;
+
+  return structuralLines > 0 || numberedItemLines >= 2;
+}
+
 export async function scrapeHtmlAgendaText(context: BrowserContext, meeting: PrimeGovMeeting) {
   const htmlAgenda = meeting.documents.find((doc) => doc.type === "HTML Agenda");
   if (!htmlAgenda) return null;
@@ -315,8 +351,9 @@ export async function scrapeHtmlAgendaText(context: BrowserContext, meeting: Pri
     });
 
     await page.waitForTimeout(3000);
-    const text = await page.locator("body").innerText();
-    return cleanText(text);
+    const text = await page.locator("#MeetingContents").innerText();
+    const normalized = normalizePrimeGovHtmlAgendaText(text);
+    return isUsablePrimeGovHtmlAgendaText(normalized) ? normalized : null;
   } catch {
     return null;
   } finally {
@@ -677,6 +714,11 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
       log(
         `PrimeGov meetings in configured window (${options.monthsBack ?? 1} month(s) back, ${options.monthsForward ?? 1} month(s) forward): ${meetings.length}.`
       );
+    }
+    const meetingsBeforeLimit = meetings.length;
+    meetings = limitPrimeGovMeetings(meetings, options.limit);
+    if (meetings.length < meetingsBeforeLimit) {
+      log(`Limited PrimeGov scrape to ${meetings.length} meeting(s) before enrichment and downloads.`);
     }
     const dedupedCurrentMeetings = meetings.filter(
       (meeting) => meeting.section === "Current And Upcoming Meetings"

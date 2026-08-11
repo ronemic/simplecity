@@ -7,19 +7,91 @@ import type { BrowserContext, Page } from "playwright";
 import {
   buildPrimeGovAttachmentIdentityUrl,
   buildDownloadFilename,
+  isUsablePrimeGovHtmlAgendaText,
+  limitPrimeGovMeetings,
   normalizePrimeGovItemDetailsUrl,
+  normalizePrimeGovHtmlAgendaText,
   PORTAL_READY_SELECTOR,
   primeGovAttachmentDownloadDescriptor,
   resolvePrimeGovAttachmentDownloadUrl,
+  scrapeHtmlAgendaText,
   waitForPortal
 } from "@/lib/scraper/primegov";
-import { downloadCompiledDocuments } from "@/lib/scraper/downloadDocuments";
+import {
+  downloadCompiledDocuments,
+  downloadIqm2Documents,
+  downloadOfficialSiteDocuments
+} from "@/lib/scraper/downloadDocuments";
+import {
+  createStreamDownloadBudget,
+  streamDownloadToTemp,
+  STREAM_DOWNLOAD_HEADER_TIMEOUT_MS,
+  STREAM_DOWNLOAD_IDLE_TIMEOUT_MS,
+  STREAM_DOWNLOAD_MAX_FILE_BYTES,
+  STREAM_DOWNLOAD_MAX_TOTAL_BYTES,
+  STREAM_DOWNLOAD_MIN_FREE_BYTES,
+  STREAM_DOWNLOAD_TOTAL_TIMEOUT_MS
+} from "@/lib/scraper/streamDownload";
 import type { PrimeGovMeeting } from "@/lib/types";
 
 type Call = {
   method: string;
   args: unknown[];
 };
+
+function downloadTestContext(request?: unknown) {
+  return {
+    ...(request ? { request } : {}),
+    cookies: async () => [],
+    addCookies: async () => undefined,
+    clearCookies: async () => undefined
+  } as unknown as BrowserContext;
+}
+
+function fetchResponse(body: BodyInit, init: ResponseInit = {}) {
+  return new Response(body, { status: 200, ...init });
+}
+
+function chunkedResponse(chunks: Array<string | Buffer>, init: ResponseInit = {}) {
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const chunk of chunks) {
+        controller.enqueue(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      controller.close();
+    }
+  }), { status: 200, ...init });
+}
+
+function primeGovAgendaText() {
+  return normalizePrimeGovHtmlAgendaText(`
+CITY OF EXAMPLE
+CITY COUNCIL REGULAR MEETING AGENDA
+Residents may submit comments to clerk@city.example before the meeting.
+1. CALL TO ORDER
+2. CONSENT CALENDAR
+2.1 Library renovation contract
+Recommendation: Approve the library renovation contract and authorize the city manager.
+3. PUBLIC HEARING
+3.1 Housing element update
+Recommended action: Adopt the housing element update after receiving public testimony.
+4. ADJOURNMENT
+Accessibility accommodations are available by contacting the City Clerk.
+`);
+}
+
+function primeGovMeeting(documents: PrimeGovMeeting["documents"] = []): PrimeGovMeeting {
+  return {
+    section: "Current And Upcoming Meetings",
+    title: "City Council",
+    dateText: "Jul 20, 2026",
+    meetingType: "City Council",
+    rowText: "City Council Jul 20, 2026",
+    hasHtmlAgenda: documents.some((document) => document.type === "HTML Agenda"),
+    hasPdf: documents.some((document) => document.url.includes("CompiledDocument")),
+    documents
+  };
+}
 
 test("waitForPortal waits for portal links instead of network idle", async () => {
   const calls: Call[] = [];
@@ -71,6 +143,51 @@ test("waitForPortal still waits for portal links if load state times out", async
   await waitForPortal(page, "https://city.example/public/portal");
 
   assert.ok(calls.some((call) => call.method === "waitForSelector"));
+});
+
+test("PrimeGov HTML agenda extraction scopes to MeetingContents and preserves line structure", async () => {
+  const selectors: string[] = [];
+  let closed = false;
+  const page = {
+    goto: async () => null,
+    waitForTimeout: async () => undefined,
+    locator: (selector: string) => {
+      selectors.push(selector);
+      return { innerText: async () => primeGovAgendaText() };
+    },
+    close: async () => {
+      closed = true;
+    }
+  } as unknown as Page;
+  const context = {
+    newPage: async () => page
+  } as unknown as BrowserContext;
+  const meeting = primeGovMeeting([
+    {
+      type: "HTML Agenda",
+      label: "HTML Agenda",
+      url: "https://city.primegov.com/Portal/Meeting?meetingTemplateId=1"
+    }
+  ]);
+
+  const text = await scrapeHtmlAgendaText(context, meeting);
+
+  assert.deepEqual(selectors, ["#MeetingContents"]);
+  assert.match(text || "", /\n2\. CONSENT CALENDAR\n/);
+  assert.doesNotMatch(text || "", /Select Language|Powered by Translate/);
+  assert.equal(closed, true);
+});
+
+test("rejects long PrimeGov translation chrome without structured agenda lines", () => {
+  const chrome = `Select Language ${"Abkhaz Acehnese Afrikaans Albanian Arabic ".repeat(30)} Powered by Translate`;
+  assert.equal(isUsablePrimeGovHtmlAgendaText(chrome), false);
+  assert.equal(isUsablePrimeGovHtmlAgendaText(primeGovAgendaText()), true);
+});
+
+test("applies the PrimeGov meeting limit before per-meeting work", () => {
+  const meetings = [primeGovMeeting(), primeGovMeeting(), primeGovMeeting()];
+  assert.equal(limitPrimeGovMeetings(meetings, 1).length, 1);
+  assert.equal(limitPrimeGovMeetings(meetings).length, 3);
 });
 
 test("normalizes PrimeGov item URLs from direct and social sharing links", () => {
@@ -184,23 +301,16 @@ test("downloads PrimeGov attachments without replacing their stable source URL",
   const stableUrl = "https://city.primegov.com/viewer/preview?id=1214&type=0";
   const signedUrl = "https://blob.example/report.pdf?sig=temporary";
   const requests: string[] = [];
-  const context = {
-    request: {
-      get: async (url: string) => {
-        requests.push(url);
-        if (url.includes("/api/systemdocument/")) {
-          return {
-            ok: () => true,
-            json: async () => signedUrl
-          };
-        }
-        return {
-          ok: () => true,
-          body: async () => Buffer.from("%PDF-test")
-        };
-      }
+  const fetched: string[] = [];
+  const context = downloadTestContext({
+    get: async (url: string) => {
+      requests.push(url);
+      return {
+        ok: () => true,
+        json: async () => signedUrl
+      };
     }
-  } as unknown as BrowserContext;
+  });
   const meeting = {
     section: "Archived Meetings",
     title: "Council",
@@ -218,16 +328,531 @@ test("downloads PrimeGov attachments without replacing their stable source URL",
   } as PrimeGovMeeting;
 
   try {
-    const result = await downloadCompiledDocuments(context, [meeting], { outputDir });
+    const result = await downloadCompiledDocuments(context, [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      fetchImpl: (async (url) => {
+        fetched.push(String(url));
+        return fetchResponse("%PDF-test", {
+          headers: { "content-type": "application/pdf" }
+        });
+      }) as typeof fetch
+    });
     assert.deepEqual(result, { downloaded: 1, failed: 0 });
     assert.deepEqual(requests, [
-      "https://city.primegov.com/api/systemdocument/GetPublicPdfDownloadUrl/1214",
-      signedUrl
+      "https://city.primegov.com/api/systemdocument/GetPublicPdfDownloadUrl/1214"
     ]);
+    assert.deepEqual(fetched, [signedUrl]);
     assert.equal(meeting.documents[0].url, stableUrl);
     assert.equal(meeting.documents[0].downloadError, null);
     assert.ok(meeting.documents[0].localPath?.startsWith(outputDir));
     assert.equal(await fs.readFile(meeting.documents[0].localPath || "", "utf8"), "%PDF-test");
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("uses bounded large-file streaming safety defaults", () => {
+  assert.equal(STREAM_DOWNLOAD_MAX_FILE_BYTES, 1024 * 1024 * 1024);
+  assert.equal(STREAM_DOWNLOAD_MAX_TOTAL_BYTES, 4 * 1024 * 1024 * 1024);
+  assert.equal(STREAM_DOWNLOAD_MIN_FREE_BYTES, 2 * 1024 * 1024 * 1024);
+  assert.equal(STREAM_DOWNLOAD_HEADER_TIMEOUT_MS, 60_000);
+  assert.equal(STREAM_DOWNLOAD_IDLE_TIMEOUT_MS, 60_000);
+  assert.equal(STREAM_DOWNLOAD_TOTAL_TIMEOUT_MS, 10 * 60_000);
+});
+
+test("does not reject PrimeGov documents at the former 100, 50, or 10 MiB caps", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-primegov-cap-"));
+  const legacyCaps = [100, 50, 10].map((mib) => mib * 1024 * 1024);
+  const context = downloadTestContext();
+  const meeting = primeGovMeeting([
+    {
+      type: "Agenda",
+      label: "Agenda",
+      url: "https://city.primegov.com/Public/CompiledDocument?id=agenda",
+      bytes: legacyCaps[0] + 1
+    },
+    {
+      type: "Packet",
+      label: "Packet",
+      url: "https://city.primegov.com/Public/CompiledDocument?id=packet",
+      bytes: legacyCaps[1] + 1
+    },
+    {
+      type: "Attachment",
+      label: "Attachment",
+      url: "https://city.primegov.com/Public/CompiledDocument?id=attachment",
+      bytes: legacyCaps[2] + 1
+    }
+  ]);
+
+  try {
+    let fetchIndex = 0;
+    const result = await downloadCompiledDocuments(context, [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      fetchImpl: (async () => fetchResponse("%PDF-test", {
+        headers: { "content-length": String(legacyCaps[fetchIndex++] + 1) }
+      })) as typeof fetch
+    });
+    assert.deepEqual(result, { downloaded: 3, failed: 0 });
+    assert.equal(fetchIndex, 3);
+    assert.ok(meeting.documents.every((document) => document.downloadError === null));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("does not reject IQM2 documents at the former 50 MiB cap", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-iqm2-cap-"));
+  const context = downloadTestContext();
+  const meeting = primeGovMeeting([
+    {
+      type: "Document",
+      label: "Attachment A",
+      url: "https://city.iqm2.com/Citizens/FileOpen.aspx?Type=4&ID=123"
+    }
+  ]);
+
+  try {
+    const result = await downloadIqm2Documents(context, [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      fetchImpl: (async () => fetchResponse("%PDF-test", {
+        headers: { "content-length": String(50 * 1024 * 1024 + 1) }
+      })) as typeof fetch
+    });
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("streams unknown-length bodies within an explicit lower cap and preserves prior files", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-primegov-body-cap-"));
+  const context = downloadTestContext();
+  const meeting = primeGovMeeting([
+    {
+      type: "Agenda",
+      label: "Agenda",
+      url: "https://city.primegov.com/Public/CompiledDocument?id=agenda"
+    }
+  ]);
+  const filename = buildDownloadFilename(
+    meeting,
+    meeting.documents[0].type,
+    meeting.documents[0].url
+  );
+  const finalPath = path.join(outputDir, `${filename}.pdf`);
+  const budget = createStreamDownloadBudget(1000);
+
+  try {
+    await fs.writeFile(finalPath, "prior-complete-file", "utf8");
+    const result = await downloadCompiledDocuments(context, [meeting], {
+      outputDir,
+      maxBytes: 8,
+      minFreeBytes: 0,
+      downloadBudget: budget,
+      fetchImpl: (async () => fetchResponse("%PDF-more-than-eight-bytes")) as typeof fetch
+    });
+    assert.deepEqual(result, { downloaded: 0, failed: 1 });
+    assert.equal(meeting.documents[0].localPath, null);
+    assert.match(meeting.documents[0].downloadError || "", /8-byte absolute safety limit/);
+    assert.ok(budget.usedBytes > 8, "failed transfers must consume the invocation budget");
+    assert.equal(await fs.readFile(finalPath, "utf8"), "prior-complete-file");
+    assert.ok((await fs.readdir(outputDir)).every((name) => !name.endsWith(".part")));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("validates redirects, carries browser cookies, and strips credentials cross-origin", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-redirect-"));
+  const targetPath = path.join(outputDir, "agenda.pdf");
+  const cookieJar: Array<Record<string, unknown>> = [{
+    name: "initial",
+    value: "one",
+    domain: "city.example",
+    path: "/",
+    expires: -1
+  }];
+  const context = {
+    cookies: async (url: string) => {
+      const hostname = new URL(url).hostname;
+      return cookieJar.filter((cookie) => cookie.domain === hostname);
+    },
+    addCookies: async (cookies: Array<Record<string, unknown>>) => {
+      for (const cookie of cookies) {
+        const storedCookie = { expires: -1, ...cookie };
+        const index = cookieJar.findIndex(
+          (entry) => entry.name === cookie.name && entry.domain === cookie.domain
+        );
+        if (index >= 0) cookieJar[index] = storedCookie;
+        else cookieJar.push(storedCookie);
+      }
+    },
+    clearCookies: async () => undefined
+  } as unknown as BrowserContext;
+  const seenUrls: string[] = [];
+  const validatedUrls: string[] = [];
+
+  try {
+    const streamed = await streamDownloadToTemp(
+      context,
+      "https://city.example/start",
+      targetPath,
+      {
+        headers: { Authorization: "Bearer secret", Cookie: "explicit=secret" },
+        minFreeBytes: 0,
+        validateUrl: (url) => {
+          validatedUrls.push(url);
+          return true;
+        },
+        fetchImpl: (async (url, init) => {
+          const requestUrl = String(url);
+          const headers = new Headers(init?.headers);
+          seenUrls.push(requestUrl);
+
+          if (requestUrl.endsWith("/start")) {
+            assert.equal(headers.get("authorization"), "Bearer secret");
+            assert.equal(headers.get("cookie"), "initial=one");
+            return new Response(null, {
+              status: 302,
+              headers: {
+                location: "/signed",
+                "set-cookie": "redirected=two; Path=/; HttpOnly"
+              }
+            });
+          }
+          if (requestUrl.endsWith("/signed")) {
+            assert.equal(headers.get("authorization"), "Bearer secret");
+            assert.match(headers.get("cookie") || "", /initial=one/);
+            assert.match(headers.get("cookie") || "", /redirected=two/);
+            return new Response(null, {
+              status: 302,
+              headers: { location: "https://cdn.example/file.pdf" }
+            });
+          }
+
+          assert.equal(headers.get("authorization"), null);
+          assert.equal(headers.get("cookie"), null);
+          return fetchResponse("%PDF-streamed");
+        }) as typeof fetch
+      }
+    );
+    try {
+      await streamed.commit(targetPath);
+    } finally {
+      await streamed.cleanup();
+    }
+
+    assert.deepEqual(seenUrls, [
+      "https://city.example/start",
+      "https://city.example/signed",
+      "https://cdn.example/file.pdf"
+    ]);
+    assert.ok(validatedUrls.includes("https://cdn.example/file.pdf"));
+    assert.equal(await fs.readFile(targetPath, "utf8"), "%PDF-streamed");
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("writes unknown-length multi-chunk bodies exactly and commits without a part file", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-chunks-"));
+  const targetPath = path.join(outputDir, "agenda.pdf");
+  const chunks = ["%P", "DF-", Buffer.alloc(5_000, "x")];
+  const expected = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+
+  try {
+    await fs.writeFile(targetPath, "prior file", "utf8");
+    const streamed = await streamDownloadToTemp(null, "https://city.example/agenda.pdf", targetPath, {
+      minFreeBytes: 0,
+      fetchImpl: (async () => chunkedResponse(chunks)) as typeof fetch
+    });
+    assert.equal(streamed.bytes, expected.length);
+    assert.deepEqual(streamed.prefix, expected.subarray(0, 4096));
+    assert.equal(await fs.readFile(targetPath, "utf8"), "prior file");
+    try {
+      await streamed.commit(targetPath);
+    } finally {
+      await streamed.cleanup();
+    }
+
+    assert.deepEqual(await fs.readFile(targetPath), expected);
+    assert.ok((await fs.readdir(outputDir)).every((name) => !name.endsWith(".part")));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("stops before reading a body when disk reserve or invocation budget is exhausted", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-precheck-"));
+  let bodyPulls = 0;
+  const unreadResponse = () => new Response(new ReadableStream<Uint8Array>({
+      pull(controller) {
+        bodyPulls += 1;
+        controller.enqueue(Buffer.from("%PDF-body"));
+        controller.close();
+      }
+    },
+    { highWaterMark: 0 }
+  ));
+
+  try {
+    await assert.rejects(
+      streamDownloadToTemp(null, "https://city.example/disk.pdf", path.join(outputDir, "disk.pdf"), {
+        fetchImpl: (async () => unreadResponse()) as typeof fetch,
+        statfsImpl: async () => ({ bavail: STREAM_DOWNLOAD_MIN_FREE_BYTES, bsize: 1 })
+      }),
+      /disk reserve/
+    );
+    assert.equal(bodyPulls, 0);
+
+    const budget = createStreamDownloadBudget(8);
+    budget.usedBytes = 8;
+    await assert.rejects(
+      streamDownloadToTemp(null, "https://city.example/budget.pdf", path.join(outputDir, "budget.pdf"), {
+        budget,
+        minFreeBytes: 0,
+        fetchImpl: (async () => unreadResponse()) as typeof fetch
+      }),
+      /invocation safety limit/
+    );
+    assert.equal(bodyPulls, 0);
+    assert.ok((await fs.readdir(outputDir)).every((name) => !name.endsWith(".part")));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("cleans partial files after idle, total, and shouldStop aborts", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-abort-"));
+  const stalledResponse = () => new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(Buffer.from("%PDF-partial"));
+    }
+  }));
+
+  try {
+    await assert.rejects(
+      streamDownloadToTemp(null, "https://city.example/idle.pdf", path.join(outputDir, "idle.pdf"), {
+        minFreeBytes: 0,
+        idleTimeoutMs: 10,
+        totalTimeoutMs: 100,
+        fetchImpl: (async () => stalledResponse()) as typeof fetch
+      }),
+      /no progress for 10ms/
+    );
+
+    await assert.rejects(
+      streamDownloadToTemp(null, "https://city.example/total.pdf", path.join(outputDir, "total.pdf"), {
+        minFreeBytes: 0,
+        idleTimeoutMs: 100,
+        totalTimeoutMs: 10,
+        fetchImpl: (async () => stalledResponse()) as typeof fetch
+      }),
+      /timed out after 10ms/
+    );
+
+    let stop = false;
+    const stoppingResponse = () => new Response(new ReadableStream<Uint8Array>({
+      pull(controller) {
+        stop = true;
+        controller.enqueue(Buffer.from("%PDF-partial"));
+      }
+    }));
+    await assert.rejects(
+      streamDownloadToTemp(null, "https://city.example/stop.pdf", path.join(outputDir, "stop.pdf"), {
+        minFreeBytes: 0,
+        shouldStop: () => stop,
+        fetchImpl: (async () => stoppingResponse()) as typeof fetch
+      }),
+      /pipeline deadline is near/
+    );
+
+    assert.deepEqual(await fs.readdir(outputDir), []);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("does not allow callers to raise the absolute one GiB file limit", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-absolute-"));
+  const targetPath = path.join(outputDir, "agenda.pdf");
+
+  try {
+    await assert.rejects(
+      streamDownloadToTemp(null, "https://city.example/agenda.pdf", targetPath, {
+        maxFileBytes: STREAM_DOWNLOAD_MAX_FILE_BYTES * 2,
+        minFreeBytes: 0,
+        fetchImpl: (async () => fetchResponse("unused", {
+          headers: { "content-length": String(STREAM_DOWNLOAD_MAX_FILE_BYTES + 1) }
+        })) as typeof fetch
+      }),
+      /1073741824-byte absolute safety limit/
+    );
+    assert.ok((await fs.readdir(outputDir)).every((name) => !name.endsWith(".part")));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("uses a strict official text fallback after primary HTTP failure", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-official-fallback-"));
+  const documentUrl = "https://city.example/agenda";
+  const fallbackUrl = "https://city.example/agenda/plain-text";
+  const officialText =
+    "City Council agenda item 4: approve the audited capital improvement agreement.";
+  const meeting = primeGovMeeting([
+    { type: "Agenda", label: "Agenda", url: documentUrl }
+  ]);
+
+  try {
+    const result = await downloadOfficialSiteDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      plainTextFallbackUrl: () => fallbackUrl,
+      validateFinalUrl: (url) => new URL(url).hostname === "city.example",
+      fetchImpl: (async (url) => String(url) === documentUrl
+        ? new Response("temporarily unavailable", { status: 503 })
+        : fetchResponse(JSON.stringify({ plainText: officialText }), {
+            headers: { "content-type": "application/json" }
+          })) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(meeting.documents[0].extractedText, officialText);
+    assert.equal(meeting.documents[0].downloadError, null);
+    assert.equal(await fs.readFile(meeting.documents[0].localPath || "", "utf8"), officialText);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("uses the official text fallback after the primary file safety guard rejects", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-official-cap-fallback-"));
+  const documentUrl = "https://city.example/oversized-agenda";
+  const fallbackUrl = "https://city.example/oversized-agenda/plain-text";
+  const officialText =
+    "City Council agenda item 7: adopt the final official transportation program.";
+  const meeting = primeGovMeeting([
+    { type: "Agenda", label: "Agenda", url: documentUrl }
+  ]);
+
+  try {
+    const result = await downloadOfficialSiteDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      plainTextFallbackUrl: () => fallbackUrl,
+      fetchImpl: (async (url) => String(url) === documentUrl
+        ? fetchResponse("not consumed", {
+            headers: { "content-length": String(STREAM_DOWNLOAD_MAX_FILE_BYTES + 1) }
+          })
+        : fetchResponse(officialText, {
+            headers: { "content-type": "text/plain; charset=utf-8" }
+          })) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(meeting.documents[0].extractedText, officialText);
+    assert.equal(meeting.documents[0].downloadError, null);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("rejects challenge HTML and invalid text fallback without retaining response files", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-official-challenge-"));
+  const documentUrl = "https://city.example/minutes";
+  const fallbackUrl = "https://city.example/minutes/plain-text";
+  const meeting = primeGovMeeting([
+    { type: "Minutes", label: "Minutes", url: documentUrl }
+  ]);
+
+  try {
+    const result = await downloadOfficialSiteDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      plainTextFallbackUrl: () => fallbackUrl,
+      fetchImpl: (async (url) => String(url) === documentUrl
+        ? fetchResponse("<html><body>Access denied. Verify you are human before continuing.</body></html>", {
+            headers: { "content-type": "text/html" }
+          })
+        : fetchResponse("Access denied. Verify you are human before continuing to official minutes.", {
+            headers: { "content-type": "text/plain" }
+          })) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 0, failed: 1 });
+    assert.equal(meeting.documents[0].localPath, null);
+    assert.match(meeting.documents[0].downloadError || "", /Primary document failed/);
+    assert.match(meeting.documents[0].downloadError || "", /Plain-text fallback failed/);
+    assert.deepEqual(await fs.readdir(outputDir), []);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("rejects IQM2 challenge HTML without retaining an orphan diagnostic", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-iqm2-challenge-"));
+  const meeting = primeGovMeeting([{
+    type: "Minutes",
+    label: "Minutes",
+    url: "https://city.iqm2.com/Citizens/FileOpen.aspx?Type=12&ID=123"
+  }]);
+
+  try {
+    const result = await downloadIqm2Documents(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      fetchImpl: (async () => fetchResponse(
+        "<html><body>Access denied. Checking your browser before continuing.</body></html>",
+        { headers: { "content-type": "text/html" } }
+      )) as typeof fetch
+    });
+    assert.deepEqual(result, { downloaded: 0, failed: 1 });
+    assert.equal(meeting.documents[0].localPath, null);
+    assert.match(meeting.documents[0].downloadError || "", /unusable HTML/);
+    assert.deepEqual(await fs.readdir(outputDir), []);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("does not download a PrimeGov packet when structured HTML agenda text is available", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-primegov-html-"));
+  let requestCalls = 0;
+  const context = {
+    request: {
+      head: async () => {
+        requestCalls += 1;
+        throw new Error("Packet request should be skipped");
+      },
+      get: async () => {
+        requestCalls += 1;
+        throw new Error("Packet request should be skipped");
+      }
+    }
+  } as unknown as BrowserContext;
+  const meeting = primeGovMeeting([
+    {
+      type: "HTML Agenda",
+      label: "HTML Agenda",
+      url: "https://city.primegov.com/Portal/Meeting?meetingTemplateId=1"
+    },
+    {
+      type: "Packet",
+      label: "Packet",
+      url: "https://city.primegov.com/Public/CompiledDocument?id=packet"
+    }
+  ]);
+  meeting.htmlAgendaText = primeGovAgendaText();
+
+  try {
+    const result = await downloadCompiledDocuments(context, [meeting], { outputDir });
+    assert.deepEqual(result, { downloaded: 0, failed: 0 });
+    assert.equal(requestCalls, 0);
   } finally {
     await fs.rm(outputDir, { recursive: true, force: true });
   }

@@ -94,7 +94,12 @@ function preservesCanonicalMeaning(
 
   if (input.canonicalStatus !== "approved" && claimsFinalApproval) return false;
   if (input.canonicalStatus === "recommended") {
-    return /\brecommend/.test(text) && /\b(?:board|next legislative|further action|not final)\b/.test(text);
+    const recommendationFailed = /\b(?:fail(?:ed)?|denied|rejected|defeated)\b/i.test(
+      input.canonicalHeadline
+    );
+    return recommendationFailed
+      ? /\brecommend/.test(text) && /\b(?:fail(?:ed)?|denied|rejected|defeated|did not advance)\b/.test(text)
+      : /\brecommend/.test(text) && /\b(?:board|next legislative|further action|not final)\b/.test(text);
   }
   if (input.canonicalStatus === "heard_and_filed") {
     return /\bheard\b/.test(text) && /\bfiled\b/.test(text);

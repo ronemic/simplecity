@@ -8,8 +8,6 @@ import { parseMeetingDate } from "@/lib/utils/date";
 import { filterMeetingsToWindow, getMeetingWindow } from "@/lib/utils/meetingWindow";
 import {
   discoverMenloParkAgendaAttachments,
-  MENLO_PARK_ATTACHMENT_MAX_BYTES,
-  MENLO_PARK_ATTACHMENT_TIMEOUT_MS,
   normalizeMenloParkAttachmentUrl
 } from "@/lib/scraper/agendaAttachments";
 
@@ -1125,8 +1123,6 @@ export async function scrapeMenloParkMeetings(
             outputDir: options.documentOutputDir,
             shouldStop: options.shouldStop,
             onlyPending: true,
-            maxBytes: MENLO_PARK_ATTACHMENT_MAX_BYTES,
-            timeoutMs: MENLO_PARK_ATTACHMENT_TIMEOUT_MS,
             validateFinalUrl: (url) => Boolean(normalizeMenloParkAttachmentUrl(url))
           });
           log(

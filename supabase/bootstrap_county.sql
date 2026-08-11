@@ -184,7 +184,8 @@ on public.summary_cards(is_published, is_featured desc, created_at desc);
 create index if not exists summary_cards_published_created_idx
 on public.summary_cards(is_published, created_at desc);
 create unique index if not exists summary_cards_regeneration_idx
-on public.summary_cards(meeting_id, agenda_item, source_url);
+on public.summary_cards(meeting_id, agenda_item, source_url)
+where source_item_id is null;
 create unique index if not exists summary_cards_source_item_idx
 on public.summary_cards(meeting_id, source_item_id)
 where source_item_id is not null;

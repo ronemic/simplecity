@@ -31,6 +31,26 @@ function hasSubstantialUntranslatedEnglish(value: string) {
   return UNTRANSLATED_ENGLISH_PHRASE_PATTERN.test(value);
 }
 
+function numericClaims(value: string) {
+  return (value.normalize("NFKC").match(/[$€£¥]?\s*\d+(?:[.,]\d+)*(?:\s*%)?/g) || [])
+    .map((claim) => {
+      const currency = claim.match(/[$€£¥]/)?.[0] || "";
+      const digits = claim.match(/\d+/g) || [];
+      const percent = claim.includes("%") ? "%" : "";
+      return `${currency}${digits.join(":")}${percent}`;
+    })
+    .sort();
+}
+
+function preservesNumericClaims(source: string, translation: string) {
+  const sourceClaims = numericClaims(source);
+  const translatedClaims = numericClaims(translation);
+  return (
+    sourceClaims.length === translatedClaims.length &&
+    sourceClaims.every((claim, index) => claim === translatedClaims[index])
+  );
+}
+
 export function canonicalizeDecisionOutcomeTranslation<
   T extends DecisionOutcomeTranslatedCopy
 >(source: DecisionOutcomeSourceCopy, translation: T): T {
@@ -77,6 +97,10 @@ export function decisionOutcomeTranslationIssues(
     ) {
       issues.push(`${field} was omitted`);
       continue;
+    }
+
+    if (!preservesNumericClaims(sourceValue, translatedValue)) {
+      issues.push(`${field} changed numeric claims`);
     }
 
     const unchanged =

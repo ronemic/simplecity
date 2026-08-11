@@ -10,9 +10,11 @@ import {
   normalizeMenloParkAttachmentUrl,
   selectAgendaItemAttachments,
   selectAllAgendaItemAttachments,
+  visitAgendaPdfPages,
   type AgendaPdfPage,
   type DiscoveredAgendaItem
 } from "@/lib/scraper/agendaAttachments";
+import type { PdfPageData, PdfParseResult } from "pdf-parse";
 import {
   appendAgendaItemAttachmentContext,
   MAX_CHARS_FOR_LLM
@@ -345,4 +347,45 @@ test("malformed PDFs fail attachment discovery without producing page data", asy
   await fs.writeFile(file, "not a PDF");
 
   await assert.rejects(() => extractAgendaPdfPages(file));
+});
+
+test("visits and cleans every agenda PDF page without building aggregate text", async () => {
+  const cleaned: number[] = [];
+  const renderedText: string[] = [];
+  const visited: number[] = [];
+  const pages = Array.from({ length: 3 }, (_, index): PdfPageData => ({
+    getTextContent: async () => ({
+      items: [text(`H${index + 1}. Agenda item ${index + 1}`, 40, 700)]
+    }),
+    getAnnotations: async () => [],
+    cleanup: () => {
+      cleaned.push(index + 1);
+    }
+  }));
+  const parsed: PdfParseResult = {
+    numpages: pages.length,
+    numrender: pages.length,
+    info: {},
+    metadata: null,
+    text: "",
+    version: "test"
+  };
+
+  await visitAgendaPdfPages(
+    "/tmp/large-agenda.pdf",
+    (page) => {
+      visited.push(page.pageNumber);
+    },
+    async (input, options) => {
+      assert.equal(input, "/tmp/large-agenda.pdf");
+      for (const page of pages) {
+        renderedText.push(await options!.pagerender!(page));
+      }
+      return parsed;
+    }
+  );
+
+  assert.deepEqual(visited, [1, 2, 3]);
+  assert.deepEqual(cleaned, [1, 2, 3]);
+  assert.deepEqual(renderedText, ["", "", ""]);
 });

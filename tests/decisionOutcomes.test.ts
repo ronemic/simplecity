@@ -20,8 +20,10 @@ import {
   canReuseDecisionOutcomeExplanation,
   decisionOutcomeCoverageComplete,
   fallbackDecisionOutcomeSummary,
+  isDecisionOutcomeMeetingItemConflict,
   keepUniqueOutcomeAssignments,
   reconcileDecisionOutcomesForMeeting,
+  upsertDecisionOutcomeRows,
   resolveCanonicalOutcomeAssignments
 } from "@/lib/db/upsertDecisionOutcomes";
 import { getDecisionOutcomesNeedingTranslation } from "@/lib/db/upsertDecisionOutcomeTranslations";
@@ -154,6 +156,35 @@ test("interprets Legistar pass flags in the context of their procedural action",
   );
 });
 
+test("treats explicitly failed procedural actions as rejected", () => {
+  const board = meeting("san-francisco", { title: "Board of Supervisors" });
+
+  assert.deepEqual(interpretOfficialAction("AMENDED", "Fail", board), {
+    kind: "rejected",
+    canonicalStatus: "rejected",
+    headline: "Motion failed",
+    nextStep: null
+  });
+  assert.deepEqual(interpretOfficialAction("CONTINUED", "Defeated", board), {
+    kind: "rejected",
+    canonicalStatus: "rejected",
+    headline: "Motion failed",
+    nextStep: null
+  });
+  assert.equal(
+    interpretOfficialAction(null, "The motion to amend failed", board).canonicalStatus,
+    "rejected"
+  );
+  assert.equal(
+    interpretOfficialAction("RECOMMENDED", "Fail", board).canonicalStatus,
+    "recommended"
+  );
+  assert.equal(
+    interpretOfficialAction("DENIED", "Pass", board).canonicalStatus,
+    "rejected"
+  );
+});
+
 test("never presents a passed committee recommendation as final approval", () => {
   const result = extractDecisionOutcome(
     card,
@@ -207,6 +238,38 @@ test("validates LLM explanations against canonical finality and source numbers",
     validateDecisionOutcomeExplanation(input, {
       canonicalHeadline: "Recommended for approval",
       summary: "The committee recommended a $9 million lease for further Board action.",
+      nextStep: null
+    }),
+    null
+  );
+});
+
+test("accepts a grounded explanation when a recommendation failed", () => {
+  const input = {
+    id: "failed-recommendation",
+    title: "Recommend the proposed lease",
+    canonicalStatus: "recommended" as const,
+    canonicalHeadline: "Recommendation failed",
+    fallbackSummary: "The official record shows that the recommendation did not pass.",
+    fallbackNextStep: null,
+    sourceContext: "Official action/result: RECOMMENDED | Fail"
+  };
+
+  assert.deepEqual(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Recommendation failed",
+      summary: "The committee recommendation failed and did not advance.",
+      nextStep: null
+    }),
+    {
+      summary: "The committee recommendation failed and did not advance.",
+      nextStep: null
+    }
+  );
+  assert.equal(
+    validateDecisionOutcomeExplanation(input, {
+      canonicalHeadline: "Recommendation failed",
+      summary: "The committee made a recommendation on the lease.",
       nextStep: null
     }),
     null
@@ -461,11 +524,20 @@ test("withholds close fuzzy ties instead of guessing between similar same-meetin
 });
 
 test("rejects conflicting numeric identities during fuzzy matching", () => {
-  const match = findGuardedAgendaItemMatch(
+  assert.equal(findGuardedAgendaItemMatch(
     "Approve 120 affordable homes in North Fair Oaks",
     [agendaItem({ title: "Approve 180 affordable homes in North Fair Oaks" })]
+  ), null);
+  assert.equal(findGuardedAgendaItemMatch(
+    "Approve 120 affordable homes at 101 Main Street",
+    [agendaItem({ title: "Approve 180 affordable homes at 101 Main Street" })]
+  ), null);
+
+  const consistent = findGuardedAgendaItemMatch(
+    "Approve 120 affordable homes at 101 Main Street",
+    [agendaItem({ title: "Fund 120 affordable homes at 101 Main Street" })]
   );
-  assert.equal(match, null);
+  assert.ok(consistent);
 });
 
 test("uses an exact agenda number and rejects a conflicting numbered section", () => {
@@ -545,6 +617,54 @@ test("reuses a stored decision explanation only when its official result source 
       "same-source",
       "The item passed."
     ),
+    false
+  );
+});
+
+test("retries outcome persistence by official item only after that exact unique conflict", async () => {
+  const conflictTargets: string[] = [];
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "decision_outcomes");
+      return {
+        upsert(_rows: Array<Record<string, unknown>>, options: { onConflict: string }) {
+          conflictTargets.push(options.onConflict);
+          return {
+            async select() {
+              if (conflictTargets.length === 1) {
+                return {
+                  data: null,
+                  error: {
+                    code: "23505",
+                    message:
+                      'duplicate key value violates unique constraint "decision_outcomes_meeting_item_idx"'
+                  }
+                };
+              }
+              return {
+                data: [{ id: "outcome-1", summary_card_id: "card-b" }],
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const result = await upsertDecisionOutcomeRows(supabase as never, [{
+    summary_card_id: "card-b",
+    meeting_id: "meeting-1",
+    matched_item_key: "item-1"
+  }]);
+
+  assert.deepEqual(conflictTargets, ["summary_card_id", "meeting_id,matched_item_key"]);
+  assert.equal(result.error, null);
+  assert.equal(
+    isDecisionOutcomeMeetingItemConflict({
+      code: "23505",
+      message: 'duplicate key value violates unique constraint "decision_outcomes_summary_card_id_key"'
+    }),
     false
   );
 });
@@ -745,6 +865,65 @@ test("extracts a Menlo Park result after a long numbered minutes discussion", ()
   assert.ok(result);
   assert.equal(result.matchedAgendaNumber, "I1");
   assert.equal(result.vote, "4–0–1");
+  assert.match(result.sourceContext, /^Official action\/result:/);
+  assert.match(result.sourceContext, /adopted the amended fee schedule, passed 4-0-1/i);
+});
+
+test("versions the explanation fingerprint across semantic input changes", () => {
+  const officialItem = agendaItem({
+    action: "Motion",
+    result: "Passed 5-0",
+    sourceUrl: card.source_url || "",
+    rowText: "The body voted on the housing agreement. Motion passed 5-0."
+  });
+  const boardOutcome = extractDecisionOutcome(
+    card,
+    meeting("san-francisco", {
+      title: "Board of Supervisors",
+      items: [officialItem]
+    })
+  );
+  const committeeOutcome = extractDecisionOutcome(
+    card,
+    meeting("san-francisco", {
+      title: "Budget and Finance Committee",
+      items: [officialItem]
+    })
+  );
+  const changedContextOutcome = extractDecisionOutcome(
+    card,
+    meeting("san-francisco", {
+      title: "Board of Supervisors",
+      items: [{ ...officialItem, rowText: `${officialItem.rowText} The clerk recorded the result.` }]
+    })
+  );
+  const changedTitleOutcome = extractDecisionOutcome(
+    { ...card, agenda_item: "Fund housing at North Fair Oaks" },
+    meeting("san-francisco", {
+      title: "Board of Supervisors",
+      items: [officialItem]
+    })
+  );
+
+  assert.ok(boardOutcome);
+  assert.ok(committeeOutcome);
+  assert.ok(changedContextOutcome);
+  assert.ok(changedTitleOutcome);
+  assert.equal(boardOutcome.canonicalStatus, "approved");
+  assert.equal(committeeOutcome.canonicalStatus, "committee_action");
+  assert.notEqual(boardOutcome.sourceHash, committeeOutcome.sourceHash);
+  assert.notEqual(boardOutcome.sourceHash, changedContextOutcome.sourceHash);
+  assert.notEqual(boardOutcome.sourceHash, changedTitleOutcome.sourceHash);
+  assert.equal(
+    boardOutcome.sourceHash,
+    extractDecisionOutcome(
+      card,
+      meeting("san-francisco", {
+        title: "Board of Supervisors",
+        items: [officialItem]
+      })
+    )?.sourceHash
+  );
 });
 
 test("uses a minutes source id when the current agenda item id changed", () => {
@@ -852,6 +1031,50 @@ test("does not attribute dated minutes to a different meeting", () => {
   assert.equal(result, null);
 });
 
+test("does not extract outcomes from failed or challenge-page minutes", () => {
+  const minutesText = [
+    "I1. Comprehensive master fee schedule",
+    "ACTION: The City Council adopted the amended fee schedule, passed 4-0-1.",
+    "J1. Future agenda topic"
+  ].join("\n");
+  const document = {
+    type: "Minutes" as const,
+    label: "Approved minutes",
+    url: "https://example.com/minutes.pdf",
+    extractedText: minutesText
+  };
+
+  assert.equal(
+    extractMeetingOutcomeItems(
+      meeting("menlo-park", { items: [], documents: [document] })
+    ).items.length,
+    1
+  );
+  assert.equal(
+    extractMeetingOutcomeItems(
+      meeting("menlo-park", {
+        items: [],
+        documents: [{ ...document, downloadError: "HTTP 500" }]
+      })
+    ).items.length,
+    0
+  );
+  assert.equal(
+    extractMeetingOutcomeItems(
+      meeting("menlo-park", {
+        items: [],
+        documents: [
+          {
+            ...document,
+            extractedText: `Access denied. Verify that you are human.\n${minutesText}`
+          }
+        ]
+      })
+    ).items.length,
+    0
+  );
+});
+
 test("audits the complete Menlo Park May 12 meeting into ten result-bearing agenda items", () => {
   const inventory = extractMeetingOutcomeItems(menloParkMay12Meeting());
   assert.deepEqual(
@@ -918,6 +1141,7 @@ test("reconciles all ten May 12 outcomes to their existing agenda cards", async 
     })
   );
   let persistedRows: Array<Record<string, unknown>> = [];
+  let persistenceConflictTarget: string | null = null;
   const supabase = {
     from(table: string) {
       if (table === "summary_cards") {
@@ -933,8 +1157,9 @@ test("reconciles all ten May 12 outcomes to their existing agenda cards", async 
       }
       assert.equal(table, "decision_outcomes");
       return {
-        upsert(rows: Array<Record<string, unknown>>) {
+        upsert(rows: Array<Record<string, unknown>>, options: { onConflict?: string }) {
           persistedRows = rows;
+          persistenceConflictTarget = options.onConflict || null;
           return {
             async select() {
               return {
@@ -964,6 +1189,7 @@ test("reconciles all ten May 12 outcomes to their existing agenda cards", async 
   assert.equal(result.outcomesUpserted, 10);
   assert.equal(result.outcomesRejectedAmbiguous, 0);
   assert.equal(persistedRows.length, 10);
+  assert.equal(persistenceConflictTarget, "summary_card_id");
   assert.equal(
     new Set(persistedRows.map((row) => row.matched_item_key)).size,
     10
@@ -1349,6 +1575,34 @@ test("decision outcome translation quality rejects English and partial-English c
     }).join(" "),
     /headline was left in English/
   );
+});
+
+test("decision outcome translations preserve numeric claims", () => {
+  const source = {
+    headline: "Approved",
+    summary: "The Board approved $5 million for 120 homes, with work due in 30 days.",
+    vote: "5-0",
+    next_step: null
+  };
+
+  assert.deepEqual(
+    decisionOutcomeTranslationIssues(source, {
+      headline: "Aprobado",
+      summary: "La Junta aprobó $5 millones para 120 viviendas, con el trabajo previsto en 30 días.",
+      vote: "5–0",
+      next_step: null
+    }),
+    []
+  );
+
+  const issues = decisionOutcomeTranslationIssues(source, {
+    headline: "Aprobado",
+    summary: "La Junta aprobó $9 millones para 180 viviendas, con el trabajo previsto en 60 días.",
+    vote: "4–1",
+    next_step: null
+  });
+  assert.match(issues.join(" "), /summary changed numeric claims/);
+  assert.match(issues.join(" "), /vote changed numeric claims/);
 });
 
 test("decision outcome translation quality allows official English proper names", () => {

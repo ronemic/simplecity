@@ -24,6 +24,7 @@ declare module "pdf-parse" {
   export interface PdfPageData {
     getTextContent(options?: Record<string, unknown>): Promise<{ items: PdfTextItem[] }>;
     getAnnotations(options?: Record<string, unknown>): Promise<PdfAnnotation[]>;
+    cleanup?: () => void;
   }
 
   export interface PdfParseOptions {
@@ -33,7 +34,7 @@ declare module "pdf-parse" {
   }
 
   export default function pdfParse(
-    buffer: Buffer,
+    input: Buffer | string,
     options?: PdfParseOptions
   ): Promise<PdfParseResult>;
 }

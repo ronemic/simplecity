@@ -12,6 +12,10 @@ import {
   mergeDiscoveredAgendaItemAttachments,
   type DiscoveredAgendaItemAttachments
 } from "@/lib/scraper/itemAttachments";
+import {
+  createStreamDownloadBudget,
+  streamDownloadToTemp
+} from "@/lib/scraper/streamDownload";
 
 type AgendaOnlineRow = {
   meetingId: string;
@@ -114,6 +118,7 @@ export async function downloadLaserficheMinutes(
 ) {
   await fs.mkdir(outputDir, { recursive: true });
   const page = await context.newPage();
+  const budget = createStreamDownloadBudget();
   let downloaded = 0;
   let failed = 0;
   try {
@@ -144,25 +149,77 @@ export async function downloadLaserficheMinutes(
           const filename = `${slugify(meeting.externalId || meeting.title)}__minutes__${slugify(document.label)}.pdf`;
           const filePath = path.join(outputDir, filename);
           if (generated.kind === "download") {
-            await generated.download.saveAs(filePath);
+            const downloadUrl = generated.download.url();
+            await generated.download.cancel();
+            const parsedDownloadUrl = new URL(downloadUrl);
+            if (parsedDownloadUrl.protocol !== "http:" && parsedDownloadUrl.protocol !== "https:") {
+              throw new Error(
+                `Laserfiche download used unsupported URL protocol: ${parsedDownloadUrl.protocol}`
+              );
+            }
+
+            const streamed = await streamDownloadToTemp(
+              context,
+              parsedDownloadUrl.toString(),
+              filePath,
+              {
+                headers: {
+                  "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
+                  Referer: document.url
+                },
+                budget,
+                shouldStop
+              }
+            );
+            try {
+              if (streamed.prefix.subarray(0, 5).toString() !== "%PDF-") {
+                throw new Error("Laserfiche generated response was not a PDF.");
+              }
+              await streamed.commit(filePath);
+            } finally {
+              await streamed.cleanup();
+            }
           } else {
             const response = generated.response;
-            if (!response.ok()) throw new Error(`Laserfiche PDF returned HTTP ${response.status()}.`);
-            const buffer = await response.body().catch(async () => {
-              const replay = await context.request.get(response.url(), {
-                headers: { Referer: document.url },
-                timeout: 120_000
-              });
-              if (!replay.ok()) {
-                throw new Error(`Laserfiche PDF replay returned HTTP ${replay.status()}.`);
+            try {
+              if (!response.ok()) {
+                throw new Error(`Laserfiche PDF returned HTTP ${response.status()}.`);
               }
-              return replay.body();
-            });
-            if (buffer.subarray(0, 5).toString() !== "%PDF-") {
-              throw new Error("Laserfiche generated response was not a PDF.");
+              const originalHeaders = await response.request().allHeaders();
+              const replayHeaders = {
+                "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
+                Referer: originalHeaders.referer || document.url,
+                ...(originalHeaders.authorization
+                  ? { Authorization: originalHeaders.authorization }
+                  : {})
+              };
+
+              // Stop the browser's copy after receiving the generated URL; the
+              // replay below streams once into a bounded, atomic local file.
+              await generated.popup.close();
+              const streamed = await streamDownloadToTemp(
+                context,
+                response.url(),
+                filePath,
+                {
+                  headers: replayHeaders,
+                  budget,
+                  shouldStop
+                }
+              );
+              try {
+                if (streamed.prefix.subarray(0, 5).toString() !== "%PDF-") {
+                  throw new Error("Laserfiche generated response was not a PDF.");
+                }
+                await streamed.commit(filePath);
+              } finally {
+                await streamed.cleanup();
+              }
+            } finally {
+              if (!generated.popup.isClosed()) {
+                await generated.popup.close().catch(() => undefined);
+              }
             }
-            await fs.writeFile(filePath, buffer);
-            await generated.popup.close();
           }
           const stat = await fs.stat(filePath);
           document.localPath = filePath;

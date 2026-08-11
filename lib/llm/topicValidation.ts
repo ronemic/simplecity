@@ -5,6 +5,7 @@ import { CARD_STATUSES } from "@/lib/cardStatus";
 import type { AgendaItem, LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { findAgendaItemForCard } from "@/lib/scraper/agendaItemContext";
 import { cleanText } from "@/lib/utils/slug";
+import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const TopicResultSchema = z.object({
   cards: z.array(
@@ -95,12 +96,18 @@ export function topicValidationCandidates(
   meeting: LlmReadyMeeting,
   summary: SimpleCitySummary
 ): TopicValidationCandidate[] {
+  const items = meeting.items || [];
+  const uniqueIds = uniqueSourceItemIds(items);
   return summary.cards.flatMap((card, cardIndex) => {
+    const exactItem = card.sourceItemId && uniqueIds.has(card.sourceItemId)
+      ? items.find((item) => item.externalId === card.sourceItemId)
+      : null;
     const item =
-      findAgendaItemForCard(card.agendaItem, meeting.items || []) ||
+      exactItem ||
+      findAgendaItemForCard(card.agendaItem, items) ||
       findAgendaItemForCard(
         `${card.agendaItem} ${card.whatIsHappening.join(" ")}`,
-        meeting.items || []
+        items
       );
     if (!item) return [];
     return [

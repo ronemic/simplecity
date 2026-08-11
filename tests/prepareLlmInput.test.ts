@@ -51,6 +51,48 @@ test("falls back to packet text when the agenda document is unreadable", async (
   );
 });
 
+test("uses a valid packet instead of a challenge-page agenda", async () => {
+  const challengeText = repeatSentence(
+    "Access denied. Verify that you are human before continuing to the requested agenda.",
+    12
+  );
+  const packetText = repeatSentence(
+    "Item 7 approves a contract for playground repairs at Central Park.",
+    12
+  );
+  const meeting: PrimeGovMeeting = {
+    section: "Upcoming Meetings",
+    title: "City Council",
+    dateText: "June 13, 2026",
+    timeText: "7:00 PM",
+    meetingType: "City Council",
+    rowText: "City Council June 13, 2026 7:00 PM Agenda Packet",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda",
+        label: "Agenda",
+        url: "https://city.example/agenda.pdf",
+        extractedText: challengeText
+      },
+      {
+        type: "Agenda Packet",
+        label: "Agenda Packet",
+        url: "https://city.example/packet.pdf",
+        extractedText: packetText
+      }
+    ]
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.equal(prepared.sourceType, "Agenda Packet");
+  assert.equal(prepared.sourceUrl, "https://city.example/packet.pdf");
+  assert.match(prepared.llmInputText, /playground repairs/);
+  assert.doesNotMatch(prepared.llmInputText, /Access denied|Verify that you are human/);
+});
+
 test("uses Accessible Agenda text before packet text for Mountain View", async () => {
   const accessibleAgendaText = repeatSentence(
     "Item 4 considers a safe routes project near downtown Mountain View.",
@@ -99,6 +141,55 @@ test("uses Accessible Agenda text before packet text for Mountain View", async (
   assert.equal(prepared.sourceUrl, "https://mountainview.example/accessible-agenda");
   assert.match(prepared.llmInputText, /safe routes project/);
   assert.doesNotMatch(prepared.llmInputText, /large packet/);
+});
+
+test("rejects PrimeGov translation chrome and falls back to the official agenda PDF", async () => {
+  const agendaText = `
+CITY COUNCIL REGULAR MEETING AGENDA
+Residents may email comments to clerk@city.example.
+1. CALL TO ORDER
+2. Library renovation contract
+Recommendation: Approve the library renovation contract.
+3. ADJOURNMENT
+${repeatSentence("Official agenda instructions.", 20)}
+`;
+  const meeting: PrimeGovMeeting = {
+    section: "Upcoming Meetings",
+    title: "City Council",
+    dateText: "July 20, 2026",
+    meetingType: "City Council",
+    rowText: "City Council July 20, 2026 HTML Agenda Agenda",
+    hasHtmlAgenda: true,
+    hasPdf: true,
+    htmlAgendaText: `Select Language ${repeatSentence(
+      "Abkhaz Acehnese Afrikaans Albanian Arabic",
+      100
+    )} Powered by Translate`,
+    documents: [
+      {
+        type: "HTML Agenda",
+        label: "HTML Agenda",
+        url: "https://city.primegov.com/Portal/Meeting?meetingTemplateId=1"
+      },
+      {
+        type: "Agenda",
+        label: "Agenda",
+        url: "https://city.primegov.com/Public/CompiledDocument?id=agenda",
+        extractedText: agendaText
+      }
+    ]
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.equal(prepared.sourceType, "Agenda");
+  assert.match(prepared.llmInputText, /Library renovation contract/);
+  assert.doesNotMatch(prepared.llmInputText, /Select Language|Abkhaz/);
+  assert.ok(
+    prepared.extractionNotes.some((note) =>
+      note.includes("did not contain structured official agenda content")
+    )
+  );
 });
 
 test("structures an unnumbered current agenda and excludes historical packet pages", async () => {
@@ -203,7 +294,10 @@ ${repeatSentence("Agenda source context.", 20)}
     prepared.llmInputText
   );
 
-  assert.ok(prepared.llmInputText.length >= MAX_CHARS_FOR_LLM);
+  assert.ok(prepared.llmInputText.length <= MAX_CHARS_FOR_LLM);
+  assert.match(prepared.llmInputText, /Source item ID: large-item-1/);
+  assert.match(prepared.llmInputText, /Source item ID: large-item-20/);
+  assert.match(prepared.llmInputText, /Official title: Large item 20/);
   assert.match(participationContext, /846 9472 6242/);
   assert.match(participationContext, /planning\.commission@menlopark\.gov/);
 });

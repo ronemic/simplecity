@@ -34,6 +34,16 @@ function getRequestedJurisdiction(): JurisdictionSlug {
   return slug;
 }
 
+function getLimit() {
+  const raw = getArgValue("limit");
+  if (!raw) return undefined;
+  const limit = Number(raw);
+  if (!Number.isFinite(limit) || limit <= 0) {
+    throw new Error("--limit must be a positive number.");
+  }
+  return Math.floor(limit);
+}
+
 async function main() {
   const jurisdiction = getJurisdictionBySlug(getRequestedJurisdiction());
   if (!jurisdiction) throw new Error("Unknown jurisdiction.");
@@ -44,6 +54,7 @@ async function main() {
   const outputDir = getJurisdictionScrapedDir(jurisdiction.slug);
   const documentsDir = getJurisdictionDocumentsDir(jurisdiction.slug);
   const jsonOutput = path.join(outputDir, "meetings.json");
+  const limit = getLimit();
 
   await fs.mkdir(outputDir, { recursive: true });
 
@@ -55,6 +66,7 @@ async function main() {
         documentOutputDir: documentsDir,
         scrapeHtmlAgendas: SHOULD_SCRAPE_HTML_AGENDAS,
         allYears: true,
+        limit,
         log: console.log
       })
     : await scrapePortal({
@@ -63,6 +75,7 @@ async function main() {
         downloadDocuments: SHOULD_DOWNLOAD,
         documentOutputDir: documentsDir,
         scrapeHtmlAgendas: SHOULD_SCRAPE_HTML_AGENDAS,
+        limit,
         log: console.log
       });
 

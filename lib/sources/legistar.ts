@@ -4,15 +4,31 @@ import { chromium, type BrowserContext, type Page } from "playwright";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { LegistarItem, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
+import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
+import { withEffectiveSourceMeetingStatus } from "@/lib/utils/meetingStatus";
 import { filterMeetingsToWindow, getMeetingWindow } from "@/lib/utils/meetingWindow";
 import { mergeDiscoveredAgendaItemAttachments } from "@/lib/scraper/itemAttachments";
+import {
+  createStreamDownloadBudget,
+  streamDownloadToTemp,
+  STREAM_DOWNLOAD_MAX_FILE_BYTES
+} from "@/lib/scraper/streamDownload";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
-export const LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES = 50 * 1024 * 1024;
+export const LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES = STREAM_DOWNLOAD_MAX_FILE_BYTES;
 export const MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING = 24;
-const LEGISTAR_OPTIONAL_DOCUMENT_TIMEOUT_MS = 20_000;
+const MAX_BUFFERED_LEGISTAR_HTML_BYTES = 50 * 1024 * 1024;
+
+function legistarHtmlToText(html: string) {
+  return cleanText(
+    html
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, " ")
+      .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+  );
+}
 
 const DOWNLOADABLE_DOCUMENT_TYPES = new Set([
   "Agenda",
@@ -212,18 +228,7 @@ function inferLegistarMeetingStatus(meeting: LegistarMeeting): LegistarMeeting {
     };
   }
 
-  if (meeting.section !== "Unknown") return meeting;
-
-  const dateTimeText = [meeting.dateText, meeting.timeText].filter(Boolean).join(" ");
-  const meetingIso = parseMeetingDate(dateTimeText);
-  if (!meetingIso) return meeting;
-
-  const isPast = new Date(meetingIso).getTime() < Date.now();
-  return {
-    ...meeting,
-    section: isPast ? "Past Meetings" : "Upcoming Meetings",
-    status: isPast ? "Past" : "Upcoming"
-  };
+  return withEffectiveSourceMeetingStatus(meeting);
 }
 
 function makeLegistarItemExternalId(sourceUrl: string, fallback: string) {
@@ -346,16 +351,6 @@ function shouldDownloadLegistarDocument(doc: LegistarDocument) {
   if (doc.isAgendaItemAttachment) return true;
   if (DOWNLOADABLE_DOCUMENT_TYPES.has(doc.type)) return true;
   return doc.type === "Media" && isLegistarViewUrl(doc.url);
-}
-
-function isEssentialLegistarDocument(doc: LegistarDocument) {
-  return [
-    "Minutes",
-    "Accessible Minutes",
-    "Agenda",
-    "Accessible Agenda",
-    "Notice of Cancellation"
-  ].includes(doc.type);
 }
 
 export function selectLegistarDocumentsForDownload(
@@ -500,6 +495,7 @@ async function downloadLegistarDocuments(
 ) {
   const docsDir = options.outputDir || path.join(process.cwd(), "scraped-primegov");
   const log = options.log || (() => undefined);
+  const budget = createStreamDownloadBudget();
   let downloaded = 0;
   let failed = 0;
 
@@ -529,79 +525,66 @@ async function downloadLegistarDocuments(
           "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
           Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
         };
-        if (!isEssentialLegistarDocument(doc)) {
-          const preflight = await context.request
-            .head(doc.url, { headers, timeout: 10_000 })
-            .catch(() => null);
-          const contentLength = Number(preflight?.headers()["content-length"] || 0);
-          if (
-            Number.isFinite(contentLength) &&
-            contentLength > LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES
-          ) {
-            failed += 1;
-            doc.localPath = null;
-            doc.bytes = contentLength;
-            doc.downloadError =
-              `Document exceeded the ${LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES}-byte optional-document limit.`;
-            log(`Skipped oversized optional Legistar document (${contentLength} bytes): ${doc.url}`);
+        const targetPath = path.join(docsDir, filename);
+        const streamed = await streamDownloadToTemp(context, doc.url, targetPath, {
+          headers,
+          budget,
+          shouldStop: options.shouldStop
+        });
+        try {
+          if (streamed.prefix.subarray(0, 5).toString() === "%PDF-") {
+            const filePath = path.join(docsDir, `${filename}.pdf`);
+            await streamed.commit(filePath);
+
+            downloaded += 1;
+            doc.localPath = filePath;
+            doc.bytes = streamed.bytes;
+            doc.downloadError = null;
+            log(`Downloaded: ${filePath}`);
             continue;
           }
-        }
 
-        const response = await context.request.get(doc.url, {
-          headers,
-          timeout: isEssentialLegistarDocument(doc)
-            ? 60_000
-            : LEGISTAR_OPTIONAL_DOCUMENT_TIMEOUT_MS
-        });
+          const contentType = streamed.headers.get("content-type") || "";
+          const prefixText = streamed.prefix.toString("utf8");
+          if (/\btext\/html\b/i.test(contentType) || /^\s*</.test(prefixText)) {
+            const bodyText = streamed.bytes <= MAX_BUFFERED_LEGISTAR_HTML_BYTES
+              ? await fs.readFile(streamed.tempPath, "utf8")
+              : null;
+            const extractedText = bodyText === null ? null : legistarHtmlToText(bodyText);
+            if (!extractedText || !isUsableOfficialSourceText(extractedText)) {
+              failed += 1;
+              doc.localPath = null;
+              doc.bytes = streamed.bytes;
+              doc.extractedText = null;
+              doc.extractionCharacterCount = 0;
+              doc.downloadError = bodyText === null
+                ? `Legistar HTML exceeded the ${MAX_BUFFERED_LEGISTAR_HTML_BYTES}-byte validation limit.`
+                : "Legistar returned an unusable HTML response.";
+              log(`Rejected unusable Legistar HTML: ${doc.url}`);
+              continue;
+            }
 
-        if (!response.ok()) {
+            const filePath = path.join(docsDir, `${filename}.html`);
+            await streamed.commit(filePath);
+
+            downloaded += 1;
+            doc.localPath = filePath;
+            doc.bytes = streamed.bytes;
+            doc.extractedText = extractedText;
+            doc.extractionCharacterCount = extractedText.length;
+            doc.downloadError = null;
+            log(`Saved HTML document text: ${filePath}`);
+            continue;
+          }
+
           failed += 1;
           doc.localPath = null;
-          doc.downloadError = `HTTP ${response.status()}`;
-          log(`Failed download ${doc.url}: ${response.status()}`);
-          continue;
+          doc.bytes = streamed.bytes;
+          doc.downloadError = "Downloaded file was not a PDF or usable HTML document.";
+          log(`Unsupported Legistar document response: ${doc.url}`);
+        } finally {
+          await streamed.cleanup();
         }
-
-        const buffer = await response.body();
-        const contentType = response.headers()["content-type"] || "";
-        const firstBytes = buffer.subarray(0, 5).toString();
-
-        if (firstBytes === "%PDF-") {
-          const filePath = path.join(docsDir, `${filename}.pdf`);
-          await fs.writeFile(filePath, buffer);
-
-          downloaded += 1;
-          doc.localPath = filePath;
-          doc.bytes = buffer.length;
-          doc.downloadError = null;
-          log(`Downloaded: ${filePath}`);
-          continue;
-        }
-
-        const bodyText = buffer.toString("utf8");
-        if (contentType.includes("text/html") || /^\s*</.test(bodyText)) {
-          const filePath = path.join(docsDir, `${filename}.html`);
-          await fs.writeFile(filePath, buffer);
-
-          downloaded += 1;
-          doc.localPath = filePath;
-          doc.bytes = buffer.length;
-          doc.extractedText = cleanText(bodyText.replace(/<[^>]+>/g, " "));
-          doc.extractionCharacterCount = doc.extractedText.length;
-          doc.downloadError = null;
-          log(`Saved HTML document text: ${filePath}`);
-          continue;
-        }
-
-        const errorPath = path.join(docsDir, `${filename}.download`);
-        await fs.writeFile(errorPath, buffer);
-
-        failed += 1;
-        doc.localPath = null;
-        doc.bytes = buffer.length;
-        doc.downloadError = `Downloaded file was not a PDF or HTML document. Saved response to ${errorPath}`;
-        log(`Unsupported Legistar document response: ${doc.url}`);
       } catch (error) {
         failed += 1;
         doc.localPath = null;
@@ -1409,7 +1392,7 @@ async function extractVisibleLegistarMeetings(
           rowText: entry.rowText,
           status: isMeetingCancelled(title, entry.rowText, documents)
             ? "Cancelled"
-            : section === "Past Meetings" || section === "All Meetings"
+            : section === "Past Meetings"
               ? "Past"
               : "Upcoming",
           sourceUrl,
@@ -1486,6 +1469,7 @@ async function downloadLegistarApiDocuments(
 ) {
   const docsDir = options.documentOutputDir || path.join(process.cwd(), "scraped-primegov");
   const log = options.log || (() => undefined);
+  const budget = createStreamDownloadBudget();
   await fs.mkdir(docsDir, { recursive: true });
 
   const queue = meetings
@@ -1508,35 +1492,33 @@ async function downloadLegistarApiDocuments(
 
     const filename = buildLegistarDocumentFilename(meeting, doc.type, doc.url);
     try {
-      const response = await fetch(doc.url, {
+      const targetPath = path.join(docsDir, filename);
+      const streamed = await streamDownloadToTemp(null, doc.url, targetPath, {
         headers: {
           "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
           Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
         },
-        signal: AbortSignal.timeout(60_000)
+        budget,
+        shouldStop: options.shouldStop
       });
-      if (!response.ok) {
-        doc.localPath = null;
-        doc.downloadError = `HTTP ${response.status}`;
-        log(`Failed download ${doc.url}: ${response.status}`);
-        continue;
-      }
+      try {
+        if (streamed.prefix.subarray(0, 5).toString() !== "%PDF-") {
+          doc.localPath = null;
+          doc.bytes = streamed.bytes;
+          doc.downloadError = "Downloaded file was not a PDF document.";
+          log(`Unsupported Legistar API document response: ${doc.url}`);
+          continue;
+        }
 
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.subarray(0, 5).toString() !== "%PDF-") {
-        doc.localPath = null;
-        doc.bytes = buffer.length;
-        doc.downloadError = "Downloaded file was not a PDF document.";
-        log(`Unsupported Legistar API document response: ${doc.url}`);
-        continue;
+        const filePath = path.join(docsDir, `${filename}.pdf`);
+        await streamed.commit(filePath);
+        doc.localPath = filePath;
+        doc.bytes = streamed.bytes;
+        doc.downloadError = null;
+        log(`Downloaded: ${filePath}`);
+      } finally {
+        await streamed.cleanup();
       }
-
-      const filePath = path.join(docsDir, `${filename}.pdf`);
-      await fs.writeFile(filePath, buffer);
-      doc.localPath = filePath;
-      doc.bytes = buffer.length;
-      doc.downloadError = null;
-      log(`Downloaded: ${filePath}`);
     } catch (error) {
       doc.localPath = null;
       doc.downloadError = error instanceof Error ? error.message : "Unknown download error";

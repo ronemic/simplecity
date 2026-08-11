@@ -4,6 +4,7 @@ import type { PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/li
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import { withEffectiveSourceMeetingStatus } from "@/lib/utils/meetingStatus";
 import {
   mergeDiscoveredAgendaItemAttachments,
   type DiscoveredAgendaItemAttachments
@@ -549,7 +550,7 @@ async function extractVisibleIqm2Meetings(
           timeText,
           location: null,
           rowText: entry.rowText,
-          status: isCancelled ? "Cancelled" : section === "Upcoming Meetings" ? "Upcoming" : "Past",
+          status: isCancelled ? "Cancelled" : section === "Past Meetings" ? "Past" : "Upcoming",
           sourceUrl,
           meetingDetailsUrl: entry.meetingDetailsUrl,
           hasHtmlAgenda: false,
@@ -804,7 +805,8 @@ export async function scrapeIqm2Meetings(
     }
 
     log("Scraping IQM2 meeting rows...");
-    let meetings = dedupeIqm2Meetings(await extractVisibleIqm2Meetings(page, jurisdiction));
+    let meetings = dedupeIqm2Meetings(await extractVisibleIqm2Meetings(page, jurisdiction))
+      .map((meeting) => withEffectiveSourceMeetingStatus(meeting));
     if (!options.allVisible) {
       meetings = filterMeetingsToWindow(meetings, options);
       log(
