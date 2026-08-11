@@ -25,6 +25,17 @@ function compactList(items: string[] | null | undefined, locale: Locale) {
   return items.slice(0, 3).join(", ");
 }
 
+const OFFICIAL_SOURCE_FALLBACK_EXPLANATIONS = new Set([
+  "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted.",
+  "SimpleCity todavía está preparando un resumen detallado. El punto de la agenda oficial está disponible ahora para que no se omita."
+]);
+
+export function isOfficialSourceFallbackCard(card: Pick<SummaryCardRow, "why_it_matters">) {
+  return OFFICIAL_SOURCE_FALLBACK_EXPLANATIONS.has(
+    String(card.why_it_matters || "").trim()
+  );
+}
+
 function getCardCommentDeadlineInfo(card: SummaryCardRow) {
   return getCommentDeadlineInfo({
     closes: card.comment_window_closes,
@@ -187,12 +198,16 @@ export function SummaryCard({
   defaultOutcomeExpanded?: boolean;
 }) {
   const [open, setOpen] = useState(Boolean(outcome));
+  const [showFullFallbackText, setShowFullFallbackText] = useState(false);
   const isSharePresentation = presentation === "share";
   const showDetails = open || isSharePresentation;
   const TitleTag = isSharePresentation ? "h1" : "h3";
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
   const points = cardSummaryPoints(card, locale);
+  const officialSourceFallback = isOfficialSourceFallbackCard(card);
+  const hasLongFallbackText =
+    officialSourceFallback && points.join(" ").length > 320;
   const titlePreview = cardPreviewText(card, locale, highlight);
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
@@ -355,10 +370,27 @@ export function SummaryCard({
                 {points.map((point) => (
                   <li key={point} className="flex gap-2">
                     <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-civic" />
-                    <span><HighlightedText text={point} query={highlight} /></span>
+                    <span
+                      className={cn(
+                        hasLongFallbackText && !showFullFallbackText && "line-clamp-5"
+                      )}
+                    >
+                      <HighlightedText text={point} query={highlight} />
+                    </span>
                   </li>
                 ))}
               </ul>
+              {hasLongFallbackText ? (
+                <button
+                  type="button"
+                  className="mt-3 text-sm font-bold text-civic underline decoration-civic/35 underline-offset-4 hover:decoration-civic"
+                  onClick={() => setShowFullFallbackText((value) => !value)}
+                >
+                  {showFullFallbackText
+                    ? locale === "es" ? "Mostrar menos" : "Show less"
+                    : locale === "es" ? "Mostrar texto completo de la agenda" : "Show full agenda text"}
+                </button>
+              ) : null}
             </section>
 
             <section>

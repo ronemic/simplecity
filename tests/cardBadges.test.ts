@@ -1,7 +1,25 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { commentSummary, statusSummary } from "../components/SummaryCard";
+import {
+  commentSummary,
+  isOfficialSourceFallbackCard,
+  statusSummary
+} from "../components/SummaryCard";
 import type { SummaryCardRow } from "../lib/types";
+
+test("official-source fallback cards are identified without affecting normal summaries", () => {
+  assert.equal(
+    isOfficialSourceFallbackCard({
+      why_it_matters:
+        "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted."
+    }),
+    true
+  );
+  assert.equal(
+    isOfficialSourceFallbackCard({ why_it_matters: "This proposal would add 40 homes." }),
+    false
+  );
+});
 
 test("information-only status and comment availability remain separate badges", () => {
   const card = {
