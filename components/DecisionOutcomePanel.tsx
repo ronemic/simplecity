@@ -75,7 +75,7 @@ export function DecisionOutcomePanel({
   defaultExpanded?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const [summaryExpanded, setSummaryExpanded] = useState(defaultExpanded);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const style = outcomeStyles[outcome.kind];
   const OutcomeIcon = style.Icon;
   const hasLongSummary = isLongDecisionOutcomeSummary(outcome.summary);

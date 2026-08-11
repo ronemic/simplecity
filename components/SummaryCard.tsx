@@ -264,7 +264,10 @@ export function SummaryCard({
           <TitleTag
             className={cn(
               "mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2",
-              isSharePresentation && "line-clamp-none text-3xl sm:line-clamp-none sm:text-4xl"
+              isSharePresentation &&
+                (officialSourceFallback
+                  ? "line-clamp-3 text-3xl sm:line-clamp-3 sm:text-4xl"
+                  : "line-clamp-none text-3xl sm:line-clamp-none sm:text-4xl")
             )}
           >
             <HighlightedText text={agendaTitle} query={highlight} />
@@ -273,7 +276,10 @@ export function SummaryCard({
             <p
               className={cn(
                 "mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
-                isSharePresentation && "line-clamp-none max-w-5xl text-base leading-7 sm:line-clamp-none"
+                isSharePresentation &&
+                  (officialSourceFallback
+                    ? "line-clamp-3 max-w-5xl text-base leading-7 sm:line-clamp-3"
+                    : "line-clamp-none max-w-5xl text-base leading-7 sm:line-clamp-none")
               )}
             >
               <HighlightedText text={titlePreview} query={highlight} />
