@@ -381,3 +381,15 @@ test("results coverage retains existing ingestion and matching gates", () => {
     coverageErrors
   );
 });
+
+test("results coverage does not fail when official-source fallbacks preserved complete coverage", () => {
+  const recoveredWarnings = [
+    "Meeting has official-source fallback coverage for 3 agenda item(s).",
+    "Detailed meeting summary was unavailable; official agenda items were retained."
+  ];
+
+  assert.deepEqual(
+    filterResultsCoverageErrors(recoveredWarnings, { persist: true, summarize: true }),
+    []
+  );
+});

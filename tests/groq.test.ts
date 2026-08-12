@@ -204,6 +204,24 @@ test("stops lazy summary batches at a deadline while retaining completed work", 
   assert.equal(stopLogged, true);
 });
 
+test("continues independent summary batches after one batch fails", async () => {
+  const errors: number[] = [];
+  const results = await runSummaryBatchesSequentially(
+    [1, 2, 3],
+    async (batch) => {
+      if (batch === 2) throw new Error("provider timeout");
+      return { summary: { meetingSummary, cards: [] }, raw: batch };
+    },
+    {
+      continueOnError: true,
+      onError: (_error, index) => errors.push(index)
+    }
+  );
+
+  assert.deepEqual(results.map((result) => result.raw), [1, 3]);
+  assert.deepEqual(errors, [1]);
+});
+
 function setLlmTestEnv() {
   process.env.OPENROUTER_API_KEY = "test-openrouter-key";
   process.env.OPENROUTER_MODEL = "openai/gpt-oss-120b";
@@ -1145,6 +1163,7 @@ test("builds bounded agenda-item batches without dropping the final item", () =>
 
   const batches = buildAgendaItemSummaryBatches(preparedMeeting);
   assert.ok(batches.length > 1);
+  assert.ok(batches.every((batch) => (batch.items?.length || 0) <= 5));
   assert.equal(batches.flatMap((batch) => batch.items || []).length, 12);
   assert.ok(batches.every((batch) => batch.llmInputText.length <= MAX_AGENDA_ITEM_BATCH_CHARS + 500));
   assert.ok(batches.some((batch) => batch.llmInputText.includes("UNIQUE_ITEM_12")));
@@ -1269,8 +1288,9 @@ test("summarizes and combines every bounded agenda-item batch", async (t) => {
 
   const result = await generateSummaryForMeeting(preparedMeeting);
 
-  assert.equal(summaryCalls, 2);
-  assert.equal(verificationCalls, 2);
+  const expectedBatchCount = buildAgendaItemSummaryBatches(preparedMeeting).length;
+  assert.equal(summaryCalls, expectedBatchCount);
+  assert.equal(verificationCalls, expectedBatchCount);
   assert.deepEqual(result.summary.cards.map((value) => value.agendaItem), [
     "Decision Alpha",
     "Decision Beta",

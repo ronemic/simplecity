@@ -95,6 +95,37 @@ test("cancelled meetings never expose stale agenda or packet text to the LLM", a
   );
 });
 
+test("recognizes a cancellation notice published under an Agenda link", async () => {
+  const meeting: PrimeGovMeeting = {
+    jurisdictionSlug: "los-altos",
+    section: "Past Meetings",
+    title: "Planning Commission",
+    dateText: "July 16, 2026",
+    meetingType: "Planning Commission",
+    rowText: "Planning Commission July 16, 2026 Agenda",
+    status: "Past",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [{
+      type: "Agenda",
+      label: "Agenda",
+      url: "https://city.example/cancellation.pdf",
+      extractedText: repeatSentence(
+        "CANCELLATION NOTICE The regular Planning Commission meeting has been cancelled.",
+        5
+      )
+    }]
+  };
+
+  const prepared = await buildLlmReadyMeeting(meeting);
+
+  assert.equal(prepared.status, "Cancelled");
+  assert.equal(prepared.sourceType, "Cancellation");
+  assert.equal(prepared.llmInputText, "");
+  assert.deepEqual(prepared.items, []);
+  assert.ok(prepared.extractionNotes.some((note) => note.includes("cancellation notice")));
+});
+
 test("uses a valid packet instead of a challenge-page agenda", async () => {
   const challengeText = repeatSentence(
     "Access denied. Verify that you are human before continuing to the requested agenda.",

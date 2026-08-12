@@ -281,7 +281,7 @@ export function shouldSkipUnchangedSummary(
 }
 
 const RESULTS_COVERAGE_ERROR_PATTERN =
-  /Outcome coverage incomplete|Decision outcome reconciliation failed|Agenda ingestion incomplete|Minutes ingestion incomplete|Summary coverage incomplete|LLM failed for|official-source fallback coverage|Detailed meeting summary was unavailable|Pipeline stopped early/i;
+  /Outcome coverage incomplete|Decision outcome reconciliation failed|Agenda ingestion incomplete|Minutes ingestion incomplete|Summary coverage incomplete|LLM failed for|Pipeline stopped early/i;
 const MISSING_SUMMARY_PROVIDER_ERROR_PATTERN =
   /No LLM provider API key is configured; summaries were not generated/i;
 
@@ -848,8 +848,7 @@ async function runSimpleCityPipelineInternal(
             if (coverage.fallbackItemIds.length > 0) {
               const message =
                 `Published official-source fallback coverage for ${coverage.fallbackItemIds.length} of ${requiredItemCount} required agenda item(s) in ${item.meeting.title}; detailed summaries will be retried on a future run.`;
-              errors.push(message);
-              log(message);
+              log(`Summary warning: ${message}`);
             }
             if (initialSummaryError) {
               const detail = initialSummaryError instanceof Error
@@ -857,8 +856,7 @@ async function runSimpleCityPipelineInternal(
                 : "Unknown LLM error";
               const message =
                 `Detailed meeting summary was unavailable for ${item.meeting.title}; item-level coverage recovery continued: ${detail}`;
-              errors.push(message);
-              log(message);
+              log(`Summary warning: ${message}`);
             }
 
             const completedSourceHash = coverage.fallbackItemIds.length > 0

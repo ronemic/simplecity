@@ -71,3 +71,28 @@ test("normalizes distinct East Palo Alto meeting bodies and preserves official r
   assert.equal(meetings[1].meetingDetailsUrl, "https://www.cityofepa.org/event/2");
   assert.notEqual(meetings[0].externalId, meetings[1].externalId);
 });
+
+test("does not attach one dated committee packet to every historical meeting row", () => {
+  const jurisdiction = getJurisdictionBySlug("east-palo-alto");
+  assert.ok(jurisdiction);
+  const reusedPacket =
+    "https://www.cityofepa.org/packets/24343/7.1.26_senior_advisory_committee_agenda_packet.pdf";
+  const meetings = normalizeEastPaloAltoRows([
+    {
+      bodyName: "Senior Advisory Committee",
+      dateTimeText: "Jul 1, 2026 - 06:00 PM",
+      rowText: "Senior Advisory Committee Jul 1, 2026 Agenda Packet",
+      links: [{ label: "Agenda Packet", column: "Agenda Packet", url: reusedPacket }]
+    },
+    {
+      bodyName: "Senior Advisory Committee",
+      dateTimeText: "Sep 2, 2026 - 06:00 PM",
+      rowText: "Senior Advisory Committee Sep 2, 2026 Agenda Packet",
+      links: [{ label: "Agenda Packet", column: "Agenda Packet", url: reusedPacket }]
+    }
+  ], jurisdiction);
+
+  assert.equal(meetings[0].documents.length, 1);
+  assert.equal(meetings[1].documents.length, 0);
+  assert.ok(meetings[1].extractionNotes?.some((note) => note.includes("different meeting date")));
+});

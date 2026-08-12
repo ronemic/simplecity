@@ -194,22 +194,41 @@ export async function completeAgendaItemCoverage(
   const retryErrors: string[] = [];
   const retriedItemIds: string[] = [];
 
+  const recordRetry = async (items: AgendaItem[]) => {
+    if (!options.generate || items.length === 0) return;
+    for (const item of items) {
+      if (!retriedItemIds.includes(item.externalId)) retriedItemIds.push(item.externalId);
+    }
+    try {
+      const retry = await options.generate(agendaItemRetryMeeting(meeting, items));
+      retryRaw.push(retry.raw);
+      summary = appendSummary(summary, retry.summary);
+    } catch (error) {
+      retryErrors.push(
+        `${items.map((item) => item.externalId).join(", ")}: ${
+          error instanceof Error ? error.message : "Unknown item-summary error"
+        }`
+      );
+    }
+  };
+
   const uncovered = uncoveredAgendaItems(meeting, summary);
   if (options.generate && uncovered.length > 0) {
     // Recover all missing items as one logical request. generateSummaryForMeeting
     // will split this meeting into bounded source-size batches when necessary. This
     // avoids launching one paid request per missing card after a partial response.
-    retriedItemIds.push(...uncovered.map((item) => item.externalId));
-    try {
-      const retry = await options.generate(agendaItemRetryMeeting(meeting, uncovered));
-      retryRaw.push(retry.raw);
-      summary = appendSummary(summary, retry.summary);
-    } catch (error) {
-      retryErrors.push(
-        `${uncovered.map((item) => item.externalId).join(", ")}: ${
-          error instanceof Error ? error.message : "Unknown item-summary error"
-        }`
-      );
+    await recordRetry(uncovered);
+
+    // A provider can return valid JSON while omitting a few items. Give only those
+    // residual items one bounded, small-batch pass instead of repeating the entire
+    // meeting or immediately publishing placeholders.
+    const remaining = uncoveredAgendaItems(meeting, summary);
+    const recoveryBatches = Array.from(
+      { length: Math.min(4, Math.ceil(remaining.length / 3)) },
+      (_, index) => remaining.slice(index * 3, index * 3 + 3)
+    );
+    for (const batch of recoveryBatches) {
+      await recordRetry(batch);
     }
   }
 

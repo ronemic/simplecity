@@ -62,6 +62,16 @@ export function isMeetingCancelled(meeting: PrimeGovMeeting) {
   );
 }
 
+export function isCancellationNoticeText(text = "") {
+  const normalized = normalizeSourceText(text);
+  return (
+    /\bcancellation notice\b/i.test(normalized) ||
+    /\b(?:this|the)\s+(?:regular|special|scheduled\s+)?meeting\b.{0,160}\b(?:has been|was|is)\s+cancell?ed\b/is.test(
+      normalized
+    )
+  );
+}
+
 function sourceUrlFallback(meeting: PrimeGovMeeting) {
   return (
     meeting.sourceUrl ||
@@ -489,6 +499,16 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     }
   }
 
+  const sourceDetectedCancellation = !isCancelled && isCancellationNoticeText(selectedText);
+  const effectiveCancelled = isCancelled || sourceDetectedCancellation;
+  if (sourceDetectedCancellation) {
+    selectedSourceType = "Cancellation";
+    meeting.items = [];
+    extractionNotes.push(
+      "The official document is a cancellation notice; retained the meeting but excluded it from decision-card summarization."
+    );
+  }
+
   let publicCommentsSummaryInput: string | null = null;
 
   if (publicCommentsPdf?.localPath) {
@@ -508,10 +528,14 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     }
   }
 
-  const extractedItems = extractAgendaItemsFromText(meeting, selectedText);
-  meeting.items = mergeAgendaItems(meeting.items || [], extractedItems);
+  const extractedItems = effectiveCancelled ? [] : extractAgendaItemsFromText(meeting, selectedText);
+  meeting.items = effectiveCancelled
+    ? []
+    : mergeAgendaItems(meeting.items || [], extractedItems);
 
-  const attachmentContext = await appendAgendaItemAttachmentContext(meeting, selectedText);
+  const attachmentContext = effectiveCancelled
+    ? { text: selectedText, included: 0 }
+    : await appendAgendaItemAttachmentContext(meeting, selectedText);
   selectedText = attachmentContext.text;
   if (attachmentContext.included > 0) {
     extractionNotes.push(
@@ -545,7 +569,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   return {
     ...meeting,
     id: slugify(`${meetingDateTimeText(meeting) || "no-date"}-${meeting.title}`),
-    status: isCancelled
+    status: effectiveCancelled
       ? "Cancelled"
       : meeting.status ||
         (meeting.section === "Current And Upcoming Meetings" ||
@@ -560,7 +584,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     // Cancellation notices are useful meeting metadata, not decisions. Keeping the
     // prepared input empty also protects non-pipeline callers from sending a stale
     // agenda or packet to an LLM after a meeting is cancelled.
-    llmInputText: isCancelled ? "" : truncateForLLM(selectedText),
+    llmInputText: effectiveCancelled ? "" : truncateForLLM(selectedText),
     publicCommentsInputText: publicCommentsSummaryInput
   };
 }

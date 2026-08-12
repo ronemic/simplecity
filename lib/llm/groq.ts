@@ -66,12 +66,15 @@ class SummaryProviderRequestError extends Error {
 }
 
 const MAX_TOPIC_VALIDATION_PROMPT_CHARS = 60_000;
-export const MAX_AGENDA_ITEM_BATCH_CHARS = 18_000;
+export const MAX_AGENDA_ITEM_BATCH_CHARS = 12_000;
+export const MAX_AGENDA_ITEMS_PER_BATCH = 5;
 
 export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmReadyMeeting[] {
   if (meeting.status === "Cancelled" || !meeting.items?.length) return [meeting];
 
-  const meetingWideContext = extractMeetingWideParticipationContext(meeting.llmInputText);
+  // Keep shared attendance/comment instructions in every batch, but do not let
+  // them crowd out the actual agenda-item evidence or recreate a large request.
+  const meetingWideContext = extractMeetingWideParticipationContext(meeting.llmInputText).slice(0, 3500);
   const batchIntroduction =
     "Generate cards only for the official items in this batch. Do not create cards for neighboring or omitted items.";
   const sharedContextBlock = meetingWideContext
@@ -81,7 +84,7 @@ export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmRead
       ].join("\n")
     : "";
   const batchItemLimit = Math.max(
-    7000,
+    2500,
     MAX_AGENDA_ITEM_BATCH_CHARS - sharedContextBlock.length - batchIntroduction.length - 200
   );
   const itemBatches: NonNullable<LlmReadyMeeting["items"]>[] = [];
@@ -92,7 +95,8 @@ export function buildAgendaItemSummaryBatches(meeting: LlmReadyMeeting): LlmRead
     const itemLength = formatAgendaItemContexts([item]).length;
     if (
       currentItems.length > 0 &&
-      currentLength + itemLength > batchItemLimit
+      (currentLength + itemLength > batchItemLimit ||
+        currentItems.length >= MAX_AGENDA_ITEMS_PER_BATCH)
     ) {
       itemBatches.push(currentItems);
       currentItems = [];
@@ -944,6 +948,8 @@ export async function runSummaryBatchesSequentially<T>(
   options: {
     shouldStop?: () => boolean;
     onStopped?: () => void;
+    continueOnError?: boolean;
+    onError?: (error: unknown, index: number) => void;
   } = {}
 ) {
   const results: Array<{ summary: SimpleCitySummary; raw: unknown }> = [];
@@ -958,6 +964,10 @@ export async function runSummaryBatchesSequentially<T>(
       if (results.length > 0 && options.shouldStop?.()) {
         options.onStopped?.();
         break;
+      }
+      if (options.continueOnError) {
+        options.onError?.(error, index);
+        continue;
       }
       throw error;
     }
@@ -1002,6 +1012,7 @@ export async function generateSummaryForMeeting(
   options.log?.(
     `Summarizing ${meeting.items?.length || 0} structured agenda item(s) in ${batches.length} bounded batch(es).`
   );
+  const batchErrors: unknown[] = [];
   const results = await runSummaryBatchesSequentially(
     batches,
     async (batch, index) => {
@@ -1014,11 +1025,21 @@ export async function generateSummaryForMeeting(
       shouldStop: () => Boolean(options.signal?.aborted || options.shouldStop?.()),
       onStopped: () => options.log?.(
         `Stopped starting agenda-item batches for ${meeting.title} at the pipeline deadline; completed batches will be retained.`
-      )
+      ),
+      continueOnError: true,
+      onError: (error, index) => {
+        batchErrors.push(error);
+        options.log?.(
+          `Agenda-item batch ${index + 1} of ${batches.length} failed for ${meeting.title}; continuing with the remaining independent batches: ${
+            error instanceof Error ? error.message : "Unknown batch error"
+          }`
+        );
+      }
     }
   );
 
   if (results.length === 0) {
+    if (batchErrors[0] instanceof Error) throw batchErrors[0];
     throw options.signal?.reason instanceof Error
       ? options.signal.reason
       : new Error(`Pipeline deadline reached before an LLM batch completed for ${meeting.title}.`);
@@ -1026,7 +1047,7 @@ export async function generateSummaryForMeeting(
 
   const combined = combineBatchSummaries(results);
   options.log?.(
-    `Finished all agenda-item batches for ${meeting.title}: ${combined.summary.cards.length} cards.`
+    `Finished agenda-item batches for ${meeting.title}: ${results.length}/${batches.length} batches succeeded and produced ${combined.summary.cards.length} cards.`
   );
   return combined;
 }

@@ -77,6 +77,51 @@ function statusFor(row: EastPaloAltoExtractedRow, iso: string | null): MeetingSt
   return new Date(iso).getTime() >= Date.now() ? "Upcoming" : "Past";
 }
 
+function datedDocumentKey(url: string) {
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(new URL(url).pathname);
+  } catch {
+    return null;
+  }
+  const match = pathname.match(/(?:^|\D)(\d{1,2})[._-](\d{1,2})[._-](\d{2,4})(?:\D|$)/);
+  if (!match) return null;
+  return parseMeetingDate(`${match[1]}/${match[2]}/${match[3]}`)?.slice(0, 10) || null;
+}
+
+function discardCrossDateDocumentLeakage(meetings: PrimeGovMeeting[]) {
+  const occurrences = new Map<string, PrimeGovMeeting[]>();
+  for (const meeting of meetings) {
+    for (const document of meeting.documents) {
+      if (!/^(?:Agenda|Agenda Packet|Minutes)$/.test(document.type)) continue;
+      const existing = occurrences.get(document.url) || [];
+      existing.push(meeting);
+      occurrences.set(document.url, existing);
+    }
+  }
+
+  for (const [url, linkedMeetings] of occurrences) {
+    if (new Set(linkedMeetings.map((meeting) => meeting.dateText)).size < 2) continue;
+    const documentDate = datedDocumentKey(url);
+    if (!documentDate) continue;
+    for (const meeting of linkedMeetings) {
+      if (parseMeetingDate(meeting.dateText)?.slice(0, 10) === documentDate) continue;
+      meeting.documents = meeting.documents.filter((document) => document.url !== url);
+      meeting.extractionNotes = [
+        ...(meeting.extractionNotes || []),
+        `Ignored a reused document URL dated ${documentDate}; it belongs to a different meeting date.`
+      ];
+      const primary = meeting.documents.find((document) => document.type === "Agenda") ||
+        meeting.documents.find((document) => document.type === "Agenda Packet") ||
+        meeting.documents.find((document) => document.type === "Meeting Details");
+      meeting.sourceUrl = primary?.url || meeting.sectionUrl || meeting.source;
+      meeting.hasPdf = meeting.documents.some((document) =>
+        !isVideo(document.type) && /agenda|minutes|document|attachment/i.test(document.type)
+      );
+    }
+  }
+}
+
 export function normalizeEastPaloAltoRows(
   rows: EastPaloAltoExtractedRow[],
   jurisdiction: JurisdictionConfig
@@ -131,6 +176,7 @@ export function normalizeEastPaloAltoRows(
       extractionNotes: []
     });
   }
+  discardCrossDateDocumentLeakage(meetings);
   return meetings;
 }
 

@@ -24,6 +24,48 @@ export const EMPTY_OFFICIAL_DOCUMENT_ERROR =
 const DOCUMENT_REQUEST_TIMEOUT_MS = 60_000;
 const MAX_BUFFERED_TEXT_DOCUMENT_BYTES = 50 * 1024 * 1024;
 const OFFICIAL_TEXT_FALLBACK_MAX_BYTES = 10 * 1024 * 1024;
+const OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS = 3;
+
+export function isTransientOfficialDocumentError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /fetch failed|socket hang up|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|timed out|made no progress|\bHTTP\s+(?:408|425|429|5\d\d)\b|failed with (?:408|425|429|5\d\d)\b/i.test(
+    message
+  );
+}
+
+async function downloadOfficialDocumentWithRetries(
+  context: BrowserContext,
+  url: string,
+  targetPath: string,
+  options: DownloadDocumentsOptions,
+  streamOptions: Parameters<typeof streamDownloadToTemp>[3],
+  log: (message: string) => void
+) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS; attempt += 1) {
+    if (options.shouldStop?.()) {
+      throw new Error("Document transfer stopped because the pipeline deadline is near.");
+    }
+    try {
+      return await streamDownloadToTemp(context, url, targetPath, streamOptions);
+    } catch (error) {
+      lastError = error;
+      if (
+        attempt === OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS ||
+        !isTransientOfficialDocumentError(error)
+      ) {
+        throw error;
+      }
+      log(
+        `Transient official-document download failure for ${url}; retrying (${attempt + 1}/${OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS}): ${
+          error instanceof Error ? error.message : "Unknown download error"
+        }`
+      );
+      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+    }
+  }
+  throw lastError;
+}
 
 export function getJurisdictionScrapedDir(jurisdictionSlug: string) {
   return path.join(SCRAPED_DIR, jurisdictionSlug);
@@ -480,11 +522,13 @@ export async function downloadIqm2Documents(
           "User-Agent": "Mozilla/5.0 SimpleCity IQM2 scraper",
           Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
         };
-        const streamed = await streamDownloadToTemp(
+        const streamed = await downloadOfficialDocumentWithRetries(
           context,
           doc.url,
           targetPath,
-          streamingOptions(options, budget, requestHeaders)
+          options,
+          streamingOptions(options, budget, requestHeaders),
+          log
         );
         try {
           if (streamed.prefix.subarray(0, 5).toString() === "%PDF-") {
@@ -599,11 +643,13 @@ export async function downloadOfficialSiteDocuments(
       let primaryError: string | null = null;
 
       try {
-        const streamed = await streamDownloadToTemp(
+        const streamed = await downloadOfficialDocumentWithRetries(
           context,
           doc.url,
           targetPath,
-          streamingOptions(options, budget, requestHeaders)
+          options,
+          streamingOptions(options, budget, requestHeaders),
+          log
         );
         try {
           doc.bytes = streamed.bytes;

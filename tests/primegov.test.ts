@@ -20,7 +20,8 @@ import {
 import {
   downloadCompiledDocuments,
   downloadIqm2Documents,
-  downloadOfficialSiteDocuments
+  downloadOfficialSiteDocuments,
+  isTransientOfficialDocumentError
 } from "@/lib/scraper/downloadDocuments";
 import {
   createStreamDownloadBudget,
@@ -725,6 +726,34 @@ test("uses a strict official text fallback after primary HTTP failure", async ()
     assert.equal(meeting.documents[0].extractedText, officialText);
     assert.equal(meeting.documents[0].downloadError, null);
     assert.equal(await fs.readFile(meeting.documents[0].localPath || "", "utf8"), officialText);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("retries transient official-document transport failures before marking ingestion incomplete", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-official-retry-"));
+  const documentUrl = "https://city.example/agenda.pdf";
+  const meeting = primeGovMeeting([{ type: "Agenda", label: "Agenda", url: documentUrl }]);
+  let attempts = 0;
+
+  try {
+    const result = await downloadOfficialSiteDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      fetchImpl: (async () => {
+        attempts += 1;
+        if (attempts < 3) throw new TypeError("fetch failed");
+        return fetchResponse("%PDF-1.7\nOfficial agenda content");
+      }) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(attempts, 3);
+    assert.equal(meeting.documents[0].downloadError, null);
+    assert.ok(meeting.documents[0].localPath?.endsWith(".pdf"));
+    assert.equal(isTransientOfficialDocumentError(new Error("fetch failed")), true);
+    assert.equal(isTransientOfficialDocumentError(new Error("HTTP 404")), false);
   } finally {
     await fs.rm(outputDir, { recursive: true, force: true });
   }

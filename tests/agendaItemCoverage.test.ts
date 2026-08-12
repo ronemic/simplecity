@@ -97,14 +97,14 @@ test("retries only uncovered items and publishes an official-source fallback whe
     }
   );
 
-  assert.deepEqual(retried, ["2B"]);
+  assert.deepEqual(retried, ["2B", "2B"]);
   assert.deepEqual(completed.fallbackItemIds, ["2B"]);
   assert.deepEqual(completed.summary.cards.map((card) => card.sourceItemId), ["2A", "2B"]);
   assert.equal(completed.summary.cards[1].confidence, "low");
   assert.equal(completed.summary.translations?.es?.cards.length, 2);
 });
 
-test("recovers all uncovered items in one bounded generation instead of one request per item", async () => {
+test("retries residual omitted items in one bounded small batch before using fallbacks", async () => {
   const source = meeting([
     item("4A", "First application"),
     item("4B", "Second application"),
@@ -115,6 +115,9 @@ test("recovers all uncovered items in one bounded generation instead of one requ
   const completed = await completeAgendaItemCoverage(source, null, {
     generate: async (retryMeeting) => {
       generatedItemGroups.push(retryMeeting.items!.map((agendaItem) => agendaItem.externalId));
+      if (generatedItemGroups.length > 1) {
+        return { summary: emptySummary(), raw: { residual: true } };
+      }
       return {
         summary: officialSourceFallbackSummary(retryMeeting, retryMeeting.items!.slice(0, 2)),
         raw: { recovered: true }
@@ -122,7 +125,7 @@ test("recovers all uncovered items in one bounded generation instead of one requ
     }
   });
 
-  assert.deepEqual(generatedItemGroups, [["4A", "4B", "4C"]]);
+  assert.deepEqual(generatedItemGroups, [["4A", "4B", "4C"], ["4C"]]);
   assert.deepEqual(completed.retriedItemIds, ["4A", "4B", "4C"]);
   assert.deepEqual(completed.fallbackItemIds, ["4C"]);
   assert.deepEqual(completed.summary.cards.map((card) => card.sourceItemId), ["4A", "4B", "4C"]);
