@@ -409,7 +409,14 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
       ?.parentCountyValue,
     undefined
   );
-  assert.equal(jurisdictionOptions.at(-1)?.value, "santa-barbara-county");
+  const santaBarbaraIndex = jurisdictionOptions.findIndex(
+    (option) => option.value === "santa-barbara-county"
+  );
+  assert.equal(
+    jurisdictionOptions[santaBarbaraIndex + 1]?.value,
+    "los-altos-school-district"
+  );
+  assert.equal(jurisdictionOptions.at(-1)?.value, "los-altos-school-district");
 });
 
 test("weekly digest subscriptions become due in the next calendar week", () => {
