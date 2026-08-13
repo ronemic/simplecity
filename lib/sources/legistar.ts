@@ -77,6 +77,23 @@ type LegistarApiEventItem = {
   EventItemMatterGuid: string | null;
 };
 
+// Legistar agendas carry typesetting rows that control where the printed PDF
+// paginates. They surface through the API as ordinary event items, so without
+// this they become agenda items, fail summarization, and publish as placeholder
+// cards. Deliberately narrow: a row is only discarded when it has no matter, no
+// recorded action, and a title that is nothing but the layout marker itself.
+const LEGISTAR_LAYOUT_MARKER = /^\s*page\s*breaks?\s*$/i;
+
+export function isLegistarLayoutMarker(
+  item: Pick<
+    LegistarApiEventItem,
+    "EventItemTitle" | "EventItemMatterId" | "EventItemActionText"
+  >
+) {
+  if (item.EventItemMatterId || item.EventItemActionText) return false;
+  return LEGISTAR_LAYOUT_MARKER.test(item.EventItemTitle || "");
+}
+
 export function shouldEnrichLegistarAgendaAttachments(
   options: Pick<ScrapeLegistarOptions, "enrichAgendaAttachments" | "enrichLegislation">
 ) {
@@ -1560,10 +1577,17 @@ export async function scrapeLegistarApiMeetings(
     );
     itemsUrl.searchParams.set("$top", "1000");
     const apiItems = await fetchLegistarApiJson<LegistarApiEventItem[]>(itemsUrl.toString());
+    const contentItems = apiItems.filter((item) => !isLegistarLayoutMarker(item));
+    const layoutMarkerCount = apiItems.length - contentItems.length;
+    if (layoutMarkerCount > 0) {
+      log(
+        `Discarded ${layoutMarkerCount} layout-marker row(s) from Legistar event ${event.EventId}.`
+      );
+    }
     const meetingDetailsUrl =
       event.EventInSiteURL ||
       `https://${client}.legistar.com/MeetingDetail.aspx?LEGID=${event.EventId}`;
-    const items: LegistarItem[] = apiItems.map((item) => {
+    const items: LegistarItem[] = contentItems.map((item) => {
       const sourceUrl = legistarApiItemSourceUrl(client, item, meetingDetailsUrl);
       return {
         externalId: `legistar-event-item-${item.EventItemId}`,
