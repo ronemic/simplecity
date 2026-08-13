@@ -293,7 +293,7 @@ export function SummaryCard({
   const updatedTimestamp = formatPacificTimestamp(card.updated_at);
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
-  const primaryButtonClass = "action-primary-sm";
+  const primaryButtonClass = "action-emphasis-sm";
   const showSantaBarbaraInterest =
     (card.jurisdiction_slug || meeting?.jurisdiction_slug) ===
     SANTA_BARBARA_INTEREST_JURISDICTION;

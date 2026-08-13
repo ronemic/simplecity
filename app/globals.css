@@ -352,10 +352,11 @@ p {
   @apply inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded border border-brand bg-brand px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:border-brand-deep hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45;
 }
 
-/* Repeated once per docket row, so it is outlined rather than filled — a solid
-   button on every row out-shouts the decision titles beside it. The border is
-   the strong rule so it still reads as a button. */
-.action-primary-sm {
+/* An emphasized action that is still outlined rather than filled.
+   Deliberately NOT named "primary": it exists for actions repeated once per
+   docket row, where a solid button on every row out-shouts the decision titles
+   beside it. A page-level primary action should use .action-primary. */
+.action-emphasis-sm {
   @apply inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-[color:var(--rule-strong)] bg-surface px-3 py-1.5 text-[13px] font-semibold text-brand transition-colors hover:border-brand hover:bg-brand-tint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45;
 }
 

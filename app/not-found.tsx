@@ -16,7 +16,7 @@ export default async function NotFound() {
         </p>
         <Link
           href="/"
-          className="action-primary-sm mt-5"
+          className="action-primary mt-5"
         >
           {t(locale, "goHome")}
         </Link>
