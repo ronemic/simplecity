@@ -137,7 +137,11 @@ test("Santa Barbara County is an API-backed Legistar jurisdiction", () => {
         option.slug === "santa-barbara-county" && option.name === "Santa Barbara County"
     )
   );
-  assert.equal(getPublicJurisdictionOptions().at(-1)?.slug, "santa-barbara-county");
+  const options = getPublicJurisdictionOptions();
+  const santaBarbaraIndex = options.findIndex(
+    (option) => option.slug === "santa-barbara-county"
+  );
+  assert.equal(options[santaBarbaraIndex + 1]?.slug, "los-altos-school-district");
 });
 
 test("Los Altos is a valid CivicClerk jurisdiction in the Santa Clara region", () => {
@@ -198,8 +202,8 @@ test("Los Altos School District is a distinct Simbli jurisdiction in the Santa C
   assert.equal(toPublicJurisdictionSlug("los-altos-school-district"), "los-altos-school-district");
   assert.equal(options[optionIndex]?.parentCountySlug, "santa-clara-county");
   assert.equal(options[optionIndex]?.kind, "school-district");
-  assert.equal(options[optionIndex - 1]?.slug, "mountain-view");
-  assert.equal(options[optionIndex + 1]?.slug, "santa-barbara-county");
+  assert.equal(options[optionIndex - 1]?.slug, "santa-barbara-county");
+  assert.equal(options.at(-1)?.slug, "los-altos-school-district");
 });
 
 test("Los Altos jurisdictions use only Santa Clara regional Supabase credentials", () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Languages, Loader2, MapPin, Menu, X } from "lucide-react";
+import { Check, ChevronDown, Languages, Loader2, MapPin, Menu, School, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
@@ -290,8 +290,16 @@ export function HeaderNav({
           onClick={() => setIsJurisdictionMenuOpen((isOpen) => !isOpen)}
         >
           <span className="flex min-w-0 items-center gap-2">
-            <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
-            <span className="truncate">{jurisdictionLabel(selectedJurisdiction, selectedLocale)}</span>
+            {selectedJurisdiction.isSchoolDistrict ? (
+              <School aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
+            ) : (
+              <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
+            )}
+            <span
+              className="truncate"
+            >
+              {jurisdictionLabel(selectedJurisdiction, selectedLocale)}
+            </span>
           </span>
           {isJurisdictionPending ? (
             <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
@@ -309,17 +317,14 @@ export function HeaderNav({
             <div role="listbox" aria-label="Jurisdiction" className="max-h-64 overflow-auto">
               {jurisdictions.map((jurisdiction, index) => {
                 const isSelected = jurisdiction.slug === selected;
-                const startsSchoolDistrictGroup =
+                const startsSchoolDistricts =
                   jurisdiction.isSchoolDistrict && !jurisdictions[index - 1]?.isSchoolDistrict;
 
                 return (
                   <Fragment key={jurisdiction.slug}>
-                    {startsSchoolDistrictGroup ? (
-                      <div
-                        aria-hidden="true"
-                        className="mx-3 mt-1 border-t border-black/10 px-1 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.08em] text-black/50"
-                      >
-                        {t(selectedLocale, "subscribeSchoolDistricts")}
+                    {startsSchoolDistricts ? (
+                      <div className="mx-3 mt-1 border-t border-black/10 px-1 pb-1 pt-2 text-[11px] font-semibold text-black/45">
+                        {selectedLocale === "es" ? "Distrito escolar" : "School district"}
                       </div>
                     ) : null}
                     <button
@@ -328,16 +333,24 @@ export function HeaderNav({
                       aria-selected={isSelected}
                       className={cn(
                         "menu-option",
-                        jurisdiction.isChild && "menu-option-child",
+                        jurisdiction.isChild && !jurisdiction.isSchoolDistrict && "menu-option-child",
                         isSelected && "menu-option-selected"
                       )}
                       onClick={() => changeJurisdiction(jurisdiction.slug)}
                     >
-                      <Check
-                        aria-hidden="true"
-                        className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
-                      />
-                      <span className="truncate">{jurisdictionLabel(jurisdiction, selectedLocale)}</span>
+                      {jurisdiction.isSchoolDistrict ? (
+                        <School aria-hidden="true" className="h-4 w-4 text-current" />
+                      ) : (
+                        <Check
+                          aria-hidden="true"
+                          className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
+                        />
+                      )}
+                      <span
+                        className="truncate"
+                      >
+                        {jurisdictionLabel(jurisdiction, selectedLocale)}
+                      </span>
                     </button>
                   </Fragment>
                 );
@@ -441,9 +454,7 @@ export function HeaderNavFallback() {
         >
           {jurisdictions.map((jurisdiction) => (
             <option key={jurisdiction.slug} value={jurisdiction.slug}>
-              {jurisdiction.isSchoolDistrict
-                ? `  ${t("en", "subscribeSchoolDistricts")} — ${jurisdiction.label}`
-                : jurisdiction.isChild
+              {jurisdiction.isChild && !jurisdiction.isSchoolDistrict
                   ? `  ${jurisdiction.label}`
                   : jurisdiction.label}
             </option>

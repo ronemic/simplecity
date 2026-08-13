@@ -186,8 +186,9 @@ export default async function DecisionsPage({
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const isSchoolDistrict = jurisdiction === "los-altos-school-district";
   const search = (params.q || "").trim();
-  const selectedCategory = categoryFromSlug(params.category);
+  const selectedCategory = isSchoolDistrict ? undefined : categoryFromSlug(params.category);
   const selectedResult = decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
   const [result, decisionResultFreshness] = await Promise.all([
@@ -235,6 +236,7 @@ export default async function DecisionsPage({
             locale={locale}
           />
         }
+        showTopicFilters={!isSchoolDistrict}
         showSantaBarbaraInterestPilot={jurisdiction === "santa-barbara-county"}
       />
     </div>

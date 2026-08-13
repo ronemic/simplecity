@@ -37,6 +37,7 @@ export function DecisionBrowser({
   emptyDescription,
   resultFilter,
   resultsCoverage,
+  showTopicFilters = true,
   showSantaBarbaraInterestPilot = false
 }: {
   cards: SummaryCardRow[];
@@ -51,6 +52,7 @@ export function DecisionBrowser({
   emptyDescription: string;
   resultFilter?: ReactNode;
   resultsCoverage?: ReactNode;
+  showTopicFilters?: boolean;
   showSantaBarbaraInterestPilot?: boolean;
 }) {
   const pathname = usePathname();
@@ -131,10 +133,12 @@ export function DecisionBrowser({
           <div aria-busy={isPending}>
             <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
           </div>
-          <DecisionFilters
-            selectedCategory={selectedCategory}
-            locale={locale}
-          />
+          {showTopicFilters ? (
+            <DecisionFilters
+              selectedCategory={selectedCategory}
+              locale={locale}
+            />
+          ) : null}
 
           <div className="mt-6 grid gap-3" aria-live="polite">
             {cards.map((card) => (

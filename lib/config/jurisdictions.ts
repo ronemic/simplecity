@@ -173,13 +173,13 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "Los Altos", slug: "los-altos", parentCountySlug: "santa-clara-county" },
   { name: "Los Altos Hills", slug: "los-altos-hills", parentCountySlug: "santa-clara-county" },
   { name: "Mountain View", slug: "mountain-view", parentCountySlug: "santa-clara-county" },
+  { name: "Santa Barbara County", slug: "santa-barbara-county" },
   {
     name: "Los Altos School District",
     slug: "los-altos-school-district",
     parentCountySlug: "santa-clara-county",
     kind: "school-district"
-  },
-  { name: "Santa Barbara County", slug: "santa-barbara-county" }
+  }
 ];
 
 export function toInternalJurisdictionSlug(
