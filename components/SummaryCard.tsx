@@ -1,18 +1,24 @@
 "use client";
 
-import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, Info, MessageSquare } from "lucide-react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
 import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
 import { PendingLink } from "@/components/PendingLink";
 import { HighlightedText } from "@/components/HighlightedText";
-import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
+import { officialSourceFallbackReason } from "@/lib/utils/summaryFallback";
 import { displayMeetingType } from "@/lib/utils/meetingDisplay";
-import { formatCompactDisplayDate, formatDisplayDate, formatPacificTimestamp } from "@/lib/utils/date";
+import {
+  formatCompactDisplayDate,
+  formatDisplayDate,
+  formatPacificTimestamp,
+  isUpcomingMeetingDate,
+  meetingDateParts
+} from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
 import { cardPreviewText, cardSummaryPoints } from "@/lib/utils/cardShare";
@@ -25,54 +31,11 @@ function compactList(items: string[] | null | undefined, locale: Locale) {
   return items.slice(0, 3).join(", ");
 }
 
-type OfficialSourceFallbackReason =
-  | "validation_failed"
-  | "generation_failed"
-  | "summary_omitted"
-  | "legacy";
-
-const OFFICIAL_SOURCE_FALLBACK_REASONS = new Map<string, OfficialSourceFallbackReason>([
-  [
-    "SimpleCity could not verify a generated summary for this item. The official agenda text is shown instead.",
-    "validation_failed"
-  ],
-  [
-    "SimpleCity no pudo verificar un resumen generado para este punto. En su lugar, se muestra el texto de la agenda oficial.",
-    "validation_failed"
-  ],
-  [
-    "SimpleCity could not generate a summary for this item. The official agenda text is shown instead.",
-    "generation_failed"
-  ],
-  [
-    "SimpleCity no pudo generar un resumen para este punto. En su lugar, se muestra el texto de la agenda oficial.",
-    "generation_failed"
-  ],
-  [
-    "This item was omitted from the generated summary. The official agenda text is shown instead.",
-    "summary_omitted"
-  ],
-  [
-    "Este punto se omitió del resumen generado. En su lugar, se muestra el texto de la agenda oficial.",
-    "summary_omitted"
-  ],
-  [
-    "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted.",
-    "legacy"
-  ],
-  [
-    "SimpleCity todavía está preparando un resumen detallado. El punto de la agenda oficial está disponible ahora para que no se omita.",
-    "legacy"
-  ]
-]);
-
 export function officialSourceFallbackInfo(
   card: Pick<SummaryCardRow, "why_it_matters">,
   locale: Locale
 ) {
-  const reason = OFFICIAL_SOURCE_FALLBACK_REASONS.get(
-    String(card.why_it_matters || "").trim()
-  );
+  const reason = officialSourceFallbackReason(card.why_it_matters);
   if (!reason) return null;
 
   if (locale === "es") {
@@ -148,11 +111,6 @@ function hasCardCommentOptionInfo(card: SummaryCardRow) {
   });
 }
 
-function getPrimaryCategory(card: SummaryCardRow) {
-  const category = (card.category_tags || []).find((item) => item in CATEGORY_DEFINITIONS);
-  return category as CategoryName | undefined;
-}
-
 export function statusSummary(
   card: SummaryCardRow,
   locale: Locale,
@@ -167,7 +125,7 @@ export function statusSummary(
   if (status === "Cancelled" || status === "Canceled" || card.meetings?.status === "Cancelled") {
     return {
       label: t(locale, "meetingCanceled"),
-      className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]",
+      className: "state--alert",
       icon: null
     };
   }
@@ -175,8 +133,8 @@ export function statusSummary(
   if (isAwaitingDecisionResult(card, outcome)) {
     return {
       label: locale === "es" ? "Esperando resultado oficial" : "Awaiting official result",
-      className: "border-[#aabce6] bg-[#eef2ff] text-[#354f9b]",
-      icon: Hourglass
+      className: "state--upcoming",
+      icon: null
     };
   }
 
@@ -192,7 +150,7 @@ export function statusSummary(
             : locale === "es"
               ? `Reunión ${compactMeetingDate}`
               : `Meeting ${compactMeetingDate}`,
-      className: "border-[#f0c75e] bg-[#fff9e9] text-[#a54f00]",
+      className: "state--upcoming",
       icon: null
     };
   }
@@ -200,7 +158,7 @@ export function statusSummary(
   if (status === "Information only") {
     return {
       label: statusLabel(locale, "Info only"),
-      className: "border-[#92dfaa] bg-[#effbf3] text-[#16743b]",
+      className: "state--decided",
       icon: null
     };
   }
@@ -208,38 +166,52 @@ export function statusSummary(
   if (status === "Routine approval") {
     return {
       label: statusLabel(locale, status),
-      className: "border-[#c6cbd8] bg-[#f4f5f8] text-[#4b5367]",
+      className: "state--decided",
       icon: null
     };
   }
 
   return {
     label: statusLabel(locale, status),
-    className: "border-black/15 bg-black/[0.035] text-black/[0.65]",
+    className: "state--decided",
     icon: null
   };
 }
 
+/**
+ * Ochre marks the one thing a reader can still do something about: a meeting
+ * that has not happened yet and has a way to comment. Once the meeting is past,
+ * the same comment path is history, so it drops to neutral.
+ */
 export function commentSummary(
   commentDeadline: CommentDeadlineInfo | null,
   hasCommentOption: boolean,
-  locale: Locale
+  locale: Locale,
+  isUpcoming = true
 ) {
+  if (!hasCommentOption && !commentDeadline) return null;
+
+  if (!isUpcoming) {
+    return {
+      label: locale === "es" ? "El plazo de comentarios ya pasó" : "Comment period has passed",
+      className: "state--decided",
+      icon: null
+    };
+  }
+
   if (commentDeadline) {
     return {
       label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value)}`,
-      className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
-      icon: Clock
+      className: "state--open",
+      icon: null
     };
   }
-  if (hasCommentOption) {
-    return {
-      label: t(locale, "commentOptionListed"),
-      className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]",
-      icon: MessageSquare
-    };
-  }
-  return null;
+
+  return {
+    label: locale === "es" ? "Abierto a comentarios" : "Open for comment",
+    className: "state--open",
+    icon: null
+  };
 }
 
 function jurisdictionLabel(card: SummaryCardRow) {
@@ -305,24 +277,23 @@ export function SummaryCard({
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
   const topicLabel = categoryTags[0] ? categoryLabel(locale, categoryTags[0]) : t(locale, "topicNotListed");
-  const primaryCategory = getPrimaryCategory(card);
-  const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
-  const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
   const status = statusSummary(card, locale, outcome);
+  const isUpcoming = isUpcomingMeetingDate(
+    meeting?.date_text,
+    meeting?.meeting_datetime,
+    meeting?.time_text
+  );
   const comment = officialSourceFallback
     ? null
-    : commentSummary(commentDeadline, hasCommentOption, locale);
+    : commentSummary(commentDeadline, hasCommentOption, locale, isUpcoming);
   const summaryConfidence = officialSourceFallback ? null : confidenceLabel(card, locale);
   const createdTimestamp = formatPacificTimestamp(card.created_at);
   const updatedTimestamp = formatPacificTimestamp(card.updated_at);
-  const CommentIcon = comment?.icon;
-  const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
-  const primaryButtonClass = "action-primary-sm font-black";
-  const noCommentLabel = t(locale, "noCommentOptionListed");
+  const primaryButtonClass = "action-emphasis-sm";
   const showSantaBarbaraInterest =
     (card.jurisdiction_slug || meeting?.jurisdiction_slug) ===
     SANTA_BARBARA_INTEREST_JURISDICTION;
@@ -330,32 +301,65 @@ export function SummaryCard({
     card.updated_at,
     outcome?.updated_at
   );
+  const dateParts = meetingDateParts(meeting?.date_text, meeting?.meeting_datetime, locale);
+  // One source of truth for "the reader can still act on this", so the rail tick,
+  // the rail note and the state line can never disagree. Gating only on
+  // commentDeadline previously flagged past items as open.
+  const isOpenForComment = isUpcoming && hasCommentOption && !officialSourceFallback;
+  // The rail tick encodes where this item sits in its lifecycle, so the column
+  // reads at a glance: ochre = you can still act, blue = ahead but no comment
+  // path listed, plain = already happened.
+  const railVariant = isOpenForComment
+    ? "date-rail--open"
+    : isUpcoming
+      ? "date-rail--upcoming"
+      : "";
 
   return (
     <article
-      className={cn("quiet-card overflow-hidden", isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)]")}
+      className={cn(
+        "overflow-hidden",
+        isSharePresentation ? "quiet-card rounded-xl" : "docket-item"
+      )}
       data-card-id={card.id}
     >
       <div
         className={cn(
-          "grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5",
-          isSharePresentation && "p-6 sm:p-8"
+          isSharePresentation
+            ? "grid gap-4 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-8"
+            : "docket-row"
         )}
       >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
-            <span>
-              <HighlightedText
-                text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
-                query={highlight}
-              />
-            </span>
-            <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
-            <span><HighlightedText text={cardJurisdictionLabel} query={highlight} /></span>
+        {!isSharePresentation ? (
+          <div className={cn("date-rail", railVariant)}>
+            {dateParts ? (
+              <>
+                <span className="rail-month">{dateParts.month}</span>
+                <span className="rail-day">{dateParts.day}</span>
+              </>
+            ) : (
+              <span className="rail-month">—</span>
+            )}
+            {isOpenForComment ? (
+              <span className="rail-note rail-note--open">
+                {locale === "es" ? "Abierto" : "Open"}
+              </span>
+            ) : null}
           </div>
+        ) : null}
+
+        <div className="min-w-0">
+          <p className="committee-eyebrow">
+            <HighlightedText
+              text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
+              query={highlight}
+            />
+            <span aria-hidden className="mx-1.5 text-[color:var(--rule-strong)]">·</span>
+            <HighlightedText text={cardJurisdictionLabel} query={highlight} />
+          </p>
           <TitleTag
             className={cn(
-              "mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2",
+              "mt-1 line-clamp-3 text-[17px] font-semibold leading-[1.3] tracking-tight text-ink sm:line-clamp-2 sm:text-[18px]",
               isSharePresentation &&
                 (officialSourceFallback
                   ? "line-clamp-3 text-3xl sm:line-clamp-3 sm:text-4xl"
@@ -367,61 +371,48 @@ export function SummaryCard({
           {titlePreview && !officialSourceFallback ? (
             <p
               className={cn(
-                "mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
+                "prose-summary mt-1.5 line-clamp-2 max-w-[64ch]",
                 isSharePresentation &&
                   (officialSourceFallback
-                    ? "line-clamp-3 max-w-5xl text-base leading-7 sm:line-clamp-3"
-                    : "line-clamp-none max-w-5xl text-base leading-7 sm:line-clamp-none")
+                    ? "line-clamp-3 max-w-[70ch] text-[17px] leading-[1.65] sm:line-clamp-3"
+                    : "line-clamp-none max-w-[70ch] text-[17px] leading-[1.65] sm:line-clamp-none")
               )}
             >
               <HighlightedText text={titlePreview} query={highlight} />
             </p>
           ) : null}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
+          <div className="meta-line mt-2.5">
             {fallbackInfo ? (
-              <span className="status-chip border-[#d9a34b] bg-[#fff7e8] text-[#794707]">
-                <Info aria-hidden className="h-3.5 w-3.5" />
-                {fallbackInfo.label}
+              <span className="state state--alert">
+                <HighlightedText text={fallbackInfo.label} query={highlight} />
               </span>
             ) : null}
-            <span
-              className={cn(
-                "status-chip",
-                status.className
-              )}
-            >
-              {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
-              <HighlightedText text={status.label} query={highlight} />
-            </span>
             {comment ? (
-              <span className={cn("status-chip", comment.className)}>
-                {CommentIcon ? <CommentIcon aria-hidden className="h-3.5 w-3.5" /> : null}
+              <span className={cn("state", comment.className)}>
                 <HighlightedText text={comment.label} query={highlight} />
               </span>
-            ) : null}
-            <span className="inline-flex items-center gap-1.5">
-              <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-              <HighlightedText text={compactMeetingDate} query={highlight} />
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className="icon-badge"
-              >
-                <TopicIcon className="h-3.5 w-3.5" />
+            ) : (
+              <span className={cn("state", status.className)}>
+                <HighlightedText text={status.label} query={highlight} />
               </span>
+            )}
+            <span>
               <HighlightedText text={topicLabel} query={highlight} />
             </span>
-            {!officialSourceFallback && !hasCommentOption ? (
-              <span className="inline-flex items-center gap-1.5 text-black/[0.5]">
-                <MessageSquare aria-hidden className="h-4 w-4" />
-                {noCommentLabel}
+            {isSharePresentation ? (
+              <span>
+                <HighlightedText text={compactMeetingDate} query={highlight} />
               </span>
             ) : null}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div
+          className={cn(
+            "flex flex-wrap items-center gap-2",
+            isSharePresentation ? "sm:justify-end" : "col-start-2 sm:col-start-3 sm:justify-end"
+          )}
+        >
           {showSantaBarbaraInterest ? (
             <SantaBarbaraInterestButton
               activityAt={interestActivityAt}
@@ -464,13 +455,14 @@ export function SummaryCard({
       {showDetails ? (
         <div
           className={cn(
-            "border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6",
+            "border-t border-rule bg-paper px-4 py-5 sm:px-5",
+            !isSharePresentation && "sm:pl-[5.25rem]",
             isSharePresentation && "px-6 py-7 sm:px-8 sm:py-8"
           )}
         >
           {officialSourceFallback ? (
-            <section className={cn("max-w-4xl text-sm leading-6 text-black/75", isSharePresentation && "text-base leading-7")}>
-              <p className="text-xs font-black uppercase tracking-wide text-civic">
+            <section className={cn("prose-summary max-w-[70ch]", isSharePresentation && "text-[17px]")}>
+              <p className="label-eyebrow">
                 {locale === "es" ? "Texto de la agenda oficial" : "Official agenda text"}
               </p>
               <div className="mt-2 space-y-2">
@@ -480,7 +472,7 @@ export function SummaryCard({
                   </p>
                 ))}
               </div>
-              <p className="mt-3 text-xs font-medium text-black/50">
+              <p className="mt-3 font-sans text-[12.5px] font-normal text-quiet">
                 {locale === "es"
                   ? "Basado en la agenda oficial. SimpleCity no ha resumido ni interpretado este texto."
                   : "Based on the official agenda. SimpleCity has not summarized or interpreted this text."}
@@ -489,31 +481,31 @@ export function SummaryCard({
           ) : (
             <div
               className={cn(
-                "grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]",
-                isSharePresentation && "text-base leading-7 lg:gap-10"
+                "grid gap-6 lg:grid-cols-[1fr_1fr_1.05fr] lg:gap-8",
+                isSharePresentation && "lg:gap-10"
               )}
             >
-              <section>
-                <p className="text-xs font-black uppercase text-civic">{t(locale, "whatIsHappening")}</p>
-                <ul className="mt-2 space-y-2">
+              <section className="prose-summary">
+                <p className="label-eyebrow font-sans">{t(locale, "whatIsHappening")}</p>
+                <ul className="mt-2 space-y-1.5">
                   {points.map((point) => (
                     <li key={point} className="flex gap-2">
-                      <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-civic" />
+                      <span aria-hidden className="mt-[0.6em] h-1 w-1 shrink-0 rounded-sm bg-[color:var(--rule-strong)]" />
                       <span><HighlightedText text={point} query={highlight} /></span>
                     </li>
                   ))}
                 </ul>
               </section>
 
-              <section>
-                <p className="text-xs font-black uppercase text-black/[0.55]">{t(locale, "whyItMatters")}</p>
+              <section className="prose-summary">
+                <p className="label-eyebrow font-sans">{t(locale, "whyItMatters")}</p>
                 <p className="mt-2">
                   <HighlightedText
                     text={card.why_it_matters || t(locale, "notListedInSource")}
                     query={highlight}
                   />
                 </p>
-                <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">{t(locale, "whoIsAffected")}</p>
+                <p className="label-eyebrow mt-4 font-sans">{t(locale, "whoIsAffected")}</p>
                 {affectedTags.length > 0 ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {affectedTags.map((resident) => (
@@ -527,25 +519,25 @@ export function SummaryCard({
                 )}
               </section>
 
-              <section>
-                <p className="text-xs font-black uppercase text-[#8e452e]">{t(locale, "howToAct")}</p>
-                <div className="mt-2 grid gap-3">
+              <section className="prose-summary">
+                <p className="label-eyebrow font-sans text-open">{t(locale, "howToAct")}</p>
+                <div className="mt-2 grid gap-2.5">
                   <p>
-                    <span className="font-bold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
+                    <span className="font-sans text-[13px] font-semibold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
                     <HighlightedText
                       text={card.how_to_act_attend || t(locale, "notListedInSource")}
                       query={highlight}
                     />
                   </p>
                   <p>
-                    <span className="font-bold text-ink">Email: </span>
+                    <span className="font-sans text-[13px] font-semibold text-ink">Email: </span>
                     <HighlightedText
                       text={card.how_to_act_email || t(locale, "notListedInSource")}
                       query={highlight}
                     />
                   </p>
                   <p>
-                    <span className="font-bold text-ink">{t(locale, "submitComment")}: </span>
+                    <span className="font-sans text-[13px] font-semibold text-ink">{t(locale, "submitComment")}: </span>
                     <HighlightedText
                       text={card.how_to_act_submit_comment || t(locale, "notListedInSource")}
                       query={highlight}
@@ -556,9 +548,9 @@ export function SummaryCard({
             </div>
           )}
 
-          <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex flex-wrap items-center gap-3">
-              <span><HighlightedText text={meetingDate} query={highlight} /></span>
+          <div className="mt-5 flex flex-col gap-3 border-t border-rule pt-4 text-[13px] font-normal text-slate sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <span className="record-value"><HighlightedText text={meetingDate} query={highlight} /></span>
               {meetingPageHref ? (
                 <PendingLink
                   href={meetingPageHref}
@@ -582,13 +574,11 @@ export function SummaryCard({
                 </a>
               ) : null}
               {summaryConfidence ? (
-                <span className="meta-chip uppercase tracking-normal text-black/50">
-                  {summaryConfidence}
-                </span>
+                <span className="text-[12.5px] font-normal text-quiet">{summaryConfidence}</span>
               ) : null}
             </div>
             {createdTimestamp ? (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-black/45 sm:justify-end sm:text-right">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-normal text-quiet sm:justify-end sm:text-right">
                 <span>
                   {locale === "es" ? "Publicado" : "Posted"}{" "}
                   <HighlightedText text={createdTimestamp} query={highlight} />

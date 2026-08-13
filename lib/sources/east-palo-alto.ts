@@ -4,7 +4,7 @@ import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { DocumentType, MeetingStatus, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
-import { parseMeetingDate } from "@/lib/utils/date";
+import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 import {
   mergeDiscoveredAgendaItemAttachments,
@@ -86,7 +86,7 @@ function datedDocumentKey(url: string) {
   }
   const match = pathname.match(/(?:^|\D)(\d{1,2})[._-](\d{1,2})[._-](\d{2,4})(?:\D|$)/);
   if (!match) return null;
-  return parseMeetingDate(`${match[1]}/${match[2]}/${match[3]}`)?.slice(0, 10) || null;
+  return civicCalendarDay(`${match[1]}/${match[2]}/${match[3]}`);
 }
 
 function discardCrossDateDocumentLeakage(meetings: PrimeGovMeeting[]) {
@@ -105,7 +105,7 @@ function discardCrossDateDocumentLeakage(meetings: PrimeGovMeeting[]) {
     const documentDate = datedDocumentKey(url);
     if (!documentDate) continue;
     for (const meeting of linkedMeetings) {
-      if (parseMeetingDate(meeting.dateText)?.slice(0, 10) === documentDate) continue;
+      if (civicCalendarDay(meeting.dateText) === documentDate) continue;
       meeting.documents = meeting.documents.filter((document) => document.url !== url);
       meeting.extractionNotes = [
         ...(meeting.extractionNotes || []),

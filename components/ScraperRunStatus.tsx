@@ -58,7 +58,7 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo" }: { jurisdiction?
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-bold text-ink">Manual scraper run</h2>
-          <p className="mt-1 text-sm text-black/70">
+          <p className="mt-1 text-sm text-slate">
             Start the scraper for the selected jurisdiction without waiting for it to finish in this request.
           </p>
         </div>
@@ -76,7 +76,7 @@ export function ScraperRunStatus({ jurisdiction = "san-mateo" }: { jurisdiction?
         <p
           className={cn(
             "mt-4 whitespace-pre-wrap rounded-lg p-4 text-sm leading-6",
-            hasIssue ? "border border-clay/25 bg-clay/10 text-[#7a2f1d]" : "bg-black/5 text-black/75"
+            hasIssue ? "border border-rule bg-paper text-deny" : "bg-paper text-slate"
           )}
         >
           {message}

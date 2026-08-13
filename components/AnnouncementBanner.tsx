@@ -38,11 +38,11 @@ export function AnnouncementBanner({
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <div className="min-w-0">
-                <p className="label-eyebrow text-black/[0.65]">
+                <p className="label-eyebrow text-slate">
                   {t(locale, "adminAnnouncement")} · {jurisdictionLabel(announcement.jurisdiction_slug)}
                 </p>
-                <h2 className="mt-1 text-xl font-black leading-snug text-ink">{announcement.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-black/75">{announcement.body}</p>
+                <h2 className="mt-1 text-xl font-semibold leading-snug text-ink">{announcement.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate">{announcement.body}</p>
               </div>
             </div>
           </aside>

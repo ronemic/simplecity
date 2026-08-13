@@ -98,8 +98,8 @@ export function PendingLink({
             {children}
           </span>
           {pending ? (
-            <span className="absolute inset-0 flex items-center justify-center gap-2 rounded-[inherit] bg-white/80 text-sm font-semibold text-black/70 backdrop-blur-sm">
-              <Loader2 aria-hidden className="h-4 w-4 animate-spin text-civic" />
+            <span className="absolute inset-0 flex items-center justify-center gap-2 rounded-[inherit] bg-surface/80 text-sm font-semibold text-slate backdrop-blur-sm">
+              <Loader2 aria-hidden className="h-4 w-4 animate-spin text-brand" />
               <span className="sr-only">{pendingLabel || "Loading"}</span>
             </span>
           ) : null}

@@ -32,6 +32,8 @@ import type { Locale } from "@/lib/i18n";
 import {
   applyDecisionOutcomeTranslation,
 } from "@/lib/i18n/decisionOutcome";
+import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
+import { isUpcomingMeetingDate } from "@/lib/utils/date";
 import {
   decisionCardSearchFilters,
   decisionMeetingSearchFilters,
@@ -79,7 +81,30 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
 ].join(",");
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
-const HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION = 80;
+/**
+ * The homepage ranks a pool of candidates down to four cards, so the pool has to
+ * be wide enough to contain the good ones. At a flat 80 per jurisdiction, Santa
+ * Barbara County (491 cards, many of them meeting cancellations) had almost
+ * nothing left after filtering and rendered two items.
+ *
+ * A flat 200 fixed that but made the "all jurisdictions" view time out, since the
+ * cost is per-jurisdiction and every row gets translation enrichment. So the pool
+ * is a shared budget: one jurisdiction gets a deep pool, thirteen split it.
+ */
+const HOME_CARD_PREVIEW_BUDGET = 520;
+const HOME_CARD_PREVIEW_MIN_PER_JURISDICTION = 40;
+const HOME_CARD_PREVIEW_MAX_PER_JURISDICTION = 200;
+
+function homeCardPreviewLimit(clientCount: number) {
+  if (clientCount <= 0) return HOME_CARD_PREVIEW_MIN_PER_JURISDICTION;
+  return Math.min(
+    HOME_CARD_PREVIEW_MAX_PER_JURISDICTION,
+    Math.max(
+      HOME_CARD_PREVIEW_MIN_PER_JURISDICTION,
+      Math.floor(HOME_CARD_PREVIEW_BUDGET / clientCount)
+    )
+  );
+}
 const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
 const PUBLIC_STATS_QUERY_TIMEOUT_MS = 4_000;
 const PUBLIC_DECISION_OUTCOME_COLUMNS = [
@@ -561,19 +586,39 @@ async function loadPublishedCardsForJurisdiction(
   locale: Locale,
   options: { limit?: number } = {}
 ) {
-  let query = supabase
-    .from("summary_cards")
-    .select(PUBLIC_SUMMARY_CARD_SELECT)
-    .eq("jurisdiction_slug", jurisdiction.slug)
-    .eq("is_published", true)
-    .order("is_featured", { ascending: false })
-    .order("created_at", { ascending: false });
+  // Ordered by decision date, not row-creation date.
+  //
+  // `created_at` is when the summarizer wrote the row, which has nothing to do
+  // with when the decision happens. A single bulk import gave 80 cards the same
+  // created_at, so a limited preview returned one arbitrary batch — Santa Barbara's
+  // homepage drew four cards from an import with no upcoming meetings and no
+  // usable summaries, while the actual pending decisions sat outside the window.
+  //
+  // `decision_sort_at` is coalesce(meeting_datetime, updated_at, created_at), kept
+  // current by a trigger, so upcoming meetings sort to the top where they belong.
+  function buildQuery(orderByDecisionDate: boolean) {
+    let query = supabase
+      .from("summary_cards")
+      .select(PUBLIC_SUMMARY_CARD_SELECT)
+      .eq("jurisdiction_slug", jurisdiction.slug)
+      .eq("is_published", true)
+      .order("is_featured", { ascending: false });
 
-  if (options.limit) {
-    query = query.limit(options.limit);
+    if (orderByDecisionDate) {
+      query = query.order("decision_sort_at", { ascending: false, nullsFirst: false });
+    }
+
+    query = query.order("created_at", { ascending: false });
+
+    return options.limit ? query.limit(options.limit) : query;
   }
 
-  const { data, error } = await query;
+  let { data, error } = await buildQuery(true);
+
+  // Older deployments may not have the column yet; fall back rather than 500.
+  if (error && isMissingDecisionSortColumn(error)) {
+    ({ data, error } = await buildQuery(false));
+  }
 
   if (error) {
     logQueryError(`Failed to load ${jurisdiction.name} published summary cards`, error);
@@ -605,17 +650,126 @@ const getCachedPublishedCardPreview = unstable_cache(
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as SummaryCardRow[];
 
+    const limit = homeCardPreviewLimit(clients.length);
     const results = await Promise.all(
-      clients.map((client) =>
-        loadPublishedCardsForJurisdiction(client, locale, {
-          limit: HOME_CARD_PREVIEW_LIMIT_PER_JURISDICTION
-        })
-      )
+      clients.map((client) => loadPublishedCardsForJurisdiction(client, locale, { limit }))
     );
 
     return sortCards(results.flat());
   },
   ["published-summary-card-preview"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
+type UpcomingMeetingShape = {
+  meeting_datetime: string | null;
+  date_text: string | null;
+  time_text: string | null;
+  status: string | null;
+};
+
+type UpcomingDecisionRow = {
+  comment_window_closes: string | null;
+  how_to_act_email: string | null;
+  how_to_act_submit_comment: string | null;
+  meetings: UpcomingMeetingShape | null;
+};
+
+// The SQL lower bound is deliberately loose — one day back — so the exact
+// "is this still ahead?" decision is made by isUpcomingMeetingDate, which knows
+// about Pacific time and about meetings that are mid-session.
+const UPCOMING_LOOKBACK_MS = 24 * 60 * 60 * 1000;
+const UPCOMING_MEETING_SCAN_LIMIT = 60;
+
+function isCancelledMeetingStatus(status?: string | null) {
+  return /^cancel{1,2}ed$/i.test(String(status || "").trim());
+}
+
+function isAttendableUpcomingMeeting(meeting: UpcomingMeetingShape | null | undefined) {
+  if (!meeting) return false;
+  if (isCancelledMeetingStatus(meeting.status)) return false;
+  return isUpcomingMeetingDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text);
+}
+
+const getCachedUpcomingDecisionSnapshot = unstable_cache(
+  async (selection: JurisdictionSelection) => {
+    const empty = { openForCommentCount: 0, nextMeetingIso: null as string | null };
+    const clients = getSafePublicClients(selection);
+    if (clients.length === 0) return empty;
+
+    const since = new Date(Date.now() - UPCOMING_LOOKBACK_MS).toISOString();
+
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        // Two separate questions, so two separate sources.
+        //
+        // The next meeting comes from the meetings table, because a resident
+        // asking "when can I show up?" wants the real calendar — not just the
+        // meetings that happen to have a summarized card yet. Santa Barbara's
+        // genuine next meeting had no card at all, and the soonest one that did
+        // have a card was cancelled.
+        //
+        // The open-for-comment count comes from published cards, because that
+        // claim is about decisions we actually summarized.
+        const [meetingResult, cardResult] = await Promise.all([
+          supabase
+            .from("meetings")
+            .select("meeting_datetime,date_text,time_text,status")
+            .eq("jurisdiction_slug", jurisdiction.slug)
+            .gte("meeting_datetime", since)
+            .order("meeting_datetime", { ascending: true })
+            .limit(UPCOMING_MEETING_SCAN_LIMIT),
+          supabase
+            .from("summary_cards")
+            .select(
+              "comment_window_closes,how_to_act_email,how_to_act_submit_comment,meetings!inner(meeting_datetime,date_text,time_text,status)"
+            )
+            .eq("jurisdiction_slug", jurisdiction.slug)
+            .eq("is_published", true)
+            .gte("meetings.meeting_datetime", since)
+        ]);
+
+        if (meetingResult.error) {
+          logQueryError(
+            `Failed to load ${jurisdiction.name} upcoming meetings`,
+            meetingResult.error
+          );
+        }
+        if (cardResult.error) {
+          logQueryError(
+            `Failed to load ${jurisdiction.name} upcoming decisions`,
+            cardResult.error
+          );
+        }
+
+        return {
+          meetings: (meetingResult.data || []) as unknown as UpcomingMeetingShape[],
+          cards: (cardResult.data || []) as unknown as UpcomingDecisionRow[]
+        };
+      })
+    );
+
+    const openForCommentCount = results
+      .flatMap((result) => result.cards)
+      .filter((row) => isAttendableUpcomingMeeting(row.meetings))
+      .filter((row) =>
+        hasCommentOptionInfo({
+          closes: row.comment_window_closes,
+          actionTexts: [row.how_to_act_submit_comment, row.how_to_act_email]
+        })
+      ).length;
+
+    const nextMeetingIso =
+      results
+        .flatMap((result) => result.meetings)
+        .filter(isAttendableUpcomingMeeting)
+        .map((meeting) => meeting.meeting_datetime)
+        .filter((value): value is string => Boolean(value))
+        .sort((left, right) => left.localeCompare(right))[0] || null;
+
+    return { openForCommentCount, nextMeetingIso };
+  },
+  ["upcoming-decision-snapshot"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1254,6 +1408,24 @@ export async function getPublishedCardCount(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug
 ) {
   return getCachedPublishedCardCount(selection);
+}
+
+/**
+ * Counts and next-meeting date for the homepage status line.
+ *
+ * This deliberately does NOT reuse the homepage card preview. That preview is
+ * the newest 80 cards per jurisdiction by `created_at`, which has nothing to do
+ * with meeting dates — for Santa Barbara County all 80 came from one import
+ * batch and none had an upcoming meeting, so the page silently claimed there
+ * was no next meeting while a Board hearing was scheduled for that afternoon.
+ *
+ * Filtering happens in the database on the joined meeting, so the result covers
+ * every published card rather than a slice of them.
+ */
+export async function getUpcomingDecisionSnapshot(
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug
+) {
+  return getCachedUpcomingDecisionSnapshot(selection);
 }
 
 export async function getDecisionResultFreshness() {

@@ -5,7 +5,7 @@ import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { DocumentType, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { downloadOfficialSiteDocuments } from "@/lib/scraper/downloadDocuments";
-import { parseMeetingDate } from "@/lib/utils/date";
+import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import {
@@ -59,9 +59,12 @@ export function attachLaserficheMinutes(
   meetings: PrimeGovMeeting[],
   entries: LaserficheMinutesEntry[]
 ) {
+  // Keyed on the Pacific calendar day. Slicing the parsed ISO gave the UTC day,
+  // so every evening council meeting keyed to the following date and never
+  // matched its own minutes archive label.
   const meetingsByDate = new Map<string, PrimeGovMeeting[]>();
   for (const meeting of meetings) {
-    const date = parseMeetingDate(meeting.dateText || "")?.slice(0, 10);
+    const date = civicCalendarDay(meeting.dateText);
     if (!date) continue;
     meetingsByDate.set(date, [...(meetingsByDate.get(date) || []), meeting]);
   }
@@ -71,7 +74,7 @@ export function attachLaserficheMinutes(
     const archiveDate = entry.label.match(/\b(20\d{2})[.-](\d{2})[.-](\d{2})\b/);
     const date = archiveDate
       ? `${archiveDate[1]}-${archiveDate[2]}-${archiveDate[3]}`
-      : parseMeetingDate(entry.label)?.slice(0, 10);
+      : civicCalendarDay(entry.label);
     if (!date) continue;
     const candidates = meetingsByDate.get(date) || [];
     const cityCouncilCandidates = candidates.filter((meeting) =>

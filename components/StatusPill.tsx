@@ -18,8 +18,8 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "status-pill",
-        STATUS_TONES[label] || "border-black/20 bg-black/5 text-black/70"
+        "state",
+        STATUS_TONES[label] || "state--decided"
       )}
     >
       <HighlightedText text={displayLabel} query={highlight} />
