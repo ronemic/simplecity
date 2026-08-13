@@ -323,7 +323,7 @@ export function HeaderNav({
                 return (
                   <Fragment key={jurisdiction.slug}>
                     {startsSchoolDistricts ? (
-                      <div className="mx-3 mt-1 border-t border-black/10 px-1 pb-1 pt-2 text-[11px] font-semibold text-black/45">
+                      <div className="menu-section-label">
                         {selectedLocale === "es" ? "Distrito escolar" : "School district"}
                       </div>
                     ) : null}
@@ -338,14 +338,10 @@ export function HeaderNav({
                       )}
                       onClick={() => changeJurisdiction(jurisdiction.slug)}
                     >
-                      {jurisdiction.isSchoolDistrict ? (
-                        <School aria-hidden="true" className="h-4 w-4 text-current" />
-                      ) : (
-                        <Check
-                          aria-hidden="true"
-                          className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
-                        />
-                      )}
+                      <Check
+                        aria-hidden="true"
+                        className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
+                      />
                       <span
                         className="truncate"
                       >

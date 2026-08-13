@@ -319,6 +319,10 @@ p {
   @apply pl-6 font-semibold;
 }
 
+.menu-section-label {
+  @apply mx-3 mt-1 border-t border-black/10 px-1 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-black/45;
+}
+
 .menu-option-selected {
   @apply bg-[#12365f] text-white hover:bg-[#12365f] focus-visible:bg-[#12365f];
 }
