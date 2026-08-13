@@ -115,6 +115,60 @@ export function summaryCardWriteBatches<T>(rows: T[], batchSize = SUMMARY_CARD_W
   return batches;
 }
 
+/**
+ * Postgres refuses to let one ON CONFLICT DO UPDATE statement touch the same row
+ * twice, and a meeting can legitimately list one URL under several document
+ * types. Later duplicates win per column, but a later row that omits extracted
+ * text must not erase text an earlier duplicate supplied — which is exactly what
+ * sequential per-document upserts did.
+ */
+export function collapseDocumentRowsByConflictTarget<T extends { source_url: string }>(
+  rows: T[]
+) {
+  const byUrl = new Map<string, T>();
+  for (const row of rows) {
+    const existing = byUrl.get(row.source_url);
+    byUrl.set(row.source_url, existing ? { ...existing, ...row } : row);
+  }
+  return [...byUrl.values()];
+}
+
+export const DOCUMENT_WRITE_BATCH_SIZE = 10;
+export const DOCUMENT_WRITE_BATCH_CHARACTERS = 1_000_000;
+
+/**
+ * Document rows carry extracted text up to the per-type storage cap, so batches
+ * are bounded by payload size as well as row count. One oversized minutes row
+ * still ships on its own rather than being dropped.
+ */
+export function documentWriteBatches<T extends { extracted_text?: unknown }>(
+  rows: T[],
+  batchSize = DOCUMENT_WRITE_BATCH_SIZE,
+  batchCharacters = DOCUMENT_WRITE_BATCH_CHARACTERS
+) {
+  const batches: T[][] = [];
+  let current: T[] = [];
+  let currentCharacters = 0;
+
+  for (const row of rows) {
+    const rowCharacters =
+      typeof row.extracted_text === "string" ? row.extracted_text.length : 0;
+    if (
+      current.length > 0 &&
+      (current.length >= batchSize || currentCharacters + rowCharacters > batchCharacters)
+    ) {
+      batches.push(current);
+      current = [];
+      currentCharacters = 0;
+    }
+    current.push(row);
+    currentCharacters += rowCharacters;
+  }
+  if (current.length > 0) batches.push(current);
+
+  return batches;
+}
+
 export function rawLlmJsonForBulkRow(rawLlmJson: unknown, rowIndex: number) {
   // A batched summary response can be hundreds of kilobytes. Repeating the
   // complete payload on every card makes a large agenda insert many times
@@ -720,26 +774,30 @@ export async function upsertMeetings(
       }
     }
 
-    for (const doc of safeMeeting.documents) {
+    const documentRows = collapseDocumentRowsByConflictTarget(
+      safeMeeting.documents.map((doc) => ({
+        ...jurisdictionColumns,
+        meeting_id: data.id,
+        type: doc.type,
+        label: doc.label,
+        source_url: doc.url,
+        local_path: doc.localPath || null,
+        storage_path: doc.storagePath || null,
+        bytes: doc.bytes || null,
+        download_error: doc.downloadError || null,
+        ...documentExtractionFieldsForStorage(
+          doc.type,
+          doc.extractedText,
+          archivedExtractions.get(doc.url)
+        ),
+        is_scanned: doc.isScanned || false
+      }))
+    );
+
+    for (const batch of documentWriteBatches(documentRows)) {
       const { error: docError } = await retryTransientSupabaseWrite(
         () => supabase.from("documents").upsert(
-          {
-            ...jurisdictionColumns,
-            meeting_id: data.id,
-            type: doc.type,
-            label: doc.label,
-            source_url: doc.url,
-            local_path: doc.localPath || null,
-            storage_path: doc.storagePath || null,
-            bytes: doc.bytes || null,
-            download_error: doc.downloadError || null,
-            ...documentExtractionFieldsForStorage(
-              doc.type,
-              doc.extractedText,
-              archivedExtractions.get(doc.url)
-            ),
-            is_scanned: doc.isScanned || false
-          },
+          batch,
           { onConflict: regionalDatabase ? "jurisdiction_slug,source_url" : "source_url" }
         ),
         {
@@ -752,7 +810,9 @@ export async function upsertMeetings(
       );
 
       if (docError) {
-        throw new Error(`Failed to upsert document ${doc.url}: ${docError.message}`);
+        throw new Error(
+          `Failed to upsert ${batch.length} document(s) for ${meeting.title}: ${docError.message}`
+        );
       }
     }
 

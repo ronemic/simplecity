@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  collapseDocumentRowsByConflictTarget,
   compactMeetingRawForStorage,
   documentExtractionFieldsForStorage,
   documentExtractedTextForStorage,
+  documentWriteBatches,
   isTransientSupabaseWriteError,
+  upsertMeetings,
   retryTransientSupabaseWrite,
   uniqueExistingExternalIdsByMeetingDetailsUrl,
   uniqueMeetingDetailsIdentityUrls
@@ -167,4 +170,148 @@ test("does not select an arbitrary external id when stored rows share a details 
 
   assert.equal(externalIds.has(sharedUrl), false);
   assert.equal(externalIds.get(uniqueUrl), "unique");
+});
+
+test("collapses documents sharing one URL so a batched upsert cannot touch a row twice", () => {
+  const rows = collapseDocumentRowsByConflictTarget([
+    { source_url: "https://city.example/doc.pdf", type: "Minutes", is_scanned: false },
+    { source_url: "https://city.example/other.pdf", type: "Agenda", is_scanned: false },
+    { source_url: "https://city.example/doc.pdf", type: "Accessible Minutes", is_scanned: true }
+  ]);
+
+  assert.equal(rows.length, 2);
+  assert.deepEqual(rows.map((row) => row.source_url), [
+    "https://city.example/doc.pdf",
+    "https://city.example/other.pdf"
+  ]);
+  assert.equal(rows[0].type, "Accessible Minutes");
+  assert.equal(rows[0].is_scanned, true);
+});
+
+test("keeps extracted text a duplicate URL supplied earlier when the later row omits it", () => {
+  const [row] = collapseDocumentRowsByConflictTarget([
+    {
+      source_url: "https://city.example/doc.pdf",
+      type: "Minutes",
+      ...documentExtractionFieldsForStorage("Minutes", "Approved 5-0.")
+    },
+    {
+      source_url: "https://city.example/doc.pdf",
+      type: "Accessible Minutes",
+      ...documentExtractionFieldsForStorage("Accessible Minutes", null)
+    }
+  ]);
+
+  assert.equal(row.type, "Accessible Minutes");
+  assert.equal(row.extracted_text, "Approved 5-0.");
+  assert.equal(row.extraction_character_count, 13);
+});
+
+test("bounds document write batches by row count and payload size", () => {
+  const small = Array.from({ length: 25 }, (_, index) => ({
+    source_url: `https://city.example/${index}.pdf`,
+    extracted_text: "short"
+  }));
+  assert.deepEqual(documentWriteBatches(small).map((batch) => batch.length), [10, 10, 5]);
+
+  const heavy = [
+    { source_url: "a", extracted_text: "x".repeat(700_000) },
+    { source_url: "b", extracted_text: "x".repeat(700_000) },
+    { source_url: "c", extracted_text: "x".repeat(100) }
+  ];
+  assert.deepEqual(documentWriteBatches(heavy).map((batch) => batch.length), [1, 2]);
+});
+
+test("ships a single oversized document row rather than dropping it", () => {
+  const batches = documentWriteBatches([
+    { source_url: "minutes", extracted_text: "x".repeat(2_000_000) },
+    { source_url: "agenda", extracted_text: "x".repeat(10) }
+  ]);
+
+  assert.deepEqual(batches.map((batch) => batch.length), [1, 1]);
+  assert.equal(batches[0][0].source_url, "minutes");
+});
+
+type CapturedWrite = { table: string; payload: unknown; options?: unknown };
+
+function fakeSupabaseClient(writes: CapturedWrite[]) {
+  function chainFor(table: string) {
+    let outcome: Record<string, unknown> = { data: [], error: null, count: 0 };
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      in: () => chain,
+      single: async () => outcome,
+      upsert: (payload: unknown, options?: unknown) => {
+        writes.push({ table, payload, options });
+        if (table === "meetings") {
+          outcome = { data: { id: "meeting-1", summarized_source_hash: null }, error: null };
+        }
+        return chain;
+      },
+      then: (resolve: (value: unknown) => unknown) => Promise.resolve(outcome).then(resolve)
+    };
+    return chain;
+  }
+
+  return { from: (table: string) => chainFor(table) } as unknown as Parameters<typeof upsertMeetings>[0];
+}
+
+function meetingWithDocuments(documents: LlmReadyMeeting["documents"]): LlmReadyMeeting {
+  return {
+    id: "council",
+    section: "Past Meetings",
+    title: "City Council",
+    dateText: "Jul 20, 2026",
+    meetingType: "City Council",
+    rowText: "City Council Jul 20, 2026",
+    status: "Past",
+    sourceType: "Agenda PDF",
+    sourceUrl: "https://city.example/meeting/1",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents,
+    extractionNotes: [],
+    llmInputText: "Agenda text.",
+    publicCommentsInputText: null
+  } as LlmReadyMeeting;
+}
+
+test("writes a meeting's documents as one batched upsert instead of one request per document", async () => {
+  const writes: CapturedWrite[] = [];
+  const documents = Array.from({ length: 6 }, (_, index) => ({
+    type: "Attachment",
+    label: `Attachment ${index}`,
+    url: `https://city.example/doc-${index}.pdf`,
+    extractedText: "Short official text."
+  })) as LlmReadyMeeting["documents"];
+
+  await upsertMeetings(fakeSupabaseClient(writes), [meetingWithDocuments(documents)]);
+
+  const documentWrites = writes.filter((write) => write.table === "documents");
+  assert.equal(documentWrites.length, 1);
+  assert.equal((documentWrites[0].payload as unknown[]).length, 6);
+  assert.deepEqual(documentWrites[0].options, { onConflict: "source_url" });
+});
+
+test("collapses duplicate document URLs before the batched upsert reaches Postgres", async () => {
+  const writes: CapturedWrite[] = [];
+  const sharedUrl = "https://city.example/minutes.pdf";
+  const documents = [
+    { type: "Minutes", label: "Minutes", url: sharedUrl, extractedText: "Approved 5-0." },
+    { type: "Accessible Minutes", label: "Accessible Minutes", url: sharedUrl },
+    { type: "Agenda", label: "Agenda", url: "https://city.example/agenda.pdf" }
+  ] as LlmReadyMeeting["documents"];
+
+  await upsertMeetings(fakeSupabaseClient(writes), [meetingWithDocuments(documents)]);
+
+  const rows = writes.find((write) => write.table === "documents")?.payload as Array<
+    Record<string, unknown>
+  >;
+  assert.equal(rows.length, 2);
+
+  const merged = rows.find((row) => row.source_url === sharedUrl);
+  assert.equal(merged?.type, "Accessible Minutes");
+  // The later duplicate carries no text of its own; the earlier row's text survives.
+  assert.equal(merged?.extracted_text, "Approved 5-0.");
 });
