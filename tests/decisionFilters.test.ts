@@ -7,6 +7,7 @@ import {
   matchesNormalizedDecisionSearchText,
   normalizeDecisionSearchText
 } from "@/lib/utils/decisionFilters";
+import { SCHOOL_CATEGORIES } from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
 
 const card = {
@@ -24,6 +25,11 @@ const card = {
 
 test("resolves decision category URL slugs", () => {
   assert.equal(categoryFromSlug("parks-environment"), "Parks & Environment");
+  assert.equal(
+    categoryFromSlug("school-buildings-grounds", SCHOOL_CATEGORIES),
+    "School Buildings & Grounds"
+  );
+  assert.equal(categoryFromSlug("parks-environment", SCHOOL_CATEGORIES), undefined);
   assert.equal(categoryFromSlug("not-a-category"), undefined);
 });
 

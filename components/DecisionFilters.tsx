@@ -9,9 +9,11 @@ import type { Locale } from "@/lib/i18n";
 
 export function DecisionFilters({
   selectedCategory,
+  categories = CATEGORIES,
   locale
 }: {
   selectedCategory?: CategoryName;
+  categories?: readonly CategoryName[];
   locale: Locale;
 }) {
   const pathname = usePathname();
@@ -42,7 +44,7 @@ export function DecisionFilters({
             <Layers3 aria-hidden className="h-4 w-4 shrink-0" />
             <span>{locale === "es" ? "Todos los temas" : "All topics"}</span>
           </PendingLink>
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <CategoryPill
               key={category}
               category={category}

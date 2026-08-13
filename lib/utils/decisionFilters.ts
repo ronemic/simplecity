@@ -7,8 +7,11 @@ import {
   type DecisionResultFilter
 } from "@/lib/utils/decisionResultFilter";
 
-export function categoryFromSlug(slug: string | null | undefined): CategoryName | undefined {
-  return CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
+export function categoryFromSlug(
+  slug: string | null | undefined,
+  categories: readonly CategoryName[] = CATEGORIES
+): CategoryName | undefined {
+  return categories.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
 }
 
 export function normalizeDecisionSearchText(value: string) {

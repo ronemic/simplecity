@@ -11,6 +11,7 @@ import {
   MEETING_WIDE_CONTEXT_HEADING
 } from "@/lib/scraper/agendaItemContext";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
+import { categoryTagsForMeeting } from "@/lib/llm/topicPolicy";
 
 type SummaryResult = { summary: SimpleCitySummary; raw: unknown };
 
@@ -91,7 +92,13 @@ function fallbackCard(meeting: LlmReadyMeeting, item: AgendaItem): SimpleCityCar
     whatIsHappening: [`The official agenda lists “${title}” for consideration.`],
     whyItMatters: "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted.",
     whoItAffects: ["Not listed in the source document."],
-    categoryTags: [],
+    categoryTags: categoryTagsForMeeting(
+      meeting,
+      [],
+      [item.title, item.action, item.recommendedAction, item.rowText]
+        .filter(Boolean)
+        .join(" ")
+    ),
     status: fallbackStatus(meeting, item),
     commentWindow: {
       opens: "Not listed in the source document.",

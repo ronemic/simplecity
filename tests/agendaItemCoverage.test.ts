@@ -81,6 +81,17 @@ test("measures coverage by stable source item id instead of meeting card count",
   );
 });
 
+test("school-district fallback cards infer a school-specific topic", () => {
+  const source = {
+    ...meeting([item("6.2", "Playground asphalt repairs at Oak School")]),
+    jurisdictionSlug: "los-altos-school-district"
+  };
+
+  const summary = officialSourceFallbackSummary(source, source.items!);
+
+  assert.deepEqual(summary.cards[0].categoryTags, ["School Buildings & Grounds"]);
+});
+
 test("retries only uncovered items and publishes an official-source fallback when retry stays empty", async () => {
   const source = meeting([item("2A", "First application"), item("2B", "Second application")]);
   const first = officialSourceFallbackSummary(source, [source.items![0]]);

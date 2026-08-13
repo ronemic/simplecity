@@ -390,7 +390,15 @@ const categoryLabels: Record<Locale, Record<CategoryName, string>> = {
     "Budget & Taxes": "Budget & Taxes",
     "Business & Development": "Business & Development",
     "Schools & Youth": "Schools & Youth",
-    "City Services": "Public Services"
+    "City Services": "Public Services",
+    "Teaching & Learning": "Teaching & Learning",
+    "Students & Families": "Students & Families",
+    "School Buildings & Grounds": "School Buildings & Grounds",
+    "School Funding": "School Funding",
+    "Teachers & Staff": "Teachers & Staff",
+    "Safety & Wellness": "Safety & Wellness",
+    "Enrollment & Boundaries": "Enrollment & Boundaries",
+    "Board & Administration": "Board & Administration"
   },
   es: {
     Housing: "Vivienda",
@@ -400,7 +408,15 @@ const categoryLabels: Record<Locale, Record<CategoryName, string>> = {
     "Budget & Taxes": "Presupuesto e impuestos",
     "Business & Development": "Negocios y desarrollo",
     "Schools & Youth": "Escuelas y jóvenes",
-    "City Services": "Servicios públicos"
+    "City Services": "Servicios públicos",
+    "Teaching & Learning": "Enseñanza y aprendizaje",
+    "Students & Families": "Estudiantes y familias",
+    "School Buildings & Grounds": "Edificios y terrenos escolares",
+    "School Funding": "Financiamiento escolar",
+    "Teachers & Staff": "Docentes y personal",
+    "Safety & Wellness": "Seguridad y bienestar",
+    "Enrollment & Boundaries": "Inscripción y zonas escolares",
+    "Board & Administration": "Junta y administración"
   }
 };
 
@@ -412,7 +428,15 @@ const categoryShortLabels: Record<Locale, Partial<Record<CategoryName, string>>>
     "Budget & Taxes": "Budget",
     "Business & Development": "Business",
     "Schools & Youth": "Schools",
-    "City Services": "Public Services"
+    "City Services": "Public Services",
+    "Teaching & Learning": "Learning",
+    "Students & Families": "Students & Families",
+    "School Buildings & Grounds": "Buildings & Grounds",
+    "School Funding": "Funding",
+    "Teachers & Staff": "Teachers & Staff",
+    "Safety & Wellness": "Safety & Wellness",
+    "Enrollment & Boundaries": "Enrollment",
+    "Board & Administration": "Board & Admin"
   },
   es: {
     Transportation: "Transporte",
@@ -421,7 +445,15 @@ const categoryShortLabels: Record<Locale, Partial<Record<CategoryName, string>>>
     "Budget & Taxes": "Presupuesto",
     "Business & Development": "Negocios",
     "Schools & Youth": "Escuelas",
-    "City Services": "Servicios"
+    "City Services": "Servicios",
+    "Teaching & Learning": "Aprendizaje",
+    "Students & Families": "Estudiantes y familias",
+    "School Buildings & Grounds": "Edificios y terrenos",
+    "School Funding": "Financiamiento",
+    "Teachers & Staff": "Docentes y personal",
+    "Safety & Wellness": "Seguridad y bienestar",
+    "Enrollment & Boundaries": "Inscripción",
+    "Board & Administration": "Junta y administración"
   }
 };
 
@@ -440,7 +472,15 @@ const categoryDescriptions: Record<Locale, Record<CategoryName, string>> = {
     "Budget & Taxes": "Gasto público, tarifas, impuestos, bonos, contratos y decisiones sobre dinero público.",
     "Business & Development": "Nuevos edificios, negocios locales, desarrollo económico, permisos y proyectos importantes.",
     "Schools & Youth": "Programas juveniles, alianzas escolares, estudiantes, cuidado infantil y servicios para familias.",
-    "City Services": "Servicios públicos, obras públicas, permisos, bibliotecas, mantenimiento y operaciones cotidianas del gobierno local."
+    "City Services": "Servicios públicos, obras públicas, permisos, bibliotecas, mantenimiento y operaciones cotidianas del gobierno local.",
+    "Teaching & Learning": "Plan de estudios, enseñanza, programas académicos, evaluaciones y aprendizaje en el aula.",
+    "Students & Families": "Servicios estudiantiles, apoyo familiar, comidas, cuidado infantil y programas de la comunidad escolar.",
+    "School Buildings & Grounds": "Aulas, planteles, patios de recreo, construcción, reparaciones y terrenos escolares.",
+    "School Funding": "Presupuestos del distrito, impuestos parcelarios, bonos, subvenciones, gastos y planificación financiera.",
+    "Teachers & Staff": "Contratación, salarios, acuerdos laborales, desarrollo profesional y empleados del distrito.",
+    "Safety & Wellness": "Seguridad escolar, planificación de emergencias, salud física, salud mental y bienestar estudiantil.",
+    "Enrollment & Boundaries": "Inscripción, áreas de asistencia, asignaciones escolares, traslados y cambios de límites.",
+    "Board & Administration": "Gobierno de la junta, asuntos de la superintendencia, políticas del distrito y administración central."
   }
 };
 

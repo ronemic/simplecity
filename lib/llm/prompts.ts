@@ -17,7 +17,7 @@ Do not rely on general knowledge or assumptions.
 
 You must transform raw agenda text into structured civic action cards.
 
-Allowed topics:
+General-government topics:
 Housing
 Transportation
 Public Safety
@@ -26,6 +26,16 @@ Budget & Taxes
 Business & Development
 Schools & Youth
 City Services
+
+School-district topics:
+Teaching & Learning
+Students & Families
+School Buildings & Grounds
+School Funding
+Teachers & Staff
+Safety & Wellness
+Enrollment & Boundaries
+Board & Administration
 
 Return ONLY valid JSON.
 No markdown.
@@ -46,7 +56,7 @@ JSON schema:
       "whatIsHappening": ["clear point 1", "clear point 2"],
       "whyItMatters": "string",
       "whoItAffects": ["string"],
-      "categoryTags": ["Housing | Transportation | Public Safety | Parks & Environment | Budget & Taxes | Business & Development | Schools & Youth | City Services"],
+      "categoryTags": ["allowed general-government or school-district topic"],
       "status": "${CARD_STATUSES.join(" | ")}",
       "commentWindow": {
         "opens": "string",
@@ -102,7 +112,7 @@ Rules:
 - Never combine the points into one string and never infer point boundaries from punctuation. Use one point only when the source supports just one useful fact.
 - “whyItMatters” must explain concrete impact.
 - “whoItAffects” should name real groups like renters, homeowners, parents, drivers, cyclists, students, local businesses, nearby residents, or taxpayers.
-- “categoryTags” must only use allowed topics.
+- “categoryTags” must only use allowed topics. Use general-government topics unless the user prompt identifies the body as a school district; for a school district, use only school-district topics.
 - Classify each card from that agenda item's complete context: its official title, recommended action, description, and any linked staff-report or attachment context labeled for that item.
 - Do not choose a topic from an isolated keyword, the meeting body's name, general meeting instructions, or neighboring agenda items.
 - Choose exactly one primary topic unless the item clearly has a second distinct impact. Put the most specific topic first and return no more than two topics.
@@ -158,6 +168,10 @@ export function buildSimpleCityUserPrompt(meeting: LlmReadyMeeting) {
     ? `
 School-district guidance:
 - This body is a public school district, not a city government.
+- Use only these school-district topics: Teaching & Learning; Students & Families; School Buildings & Grounds; School Funding; Teachers & Staff; Safety & Wellness; Enrollment & Boundaries; Board & Administration.
+- Teaching & Learning covers curriculum, instruction, academic programs, assessments, and classroom learning. Students & Families covers student services, family support, meals, childcare, and school-community programs. School Buildings & Grounds covers campuses, classrooms, playgrounds, construction, repairs, and grounds. School Funding covers budgets, parcel taxes, bonds, grants, spending, and financial planning. Teachers & Staff covers hiring, compensation, labor agreements, professional development, and employees. Safety & Wellness covers campus safety, emergencies, physical health, mental health, and wellness. Enrollment & Boundaries covers enrollment, attendance areas, assignments, transfers, and boundary changes. Board & Administration covers board governance, superintendent matters, district-wide policy, and central administration.
+- Choose one primary school topic unless the item clearly gives a second school topic comparable weight. Use Board & Administration only when governance or administration is the actual subject or no more substantive school topic is supported.
+- A school campus, playground, field, landscaping project, or grounds repair is School Buildings & Grounds. Do not use Parks & Environment, Business & Development, City Services, or another general-government topic for a school-district card.
 - Create separate cards for substantive Board actions and discussions involving curriculum, student services, facilities, enrollment or boundaries, budgets, parcel taxes, contracts, labor, safety, policies, and governance.
 - Preserve substantive consent-calendar items as separate cards when item-specific source blocks are available; never collapse the entire consent calendar into one vague card.
 - A committee recommendation is advice to the Board, not a final district decision.

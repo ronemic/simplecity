@@ -23,6 +23,7 @@ import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
+import { CATEGORIES, SCHOOL_CATEGORIES } from "@/lib/constants";
 
 export const revalidate = 300;
 
@@ -187,8 +188,9 @@ export default async function DecisionsPage({
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
   const isSchoolDistrict = jurisdiction === "los-altos-school-district";
+  const topicCategories = isSchoolDistrict ? SCHOOL_CATEGORIES : CATEGORIES;
   const search = (params.q || "").trim();
-  const selectedCategory = isSchoolDistrict ? undefined : categoryFromSlug(params.category);
+  const selectedCategory = categoryFromSlug(params.category, topicCategories);
   const selectedResult = decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
   const [result, decisionResultFreshness] = await Promise.all([
@@ -224,6 +226,7 @@ export default async function DecisionsPage({
         pageSize={result.pageSize}
         totalCount={result.totalCount}
         selectedCategory={selectedCategory}
+        topicCategories={topicCategories}
         selectedResult={selectedResult}
         locale={locale}
         emptyDescription={noCardsDescription(locale, jurisdiction, jurisdictionLabel)}
@@ -236,7 +239,6 @@ export default async function DecisionsPage({
             locale={locale}
           />
         }
-        showTopicFilters={!isSchoolDistrict}
         showSantaBarbaraInterestPilot={jurisdiction === "santa-barbara-county"}
       />
     </div>

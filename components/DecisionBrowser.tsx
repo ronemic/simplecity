@@ -32,6 +32,7 @@ export function DecisionBrowser({
   pageSize,
   totalCount,
   selectedCategory,
+  topicCategories,
   selectedResult,
   locale,
   emptyDescription,
@@ -47,6 +48,7 @@ export function DecisionBrowser({
   pageSize: number;
   totalCount: number;
   selectedCategory?: CategoryName;
+  topicCategories?: readonly CategoryName[];
   selectedResult?: ResultFilter;
   locale: Locale;
   emptyDescription: string;
@@ -136,6 +138,7 @@ export function DecisionBrowser({
           {showTopicFilters ? (
             <DecisionFilters
               selectedCategory={selectedCategory}
+              categories={topicCategories}
               locale={locale}
             />
           ) : null}

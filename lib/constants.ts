@@ -1,12 +1,20 @@
 import {
   Bike,
+  BookOpen,
   BriefcaseBusiness,
   Building2,
   CircleDollarSign,
+  Gavel,
   GraduationCap,
+  HandCoins,
+  HeartPulse,
   Home,
+  MapPinned,
+  School,
   ShieldCheck,
-  Trees
+  Trees,
+  UserRoundCog,
+  UsersRound
 } from "lucide-react";
 
 export const DECISION_CARD_PAGE_SIZE = 12;
@@ -22,7 +30,21 @@ export const CATEGORIES = [
   "City Services"
 ] as const;
 
-export type CategoryName = (typeof CATEGORIES)[number];
+export const SCHOOL_CATEGORIES = [
+  "Teaching & Learning",
+  "Students & Families",
+  "School Buildings & Grounds",
+  "School Funding",
+  "Teachers & Staff",
+  "Safety & Wellness",
+  "Enrollment & Boundaries",
+  "Board & Administration"
+] as const;
+
+export const ALL_CATEGORIES = [...CATEGORIES, ...SCHOOL_CATEGORIES] as const;
+
+export type CategoryName = (typeof ALL_CATEGORIES)[number];
+export type SchoolCategoryName = (typeof SCHOOL_CATEGORIES)[number];
 
 export const CATEGORY_DEFINITIONS: Record<
   CategoryName,
@@ -80,6 +102,54 @@ export const CATEGORY_DEFINITIONS: Record<
     description: "Utilities, public works, permits, libraries, maintenance, and everyday local government operations.",
     tone: "bg-white text-[#365d6a] border-black/15",
     icon: Building2
+  },
+  "Teaching & Learning": {
+    slug: "teaching-learning",
+    description: "Curriculum, instruction, academic programs, assessments, and classroom learning.",
+    tone: "bg-white text-[#4d4f91] border-black/15",
+    icon: BookOpen
+  },
+  "Students & Families": {
+    slug: "students-families",
+    description: "Student services, family support, meals, childcare, and school-community programs.",
+    tone: "bg-white text-[#7a4770] border-black/15",
+    icon: UsersRound
+  },
+  "School Buildings & Grounds": {
+    slug: "school-buildings-grounds",
+    description: "Classrooms, campuses, playgrounds, construction, repairs, and school grounds.",
+    tone: "bg-white text-[#42652a] border-black/15",
+    icon: School
+  },
+  "School Funding": {
+    slug: "school-funding",
+    description: "District budgets, parcel taxes, bonds, grants, spending, and financial planning.",
+    tone: "bg-white text-[#725722] border-black/15",
+    icon: HandCoins
+  },
+  "Teachers & Staff": {
+    slug: "teachers-staff",
+    description: "Hiring, compensation, labor agreements, professional development, and district employees.",
+    tone: "bg-white text-[#2a665d] border-black/15",
+    icon: UserRoundCog
+  },
+  "Safety & Wellness": {
+    slug: "safety-wellness",
+    description: "Campus safety, emergency planning, physical health, mental health, and student wellness.",
+    tone: "bg-white text-[#765c24] border-black/15",
+    icon: HeartPulse
+  },
+  "Enrollment & Boundaries": {
+    slug: "enrollment-boundaries",
+    description: "Enrollment, attendance areas, school assignments, transfers, and boundary changes.",
+    tone: "bg-white text-[#2b5d97] border-black/15",
+    icon: MapPinned
+  },
+  "Board & Administration": {
+    slug: "board-administration",
+    description: "Board governance, superintendent matters, district policies, and central administration.",
+    tone: "bg-white text-[#365d6a] border-black/15",
+    icon: Gavel
   }
 };
 

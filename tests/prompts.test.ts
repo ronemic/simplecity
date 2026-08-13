@@ -94,6 +94,10 @@ test("LASD prompts distinguish school-board decisions and protect sensitive deta
 
   const prompt = buildSimpleCityUserPrompt(meeting);
   assert.match(prompt, /public school district, not a city government/);
+  assert.match(prompt, /Use only these school-district topics/);
+  assert.match(prompt, /School Buildings & Grounds/);
+  assert.match(prompt, /Board & Administration only when governance or administration is the actual subject/);
+  assert.match(prompt, /playground, field, landscaping project, or grounds repair is School Buildings & Grounds/);
   assert.match(prompt, /curriculum, student services, facilities/);
   assert.match(prompt, /committee recommendation is advice/);
   assert.match(prompt, /confidential student, discipline, special-education/);

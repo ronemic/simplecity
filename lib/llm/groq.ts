@@ -18,6 +18,7 @@ import {
   type LlmProvider
 } from "./provider";
 import { buildSimpleCityUserPrompt, SIMPLECITY_SYSTEM_PROMPT } from "./prompts";
+import { applyMeetingTopicPolicy } from "./topicPolicy";
 import {
   parseAndValidateSummary,
   parsePossiblyWrappedJson,
@@ -1006,7 +1007,8 @@ export async function generateSummaryForMeeting(
   const batches = buildAgendaItemSummaryBatches(meeting);
 
   if (batches.length === 1 && batches[0] === meeting) {
-    return generateSummaryForInput(meeting, options);
+    const result = await generateSummaryForInput(meeting, options);
+    return { ...result, summary: applyMeetingTopicPolicy(meeting, result.summary) };
   }
 
   options.log?.(
@@ -1049,5 +1051,5 @@ export async function generateSummaryForMeeting(
   options.log?.(
     `Finished agenda-item batches for ${meeting.title}: ${results.length}/${batches.length} batches succeeded and produced ${combined.summary.cards.length} cards.`
   );
-  return combined;
+  return { ...combined, summary: applyMeetingTopicPolicy(meeting, combined.summary) };
 }

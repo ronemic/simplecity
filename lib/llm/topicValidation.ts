@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
-import { CATEGORIES } from "@/lib/constants";
+import { ALL_CATEGORIES } from "@/lib/constants";
 import { CARD_STATUSES } from "@/lib/cardStatus";
 import type { AgendaItem, LlmReadyMeeting, SimpleCitySummary } from "@/lib/types";
 import { findAgendaItemForCard } from "@/lib/scraper/agendaItemContext";
@@ -11,7 +11,7 @@ const TopicResultSchema = z.object({
   cards: z.array(
     z.object({
       cardIndex: z.number().int().nonnegative(),
-      categoryTags: z.array(z.enum(CATEGORIES)).min(1).max(2),
+      categoryTags: z.array(z.enum(ALL_CATEGORIES)).min(1).max(2),
       status: z.enum(CARD_STATUSES)
     })
   )
@@ -21,6 +21,7 @@ export type TopicValidationCandidate = {
   cardIndex: number;
   item: AgendaItem;
   meetingStatus: LlmReadyMeeting["status"];
+  jurisdictionSlug: string | null;
   context: string;
 };
 
@@ -36,6 +37,16 @@ Business & Development
 Schools & Youth
 City Services
 
+School-district topics:
+Teaching & Learning
+Students & Families
+School Buildings & Grounds
+School Funding
+Teachers & Staff
+Safety & Wellness
+Enrollment & Boundaries
+Board & Administration
+
 Topic meanings:
 - Housing: homes, rent, zoning, and housing affordability.
 - Transportation: streets, bridges, parking, transit, traffic, and mobility.
@@ -45,11 +56,21 @@ Topic meanings:
 - Business & Development: economic development, commercial activity, procurement, and contracts when no more specific service topic controls.
 - Schools & Youth: education, childcare, and youth programs.
 - City Services: government operations, commissions, administration, and resident services.
+- Teaching & Learning: curriculum, instruction, academic programs, assessments, and classroom learning.
+- Students & Families: student services, family support, meals, childcare, and school-community programs.
+- School Buildings & Grounds: campuses, classrooms, playgrounds, construction, repairs, and grounds.
+- School Funding: district budgets, parcel taxes, bonds, grants, spending, and financial planning.
+- Teachers & Staff: hiring, compensation, labor agreements, professional development, and employees.
+- Safety & Wellness: campus safety, emergencies, physical health, mental health, and wellness.
+- Enrollment & Boundaries: enrollment, attendance areas, assignments, transfers, and boundary changes.
+- Board & Administration: board governance, superintendent matters, district-wide policy, and central administration.
 
 For every supplied card:
 - Classify from the complete item context, including its official title, recommended action, description, and linked supporting-report text.
 - Make a fresh classification from the official context; do not assume a previous model's choice was correct.
 - Do not classify from an isolated word, the meeting body's name, or general knowledge.
+- When the card block identifies the Los Altos School District, use only school-district topics. For every other jurisdiction, use only the general-government topics.
+- For a school district, use Board & Administration only when governance or administration is the actual subject or no more substantive school topic is supported. School playgrounds, fields, landscaping, construction, and repairs are School Buildings & Grounds, not Parks & Environment.
 - Return exactly one primary topic unless the context clearly supports a second distinct impact.
 - Put the most specific topic first and return no more than two topics.
 - Add a second topic only when the item itself gives that second subject comparable weight; incidental examples or subprojects in a supporting report do not justify another topic.
@@ -115,6 +136,7 @@ export function topicValidationCandidates(
         cardIndex,
         item,
         meetingStatus: meeting.status,
+        jurisdictionSlug: meeting.jurisdictionSlug || null,
         context: isolatedItemContext(item)
       }
     ];
@@ -129,6 +151,7 @@ export function buildTopicValidationPrompt(candidates: TopicValidationCandidate[
       [
         `CARD ${candidate.cardIndex}`,
         `Meeting status: ${candidate.meetingStatus}`,
+        `Jurisdiction: ${candidate.jurisdictionSlug || "Not listed"}`,
         candidate.context
       ].join("\n")
     )

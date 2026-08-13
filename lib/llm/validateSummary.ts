@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
-import { CATEGORIES } from "@/lib/constants";
+import { ALL_CATEGORIES } from "@/lib/constants";
 import { CARD_STATUSES } from "@/lib/cardStatus";
 import type { LlmReadyMeeting, MeetingStatus, SimpleCityCardTranslation, SimpleCitySummary } from "@/lib/types";
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
@@ -10,7 +10,7 @@ import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 import { extractMeetingWideParticipationContext } from "@/lib/scraper/agendaItemContext";
 import { parseMeetingDate } from "@/lib/utils/date";
 
-const allowedCategories = new Set<string>(CATEGORIES);
+const allowedCategories = new Set<string>(ALL_CATEGORIES);
 const allowedStatuses = new Set<string>(CARD_STATUSES);
 const confidenceRank = {
   low: 0,

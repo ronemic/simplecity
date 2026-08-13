@@ -97,6 +97,7 @@ test("builds topic verification from only the matched agenda-item context", () =
   assert.equal(candidates.length, 1);
   assert.match(prompt, /Canopy provides tree and urban forestry services/);
   assert.match(prompt, /Agenda section: Special Presentations/);
+  assert.match(prompt, /Jurisdiction: Not listed/);
   assert.doesNotMatch(prompt, /FLAT_PACKET_SENTINEL/);
   assert.doesNotMatch(prompt, /Police staffing report/);
   assert.doesNotMatch(prompt, /Currently selected topics/);
@@ -201,6 +202,51 @@ test("topic verifier evaluates complete recommendations and service-specific wor
   assert.match(TOPIC_VALIDATION_SYSTEM_PROMPT, /service charge, revenue, or tax-roll collection/);
   assert.match(TOPIC_VALIDATION_SYSTEM_PROMPT, /Use Routine approval only for approval of meeting minutes/);
   assert.match(TOPIC_VALIDATION_SYSTEM_PROMPT, /Do not use it for a substantive contract, budget, permit/);
+  assert.match(TOPIC_VALIDATION_SYSTEM_PROMPT, /School Buildings & Grounds/);
+  assert.match(TOPIC_VALIDATION_SYSTEM_PROMPT, /Board & Administration only when governance or administration is the actual subject/);
+});
+
+test("school-district topic verification identifies the jurisdiction and accepts school topics", () => {
+  const schoolMeeting: LlmReadyMeeting = {
+    ...meeting,
+    jurisdictionSlug: "los-altos-school-district",
+    items: [
+      {
+        ...meeting.items![0],
+        externalId: "school-item",
+        title: "Playground asphalt repairs at Egan School",
+        action: "Approve the playground repair contract.",
+        rowText: "Repair asphalt on the Egan School playground."
+      }
+    ]
+  };
+  const schoolSummary: SimpleCitySummary = {
+    ...summary,
+    cards: [
+      {
+        ...summary.cards[0],
+        sourceItemId: "school-item",
+        agendaItem: "Vote on playground asphalt repairs at Egan School"
+      }
+    ]
+  };
+  const candidates = topicValidationCandidates(schoolMeeting, schoolSummary);
+  const prompt = buildTopicValidationPrompt(candidates);
+  const verified = parseTopicValidation(
+    JSON.stringify({
+      cards: [
+        {
+          cardIndex: 0,
+          categoryTags: ["School Buildings & Grounds"],
+          status: "Upcoming vote"
+        }
+      ]
+    }),
+    candidates
+  );
+
+  assert.match(prompt, /Jurisdiction: los-altos-school-district/);
+  assert.deepEqual(verified[0].categoryTags, ["School Buildings & Grounds"]);
 });
 
 test("accepts routine approval for minutes while keeping substantive approvals as upcoming votes", () => {

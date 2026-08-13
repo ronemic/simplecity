@@ -3,7 +3,7 @@
 import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { SummaryCardRow } from "@/lib/types";
 import { normalizeSummaryPoints, summaryPointsFromLines } from "@/lib/utils/summaryPoints";
@@ -25,6 +25,9 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState("");
   const cardJurisdictionSlug = card.jurisdiction_slug || card.meetings?.jurisdiction_slug || "foster-city";
+  const availableCategories = cardJurisdictionSlug === "los-altos-school-district"
+    ? SCHOOL_CATEGORIES
+    : CATEGORIES;
 
   async function submitUpdate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -164,7 +167,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
           <fieldset className="md:col-span-2">
             <legend className="text-xs font-bold uppercase text-black/70">Topics</legend>
             <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.02] p-2">
-              {CATEGORIES.map((category) => (
+              {availableCategories.map((category) => (
                 <label
                   key={category}
                   className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm shadow-sm"
