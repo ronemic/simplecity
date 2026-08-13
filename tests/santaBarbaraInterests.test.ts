@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { isAllowedInterestOrigin } from "@/app/api/interests/santa-barbara/route";
+import { isAllowedInterestOrigin } from "@/lib/security/requestOrigin";
 import {
   getOrCreateSantaBarbaraInterestDeviceToken,
   markSantaBarbaraInterestSeen,

@@ -40,10 +40,10 @@ export function CookiePreferenceControls({ locale }: { locale: Locale }) {
 
   return (
     <div className="quiet-card p-5 sm:p-6">
-      <h2 className="text-xl font-black text-ink">
+      <h2 className="text-xl font-semibold text-ink">
         {locale === "es" ? "Preferencias de SimpleCity" : "SimpleCity preferences"}
       </h2>
-      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-black/65">
+      <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate">
         {locale === "es"
           ? "Puedes borrar el idioma, la jurisdicción y la vista de reuniones guardados en este dispositivo. SimpleCity volverá a usar sus valores predeterminados. Esto no desactiva Google Analytics ni retira intereses de Santa Bárbara."
           : "You can clear the language, jurisdiction, and meeting-view choices saved on this device. SimpleCity will return to its defaults. This does not disable Google Analytics or withdraw Santa Barbara interests."}
@@ -54,7 +54,7 @@ export function CookiePreferenceControls({ locale }: { locale: Locale }) {
           {locale === "es" ? "Borrar preferencias" : "Clear preferences"}
         </button>
         {cleared ? (
-          <span className="inline-flex items-center gap-2 text-sm font-bold text-[#24613c]" role="status">
+          <span className="inline-flex items-center gap-2 text-sm font-bold text-affirm" role="status">
             <CheckCircle2 aria-hidden className="h-4 w-4" />
             {locale === "es" ? "Preferencias borradas" : "Preferences cleared"}
           </span>

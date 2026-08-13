@@ -99,10 +99,10 @@ export function AdminLoginForm() {
   return (
     <div className="quiet-card mx-auto max-w-md p-6 sm:p-8">
       <p className="label-eyebrow">Admin access</p>
-      <h1 className="mt-2 text-3xl font-black text-ink">Admin login</h1>
+      <h1 className="mt-2 text-3xl font-semibold text-ink">Admin login</h1>
       <form className="mt-6 space-y-3" onSubmit={signIn}>
         <label className="block space-y-1">
-          <span className="text-sm font-semibold text-black/70">Password</span>
+          <span className="text-sm font-semibold text-slate">Password</span>
           <input
             type="password"
             value={password}
@@ -112,7 +112,7 @@ export function AdminLoginForm() {
             disabled={loading || isLocked}
           />
         </label>
-        {message ? <p className="rounded-lg bg-black/5 p-3 text-sm text-black/75">{message}</p> : null}
+        {message ? <p className="rounded-lg bg-paper p-3 text-sm text-slate">{message}</p> : null}
         <button
           type="submit"
           disabled={loading || !password || isLocked}

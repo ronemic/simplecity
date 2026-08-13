@@ -1,4 +1,4 @@
-import { CalendarDays, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { type Locale, t } from "@/lib/i18n";
 
@@ -24,58 +24,50 @@ export function SearchAndFilters({
         : `${resultCount ?? 0} results`;
 
   return (
-    <div className="w-full max-w-[740px]">
-      <form
-        className="flex w-full rounded-[10px] border border-white/20 bg-white/10 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur"
-        action={action}
-        role="search"
-      >
-        <label className="flex flex-1">
+    <div className="search-panel w-full">
+      <form className="relative" action={action} role="search">
+        <label>
           <span className="sr-only">{t(locale, "searchDecisionsMeetingsTopics")}</span>
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-quiet"
+          />
           <input
             name="q"
             defaultValue={search}
             placeholder={t(locale, "searchDecisions")}
-            className="min-h-14 w-full rounded-lg rounded-r-none border border-transparent bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm transition placeholder:text-black/[0.48] focus:border-[#89b8f7] focus:outline-none focus:ring-4 focus:ring-[#8fbfff]/25"
+            className="input-control input-control--search"
           />
         </label>
         <button
           aria-label={t(locale, "search")}
-          className="-ml-px inline-flex min-h-14 w-16 shrink-0 items-center justify-center rounded-lg rounded-l-none bg-[#dcecff] px-4 py-3 text-base font-black text-[#102134] shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8fbfff]/30"
+          className="absolute right-1.5 top-1/2 inline-flex min-h-8 -translate-y-1/2 items-center rounded px-2.5 text-[13px] font-semibold text-brand transition-colors hover:bg-brand-tint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
         >
-          <Search aria-hidden className="h-5 w-5" />
-          <span className="sr-only">{t(locale, "search")}</span>
+          {t(locale, "search")}
         </button>
       </form>
 
       {hasSearch ? (
-        <div
-          role="status"
-          className="mt-3 flex flex-col items-start justify-between gap-2 rounded-lg border border-white/[0.16] bg-white/10 px-4 py-3 text-sm font-semibold text-[#e9f2ff] sm:flex-row"
-        >
-          <span>
-            {locale === "es"
-              ? `Mostrando ${resultLabel} para "${search.trim()}".`
-              : `Showing ${resultLabel} for "${search.trim()}".`}
-          </span>
-          <Link href="#search-results" className="rounded-md py-1 text-[#b9d7ff] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:px-2">
+        <p role="status" className="mt-2.5 text-[13px] font-normal text-slate">
+          {locale === "es"
+            ? `Mostrando ${resultLabel} para "${search.trim()}".`
+            : `Showing ${resultLabel} for "${search.trim()}".`}{" "}
+          <Link href="#search-results" className="action-link">
             {t(locale, "viewResults")}
           </Link>
-        </div>
+        </p>
       ) : null}
 
-      <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold sm:mt-4 sm:items-center">
-        <Link
-          href="/decisions"
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/[0.16] px-4 py-2 text-[#e7f0fb] transition hover:border-white/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
-        >
+      {/* Tied to the field with a rule so they read as its shortcuts, not as
+          stray links sitting on the page. */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-rule pt-3">
+        <Link href="/decisions" className="action-link">
           {locale === "es" ? "Ver decisiones actuales" : "See current decisions"}
         </Link>
-        <Link
-          href="/meetings"
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[#b9d7ff] transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
-        >
-          <CalendarDays aria-hidden className="h-4 w-4" />
+        {/* Hidden where the links stack, so the dot cannot be orphaned at the end
+            of the first line. */}
+        <span aria-hidden className="hidden text-[color:var(--rule-strong)] sm:inline">·</span>
+        <Link href="/meetings" className="action-link">
           {t(locale, "viewMeetingCalendar")}
         </Link>
       </div>

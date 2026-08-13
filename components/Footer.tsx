@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -33,6 +34,9 @@ function aboutLabel(locale: Locale) {
 function localizedHref(path: string, locale: Locale) {
   return `${path}?lang=${locale}`;
 }
+
+const FOOTER_LINK_CLASS =
+  "text-[13.5px] font-medium text-slate underline decoration-transparent underline-offset-4 transition-colors hover:text-brand hover:decoration-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand";
 
 export function Footer({ locale = "en" }: { locale?: Locale }) {
   const [currentLocale, setCurrentLocale] = useState(locale);
@@ -68,31 +72,54 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
     };
   }, []);
 
+  const links = [
+    { href: localizedHref("/about", currentLocale), label: aboutLabel(currentLocale) },
+    {
+      href: localizedHref("/subscribe", currentLocale),
+      label: currentLocale === "es" ? "Suscribirse" : "Subscribe"
+    },
+    {
+      href: localizedHref("/privacy", currentLocale),
+      label: currentLocale === "es" ? "Privacidad" : "Privacy"
+    },
+    {
+      href: localizedHref("/cookies", currentLocale),
+      label: currentLocale === "es" ? "Configuración de cookies" : "Cookie settings"
+    }
+  ];
+
   return (
-    <footer className="mt-10 border-t border-black/10 bg-[#eef3f6]">
-      <div className="section-shell grid gap-6 py-8 text-sm text-black/70 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-        <div className="max-w-3xl">
-          <p className="text-base font-black text-ink">SimpleCity</p>
-          <p className="mt-3 max-w-2xl leading-6">{footerDescription(currentLocale)}</p>
+    <footer className="mt-4 border-t border-rule bg-band">
+      <div className="section-shell grid gap-8 py-10 md:grid-cols-[minmax(0,1fr)_auto] md:items-start md:gap-12">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/favicon.svg"
+              alt=""
+              width={24}
+              height={24}
+              className="h-6 w-6 shrink-0 rounded"
+            />
+            <p className="text-[15px] font-semibold tracking-tight text-ink">SimpleCity</p>
+          </div>
+          {/* Held to a readable measure — it ran the full page width before. */}
+          <p className="mt-3 max-w-[58ch] text-[13px] leading-6 text-quiet">
+            {footerDescription(currentLocale)}
+          </p>
         </div>
 
+        {/* A column on desktop rather than a wrapping row of ghost buttons, which
+            read as loosely scattered chips. */}
         <nav
           aria-label={currentLocale === "es" ? "Enlaces del pie de página" : "Footer links"}
-          className="flex flex-wrap gap-2 font-bold md:justify-end"
+          className="grid grid-cols-2 gap-x-6 gap-y-2.5 md:flex md:flex-col md:items-end md:gap-y-2"
         >
-          <Link className="action-ghost" href={localizedHref("/about", currentLocale)}>
-            {aboutLabel(currentLocale)}
-          </Link>
-          <Link className="action-ghost" href={localizedHref("/subscribe", currentLocale)}>
-            {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
-          </Link>
-          <Link className="action-ghost" href={localizedHref("/privacy", currentLocale)}>
-            {currentLocale === "es" ? "Privacidad" : "Privacy"}
-          </Link>
-          <Link className="action-ghost" href={localizedHref("/cookies", currentLocale)}>
-            {currentLocale === "es" ? "Configuración de cookies" : "Cookie settings"}
-          </Link>
-          <a className="action-ghost" href="mailto:simplecityadmin@gmail.com">
+          {links.map((link) => (
+            <Link key={link.href} className={FOOTER_LINK_CLASS} href={link.href}>
+              {link.label}
+            </Link>
+          ))}
+          <a className={FOOTER_LINK_CLASS} href="mailto:simplecityadmin@gmail.com">
             {t(currentLocale, "contact")}
           </a>
         </nav>

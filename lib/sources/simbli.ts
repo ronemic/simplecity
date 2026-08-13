@@ -4,7 +4,7 @@ import type { DocumentType, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResul
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { downloadOfficialSiteDocuments } from "@/lib/scraper/downloadDocuments";
 import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
-import { parseMeetingDate } from "@/lib/utils/date";
+import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { cleanText } from "@/lib/utils/slug";
 
 const LASD_ARCHIVE_URL = "https://www.lasdschools.org/284537_2";
@@ -94,7 +94,7 @@ function calendarDateKey(value: string | null) {
   const numeric = value.match(/\b(\d{1,2})\/(\d{1,2})\/(20\d{2})\b/);
   if (numeric) return `${numeric[3]}-${numeric[1].padStart(2, "0")}-${numeric[2].padStart(2, "0")}`;
   const named = value.match(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),\s*(20\d{2})\b/i);
-  if (!named) return parseMeetingDate(value)?.slice(0, 10) || null;
+  if (!named) return civicCalendarDay(value);
   const month = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"].indexOf(named[1].toLowerCase()) + 1;
   return `${named[3]}-${String(month).padStart(2, "0")}-${named[2].padStart(2, "0")}`;
 }

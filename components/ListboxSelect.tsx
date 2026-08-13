@@ -67,16 +67,16 @@ export function ListboxSelect({
         onClick={() => setIsOpen((open) => !open)}
       >
         <span className="truncate">
-          {prefix ? <span className="font-semibold text-black/55">{prefix}: </span> : null}
+          {prefix ? <span className="font-semibold text-quiet">{prefix}: </span> : null}
           {selectedOption?.label || label}
         </span>
         <ChevronDown
           aria-hidden="true"
-          className={`h-4 w-4 shrink-0 text-black/60 transition ${isOpen ? "rotate-180" : ""}`}
+          className={`h-4 w-4 shrink-0 text-slate transition ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
       {isOpen ? (
-        <div className="menu-popover border-black/20 shadow-soft">
+        <div className="menu-popover border-rule shadow-soft">
           <div role="listbox" aria-label={label} className="max-h-64 overflow-auto">
             {options.map((option) => {
               const isSelected = option.value === selectedValue;

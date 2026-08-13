@@ -113,7 +113,7 @@ export function SantaBarbaraInterestButton({
           aria-pressed={interested}
           className={cn(
             interested
-              ? "action-secondary-sm !rounded-r-none !border-civic/35 !bg-civic/10 !text-civic"
+              ? "action-secondary-sm !rounded-r-none !border-brand/35 !bg-brand-tint !text-brand"
               : "action-secondary-sm !rounded-r-none"
           )}
           disabled={!loaded || busy}
@@ -139,8 +139,8 @@ export function SantaBarbaraInterestButton({
               aria-describedby={disclosureId}
               aria-label={locale === "es" ? "Acerca del programa piloto de interés" : "About the interest pilot"}
               className={cn(
-                "action-secondary-sm !min-h-10 !w-10 !cursor-help !rounded-l-none !px-0 text-black/55",
-                interested && "!border-civic/35 !bg-civic/10 !text-civic"
+                "action-secondary-sm !min-h-10 !w-10 !cursor-help !rounded-l-none !px-0 text-quiet",
+                interested && "!border-brand/35 !bg-brand-tint !text-brand"
               )}
               type="button"
             >
@@ -151,10 +151,10 @@ export function SantaBarbaraInterestButton({
               id={disclosureId}
               role="tooltip"
             >
-              <p className="rounded-lg border border-black/10 bg-white p-3 text-left text-xs font-semibold leading-5 text-black/65 shadow-xl">
+              <p className="rounded-lg border border-rule bg-surface p-3 text-left text-xs font-semibold leading-5 text-slate shadow-xl">
                 {disclosure}{" "}
                 <Link
-                  className="font-bold text-civic underline underline-offset-2"
+                  className="font-bold text-brand underline underline-offset-2"
                   href={`/privacy?lang=${locale}`}
                 >
                   {locale === "es" ? "Detalles" : "Details"}
@@ -165,10 +165,10 @@ export function SantaBarbaraInterestButton({
         ) : null}
       </div>
       {showDisclosure ? (
-        <p className="mt-2 max-w-sm text-xs font-semibold leading-5 text-black/55">
+        <p className="mt-2 max-w-sm text-xs font-semibold leading-5 text-quiet">
           {disclosure}{" "}
           <Link
-            className="font-bold text-civic underline underline-offset-2"
+            className="font-bold text-brand underline underline-offset-2"
             href={`/privacy?lang=${locale}`}
           >
             {locale === "es" ? "Detalles" : "Details"}
@@ -176,7 +176,7 @@ export function SantaBarbaraInterestButton({
         </p>
       ) : null}
       {error ? (
-        <p className="mt-1.5 text-xs font-bold leading-5 text-[#9f2a20]" role="status">
+        <p className="mt-1.5 text-xs font-bold leading-5 text-deny" role="status">
           {error}
         </p>
       ) : null}

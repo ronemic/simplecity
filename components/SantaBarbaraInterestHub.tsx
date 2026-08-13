@@ -142,7 +142,7 @@ export function SantaBarbaraInterestHub({
   }
 
   return (
-    <section className="mb-5 border-b border-black/10 pb-4" aria-label={locale === "es" ? "Vistas de decisiones" : "Decision views"}>
+    <section className="mb-5 border-b border-rule pb-4" aria-label={locale === "es" ? "Vistas de decisiones" : "Decision views"}>
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="segmented-control w-full sm:w-auto" role="group" aria-label={locale === "es" ? "Mostrar decisiones" : "Show decisions"}>
           <button
@@ -162,11 +162,11 @@ export function SantaBarbaraInterestHub({
           >
             <Star aria-hidden className="h-4 w-4" />
             {locale === "es" ? "Mis intereses" : "My interests"}
-            <span className={cn("tabular-nums", activeView === "interests" ? "text-white/80" : "text-black/45")}>
+            <span className={cn("tabular-nums", activeView === "interests" ? "text-white/80" : "text-quiet")}>
               {interests.length}
             </span>
             {updatedCount > 0 ? (
-              <span className={cn("h-2 w-2 rounded-full", activeView === "interests" ? "bg-white" : "bg-civic")}>
+              <span className={cn("h-2 w-2 rounded-full", activeView === "interests" ? "bg-surface" : "bg-brand")}>
                 <span className="sr-only">{updatedCount} {locale === "es" ? "actualizaciones" : "updates"}</span>
               </span>
             ) : null}
@@ -177,17 +177,17 @@ export function SantaBarbaraInterestHub({
       {activeView === "interests" ? (
         <div className="mt-4">
           {loading && Object.keys(cards).length === 0 ? (
-            <p className="inline-flex items-center gap-2 py-4 text-sm font-bold text-black/60">
+            <p className="inline-flex items-center gap-2 py-4 text-sm font-bold text-slate">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
               {locale === "es" ? "Buscando actualizaciones" : "Checking for updates"}
             </p>
           ) : interests.length === 0 ? (
             <div className="quiet-card px-5 py-8 text-center">
-              <Star aria-hidden className="mx-auto h-5 w-5 text-black/35" />
-              <h2 className="mt-2 text-base font-black text-ink">
+              <Star aria-hidden className="mx-auto h-5 w-5 text-quiet" />
+              <h2 className="mt-2 text-base font-semibold text-ink">
                 {locale === "es" ? "Aún no tienes intereses guardados" : "No saved interests yet"}
               </h2>
-              <p className="mt-1 text-sm font-medium leading-6 text-black/60">
+              <p className="mt-1 text-sm font-medium leading-6 text-slate">
                 {locale === "es"
                   ? "Selecciona Todas las decisiones y marca los temas que te interesen."
                   : "Return to All decisions and mark the issues you care about."}
@@ -203,7 +203,7 @@ export function SantaBarbaraInterestHub({
                   return (
                     <div key={interest.cardId}>
                       {hasUpdate ? (
-                        <span className="status-chip mb-2 border-[#aabce6] bg-[#eef2ff] text-[#354f9b]">
+                        <span className="state state--upcoming mb-2">
                           {update?.hasResult
                             ? locale === "es"
                               ? "Resultado disponible"
@@ -220,17 +220,17 @@ export function SantaBarbaraInterestHub({
 
                 return (
                   <Link
-                    className="quiet-card flex items-start justify-between gap-4 px-4 py-4 transition hover:bg-black/[0.025] sm:px-5"
+                    className="quiet-card flex items-start justify-between gap-4 px-4 py-4 transition hover:bg-brand-tint sm:px-5"
                     href={`/cards/${encodeURIComponent(interest.cardId)}?lang=${locale}`}
                     key={interest.cardId}
                     onClick={() => openInterest(interest)}
                   >
                     <span className="min-w-0">
-                      <span className="line-clamp-2 text-sm font-black leading-5 text-ink">{interest.title}</span>
-                      <span className="mt-0.5 block text-xs font-semibold text-black/50">{interest.meetingDate}</span>
+                      <span className="line-clamp-2 text-sm font-semibold leading-5 text-ink">{interest.title}</span>
+                      <span className="mt-0.5 block text-xs font-semibold text-quiet">{interest.meetingDate}</span>
                     </span>
                     {hasUpdate ? (
-                      <span className="status-chip shrink-0 border-[#aabce6] bg-[#eef2ff] text-[#354f9b]">
+                      <span className="state state--upcoming shrink-0">
                         {update?.hasResult
                           ? locale === "es"
                             ? "Resultado disponible"
@@ -248,7 +248,7 @@ export function SantaBarbaraInterestHub({
 
           {interests.length > 0 ? (
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <button className="action-ghost !text-[#9f2a20]" disabled={clearing} onClick={clearInterests} type="button">
+              <button className="action-ghost !text-deny" disabled={clearing} onClick={clearInterests} type="button">
                 {clearing ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Trash2 aria-hidden className="h-4 w-4" />}
                 {locale === "es" ? "Retirar todos" : "Withdraw all"}
               </button>
@@ -257,7 +257,7 @@ export function SantaBarbaraInterestHub({
               </Link>
             </div>
           ) : null}
-          {error ? <p className="mt-2 text-xs font-bold text-[#9f2a20]" role="status">{error}</p> : null}
+          {error ? <p className="mt-2 text-xs font-bold text-deny" role="status">{error}</p> : null}
         </div>
       ) : null}
     </section>

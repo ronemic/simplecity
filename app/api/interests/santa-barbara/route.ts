@@ -8,6 +8,7 @@ import {
 } from "@/lib/interests/santaBarbara";
 import { getPublishedCardsByIds } from "@/lib/db/queries";
 import { consumeRateLimit, getRequestIp, rateLimitedResponse } from "@/lib/security/rateLimit";
+import { isAllowedInterestOrigin } from "@/lib/security/requestOrigin";
 
 export const runtime = "nodejs";
 
@@ -15,36 +16,6 @@ function jsonResponse(body: unknown, init?: ResponseInit) {
   const response = Response.json(body, init);
   response.headers.set("Cache-Control", "no-store");
   return response;
-}
-
-export function isAllowedInterestOrigin(request: Request) {
-  const origin = request.headers.get("origin");
-  if (!origin) return true;
-
-  try {
-    const originUrl = new URL(origin);
-    const requestUrl = new URL(request.url);
-    if (originUrl.protocol !== "http:" && originUrl.protocol !== "https:") return false;
-
-    const forwardedProtocol =
-      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
-      requestUrl.protocol.replace(/:$/, "");
-    const requestHosts = [
-      requestUrl.host,
-      request.headers.get("host")?.split(",")[0]?.trim(),
-      request.headers.get("x-forwarded-host")?.split(",")[0]?.trim()
-    ].filter((host): host is string => Boolean(host));
-
-    return requestHosts.some((host) => {
-      try {
-        return originUrl.origin === new URL(`${forwardedProtocol}://${host}`).origin;
-      } catch {
-        return false;
-      }
-    });
-  } catch {
-    return false;
-  }
 }
 
 export async function GET(request: Request) {

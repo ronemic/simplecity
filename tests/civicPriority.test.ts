@@ -6,6 +6,7 @@ import {
   digestMeetingCutoff,
   isMeetingFreshForDigest,
   isDigestWorthyCard,
+  isMeetingAnnouncementCard,
   isPublicInterestCard,
   publicAgendaTitle,
   publicInterestScore,
@@ -378,4 +379,28 @@ test("agenda titles simplify planning and policy phrases", () => {
     publicAgendaTitle(card({ agenda_item: "5.2 Foster City Climate Action Plan Overview" })),
     "Foster City climate action plan update"
   );
+});
+
+test("agenda items that only announce a meeting are not daily-life decisions", () => {
+  // These read circularly on the homepage: the "connected decision" restates the
+  // meeting it belongs to.
+  const announcement = card({
+    id: "announcement",
+    agenda_item: "Special meeting of Behavioral Health Board Cultural Competency Advisory Committee",
+    category_tags: ["City Services"],
+    status: "Upcoming vote"
+  });
+  assert.equal(isMeetingAnnouncementCard(announcement), true);
+  assert.equal(isPublicInterestCard(announcement), false);
+
+  // Anchored at the start, so a real item that mentions a special meeting stays.
+  const realItem = card({
+    id: "real",
+    agenda_item: "Public hearing on rent stabilization at the special meeting of the City Council",
+    what_is_happening: ["The council will hear public comment on rent stabilization."],
+    category_tags: ["Housing"],
+    status: "Upcoming vote"
+  });
+  assert.equal(isMeetingAnnouncementCard(realItem), false);
+  assert.equal(isPublicInterestCard(realItem), true);
 });

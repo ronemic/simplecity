@@ -124,14 +124,14 @@ function calendarMeetingTone(status?: string | null) {
   const normalized = status?.toLowerCase() || "";
 
   if (normalized.includes("cancel")) {
-    return "border-[#f0c8bb] bg-[#fff7f3] text-[#7d321f] hover:border-[#dc9f8d] hover:bg-[#fff1eb]";
+    return "border-rule bg-surface text-deny hover:border-[color:var(--rule-strong)] hover:bg-paper";
   }
 
   if (normalized.includes("upcoming")) {
-    return "border-civic/20 bg-[#f3f7ff] text-[#12365f] hover:border-civic/35 hover:bg-[#eaf2ff]";
+    return "border-rule bg-surface text-brand hover:border-brand hover:bg-brand-tint";
   }
 
-  return "border-black/10 bg-white/90 text-ink hover:border-civic/25 hover:bg-[#f7fbff]";
+  return "border-rule bg-surface text-ink hover:border-brand/25 hover:bg-brand-tint";
 }
 
 function calendarMeetingTitle(meeting: MeetingRow, locale: Locale) {
@@ -235,7 +235,7 @@ function CalendarMeetingLink({
       contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
       pendingLabel={t(locale, "openingMeeting")}
     >
-      <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
+      <span className="block w-full text-[10px] font-semibold leading-4 text-current opacity-80">
         <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
       </span>
       <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
@@ -245,7 +245,7 @@ function CalendarMeetingLink({
         />
       </span>
       {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
-        <span className="block w-full whitespace-normal break-words text-[10px] font-black leading-4 text-current">
+        <span className="block w-full whitespace-normal break-words text-[10px] font-semibold leading-4 text-current">
           <HighlightedText text={searchMatch.text} query={highlight} />
         </span>
       ) : null}
@@ -282,7 +282,7 @@ function MeetingLine({
         compact ? "sm:grid-cols-[4.25rem_1fr] sm:items-start" : "sm:grid-cols-[7rem_1fr_auto] sm:items-center"
       )}
     >
-      <div className="flex items-center gap-1.5 text-sm font-black text-[#12365f]">
+      <div className="flex items-center gap-1.5 text-sm font-semibold text-slate">
         <Clock aria-hidden className="h-3.5 w-3.5" />
         <span><HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} /></span>
       </div>
@@ -290,7 +290,7 @@ function MeetingLine({
         <PendingLink
           href={meetingHref(meeting)}
           className={cn(
-            "block w-full font-black text-ink transition hover:text-civic focus-visible:focus-ring",
+            "block w-full font-semibold text-ink transition hover:text-brand focus-visible:focus-ring",
             compact ? "line-clamp-3 text-sm leading-5" : "line-clamp-2 text-lg leading-snug sm:text-[1.05rem]"
           )}
           contentClassName={cn(
@@ -301,13 +301,13 @@ function MeetingLine({
         >
           <HighlightedText text={displayMeetingTitle(meeting, meetingTitleFallback, locale)} query={highlight} />
         </PendingLink>
-        <p className="mt-0.5 text-xs font-semibold leading-5 text-black/55">
+        <p className="mt-0.5 text-xs font-semibold leading-5 text-quiet">
           <HighlightedText text={meetingType} query={highlight} />
           {" · "}
           <HighlightedText text={meetingJurisdiction} query={highlight} />
         </p>
         {showCompactSearchMatch ? (
-          <p className="mt-0.5 text-xs font-bold leading-5 text-civic">
+          <p className="mt-0.5 text-xs font-bold leading-5 text-brand">
             <HighlightedText text={searchMatch.text} query={highlight} />
           </p>
         ) : null}
@@ -590,9 +590,9 @@ export function MeetingList({
 
       {meetings.length === 0 ? (
         <div className="quiet-card p-8 text-center">
-          <FileText aria-hidden className="mx-auto h-10 w-10 text-black/40" />
+          <FileText aria-hidden className="mx-auto h-10 w-10 text-quiet" />
           <h2 className="mt-3 text-xl font-bold text-ink">{t(locale, "noMatchingMeetings")}</h2>
-          <p className="mt-2 text-sm leading-6 text-black/70">
+          <p className="mt-2 text-sm leading-6 text-slate">
             {t(locale, "tryBroaderMeetingSearch")}
           </p>
         </div>
@@ -605,11 +605,11 @@ export function MeetingList({
             )}
           >
             <section className="quiet-card overflow-hidden">
-              <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
+              <div className="grid gap-4 border-b border-rule bg-surface p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
                 <div>
-                  <p className="label-eyebrow text-civic">{t(locale, "monthView")}</p>
-                  <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
-                  <p className="mt-1 text-sm font-semibold text-black/60">
+                  <p className="label-eyebrow text-brand">{t(locale, "monthView")}</p>
+                  <h2 className="mt-1 text-2xl font-semibold text-ink">{activeMonthLabel}</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate">
                     {locale === "es"
                       ? `${monthMeetingCount} reuniones mostradas este mes.`
                       : `${monthMeetingCount} meetings shown this month.`}
@@ -644,16 +644,16 @@ export function MeetingList({
 
               <div className="overflow-x-auto">
                 <div className="min-w-[620px] sm:min-w-[720px]">
-                  <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
+                  <div className="grid grid-cols-7 border-b border-rule bg-paper">
                     {weekdayLabels.map((day) => (
-                      <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
+                      <div key={day} className="px-3 py-2.5 text-center text-xs font-semibold uppercase text-quiet">
                         {day}
                       </div>
                     ))}
                   </div>
                   <div
                     ref={calendarGridRef}
-                    className="grid auto-rows-auto grid-cols-7 bg-[#edf2f5]"
+                    className="grid auto-rows-auto grid-cols-7 bg-paper"
                   >
                     {monthDays.map((day, dayIndex) => {
                       const inMonth = day.startsWith(activeMonth);
@@ -672,9 +672,9 @@ export function MeetingList({
                         <div
                           key={day}
                           className={cn(
-                            "relative flex min-h-[300px] flex-col border-b border-r border-black/10 bg-white p-2",
-                            !inMonth && "bg-[#eef1f4] text-black/25",
-                            isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]",
+                            "relative flex min-h-[300px] flex-col border-b border-r border-rule bg-surface p-2",
+                            !inMonth && "bg-paper text-quiet",
+                            isSelected && "z-10 shadow-[inset_0_0_0_2px_var(--brand)]",
                             isPopoverOpen && "z-30"
                           )}
                         >
@@ -691,20 +691,20 @@ export function MeetingList({
                             }
                             className={cn(
                               "absolute inset-0 z-0 transition focus-visible:focus-ring",
-                              inMonth ? "cursor-pointer hover:bg-civic/[0.04]" : "cursor-default"
+                              inMonth ? "cursor-pointer hover:bg-brand/[0.04]" : "cursor-default"
                             )}
                           />
                           <div className="pointer-events-none relative z-10 flex items-center gap-1">
                             <span
                               className={cn(
-                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition",
+                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-semibold leading-none transition",
                                 isSelected
-                                  ? "bg-civic text-white"
+                                  ? "bg-brand text-white"
                                   : isToday
-                                    ? "bg-[#dce9ff] text-civic ring-1 ring-civic/20"
+                                    ? "bg-brand-tint text-brand ring-1 ring-brand/20"
                                     : inMonth
                                       ? "text-ink"
-                                      : "text-black/25"
+                                      : "text-quiet"
                               )}
                             >
                               {Number(day.slice(-2))}
@@ -736,7 +736,7 @@ export function MeetingList({
                               }}
                               aria-expanded={isPopoverOpen}
                               aria-controls={`calendar-popover-${day}`}
-                              className="absolute bottom-2 left-2 z-20 rounded-md bg-white/90 px-2 py-1 text-left text-[10px] font-black leading-4 text-civic transition hover:bg-civic/[0.08] focus-visible:focus-ring"
+                              className="absolute bottom-2 left-2 z-20 rounded-md bg-surface/90 px-2 py-1 text-left text-[10px] font-semibold leading-4 text-brand transition hover:bg-brand-tint focus-visible:focus-ring"
                               aria-label={
                                 locale === "es"
                                   ? `Mostrar ${calendarDayLayout.overflowCount} reuniones más del ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
@@ -760,20 +760,20 @@ export function MeetingList({
                                 day: "numeric"
                               }, locale)}
                               className={cn(
-                                "pointer-events-auto absolute z-40 w-[min(280px,calc(100vw-2rem))] rounded-lg border border-black/15 bg-white shadow-[0_12px_30px_rgba(23,23,23,0.18)]",
+                                "pointer-events-auto absolute z-40 w-[min(280px,calc(100vw-2rem))] rounded-lg border border-[color:var(--rule-strong)] bg-surface shadow-[0_12px_30px_rgba(23,23,23,0.18)]",
                                 dayIndex % 7 >= 5 ? "right-2" : "left-2",
                                 dayIndex >= 35 ? "bottom-2" : "top-10"
                               )}
                             >
-                              <div className="border-b border-black/10 px-3 py-2.5">
-                                <p className="text-sm font-black text-ink">
+                              <div className="border-b border-rule px-3 py-2.5">
+                                <p className="text-sm font-semibold text-ink">
                                   {formatDateKey(day, {
                                     weekday: "long",
                                     month: "short",
                                     day: "numeric"
                                   }, locale)}
                                 </p>
-                                <p className="mt-0.5 text-[10px] font-bold text-black/55">
+                                <p className="mt-0.5 text-[10px] font-bold text-quiet">
                                   {locale === "es"
                                     ? `${dayMeetings.length} reuniones`
                                     : `${dayMeetings.length} meetings`}
@@ -800,9 +800,9 @@ export function MeetingList({
             </section>
 
             <aside className="quiet-card overflow-hidden">
-              <div className="border-b border-black/10 p-4">
-                <p className="label-eyebrow text-civic">{t(locale, "dayView")}</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">
+              <div className="border-b border-rule p-4">
+                <p className="label-eyebrow text-brand">{t(locale, "dayView")}</p>
+                <h2 className="mt-1 text-2xl font-semibold text-ink">
                   {activeDate
                     ? formatDateKey(activeDate, {
                         weekday: "long",
@@ -811,7 +811,7 @@ export function MeetingList({
                       }, locale)
                     : t(locale, "selectADay")}
                 </h2>
-                <p className="mt-1 text-sm font-semibold text-black/60">
+                <p className="mt-1 text-sm font-semibold text-slate">
                   {activeDateMeetings.length === 1
                     ? locale === "es"
                       ? "1 reunión indicada."
@@ -821,7 +821,7 @@ export function MeetingList({
                       : `${activeDateMeetings.length} meetings listed.`}
                 </p>
               </div>
-              <div className="divide-y divide-black/10">
+              <div className="divide-y divide-rule">
                 {activeDateMeetings.length > 0 ? (
                   activeDateMeetings.map((meeting) => (
                     <div key={meeting.id} className="p-3.5">
@@ -830,7 +830,7 @@ export function MeetingList({
                   ))
                 ) : (
                   <div className="p-4">
-                    <p className="text-sm font-semibold leading-6 text-black/70">
+                    <p className="text-sm font-semibold leading-6 text-slate">
                       {t(locale, "noMeetingsForDay")}
                     </p>
                   </div>
@@ -845,10 +845,10 @@ export function MeetingList({
               activeView !== "list" && "hidden"
             )}
           >
-            <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-3 border-b border-rule p-5 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="label-eyebrow text-civic">{t(locale, "allMatchingMeetings")}</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">
+                <p className="label-eyebrow text-brand">{t(locale, "allMatchingMeetings")}</p>
+                <h2 className="mt-1 text-2xl font-semibold text-ink">
                   {meetings.length === 1
                     ? locale === "es"
                       ? "1 reunión"
@@ -858,20 +858,20 @@ export function MeetingList({
                       : `${meetings.length} meetings`}
                 </h2>
               </div>
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-slate">
                 <Search aria-hidden className="h-4 w-4" />
                 {locale === "es"
                   ? "La búsqueda se aplica a esta lista."
                   : "Search applies to this list."}
               </p>
             </div>
-            <div className="divide-y divide-black/10">
+            <div className="divide-y divide-rule">
               {sortedMeetings.map((meeting) => (
                 <article key={meeting.id} className="grid gap-2 p-5 sm:p-6">
-                  <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
+                  <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate">
                     <StatusPill status={meeting.status} locale={locale} highlight={highlight} />
                     <span className="inline-flex items-center gap-1.5">
-                      <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
+                      <CalendarDays aria-hidden className="h-4 w-4 text-slate" />
                       <HighlightedText
                         text={formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
                         query={highlight}

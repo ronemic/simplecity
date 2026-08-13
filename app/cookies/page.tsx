@@ -34,7 +34,7 @@ export default async function CookiesPage({
   return (
     <div className="section-shell py-8 sm:py-10">
       <div className="max-w-4xl">
-        <p className="label-eyebrow !text-civic">{es ? "Controles del navegador" : "Browser controls"}</p>
+        <p className="label-eyebrow !text-brand">{es ? "Controles del navegador" : "Browser controls"}</p>
         <h1 className="page-title mt-2">{es ? "Configuración de cookies" : "Cookie Settings"}</h1>
         <p className="page-copy mt-4">
           {es
@@ -46,7 +46,7 @@ export default async function CookiesPage({
           <CookiePreferenceControls locale={locale} />
 
           <section className="quiet-card overflow-hidden">
-            <div className="grid gap-px bg-black/10 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-px bg-rule sm:grid-cols-2 lg:grid-cols-4">
               <CookieType
                 title={es ? "Preferencias" : "Preferences"}
                 detail={
@@ -87,10 +87,10 @@ export default async function CookiesPage({
           </section>
 
           <section className="quiet-card p-5 sm:p-6">
-            <h2 className="text-xl font-black text-ink">
+            <h2 className="text-xl font-semibold text-ink">
               {es ? "Administrar cookies de analítica" : "Managing analytics cookies"}
             </h2>
-            <p className="mt-2 text-sm font-semibold leading-6 text-black/65">
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate">
               {es
                 ? "Puedes bloquear o borrar cookies, incluida la analítica, desde la configuración de privacidad de tu navegador. Google también ofrece un complemento para impedir que Google Analytics mida tus visitas. Bloquear cookies de preferencias puede hacer que SimpleCity no recuerde tus selecciones."
                 : "You can block or delete cookies, including analytics cookies, from your browser’s privacy settings. Google also offers an add-on that prevents Google Analytics from measuring your visits. Blocking preference cookies may prevent SimpleCity from remembering your selections."}
@@ -113,10 +113,10 @@ export default async function CookiesPage({
 
 function CookieType({ title, detail, examples }: { title: string; detail: string; examples: string }) {
   return (
-    <article className="bg-white p-5 sm:p-6">
-      <h2 className="text-lg font-black text-ink">{title}</h2>
-      <p className="mt-2 text-sm font-semibold leading-6 text-black/65">{detail}</p>
-      <p className="mt-3 break-words font-mono text-xs font-bold text-civic">{examples}</p>
+    <article className="bg-surface p-5 sm:p-6">
+      <h2 className="text-lg font-semibold text-ink">{title}</h2>
+      <p className="mt-2 text-sm font-semibold leading-6 text-slate">{detail}</p>
+      <p className="mt-3 break-words font-mono text-xs font-bold text-brand">{examples}</p>
     </article>
   );
 }

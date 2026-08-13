@@ -16,10 +16,10 @@ export default async function OfflinePage() {
   return (
     <div className="section-shell py-10 sm:py-14">
       <section className="quiet-card mx-auto max-w-2xl p-6 sm:p-8">
-        <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-civic text-white">
+        <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-brand text-white">
           <WifiOff aria-hidden="true" className="h-6 w-6" />
         </div>
-        <p className="label-eyebrow text-civic">{isSpanish ? "Sin conexión" : "Offline"}</p>
+        <p className="label-eyebrow text-brand">{isSpanish ? "Sin conexión" : "Offline"}</p>
         <h1 className="page-title mt-2">
           {isSpanish
             ? "Necesitas conexión para ver los datos cívicos más recientes."

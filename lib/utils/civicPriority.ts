@@ -1,6 +1,7 @@
 import type { SummaryCardRow } from "@/lib/types";
 import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
+import { officialSourceFallbackReason } from "@/lib/utils/summaryFallback";
 
 const IMPACT_CATEGORY_SCORES: Record<string, number> = {
   Housing: 34,
@@ -21,11 +22,36 @@ const IMPACT_CATEGORY_SCORES: Record<string, number> = {
   "Parks & Environment": 20
 };
 
-const HIGH_IMPACT_PATTERNS = [
-  /\b(public hearing|hearing|ordinance|resolution|vote|adopt|approve|authorize|award|contract|agreement|grant|budget|fee|tax|rate|bond|funding|spending|appropriation)\b/i,
-  /\b(housing|affordable|rent|tenant|zoning|development|permit|construction|traffic|parking|road|transit|bike|pedestrian|safety|police|fire|emergency|health|clinic|child|youth|school)\b/i,
-  /\b(water|sewer|utility|garbage|library|park|trail|flood|climate|eviction|domestic violence|homeless|shelter)\b/i,
-  /\$\s?\d|\b\d+(?:\.\d+)?\s?%/i
+/**
+ * Subject matter that turns up in someone's actual day: where they live, how
+ * they get around, what they pay, whether services run.
+ *
+ * Parliamentary verbs — vote, adopt, approve, authorize, resolution — are
+ * deliberately NOT here. They appear on nearly every agenda item, so scoring
+ * them rewarded procedural filler as highly as a rezoning. What earns a homepage
+ * slot is the subject, not the motion type attached to it.
+ */
+const DAILY_LIFE_PATTERNS: Array<[RegExp, number]> = [
+  [/\b(housing|affordable housing|rent|renters?|tenants?|eviction|homeless(?:ness)?|shelter|accessory dwelling|ADUs?)\b/i, 30],
+  [/\b(tax|taxes|fees?|rates?|fines?|assessments?|surcharge|utility bill)\b/i, 26],
+  // Public money is a daily-life subject, not merely a procedural one: a budget
+  // hearing decides service levels. Filing this under "binding actions" meant a
+  // continued budget hearing scored well but failed the impact gate entirely.
+  [/\b(budget|funding|appropriations?|spending|revenue|deficit|shortfall|fiscal|reserves?)\b/i, 22],
+  [/\b(traffic|parking|roads?|streets?|sidewalks?|crosswalks?|bike|bicycle|pedestrian|transit|bus|rail|train|speed limit|intersection)\b/i, 26],
+  [/\b(police|fire|emergency|crime|ambulance|paramedic|disaster|evacuation|flood(?:ing)?|wildfire|earthquake)\b/i, 26],
+  [/\b(zoning|rezon\w+|general plan|land use|subdivision|construction|building height|density|development agreement)\b/i, 24],
+  [/\b(water|sewer|storm drain|garbage|trash|recycling|utility|utilities|electricity|power|solar|energy|broadband|internet|wi-?fi)\b/i, 24],
+  [/\b(climate|emissions|air quality|groundwater|drought|sea level)\b/i, 20],
+  [/\b(schools?|students?|classrooms?|teachers?|child ?care|preschool|playground|youth program)\b/i, 24],
+  [/\b(health|clinic|hospital|mental health|food|nutrition|seniors?|disabilit\w+|accessib\w+)\b/i, 22],
+  [/\b(parks?|trails?|library|libraries|pool|community center|open space|trees?)\b/i, 18]
+];
+
+/** Actions that bind — worth points, but only alongside a real subject. */
+const BINDING_ACTION_PATTERNS: Array<[RegExp, number]> = [
+  [/\b(ordinance|public hearing|ballot measure|bond measure|moratorium)\b/i, 16],
+  [/\bcapital improvement\b/i, 14]
 ];
 
 const ROUTINE_PATTERNS = [
@@ -33,12 +59,51 @@ const ROUTINE_PATTERNS = [
   /\b(call to order|roll call|pledge of allegiance|adjournment|approval of agenda)\b/i,
   /\b(recognize|recognition|proclamation|commendation|certificate)\b/i,
   /\bnational .+ month\b/i,
-  /\bpresentation only\b/i
+  /\bpresentation only\b/i,
+  /\b(introduce and welcome|swearing[- ]in|oath of office|installation of officers)\b/i
 ];
 
+/**
+ * The internal housekeeping of running a public body. Real work, but it is not
+ * what "decisions that may affect daily life" is promising a reader.
+ */
 const PROCEDURAL_PATTERNS = [
-  /\b(ad hoc|nominating|appoint(?:ment)?|appoint commissioners?|committee appointments?|officer election|bylaws?|rules of procedure|work plan)\b/i,
-  /\b(elect chair|elect vice chair|select chair|select vice chair)\b/i
+  /\b(ad hoc|nominating|appoint(?:ment)?s?|appoint commissioners?|committee appointments?|officer election|bylaws?|rules of procedure|work ?plans?)\b/i,
+  /\b(elect|select) (?:a )?(?:new )?(?:chair|vice chair|president|secretary)\b/i,
+  /\b(orientation|annual report|receive and file|informational (?:item|update|report)|status update|(?:monthly|quarterly|mid-?year) report)\b/i,
+  /\b(meeting end time|item rollover|terms? and limits?|term limits?|meeting schedule|calendar of meetings)\b/i,
+  // Announcements that a meeting will occur. "Notice of public hearing" is
+  // deliberately excluded from this list — a hearing notice is a real chance to
+  // be heard, which is the opposite of housekeeping.
+  /\bmeeting notice\b/i,
+  /\bnotice of (?:a |an )?(?:special|joint|regular|adjourned|closed)\b[^.]{0,24}\bmeeting\b/i,
+  /\bspecial joint (?:commission|committee|board)\b/i
+];
+
+/**
+ * Agenda items that only announce that a meeting is happening.
+ *
+ * Anchored to the start of the agenda item rather than searched across the card
+ * text, because "special meeting" legitimately appears inside real items ("public
+ * hearing at the special meeting of…"). These read circularly on the homepage:
+ * the connected decision restates the meeting it belongs to.
+ */
+const MEETING_ANNOUNCEMENT_PATTERNS = [
+  /^\s*(?:notice of\s+)?(?:an?\s+)?(?:special|regular|adjourned|closed|joint|annual)\s+(?:session|meeting)\b/i,
+  /^\s*meeting of the\b/i,
+  /^\s*(?:call|notice) of\s+(?:a\s+)?(?:special|closed)\b/i
+];
+
+export function isMeetingAnnouncementCard(card: SummaryCardRow) {
+  const agendaItem = String(card.agenda_item || "").trim();
+  if (!agendaItem) return false;
+  return MEETING_ANNOUNCEMENT_PATTERNS.some((pattern) => pattern.test(agendaItem));
+}
+
+const WITHDRAWN_PATTERNS = [
+  /\bwithdrawn\b/i,
+  /\bremoved from (?:the )?agenda\b/i,
+  /\bno action taken\b/i
 ];
 
 const CANCELLATION_PATTERNS = [
@@ -259,6 +324,57 @@ function recencyScore(card: SummaryCardRow, now = Date.now()) {
   return Math.max(0, bonus);
 }
 
+const MONEY_PATTERN = /\$\s?([\d][\d,]*(?:\.\d+)?)\s*(billion|million|thousand|[bmk])?\b/gi;
+
+function largestDollarAmount(text: string) {
+  let largest = 0;
+
+  for (const match of text.matchAll(MONEY_PATTERN)) {
+    let amount = Number(match[1].replace(/,/g, ""));
+    if (!Number.isFinite(amount)) continue;
+
+    const unit = (match[2] || "").toLowerCase();
+    if (unit.startsWith("b")) amount *= 1e9;
+    else if (unit.startsWith("m")) amount *= 1e6;
+    else if (unit.startsWith("k") || unit === "thousand") amount *= 1e3;
+
+    largest = Math.max(largest, amount);
+  }
+
+  return largest;
+}
+
+/**
+ * How much money is at stake, on a log scale — roughly $10k→8, $1M→16, $60M→23.
+ *
+ * A flat bonus for containing a dollar sign ranked a $49,994 drone donation above
+ * a $60,000,000 housing bond. Magnitude is the whole point of the signal.
+ */
+export function moneyScore(text: string) {
+  const amount = largestDollarAmount(text);
+  if (amount < 1000) return 0;
+  return Math.min(26, Math.max(0, Math.round((Math.log10(amount) - 3) * 4 + 4)));
+}
+
+function dailyLifeScore(text: string) {
+  let score = 0;
+  for (const [pattern, weight] of DAILY_LIFE_PATTERNS) {
+    if (pattern.test(text)) score += weight;
+  }
+  // Capped so an item that name-drops many topics cannot outrank a focused one.
+  return Math.min(score, 62);
+}
+
+export function hasDailyLifeSubject(card: SummaryCardRow) {
+  const text = cardText(card);
+  return DAILY_LIFE_PATTERNS.some(([pattern]) => pattern.test(text));
+}
+
+export function isWithdrawnCard(card: SummaryCardRow) {
+  const text = cardText(card);
+  return WITHDRAWN_PATTERNS.some((pattern) => pattern.test(text));
+}
+
 function hasCardCommentOptionInfo(card: SummaryCardRow) {
   return hasCommentOptionInfo({
     closes: card.comment_window_closes,
@@ -288,31 +404,108 @@ export function publicInterestScore(card: SummaryCardRow) {
   const text = cardText(card);
   let score = 0;
 
+  // Capped rather than summed: a broad visioning document gets tagged with every
+  // category and was scoring higher than an actual rezoning on that basis alone.
+  let categoryScore = 0;
   for (const category of card.category_tags || []) {
-    score += IMPACT_CATEGORY_SCORES[category] || 0;
+    categoryScore += IMPACT_CATEGORY_SCORES[category] || 0;
   }
+  score += Math.min(categoryScore, 44);
 
   if (card.status === "Upcoming vote") score += 32;
   if (card.status === "Routine approval") score -= 20;
   if (card.status === "Under discussion") score += 22;
   if (card.status === "Passed") score += 10;
   if (card.status === "Information only") score -= 8;
-  if (card.meetings?.status === "Upcoming") score += 12;
   if (hasCardCommentOptionInfo(card)) score += 4;
 
-  for (const pattern of HIGH_IMPACT_PATTERNS) {
-    if (pattern.test(text)) score += 14;
+  score += dailyLifeScore(text);
+  score += moneyScore(text);
+
+  for (const [pattern, weight] of BINDING_ACTION_PATTERNS) {
+    if (pattern.test(text)) score += weight;
   }
 
-  if (isRoutineOrCeremonialCard(card)) score -= 90;
-  if (isProceduralCard(card)) score -= 42;
-  if (isCancellationCard(card)) score -= 32;
+  // Heavy enough that housekeeping cannot climb back over the threshold on the
+  // strength of a category tag alone.
+  // No plain-language summary means the card cannot deliver what this section
+  // promises, so it should not headline — but it stays available on the decisions
+  // list, since the underlying decision is real.
+  if (officialSourceFallbackReason(card.why_it_matters)) score -= 60;
+
+  if (isMeetingAnnouncementCard(card)) score -= 100;
+  if (isRoutineOrCeremonialCard(card)) score -= 140;
+  if (isProceduralCard(card)) score -= 80;
+  if (isWithdrawnCard(card)) score -= 90;
+  if (isCancellationCard(card)) score -= 70;
 
   return score;
 }
 
+const PUBLIC_INTEREST_THRESHOLD = 58;
+
+/**
+ * Whether an item belongs under "decisions that may affect daily life".
+ *
+ * Requires a real reason, not just a passing score: identifiable daily-life
+ * subject matter, meaningful money, or a vote a reader could still show up for.
+ * A score alone used to be satisfiable by a category tag plus the word "approve".
+ */
 export function isPublicInterestCard(card: SummaryCardRow) {
-  return publicInterestScore(card) >= 34 && !isRoutineOrCeremonialCard(card);
+  if (
+    isRoutineOrCeremonialCard(card) ||
+    isProceduralCard(card) ||
+    isMeetingAnnouncementCard(card) ||
+    isWithdrawnCard(card) ||
+    isCancellationCard(card)
+  ) {
+    return false;
+  }
+
+  // This section's whole promise is a plain-language summary. A card that fell
+  // back to raw agenda text cannot keep that promise, so it stays on the full
+  // decisions list instead of headlining here.
+  if (officialSourceFallbackReason(card.why_it_matters)) return false;
+
+  const hasImpactReason =
+    hasDailyLifeSubject(card) ||
+    moneyScore(cardText(card)) >= 12 ||
+    card.status === "Upcoming vote";
+
+  return hasImpactReason && publicInterestScore(card) >= PUBLIC_INTEREST_THRESHOLD;
+}
+
+const STALENESS_WINDOW_DAYS = 180;
+const STALENESS_FLOOR = 0.5;
+
+/**
+ * Discounts decisions as they age, so the homepage reads as current business.
+ *
+ * Upcoming items are never discounted — they are inherently current. Past items
+ * fade to half weight over six months, which is gentle enough that a major
+ * decision still outranks a minor fresh one, but firm enough that a moderate item
+ * from last week beats a similar one from spring.
+ */
+function freshnessFactor(card: SummaryCardRow, now = Date.now()) {
+  const time = meetingTime(card);
+  if (!time || time >= now) return 1;
+
+  const ageInDays = (now - time) / DAY_IN_MS;
+  return Math.max(STALENESS_FLOOR, 1 - ageInDays / STALENESS_WINDOW_DAYS);
+}
+
+/**
+ * Ranks by how much an item matters, discounted by age, with recency as a nudge
+ * rather than the deciding factor.
+ *
+ * Recency used to be its own comparison step ahead of the score. Because
+ * recencyScore is a continuous value derived from fractional days, two cards
+ * essentially never tied, so the score was unreachable and the homepage was
+ * ordered purely by date — which is how a department workplan overview outranked
+ * an eight-story building approval.
+ */
+export function rankingScore(card: SummaryCardRow, now = Date.now()) {
+  return publicInterestScore(card) * freshnessFactor(card, now) + recencyScore(card, now);
 }
 
 export function compareCardsByPublicInterest(left: SummaryCardRow, right: SummaryCardRow, now = Date.now()) {
@@ -321,17 +514,57 @@ export function compareCardsByPublicInterest(left: SummaryCardRow, right: Summar
   const leftFuture = leftTime >= now;
   const rightFuture = rightTime >= now;
 
+  // Anything a reader can still act on comes first — that is the whole promise
+  // of the product — but within each group, importance decides the order.
   if (leftFuture !== rightFuture) {
     return Number(rightFuture) - Number(leftFuture);
   }
 
-  const freshnessDelta = recencyScore(right, now) - recencyScore(left, now);
-  if (freshnessDelta !== 0) return freshnessDelta;
-
-  const scoreDelta = publicInterestScore(right) - publicInterestScore(left);
-  if (scoreDelta !== 0) return scoreDelta;
+  const rankDelta = rankingScore(right, now) - rankingScore(left, now);
+  if (rankDelta !== 0) return rankDelta;
   if (leftFuture && rightFuture) return leftTime - rightTime;
   return rightTime - leftTime;
+}
+
+/**
+ * Takes the top `limit` cards while allowing at most `perMeeting` from any single
+ * meeting, so a short list spans several bodies and dates instead of turning into
+ * one council agenda.
+ *
+ * Falls back to filling from the remainder if the cap cannot be satisfied.
+ */
+export function selectDiverseCards(
+  cards: SummaryCardRow[],
+  limit: number,
+  perMeeting = 2
+) {
+  if (limit <= 0) return [] as SummaryCardRow[];
+
+  const usedByMeeting = new Map<string, number>();
+  const selected: SummaryCardRow[] = [];
+  const deferred: SummaryCardRow[] = [];
+
+  for (const card of cards) {
+    if (selected.length >= limit) break;
+
+    const key = card.meeting_id || card.meetings?.id || card.id;
+    const used = usedByMeeting.get(key) || 0;
+
+    if (used >= perMeeting) {
+      deferred.push(card);
+      continue;
+    }
+
+    usedByMeeting.set(key, used + 1);
+    selected.push(card);
+  }
+
+  for (const card of deferred) {
+    if (selected.length >= limit) break;
+    selected.push(card);
+  }
+
+  return selected;
 }
 
 export function isDigestWorthyCard(card: SummaryCardRow) {

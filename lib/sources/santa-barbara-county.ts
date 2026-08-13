@@ -16,7 +16,7 @@ import {
 } from "@/lib/scraper/streamDownload";
 import { scrapeLegistarMeetings } from "@/lib/sources/legistar";
 import { cleanText, slugify } from "@/lib/utils/slug";
-import { parseMeetingDate } from "@/lib/utils/date";
+import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { getMeetingWindow } from "@/lib/utils/meetingWindow";
 
 export const SANTA_BARBARA_PLANNING_COMMISSION_URL =
@@ -117,11 +117,13 @@ export function parsePlanningCommissionFolder(item: BoxItem): PlanningFolder | n
   const dateText = `${Number(match[1])}/${Number(match[2])}/${year}`;
   const parsed = parseMeetingDate(`${dateText} 9:00 AM`);
   if (!parsed) return null;
+  const dateKey = civicCalendarDay(null, parsed);
+  if (!dateKey) return null;
   return {
     ...item,
     type: "folder",
     dateText,
-    dateKey: parsed.slice(0, 10),
+    dateKey,
     timestamp: new Date(parsed).getTime(),
     cancelled: /\b(?:cancell?ed|to be adjourned)\b/i.test(item.name)
   };
@@ -139,7 +141,7 @@ function dateKeyFromText(value: string) {
   const match = value.match(/\b(\d{1,2})[-/](\d{1,2})[-/](\d{2}|\d{4})\b/);
   if (!match) return null;
   const year = match[3].length === 2 ? 2000 + Number(match[3]) : Number(match[3]);
-  return parseMeetingDate(`${match[1]}/${match[2]}/${year}`)?.slice(0, 10) || null;
+  return civicCalendarDay(`${match[1]}/${match[2]}/${year}`);
 }
 
 function boxFolderUrl(folderId: number) {
@@ -505,9 +507,12 @@ export async function scrapeSantaBarbaraPlanningCommissionMeetings(
     });
   }
 
+  // Keyed on the Pacific calendar day. Slicing the parsed ISO gave the UTC day,
+  // so an evening meeting keyed to the following date while the archive labels it
+  // compares against key off a bare date — they could never match.
   const meetingsByDate = new Map(
     meetings.map((meeting) => [
-      parseMeetingDate(`${meeting.dateText || ""} ${meeting.timeText || ""}`)?.slice(0, 10),
+      civicCalendarDay(`${meeting.dateText || ""} ${meeting.timeText || ""}`),
       meeting
     ])
   );

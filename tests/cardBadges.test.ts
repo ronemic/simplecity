@@ -62,7 +62,23 @@ test("information-only status and comment availability remain separate badges", 
   } as SummaryCardRow;
 
   assert.equal(statusSummary(card, "en").label, "Info only");
-  assert.equal(commentSummary(null, true, "en")?.label, "Comment option listed");
+  assert.equal(commentSummary(null, true, "en")?.label, "Open for comment");
+});
+
+test("a comment option on a past meeting reads as closed, not open", () => {
+  // Ochre is reserved for windows a reader can still act inside, so the same
+  // comment path must not advertise itself once the meeting has happened.
+  const open = commentSummary(null, true, "en", true);
+  assert.equal(open?.label, "Open for comment");
+  assert.equal(open?.className, "state--open");
+
+  const closed = commentSummary(null, true, "en", false);
+  assert.equal(closed?.label, "Comment period has passed");
+  assert.equal(closed?.className, "state--decided");
+});
+
+test("no comment path at all yields no comment badge", () => {
+  assert.equal(commentSummary(null, false, "en"), null);
 });
 
 test("routine approvals have a distinct localized status badge", () => {
@@ -73,7 +89,9 @@ test("routine approvals have a distinct localized status badge", () => {
 
   assert.equal(statusSummary(card, "en").label, "Routine approval");
   assert.equal(statusSummary(card, "es").label, "Aprobación rutinaria");
-  assert.match(statusSummary(card, "en").className, /bg-\[#f4f5f8\]/);
+  // Asserts the semantic state rather than a hex value, so restyling does not
+  // break the test while a wrong meaning still does.
+  assert.equal(statusSummary(card, "en").className, "state--decided");
 });
 
 test("past decision cards without a result clearly show that the official result is pending", () => {
@@ -85,7 +103,7 @@ test("past decision cards without a result clearly show that the official result
 
   assert.equal(statusSummary(card, "en").label, "Awaiting official result");
   assert.equal(statusSummary(card, "es").label, "Esperando resultado oficial");
-  assert.match(statusSummary(card, "en").className, /bg-\[#eef2ff\]/);
+  assert.equal(statusSummary(card, "en").className, "state--upcoming");
 });
 
 test("an attached result takes precedence over the awaiting-result state", () => {
