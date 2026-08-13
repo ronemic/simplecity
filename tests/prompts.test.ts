@@ -71,3 +71,31 @@ test("decision-card prompts exclude submitted public-comment bodies", () => {
   assert.doesNotMatch(prompt, /PUBLIC_COMMENT_BODY_SENTINEL/);
   assert.doesNotMatch(SIMPLECITY_SYSTEM_PROMPT, /optional public-comment text/i);
 });
+
+test("LASD prompts distinguish school-board decisions and protect sensitive details", () => {
+  const meeting: LlmReadyMeeting = {
+    id: "lasd-meeting",
+    jurisdictionSlug: "los-altos-school-district",
+    section: "Upcoming Meetings",
+    title: "Regular Meeting of the Board of Trustees",
+    dateText: "August 17, 2026",
+    meetingType: "Board of Trustees",
+    rowText: "",
+    status: "Upcoming",
+    sourceType: "Simbli agenda",
+    sourceUrl: "https://simbli.example/meeting",
+    hasHtmlAgenda: true,
+    hasPdf: false,
+    documents: [],
+    extractionNotes: [],
+    llmInputText: "Official agenda item text.",
+    publicCommentsInputText: null
+  };
+
+  const prompt = buildSimpleCityUserPrompt(meeting);
+  assert.match(prompt, /public school district, not a city government/);
+  assert.match(prompt, /curriculum, student services, facilities/);
+  assert.match(prompt, /committee recommendation is advice/);
+  assert.match(prompt, /confidential student, discipline, special-education/);
+  assert.match(prompt, /Virtual viewing does not imply virtual public comment/);
+});

@@ -86,6 +86,7 @@ type TranslationKey =
   | "subscribeConfirmedBody"
   | "subscribeConfirmedTitle"
   | "subscribeRegionalCoverage"
+  | "subscribeSchoolDistricts"
   | "subscribeSanMateoCountyCities"
   | "subscribeSantaClaraCountyCities"
   | "subscribeEmailAddress"
@@ -205,6 +206,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
       "Weekly digests will use your latest selected areas when new SimpleCity cards are published.",
     subscribeConfirmedTitle: "Your email updates are confirmed",
     subscribeRegionalCoverage: "Regional coverage",
+    subscribeSchoolDistricts: "School districts",
     subscribeSanMateoCountyCities: "Cities in San Mateo County",
     subscribeSantaClaraCountyCities: "Cities in Santa Clara County",
     subscribeEmailAddress: "Email address",
@@ -328,6 +330,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
       "Los resúmenes semanales usarán las áreas que elegiste más recientemente cuando se publiquen nuevas tarjetas de SimpleCity.",
     subscribeConfirmedTitle: "Tus actualizaciones por email están confirmadas",
     subscribeRegionalCoverage: "Cobertura regional",
+    subscribeSchoolDistricts: "Distritos escolares",
     subscribeSanMateoCountyCities: "Ciudades del condado de San Mateo",
     subscribeSantaClaraCountyCities: "Ciudades del condado de Santa Clara",
     subscribeEmailAddress: "Email",

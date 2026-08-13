@@ -8,6 +8,7 @@ type JurisdictionOption = {
   value: string;
   label: string;
   parentCountyValue?: string;
+  kind?: "school-district";
 };
 
 type SubscribeStatus = "idle" | "success" | "error";
@@ -53,7 +54,17 @@ export function SubscribeForm({
       id: "santa-clara-cities",
       label: t(locale, "subscribeSantaClaraCountyCities"),
       jurisdictions: jurisdictions.filter(
-        (jurisdiction) => jurisdiction.parentCountyValue === "santa-clara-county"
+        (jurisdiction) =>
+          jurisdiction.parentCountyValue === "santa-clara-county" &&
+          jurisdiction.kind !== "school-district"
+      ),
+      columns: "sm:grid-cols-2 md:grid-cols-1"
+    },
+    {
+      id: "school-districts",
+      label: t(locale, "subscribeSchoolDistricts"),
+      jurisdictions: jurisdictions.filter(
+        (jurisdiction) => jurisdiction.kind === "school-district"
       ),
       columns: "sm:grid-cols-2 md:grid-cols-1"
     }
@@ -183,7 +194,7 @@ export function SubscribeForm({
         <legend className="text-sm font-black text-ink">
           {t(locale, "subscribeWeeklyDigestAreas")}
         </legend>
-        <div className="grid gap-3 md:grid-cols-[0.78fr_1.3fr_0.92fr]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[0.78fr_1.3fr_0.92fr_1fr]">
           {jurisdictionGroups.map((group) => (
             <div
               aria-labelledby={`${group.id}-label`}

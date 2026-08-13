@@ -388,6 +388,15 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
     "santa-clara-county"
   );
   assert.equal(
+    jurisdictionOptions.find((option) => option.value === "los-altos-school-district")
+      ?.parentCountyValue,
+    "santa-clara-county"
+  );
+  assert.equal(
+    jurisdictionOptions.find((option) => option.value === "los-altos-school-district")?.kind,
+    "school-district"
+  );
+  assert.equal(
     jurisdictionOptions.find((option) => option.value === "redwood-city")?.parentCountyValue,
     "san-mateo-county"
   );

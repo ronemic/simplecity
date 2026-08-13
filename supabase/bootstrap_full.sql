@@ -1596,4 +1596,15 @@ revoke all privileges on table public.santa_barbara_decision_interest_totals
   from public, anon, authenticated;
 grant select on table public.santa_barbara_decision_interest_totals to service_role;
 
+-- -----------------------------------------------------------------------------
+-- Source: supabase/migrations/20260812000000_add_los_altos_school_district_jurisdiction.sql
+-- -----------------------------------------------------------------------------
+
+insert into public.jurisdictions (slug, name, region_slug)
+values ('los-altos-school-district', 'Los Altos School District', 'santa-clara')
+on conflict (slug) do update
+set name = excluded.name,
+    region_slug = excluded.region_slug,
+    updated_at = now();
+
 commit;

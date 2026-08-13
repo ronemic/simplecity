@@ -7,6 +7,7 @@ const OFFICIAL_DOCUMENT_ERROR_PATTERNS = [
   /\baccess denied\b/i,
   /\b(?:401 unauthorized|403 forbidden|404 not found|502 bad gateway|503 service unavailable|504 gateway timeout)\b/i,
   /\b(?:cloudflare ray id|checking your browser|verify (?:that )?you are (?:a )?human|captcha)\b/i,
+  /\brequest unsuccessful\.?.*\bincapsula incident id\b/i,
   /\b(?:oops[.!\s]*(?:an )?error occurred|a problem has occurred on this web site)\b/i,
   /^\s*(?:internal server error|service unavailable|request (?:was )?blocked|forbidden|unauthorized)\b/i,
   /<(?:!doctype|html|head|body|script)\b/i

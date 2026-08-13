@@ -3,7 +3,7 @@
 import { Check, ChevronDown, Languages, Loader2, MapPin, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getPublicJurisdictionOptions
@@ -29,7 +29,8 @@ const nav = [
 const jurisdictions = getPublicJurisdictionOptions().map((jurisdiction) => ({
   slug: jurisdiction.slug,
   label: jurisdiction.name,
-  isChild: Boolean(jurisdiction.parentCountySlug)
+  isChild: Boolean(jurisdiction.parentCountySlug),
+  isSchoolDistrict: jurisdiction.kind === "school-district"
 }));
 
 const JURISDICTION_STORAGE_KEY = "simplecity.jurisdiction";
@@ -306,28 +307,39 @@ export function HeaderNav({
         {isJurisdictionMenuOpen ? (
           <div className="menu-popover">
             <div role="listbox" aria-label="Jurisdiction" className="max-h-64 overflow-auto">
-              {jurisdictions.map((jurisdiction) => {
+              {jurisdictions.map((jurisdiction, index) => {
                 const isSelected = jurisdiction.slug === selected;
+                const startsSchoolDistrictGroup =
+                  jurisdiction.isSchoolDistrict && !jurisdictions[index - 1]?.isSchoolDistrict;
 
                 return (
-                  <button
-                    key={jurisdiction.slug}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    className={cn(
-                      "menu-option",
-                      jurisdiction.isChild && "menu-option-child",
-                      isSelected && "menu-option-selected"
-                    )}
-                    onClick={() => changeJurisdiction(jurisdiction.slug)}
-                  >
-                    <Check
-                      aria-hidden="true"
-                      className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
-                    />
-                    <span className="truncate">{jurisdictionLabel(jurisdiction, selectedLocale)}</span>
-                  </button>
+                  <Fragment key={jurisdiction.slug}>
+                    {startsSchoolDistrictGroup ? (
+                      <div
+                        aria-hidden="true"
+                        className="mx-3 mt-1 border-t border-black/10 px-1 pb-1 pt-2 text-[10px] font-black uppercase tracking-[0.08em] text-black/50"
+                      >
+                        {t(selectedLocale, "subscribeSchoolDistricts")}
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      className={cn(
+                        "menu-option",
+                        jurisdiction.isChild && "menu-option-child",
+                        isSelected && "menu-option-selected"
+                      )}
+                      onClick={() => changeJurisdiction(jurisdiction.slug)}
+                    >
+                      <Check
+                        aria-hidden="true"
+                        className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
+                      />
+                      <span className="truncate">{jurisdictionLabel(jurisdiction, selectedLocale)}</span>
+                    </button>
+                  </Fragment>
                 );
               })}
             </div>
@@ -429,7 +441,11 @@ export function HeaderNavFallback() {
         >
           {jurisdictions.map((jurisdiction) => (
             <option key={jurisdiction.slug} value={jurisdiction.slug}>
-              {jurisdiction.isChild ? `  ${jurisdiction.label}` : jurisdiction.label}
+              {jurisdiction.isSchoolDistrict
+                ? `  ${t("en", "subscribeSchoolDistricts")} — ${jurisdiction.label}`
+                : jurisdiction.isChild
+                  ? `  ${jurisdiction.label}`
+                  : jurisdiction.label}
             </option>
           ))}
         </select>

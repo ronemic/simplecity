@@ -68,9 +68,19 @@ test("groups alphabetized cities beneath their clickable counties", () => {
   );
   assert.deepEqual(
     options
-      .filter((jurisdiction) => jurisdiction.parentCountySlug === "santa-clara-county")
+      .filter(
+        (jurisdiction) =>
+          jurisdiction.parentCountySlug === "santa-clara-county" &&
+          jurisdiction.kind !== "school-district"
+      )
       .map((jurisdiction) => jurisdiction.slug),
     ["los-altos", "los-altos-hills", "mountain-view"]
+  );
+  assert.deepEqual(
+    options
+      .filter((jurisdiction) => jurisdiction.kind === "school-district")
+      .map((jurisdiction) => jurisdiction.slug),
+    ["los-altos-school-district"]
   );
   assert.equal(
     options.find((jurisdiction) => jurisdiction.slug === "san-mateo-county")?.parentCountySlug,
@@ -164,6 +174,34 @@ test("Los Altos Hills is a valid CivicClerk jurisdiction in the Santa Clara regi
   assert.equal(toPublicJurisdictionSlug("los-altos-hills"), "los-altos-hills");
 });
 
+test("Los Altos School District is a distinct Simbli jurisdiction in the Santa Clara region", () => {
+  const district = getJurisdictionBySlug("los-altos-school-district");
+  const options = getPublicJurisdictionOptions();
+  const optionIndex = options.findIndex(
+    (option) => option.slug === "los-altos-school-district"
+  );
+
+  assert.equal(
+    requireValidJurisdictionSlug("los-altos-school-district"),
+    "los-altos-school-district"
+  );
+  assert.equal(district?.name, "Los Altos School District");
+  assert.equal(district?.officialName, "Los Altos School District");
+  assert.equal(district?.platform, "simbli");
+  assert.equal(district?.regionSlug, "santa-clara");
+  assert.equal(district?.timezone, "America/Los_Angeles");
+  assert.equal(
+    district?.sourceUrl,
+    "https://simbli.eboardsolutions.com/SB_Meetings/SB_MeetingListing.aspx?S=36030305"
+  );
+  assert.equal(district?.simbliUrl, district?.sourceUrl);
+  assert.equal(toPublicJurisdictionSlug("los-altos-school-district"), "los-altos-school-district");
+  assert.equal(options[optionIndex]?.parentCountySlug, "santa-clara-county");
+  assert.equal(options[optionIndex]?.kind, "school-district");
+  assert.equal(options[optionIndex - 1]?.slug, "mountain-view");
+  assert.equal(options[optionIndex + 1]?.slug, "santa-barbara-county");
+});
+
 test("Los Altos jurisdictions use only Santa Clara regional Supabase credentials", () => {
   const previous = {
     url: process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
@@ -176,7 +214,11 @@ test("Los Altos jurisdictions use only Santa Clara regional Supabase credentials
   process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY = "regional-service-key";
 
   try {
-    for (const slug of ["los-altos", "los-altos-hills"] as const) {
+    for (const slug of [
+      "los-altos",
+      "los-altos-hills",
+      "los-altos-school-district"
+    ] as const) {
       const jurisdiction = getJurisdictionBySlug(slug);
       assert.equal(jurisdiction?.supabaseUrl, "https://santa-clara.example.test");
       assert.equal(jurisdiction?.supabaseAnonKey, "regional-anon-key");
@@ -205,6 +247,12 @@ test("Los Altos reports missing Santa Clara regional configuration", () => {
   try {
     assert.throws(
       () => getServiceSupabaseClientForJurisdiction("los-altos"),
+      (error) =>
+        error instanceof Error &&
+        error.message === SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE
+    );
+    assert.throws(
+      () => getServiceSupabaseClientForJurisdiction("los-altos-school-district"),
       (error) =>
         error instanceof Error &&
         error.message === SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE

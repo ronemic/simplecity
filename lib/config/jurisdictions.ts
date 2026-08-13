@@ -11,6 +11,7 @@ export type JurisdictionSlug =
   | "mountain-view"
   | "los-altos"
   | "los-altos-hills"
+  | "los-altos-school-district"
   | "santa-barbara-county"
   | "san-francisco"
   | "menlo-park"
@@ -24,6 +25,7 @@ export type PublicJurisdictionSlug =
   | "mountain-view"
   | "los-altos"
   | "los-altos-hills"
+  | "los-altos-school-district"
   | "santa-barbara-county"
   | "san-francisco"
   | "menlo-park"
@@ -33,7 +35,14 @@ export type JurisdictionSelection = JurisdictionSlug | typeof ALL_JURISDICTIONS_
 export type PublicJurisdictionSelection =
   | PublicJurisdictionSlug
   | typeof ALL_JURISDICTIONS_SLUG;
-export type CivicPlatform = "primegov" | "iqm2" | "legistar" | "official-site" | "civicclerk" | "agenda-online";
+export type CivicPlatform =
+  | "primegov"
+  | "iqm2"
+  | "legistar"
+  | "official-site"
+  | "civicclerk"
+  | "agenda-online"
+  | "simbli";
 export type RegionSlug =
   | "san-francisco"
   | "north-san-mateo"
@@ -56,6 +65,7 @@ export type JurisdictionConfig = {
   officialSiteUrl?: string;
   meetingsUrl?: string;
   civicClerkUrl?: string;
+  simbliUrl?: string;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
@@ -65,6 +75,7 @@ export type JurisdictionPublicOption = {
   name: string;
   slug: PublicJurisdictionSelection;
   parentCountySlug?: PublicJurisdictionSlug;
+  kind?: "school-district";
 };
 
 const DEFAULT_FOSTER_CITY_PRIMEGOV_URL = "https://fostercity.primegov.com/public/portal";
@@ -97,6 +108,8 @@ export const DEFAULT_LOS_ALTOS_CIVICCLERK_URL =
   "https://losaltosca.portal.civicclerk.com/";
 export const DEFAULT_LOS_ALTOS_HILLS_CIVICCLERK_URL =
   "https://losaltoshillsca.portal.civicclerk.com/";
+export const DEFAULT_LOS_ALTOS_SCHOOL_DISTRICT_SIMBLI_URL =
+  "https://simbli.eboardsolutions.com/SB_Meetings/SB_MeetingListing.aspx?S=36030305";
 export const SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE = [
   "Santa Clara region Supabase configuration is missing. Set",
   "NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,",
@@ -139,6 +152,7 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "santa-clara-county",
   "los-altos",
   "los-altos-hills",
+  "los-altos-school-district",
   "san-francisco",
   "menlo-park",
   "east-palo-alto",
@@ -159,6 +173,12 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "Los Altos", slug: "los-altos", parentCountySlug: "santa-clara-county" },
   { name: "Los Altos Hills", slug: "los-altos-hills", parentCountySlug: "santa-clara-county" },
   { name: "Mountain View", slug: "mountain-view", parentCountySlug: "santa-clara-county" },
+  {
+    name: "Los Altos School District",
+    slug: "los-altos-school-district",
+    parentCountySlug: "santa-clara-county",
+    kind: "school-district"
+  },
   { name: "Santa Barbara County", slug: "santa-barbara-county" }
 ];
 
@@ -185,6 +205,7 @@ export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
   if (internalSlug === "mountain-view") return "Mountain View";
   if (internalSlug === "los-altos") return "Los Altos";
   if (internalSlug === "los-altos-hills") return "Los Altos Hills";
+  if (internalSlug === "los-altos-school-district") return "Los Altos School District";
   if (internalSlug === "santa-barbara-county") return "Santa Barbara County";
   if (internalSlug === "san-francisco") return "San Francisco";
   if (internalSlug === "menlo-park") return "Menlo Park";
@@ -377,6 +398,23 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseServiceRoleKey: santaClara?.serviceRoleKey
     },
     {
+      name: "Los Altos School District",
+      officialName: "Los Altos School District",
+      slug: "los-altos-school-district",
+      regionSlug: "santa-clara",
+      platform: "simbli",
+      timezone: "America/Los_Angeles",
+      sourceUrl:
+        process.env.LOS_ALTOS_SCHOOL_DISTRICT_SIMBLI_URL ||
+        DEFAULT_LOS_ALTOS_SCHOOL_DISTRICT_SIMBLI_URL,
+      simbliUrl:
+        process.env.LOS_ALTOS_SCHOOL_DISTRICT_SIMBLI_URL ||
+        DEFAULT_LOS_ALTOS_SCHOOL_DISTRICT_SIMBLI_URL,
+      supabaseUrl: santaClara?.url,
+      supabaseAnonKey: santaClara?.anonKey,
+      supabaseServiceRoleKey: santaClara?.serviceRoleKey
+    },
+    {
       name: "San Francisco",
       officialName: "City and County of San Francisco",
       slug: "san-francisco",
@@ -536,6 +574,7 @@ export function requireValidJurisdictionSlug(
     slug === "mountain-view" ||
     slug === "los-altos" ||
     slug === "los-altos-hills" ||
+    slug === "los-altos-school-district" ||
     slug === "santa-barbara-county" ||
     slug === "san-francisco" ||
     slug === "menlo-park" ||
@@ -589,7 +628,11 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
       : "Mountain View public Supabase configuration is missing. Set NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_URL and NEXT_PUBLIC_MOUNTAIN_VIEW_SUPABASE_ANON_KEY.";
   }
 
-  if (jurisdiction.slug === "los-altos" || jurisdiction.slug === "los-altos-hills") {
+  if (
+    jurisdiction.slug === "los-altos" ||
+    jurisdiction.slug === "los-altos-hills" ||
+    jurisdiction.slug === "los-altos-school-district"
+  ) {
     return SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 

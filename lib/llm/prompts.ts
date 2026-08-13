@@ -154,6 +154,18 @@ export function buildSimpleCityUserPrompt(meeting: LlmReadyMeeting) {
       ? `${meeting.dateText} ${meeting.timeText}`
       : meeting.dateText;
 
+  const jurisdictionGuidance = meeting.jurisdictionSlug === "los-altos-school-district"
+    ? `
+School-district guidance:
+- This body is a public school district, not a city government.
+- Create separate cards for substantive Board actions and discussions involving curriculum, student services, facilities, enrollment or boundaries, budgets, parcel taxes, contracts, labor, safety, policies, and governance.
+- Preserve substantive consent-calendar items as separate cards when item-specific source blocks are available; never collapse the entire consent calendar into one vague card.
+- A committee recommendation is advice to the Board, not a final district decision.
+- Do not infer or expose confidential student, discipline, special-education, personnel, or closed-session details beyond what the public source explicitly reports.
+- Virtual viewing does not imply virtual public comment. Follow only the participation method stated in the current meeting source.
+`
+    : "";
+
   return `Meeting metadata:
 Title: ${meeting.title}
 Meeting type: ${meeting.meetingType}
@@ -162,10 +174,11 @@ Status: ${meeting.status}
 Source type: ${meeting.sourceType || "Not listed in the source document."}
 Source URL: ${meeting.sourceUrl || "Not listed in the source document."}
 Source quality notes: ${
-    meeting.extractionNotes?.length
+  meeting.extractionNotes?.length
       ? meeting.extractionNotes.join("; ")
       : "No extraction issues recorded."
   }
+${jurisdictionGuidance}
 
 Raw agenda text:
 ${meeting.llmInputText}

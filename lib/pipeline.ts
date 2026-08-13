@@ -49,6 +49,7 @@ import {
 } from "@/lib/sources/santa-barbara-county";
 import { scrapeCivicClerkMeetings } from "@/lib/sources/civicclerk";
 import { scrapeAgendaOnlineMeetings } from "@/lib/sources/agenda-online";
+import { scrapeSimbliMeetings } from "@/lib/sources/simbli";
 import {
   enrichMenloParkMeetingTimesFromAgendaText,
   scrapeMenloParkMeetings
@@ -520,6 +521,16 @@ async function runSimpleCityPipelineInternal(
                 ...options,
                 jurisdiction,
                 portalUrl: options.portalUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              })
+          : jurisdiction.platform === "simbli"
+            ? await scrapeSimbliMeetings({
+                ...options,
+                jurisdiction,
+                portalUrl: options.portalUrl || jurisdiction.simbliUrl || jurisdiction.sourceUrl,
                 documentOutputDir,
                 downloadDocuments: options.downloadDocuments ?? true,
                 shouldStop: deadlineExceeded,

@@ -52,6 +52,10 @@ function sourceCredentials(slug: JurisdictionSlug) {
       process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
       process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
     ],
+    "los-altos-school-district": [
+      process.env.NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL,
+      process.env.SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY
+    ],
     "santa-barbara-county": [
       process.env.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL,
       process.env.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY

@@ -10,8 +10,14 @@ const pipeline = readFileSync(new URL("../lib/pipeline.ts", import.meta.url), "u
 const dedicatedWorkflows = [
   nightlyWorkflow,
   readFileSync(new URL("../.github/workflows/menlo-park-pipeline.yml", import.meta.url), "utf8"),
-  readFileSync(new URL("../.github/workflows/santa-barbara-county-pipeline.yml", import.meta.url), "utf8")
+  readFileSync(new URL("../.github/workflows/santa-barbara-county-pipeline.yml", import.meta.url), "utf8"),
+  readFileSync(
+    new URL("../.github/workflows/los-altos-school-district-pipeline.yml", import.meta.url),
+    "utf8"
+  )
 ];
+
+const losAltosSchoolDistrictWorkflow = dedicatedWorkflows.at(-1) ?? "";
 
 test("nightly workflows do not rerun an entire paid pipeline after failure", () => {
   assert.doesNotMatch(nightlyWorkflow, /pipeline_args=/);
@@ -49,4 +55,18 @@ test("every scraper workflow exposes all five Groq keys for hybrid routing", () 
     }
     assert.match(workflow, /GROQ_MODEL:/);
   }
+});
+
+test("Los Altos School District has an isolated bounded daily workflow", () => {
+  assert.match(losAltosSchoolDistrictWorkflow, /cron: "30 16 \* \* \*"/);
+  assert.match(losAltosSchoolDistrictWorkflow, /timeout-minutes: 60/);
+  assert.match(losAltosSchoolDistrictWorkflow, /--max-runtime-minutes=45/);
+  assert.match(losAltosSchoolDistrictWorkflow, /--require-results-coverage/);
+  assert.match(losAltosSchoolDistrictWorkflow, /NEXT_PUBLIC_SANTA_CLARA_REGION_SUPABASE_URL/);
+  assert.match(losAltosSchoolDistrictWorkflow, /SANTA_CLARA_REGION_SUPABASE_SERVICE_ROLE_KEY/);
+  assert.match(losAltosSchoolDistrictWorkflow, /uses: \.\/\.github\/actions\/setup-playwright/);
+  assert.match(losAltosSchoolDistrictWorkflow, /date -u \+%u/);
+  assert.match(losAltosSchoolDistrictWorkflow, /months_back=3/);
+  assert.match(losAltosSchoolDistrictWorkflow, /months_back=1/);
+  assert.doesNotMatch(losAltosSchoolDistrictWorkflow, /NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL/);
 });

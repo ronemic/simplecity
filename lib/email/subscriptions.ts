@@ -145,7 +145,8 @@ export function publicEmailJurisdictionOptions() {
       label: jurisdiction.name,
       parentCountyValue: jurisdiction.parentCountySlug
         ? (requireValidJurisdictionSlug(jurisdiction.parentCountySlug) as JurisdictionSlug)
-        : undefined
+        : undefined,
+      kind: jurisdiction.kind
     }));
 }
 
