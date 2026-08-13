@@ -253,6 +253,7 @@ function cardInsertRow(
   options: {
     jurisdiction?: JurisdictionConfig | null;
     includeSourceItemId?: boolean;
+    sourceItemId?: string | null;
     isPublished: boolean;
     isFeatured: boolean;
     adminNotes: string | null;
@@ -269,7 +270,12 @@ function cardInsertRow(
     meeting_id: meetingId,
     ...(options.includeSourceItemId === false
       ? {}
-      : { source_item_id: card.sourceItemId || null }),
+      : {
+          source_item_id:
+            options.sourceItemId !== undefined
+              ? options.sourceItemId
+              : card.sourceItemId || null
+        }),
     agenda_item: card.agendaItem,
     what_is_happening: summaryPointsStorageText(card.whatIsHappening),
     why_it_matters: card.whyItMatters,
@@ -511,9 +517,10 @@ async function writeSpanishCardTranslations(
       card.source_item_id ? [[card.source_item_id, card] as const] : []
     )
   );
+  // Keyed by agenda item and URL rather than identity, so a card that adopted a
+  // row already carrying a source item ID still finds its persisted row here.
   const uniqueLegacyInsertedByKey = new Map<string, InsertedCardIdentity | null>();
   for (const inserted of insertedCards) {
-    if (inserted.source_item_id) continue;
     const key = exactCardKey(inserted.agenda_item, inserted.source_url);
     uniqueLegacyInsertedByKey.set(
       key,
@@ -910,26 +917,25 @@ export async function appendSummaryCardsForMeeting(
   const legacyExistingCards = retainedExistingCards.filter(
     (card) => !card.source_item_id
   );
-  const uniqueExistingMatch = (
+  const uniqueMatchWithin = (
+    candidates: ExistingAppendCard[],
     card: SimpleCityCard,
     excludedIds: ReadonlySet<string>
   ) => {
-    const availableLegacyCards = legacyExistingCards.filter(
-      (existing) => !excludedIds.has(existing.id)
-    );
-    const exactMatches = availableLegacyCards.filter(
+    const available = candidates.filter((existing) => !excludedIds.has(existing.id));
+    const exactMatches = available.filter(
       (existing) =>
         exactCardKey(existing.agenda_item, existing.source_url) ===
         exactCardKey(card.agendaItem, card.source)
     );
     if (exactMatches.length === 1) return exactMatches[0];
 
-    const agendaMatches = availableLegacyCards.filter(
+    const agendaMatches = available.filter(
       (existing) => normalizeCardKey(existing.agenda_item) === normalizeCardKey(card.agendaItem)
     );
     if (agendaMatches.length === 1) return agendaMatches[0];
 
-    const fuzzyMatches = availableLegacyCards.filter(
+    const fuzzyMatches = available.filter(
       (existing) => areLikelySameAgendaItem(existing.agenda_item || "", card.agendaItem)
     );
     return fuzzyMatches.length === 1 ? fuzzyMatches[0] : null;
@@ -954,6 +960,27 @@ export async function appendSummaryCardsForMeeting(
       seenLegacyKeys.add(exactKey);
       return true;
     });
+
+  // A regenerated card whose source item ID the model failed to re-emit still
+  // describes an agenda item that already owns a row. Let it adopt that row
+  // instead of inserting a near-duplicate, but never take a row whose identity
+  // another card in this batch is about to claim.
+  const incomingSourceItemIds = new Set(
+    cardsToPersist.flatMap(({ card }) => (card.sourceItemId ? [card.sourceItemId] : []))
+  );
+  const adoptableIdentifiedCards = retainedExistingCards.filter(
+    (card) =>
+      Boolean(card.source_item_id) &&
+      !incomingSourceItemIds.has(card.source_item_id as string)
+  );
+  const uniqueExistingMatch = (
+    card: SimpleCityCard,
+    excludedIds: ReadonlySet<string>
+  ) => {
+    const legacyMatch = uniqueMatchWithin(legacyExistingCards, card, excludedIds);
+    if (legacyMatch || card.sourceItemId) return legacyMatch;
+    return uniqueMatchWithin(adoptableIdentifiedCards, card, excludedIds);
+  };
 
   if (placeholderIdsToDelete.length > 0) {
     const { error: deleteError } = await supabase
@@ -1000,6 +1027,8 @@ export async function appendSummaryCardsForMeeting(
       {
         jurisdiction: options.jurisdiction,
         includeSourceItemId: sourceItemIdAvailable,
+        // Adopting a row must never strip the identity it already carries.
+        sourceItemId: entry.card.sourceItemId || existing.source_item_id || null,
         isPublished: existing.is_published ?? true,
         isFeatured: existing.is_featured ?? false,
         adminNotes: existing.admin_notes || null
