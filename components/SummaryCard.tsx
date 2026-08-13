@@ -317,11 +317,9 @@ export function SummaryCard({
 
   return (
     <article
-      className={cn(
-        // The list card must not clip, so a hover disclosure can open past its
-        // edge. The share view renders that disclosure inline, so it can clip.
-        isSharePresentation ? "quiet-card overflow-hidden rounded-xl" : "docket-item"
-      )}
+      // Both views use .docket-item so neither clips its own hover disclosure;
+      // the share view only differs in corner radius.
+      className={cn("docket-item", isSharePresentation && "rounded-xl")}
       data-card-id={card.id}
     >
       <div
@@ -421,7 +419,6 @@ export function SummaryCard({
               locale={locale}
               meetingDate={meetingDate}
               meetingStatus={meeting?.status || null}
-              showDisclosure={isSharePresentation}
               title={agendaTitle}
             />
           ) : null}
