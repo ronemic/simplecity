@@ -252,7 +252,8 @@ export function SummaryCard({
   locale = "en",
   presentation = "list",
   outcome = card.outcome,
-  defaultOutcomeExpanded = false
+  defaultOutcomeExpanded = false,
+  expandOnOutcome = true
 }: {
   card: SummaryCardRow;
   highlight?: string;
@@ -260,8 +261,9 @@ export function SummaryCard({
   presentation?: "list" | "share";
   outcome?: DecisionOutcome | null;
   defaultOutcomeExpanded?: boolean;
+  expandOnOutcome?: boolean;
 }) {
-  const [open, setOpen] = useState(Boolean(outcome));
+  const [open, setOpen] = useState(expandOnOutcome && Boolean(outcome));
   const isSharePresentation = presentation === "share";
   const showDetails = open || isSharePresentation;
   const TitleTag = isSharePresentation ? "h1" : "h3";

@@ -316,7 +316,7 @@ export default async function Home({
         {filteredCards.length > 0 ? (
           <div className="docket-stack">
             {visibleCards.map((card) => (
-              <SummaryCard key={card.id} card={card} locale={locale} />
+              <SummaryCard key={card.id} card={card} locale={locale} expandOnOutcome={false} />
             ))}
           </div>
         ) : (
