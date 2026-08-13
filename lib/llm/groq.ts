@@ -308,7 +308,11 @@ function mergeValidatedSummaries(
   repaired: SimpleCitySummary
 ): SimpleCitySummary {
   const cards = [...accepted.cards];
-  const spanishCards = [...(accepted.translations?.es?.cards || [])];
+  // Translations are published by index against the card list, so untranslated
+  // accepted cards still need a placeholder before repaired translations append.
+  const spanishCards = [
+    ...(accepted.translations?.es?.cards || accepted.cards.map(() => null))
+  ];
   const repairedSpanishCards = repaired.translations?.es?.cards || [];
 
   for (const [index, card] of repaired.cards.entries()) {

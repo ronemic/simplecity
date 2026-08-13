@@ -725,6 +725,88 @@ test("repairs only source-unsupported cards without regenerating the meeting", a
   ]);
 });
 
+test("keeps repaired Spanish cards aligned when the accepted cards were untranslated", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = captureLlmEnv();
+  let calls = 0;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    restoreLlmEnv(originalEnv);
+  });
+
+  setLlmTestEnv();
+  const twoItemMeeting: LlmReadyMeeting = {
+    ...meeting(),
+    llmInputText: (
+      "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM for park maintenance. " +
+      "Item 5 - Sidewalk repair. The council will consider a $100 contract at 7:00 PM for sidewalk repair. "
+    ).repeat(8)
+  };
+  const sidewalkCard = card({
+    agendaItem: "Item 5 - Sidewalk repair",
+    whatIsHappening: ["The council will consider a $100 contract for sidewalk repair."]
+  });
+
+  globalThis.fetch = (async () => {
+    calls += 1;
+
+    // The first response omits translations entirely and its second card cites a
+    // dollar amount the source never states, so only that card is repaired.
+    if (calls === 1) {
+      return groqResponse({
+        meetingSummary,
+        cards: [
+          card(),
+          card({
+            agendaItem: "Item 5 - Sidewalk repair",
+            whatIsHappening: ["The council will consider a $250 contract for sidewalk repair."]
+          })
+        ]
+      });
+    }
+
+    return groqResponse({
+      meetingSummary,
+      cards: [sidewalkCard],
+      translations: {
+        es: {
+          cards: [
+            {
+              agendaItem: "Punto 5 - Reparación de aceras",
+              whatIsHappening: ["El concejo considerará un contrato de $100 para reparar aceras."],
+              whyItMatters: "El contrato afecta el trabajo de reparación de aceras.",
+              whoItAffects: ["peatones"],
+              status: "Votación próxima",
+              commentWindow: {
+                opens: "No indicado en el documento fuente.",
+                closes: "No indicado en el documento fuente."
+              },
+              howToAct: {
+                attend: "Asista a la reunión a las 7:00 PM.",
+                email: "No indicado en el documento fuente.",
+                submitComment: "No indicado en el documento fuente."
+              }
+            }
+          ]
+        }
+      }
+    });
+  }) as typeof fetch;
+
+  const result = await generateSummaryForMeeting(twoItemMeeting);
+  const spanishCards = result.summary.translations?.es?.cards || [];
+
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    result.summary.cards.map((entry) => entry.agendaItem),
+    ["Item 4 - Contract approval", "Item 5 - Sidewalk repair"]
+  );
+  assert.equal(spanishCards.length, result.summary.cards.length);
+  assert.equal(spanishCards[0], null);
+  assert.equal(spanishCards[1]?.agendaItem, "Punto 5 - Reparación de aceras");
+});
+
 test("rejects a failed targeted repair without regenerating the meeting", async (t) => {
   const originalFetch = globalThis.fetch;
   const originalEnv = captureLlmEnv();
