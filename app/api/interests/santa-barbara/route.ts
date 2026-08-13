@@ -2,7 +2,11 @@ import {
   getSantaBarbaraInterestCardUpdates,
   setSantaBarbaraDecisionInterest
 } from "@/lib/interests/santaBarbaraServer";
-import { isInterestUuid } from "@/lib/interests/santaBarbara";
+import {
+  isInterestUuid,
+  SANTA_BARBARA_INTEREST_JURISDICTION
+} from "@/lib/interests/santaBarbara";
+import { getPublishedCardsByIds } from "@/lib/db/queries";
 import { consumeRateLimit, getRequestIp, rateLimitedResponse } from "@/lib/security/rateLimit";
 
 export const runtime = "nodejs";
@@ -46,6 +50,7 @@ export function isAllowedInterestOrigin(request: Request) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const cardIds = url.searchParams.getAll("id");
+  const locale = url.searchParams.get("lang") === "es" ? "es" : "en";
   if (cardIds.length > 50 || cardIds.some((id) => !isInterestUuid(id))) {
     return jsonResponse({ error: "Invalid interested-card request." }, { status: 400 });
   }
@@ -60,8 +65,13 @@ export async function GET(request: Request) {
   if (!rateLimit.allowed) return rateLimitedResponse(rateLimit.retryAfterSeconds);
 
   try {
+    const [updates, cards] = await Promise.all([
+      getSantaBarbaraInterestCardUpdates(cardIds),
+      getPublishedCardsByIds(cardIds, SANTA_BARBARA_INTEREST_JURISDICTION, locale)
+    ]);
     return jsonResponse({
-      cards: await getSantaBarbaraInterestCardUpdates(cardIds)
+      updates,
+      cards
     });
   } catch (error) {
     console.error("[SimpleCity] Failed to load Santa Barbara interested cards:", error);

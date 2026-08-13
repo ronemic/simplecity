@@ -1267,6 +1267,39 @@ export async function getPublishedDecisionCards(
   return loadPublishedCardsForSelection(selection, locale);
 }
 
+export async function getPublishedCardsByIds(
+  cardIds: string[],
+  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
+) {
+  const ids = [...new Set(cardIds)].slice(0, 50);
+  if (ids.length === 0) return [] as SummaryCardRow[];
+
+  const clients = getSafePublicClients(selection);
+  const results = await Promise.all(
+    clients.map(async ({ jurisdiction, supabase }) => {
+      const { data, error } = await supabase
+        .from("summary_cards")
+        .select(PUBLIC_SUMMARY_CARD_SELECT)
+        .eq("jurisdiction_slug", jurisdiction.slug)
+        .eq("is_published", true)
+        .in("id", ids);
+
+      if (error) {
+        logQueryError(`Failed to load ${jurisdiction.name} published summary cards by id`, error);
+        return [] as SummaryCardRow[];
+      }
+
+      const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+        withCardJurisdictionFallback(row, jurisdiction)
+      );
+      return enrichPublicCards(supabase, rows, locale);
+    })
+  );
+
+  return results.flat();
+}
+
 export async function getPublishedCard(id: string, locale: Locale = "en") {
   return getCachedPublishedCard(id, locale);
 }

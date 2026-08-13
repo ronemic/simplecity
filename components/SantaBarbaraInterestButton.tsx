@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Star } from "lucide-react";
+import { Info, Loader2, Star } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -34,6 +34,11 @@ export function SantaBarbaraInterestButton({
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const disclosure =
+    locale === "es"
+      ? "Guardado en este navegador. Los totales anónimos pueden compartirse con el Condado de Santa Bárbara. No es un voto oficial."
+      : "Saved on this browser. Anonymous totals may be shared with Santa Barbara County. This is not an official vote.";
+  const disclosureId = `interest-disclosure-${cardId}`;
 
   useEffect(() => {
     function sync() {
@@ -103,40 +108,70 @@ export function SantaBarbaraInterestButton({
 
   return (
     <div className={cn("min-w-0", showDisclosure && "max-w-sm")}>
-      <button
-        aria-pressed={interested}
-        className={cn(
-          interested
-            ? "action-secondary-sm !border-civic/35 !bg-civic/10 !text-civic"
-            : "action-secondary-sm"
-        )}
-        disabled={!loaded || busy}
-        onClick={toggleInterest}
-        type="button"
-      >
-        {busy ? (
-          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-        ) : (
-          <Star aria-hidden className={cn("h-4 w-4", interested && "fill-current")} />
-        )}
-        {interested
-          ? locale === "es"
-            ? "Me interesa"
-            : "Interested"
-          : locale === "es"
-            ? "Me interesa"
-            : "I’m interested"}
-      </button>
+      <div className="flex items-center">
+        <button
+          aria-pressed={interested}
+          className={cn(
+            interested
+              ? "action-secondary-sm !rounded-r-none !border-civic/35 !bg-civic/10 !text-civic"
+              : "action-secondary-sm !rounded-r-none"
+          )}
+          disabled={!loaded || busy}
+          onClick={toggleInterest}
+          type="button"
+        >
+          {busy ? (
+            <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+          ) : (
+            <Star aria-hidden className={cn("h-4 w-4", interested && "fill-current")} />
+          )}
+          {interested
+            ? locale === "es"
+              ? "Me interesa"
+              : "Interested"
+            : locale === "es"
+              ? "Me interesa"
+              : "I’m interested"}
+        </button>
+        {!showDisclosure ? (
+          <div className="group relative -ml-px">
+            <button
+              aria-describedby={disclosureId}
+              aria-label={locale === "es" ? "Acerca del programa piloto de interés" : "About the interest pilot"}
+              className={cn(
+                "action-secondary-sm !min-h-10 !w-10 !cursor-help !rounded-l-none !px-0 text-black/55",
+                interested && "!border-civic/35 !bg-civic/10 !text-civic"
+              )}
+              type="button"
+            >
+              <Info aria-hidden className="h-4 w-4" />
+            </button>
+            <div
+              className="pointer-events-none invisible absolute left-full top-1/2 z-30 w-72 max-w-[calc(100vw-2rem)] -translate-y-1/2 pl-2 opacity-0 transition group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+              id={disclosureId}
+              role="tooltip"
+            >
+              <p className="rounded-lg border border-black/10 bg-white p-3 text-left text-xs font-semibold leading-5 text-black/65 shadow-xl">
+                {disclosure}{" "}
+                <Link
+                  className="font-bold text-civic underline underline-offset-2"
+                  href={`/privacy?lang=${locale}`}
+                >
+                  {locale === "es" ? "Detalles" : "Details"}
+                </Link>
+              </p>
+            </div>
+          </div>
+        ) : null}
+      </div>
       {showDisclosure ? (
-        <p className="mt-2 text-xs font-semibold leading-5 text-black/55">
-          {locale === "es"
-            ? "Se contará como una señal anónima que puede incluirse en totales agregados para el Condado de Santa Bárbara. No es un voto ni comentario público oficial."
-            : "Counted as an anonymous signal that may be included in aggregate totals for Santa Barbara County. This is not an official vote or public comment."}{" "}
+        <p className="mt-2 max-w-sm text-xs font-semibold leading-5 text-black/55">
+          {disclosure}{" "}
           <Link
             className="font-bold text-civic underline underline-offset-2"
             href={`/privacy?lang=${locale}`}
           >
-            {locale === "es" ? "Privacidad" : "Privacy"}
+            {locale === "es" ? "Detalles" : "Details"}
           </Link>
         </p>
       ) : null}

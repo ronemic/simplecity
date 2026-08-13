@@ -3,6 +3,7 @@
 import { Layers3, Loader2, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { SummaryCard } from "@/components/SummaryCard";
 import {
   getOrCreateSantaBarbaraInterestDeviceToken,
   markSantaBarbaraInterestSeen,
@@ -16,6 +17,7 @@ import {
   type SantaBarbaraInterestCardUpdate
 } from "@/lib/interests/santaBarbara";
 import type { Locale } from "@/lib/i18n";
+import type { SummaryCardRow } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 
 export type SantaBarbaraDecisionView = "all" | "interests";
@@ -31,6 +33,7 @@ export function SantaBarbaraInterestHub({
 }) {
   const [interests, setInterests] = useState<SavedSantaBarbaraInterest[]>([]);
   const [updates, setUpdates] = useState<Record<string, SantaBarbaraInterestCardUpdate>>({});
+  const [cards, setCards] = useState<Record<string, SummaryCardRow>>({});
   const [loading, setLoading] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [error, setError] = useState("");
@@ -39,6 +42,7 @@ export function SantaBarbaraInterestHub({
     setInterests(saved);
     if (saved.length === 0) {
       setUpdates({});
+      setCards({});
       return;
     }
 
@@ -46,13 +50,20 @@ export function SantaBarbaraInterestHub({
     try {
       const params = new URLSearchParams();
       for (const interest of saved.slice(0, 50)) params.append("id", interest.cardId);
+      params.set("lang", locale);
       const response = await fetch(`/api/interests/santa-barbara?${params.toString()}`, {
         headers: { Accept: "application/json" }
       });
       if (!response.ok) throw new Error("Interest updates unavailable");
-      const result = (await response.json()) as { cards?: SantaBarbaraInterestCardUpdate[] };
+      const result = (await response.json()) as {
+        updates?: SantaBarbaraInterestCardUpdate[];
+        cards?: SummaryCardRow[];
+      };
       setUpdates(
-        Object.fromEntries((result.cards || []).map((update) => [update.cardId, update]))
+        Object.fromEntries((result.updates || []).map((update) => [update.cardId, update]))
+      );
+      setCards(
+        Object.fromEntries((result.cards || []).map((card) => [card.id, card]))
       );
       setError("");
     } catch {
@@ -161,20 +172,11 @@ export function SantaBarbaraInterestHub({
             ) : null}
           </button>
         </div>
-
-        <p className="text-xs font-medium leading-5 text-black/55 sm:max-w-xl sm:text-right">
-          {locale === "es"
-            ? "Guardado en este navegador · Los totales anónimos pueden compartirse con el Condado. No es un voto oficial."
-            : "Saved on this browser · Anonymous totals may be shared with the County. Not an official vote."}{" "}
-          <Link className="font-bold text-civic underline underline-offset-2" href={`/privacy?lang=${locale}`}>
-            {locale === "es" ? "Detalles" : "Details"}
-          </Link>
-        </p>
       </div>
 
       {activeView === "interests" ? (
         <div className="mt-4">
-          {loading ? (
+          {loading && Object.keys(cards).length === 0 ? (
             <p className="inline-flex items-center gap-2 py-4 text-sm font-bold text-black/60">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
               {locale === "es" ? "Buscando actualizaciones" : "Checking for updates"}
@@ -192,13 +194,33 @@ export function SantaBarbaraInterestHub({
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-black/10 border-y border-black/10">
+            <div className="grid gap-3">
               {interests.map((interest) => {
                 const update = updates[interest.cardId];
                 const hasUpdate = hasInterestUpdate(interest, update);
+                const card = cards[interest.cardId];
+                if (card) {
+                  return (
+                    <div key={interest.cardId}>
+                      {hasUpdate ? (
+                        <span className="status-chip mb-2 border-[#aabce6] bg-[#eef2ff] text-[#354f9b]">
+                          {update?.hasResult
+                            ? locale === "es"
+                              ? "Resultado disponible"
+                              : "Result available"
+                            : locale === "es"
+                              ? "Actualizado"
+                              : "Updated"}
+                        </span>
+                      ) : null}
+                      <SummaryCard card={card} locale={locale} />
+                    </div>
+                  );
+                }
+
                 return (
                   <Link
-                    className="flex items-start justify-between gap-4 px-1 py-3.5 transition hover:bg-black/[0.025] sm:px-3"
+                    className="quiet-card flex items-start justify-between gap-4 px-4 py-4 transition hover:bg-black/[0.025] sm:px-5"
                     href={`/cards/${encodeURIComponent(interest.cardId)}?lang=${locale}`}
                     key={interest.cardId}
                     onClick={() => openInterest(interest)}
@@ -225,10 +247,15 @@ export function SantaBarbaraInterestHub({
           )}
 
           {interests.length > 0 ? (
-            <button className="action-ghost mt-3 !text-[#9f2a20]" disabled={clearing} onClick={clearInterests} type="button">
-              {clearing ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Trash2 aria-hidden className="h-4 w-4" />}
-              {locale === "es" ? "Retirar todos" : "Withdraw all"}
-            </button>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+              <button className="action-ghost !text-[#9f2a20]" disabled={clearing} onClick={clearInterests} type="button">
+                {clearing ? <Loader2 aria-hidden className="h-4 w-4 animate-spin" /> : <Trash2 aria-hidden className="h-4 w-4" />}
+                {locale === "es" ? "Retirar todos" : "Withdraw all"}
+              </button>
+              <Link className="action-link text-xs" href={`/privacy?lang=${locale}`}>
+                {locale === "es" ? "Acerca del programa piloto de interés" : "About the interest pilot"}
+              </Link>
+            </div>
           ) : null}
           {error ? <p className="mt-2 text-xs font-bold text-[#9f2a20]" role="status">{error}</p> : null}
         </div>
