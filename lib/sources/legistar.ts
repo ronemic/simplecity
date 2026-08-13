@@ -94,6 +94,56 @@ export function isLegistarLayoutMarker(
   return LEGISTAR_LAYOUT_MARKER.test(item.EventItemTitle || "");
 }
 
+// Santa Barbara County stamps the same scaffolding into every Board agenda:
+// section headings, standing legal and accessibility notices, the hearing-room
+// address, and session transitions. They arrive as event items with no matter
+// and no recorded action, so each one became a card the model could not write.
+// Measured across 33 meetings, these 26 shapes account for 83% of the rows that
+// still failed after layout markers were removed.
+//
+// Every substantive counterpart survives: closed-session topics, resolutions,
+// and administrative items all carry a matter record, and anything the clerk
+// later files minutes text against carries an action. The guard below re-admits
+// a row the moment it gains either, so this can only ever drop empty scaffolding.
+const SANTA_BARBARA_AGENDA_SCAFFOLDING = [
+  /^closed session$/i,
+  /^recess(?:ed)? to closed session$/i,
+  /^board meeting procedures$/i,
+  /^late distribution and ex-?parte communications?$/i,
+  /^disclosure of campaign contributions$/i,
+  /^disability access(?: and accommodation requests)?$/i,
+  /^challenges$/i,
+  /^if you challenge a determination made on a matter on this agenda in court\b/i,
+  /^all matters listed hereunder constitute a consent agenda\b/i,
+  /^https?:\/\/\S+$/i,
+  /^county executive officer'?s report$/i,
+  /^departmental agenda\b.*\bplanning items and public hearings$/i,
+  /^administrative agenda$/i,
+  /^administrative items?$/i,
+  /^approval of administrative agenda$/i,
+  /^resolutions to be presented$/i,
+  /^honorary resolutions$/i,
+  /^hearing requests$/i,
+  /^board of supervisors$/i,
+  /^county administration building\b/i,
+  /^joseph centeno betteravia\b/i,
+  // "9:00 A.M. ..... Convened to Regular Session"
+  /^\d{1,2}:\d{2}\s*[ap]\.?\s*m\.?\s*\.*\s*(?:convene|convened|recess|recessed)\s+to\b/i,
+  /^addendum$/i
+];
+
+export function isSantaBarbaraAgendaScaffolding(
+  item: Pick<
+    LegistarApiEventItem,
+    "EventItemTitle" | "EventItemMatterId" | "EventItemActionText"
+  >
+) {
+  if (item.EventItemMatterId || item.EventItemActionText) return false;
+  const title = (item.EventItemTitle || "").replace(/\s+/g, " ").trim();
+  if (!title) return false;
+  return SANTA_BARBARA_AGENDA_SCAFFOLDING.some((pattern) => pattern.test(title));
+}
+
 export function shouldEnrichLegistarAgendaAttachments(
   options: Pick<ScrapeLegistarOptions, "enrichAgendaAttachments" | "enrichLegislation">
 ) {
@@ -1577,11 +1627,18 @@ export async function scrapeLegistarApiMeetings(
     );
     itemsUrl.searchParams.set("$top", "1000");
     const apiItems = await fetchLegistarApiJson<LegistarApiEventItem[]>(itemsUrl.toString());
-    const contentItems = apiItems.filter((item) => !isLegistarLayoutMarker(item));
-    const layoutMarkerCount = apiItems.length - contentItems.length;
-    if (layoutMarkerCount > 0) {
+    // The scaffolding vocabulary is drawn from Santa Barbara's agenda template, so
+    // it stays scoped to that jurisdiction rather than applying to any future
+    // Legistar API client that happens to reuse one of these headings for content.
+    const isScaffolding = (item: LegistarApiEventItem) =>
+      jurisdiction.slug === "santa-barbara-county" && isSantaBarbaraAgendaScaffolding(item);
+    const contentItems = apiItems.filter(
+      (item) => !isLegistarLayoutMarker(item) && !isScaffolding(item)
+    );
+    const discardedCount = apiItems.length - contentItems.length;
+    if (discardedCount > 0) {
       log(
-        `Discarded ${layoutMarkerCount} layout-marker row(s) from Legistar event ${event.EventId}.`
+        `Discarded ${discardedCount} layout-marker and agenda-scaffolding row(s) from Legistar event ${event.EventId}.`
       );
     }
     const meetingDetailsUrl =

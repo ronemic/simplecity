@@ -70,7 +70,7 @@ function currentAgendaSection(text: string) {
   return currentSource.slice(start);
 }
 
-function isSectionTitle(value: string) {
+export function isSectionTitle(value: string) {
   const withoutSectionNumber = value.replace(/^[A-Z]\s*[.):-]\s*/i, "");
   return (
     SECTION_TITLE.test(withoutSectionNumber) ||
