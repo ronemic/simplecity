@@ -10,7 +10,6 @@ import type {
 } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { downloadOfficialSiteDocuments } from "@/lib/scraper/downloadDocuments";
-import { isSectionTitle } from "@/lib/scraper/agendaItemContext";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import { getVideoEmbedUrl } from "@/lib/utils/videoEmbed";
@@ -357,19 +356,14 @@ function normalizeFilesPage(
     const document = documentFromFile(file, portalUrl, sourceUrl);
     return document ? [document] : [];
   });
-  // CivicClerk items come from whatever the portal marks as a list subheader, so
-  // unlike the PDF-extraction path nothing has already rejected section headings.
-  // Los Altos and Los Altos Hills currently publish only numbered items here, but
-  // a heading that is purely a section name carries no decision to summarize.
-  const items: AgendaItem[] = page.items.flatMap((item, index) => {
+  const items: AgendaItem[] = page.items.map((item, index) => {
     const identity = itemIdentity(item.heading, index);
-    if (isSectionTitle(identity.title)) return [];
     const attachments = item.files.flatMap((file) => {
       const document = documentFromFile(file, portalUrl, sourceUrl, identity);
       return document ? [document] : [];
     });
     documents.push(...attachments);
-    return [{
+    return {
       externalId: `${meeting.externalId}-item-${slugify(identity.number || identity.title)}`,
       fileNumber: null,
       agendaNumber: identity.number,
@@ -380,7 +374,7 @@ function normalizeFilesPage(
       sourceUrl,
       rowText: cleanText([item.heading, ...item.files.map((file) => file.label)].join(" ")),
       attachments
-    }];
+    };
   });
 
   const seen = new Set<string>();
