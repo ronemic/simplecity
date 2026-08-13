@@ -15,6 +15,29 @@ import { categoryTagsForMeeting } from "@/lib/llm/topicPolicy";
 
 type SummaryResult = { summary: SimpleCitySummary; raw: unknown };
 
+export type OfficialSourceFallbackReason =
+  | "validation_failed"
+  | "generation_failed"
+  | "summary_omitted";
+
+const FALLBACK_EXPLANATIONS: Record<OfficialSourceFallbackReason, string> = {
+  validation_failed:
+    "SimpleCity could not verify a generated summary for this item. The official agenda text is shown instead.",
+  generation_failed:
+    "SimpleCity could not generate a summary for this item. The official agenda text is shown instead.",
+  summary_omitted:
+    "This item was omitted from the generated summary. The official agenda text is shown instead."
+};
+
+const FALLBACK_EXPLANATIONS_ES: Record<OfficialSourceFallbackReason, string> = {
+  validation_failed:
+    "SimpleCity no pudo verificar un resumen generado para este punto. En su lugar, se muestra el texto de la agenda oficial.",
+  generation_failed:
+    "SimpleCity no pudo generar un resumen para este punto. En su lugar, se muestra el texto de la agenda oficial.",
+  summary_omitted:
+    "Este punto se omitió del resumen generado. En su lugar, se muestra el texto de la agenda oficial."
+};
+
 const ROUTINE_ITEM = /^(?:call to order(?: and roll call)?|roll call|pledge of allegiance|invocation|opening remarks?|approv(?:al of|e|ing) (?:the )?(?:agenda|order of business|minutes)|public comments?|open forum|oral communications?|staff reports?|committee reports?|commission reports?|future agenda items?|announcements?|adjournment)(?:\b|\s*[-:])/i;
 const DECISION_ACTION = /\b(?:approve|adopt|authorize|award|appoint|select|deny|amend|continue|recommend|provide direction|public hearing|application|permit|subdivision|variance|appeal)\b/i;
 
@@ -83,14 +106,18 @@ function fallbackStatus(meeting: LlmReadyMeeting, item: AgendaItem) {
   return DECISION_ACTION.test(actionText) ? "Upcoming vote" : "Under discussion";
 }
 
-function fallbackCard(meeting: LlmReadyMeeting, item: AgendaItem): SimpleCityCard {
+function fallbackCard(
+  meeting: LlmReadyMeeting,
+  item: AgendaItem,
+  reason: OfficialSourceFallbackReason
+): SimpleCityCard {
   const title = itemLabel(item);
   const source = item.sourceUrl || meeting.sourceUrl || meeting.meetingDetailsUrl || "";
   return {
     sourceItemId: item.externalId,
     agendaItem: title,
-    whatIsHappening: [`The official agenda lists “${title}” for consideration.`],
-    whyItMatters: "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted.",
+    whatIsHappening: [title],
+    whyItMatters: FALLBACK_EXPLANATIONS[reason],
     whoItAffects: ["Not listed in the source document."],
     categoryTags: categoryTagsForMeeting(
       meeting,
@@ -114,11 +141,14 @@ function fallbackCard(meeting: LlmReadyMeeting, item: AgendaItem): SimpleCityCar
   };
 }
 
-function fallbackTranslation(card: SimpleCityCard): SimpleCityCardTranslation {
+function fallbackTranslation(
+  card: SimpleCityCard,
+  reason: OfficialSourceFallbackReason
+): SimpleCityCardTranslation {
   return {
     agendaItem: card.agendaItem,
-    whatIsHappening: [`La agenda oficial incluye “${card.agendaItem}” para su consideración.`],
-    whyItMatters: "SimpleCity todavía está preparando un resumen detallado. El punto de la agenda oficial está disponible ahora para que no se omita.",
+    whatIsHappening: [card.agendaItem],
+    whyItMatters: FALLBACK_EXPLANATIONS_ES[reason],
     whoItAffects: ["No indicado en el documento fuente."],
     status: card.status,
     commentWindow: {
@@ -135,9 +165,14 @@ function fallbackTranslation(card: SimpleCityCard): SimpleCityCardTranslation {
 
 export function officialSourceFallbackSummary(
   meeting: LlmReadyMeeting,
-  items: AgendaItem[]
+  items: AgendaItem[],
+  reasonForItem: OfficialSourceFallbackReason | ((item: AgendaItem) => OfficialSourceFallbackReason) =
+    "summary_omitted"
 ): SimpleCitySummary {
-  const cards = items.map((item) => fallbackCard(meeting, item));
+  const reasons = items.map((item) =>
+    typeof reasonForItem === "function" ? reasonForItem(item) : reasonForItem
+  );
+  const cards = items.map((item, index) => fallbackCard(meeting, item, reasons[index]));
   return {
     meetingSummary: {
       title: meeting.title,
@@ -152,10 +187,42 @@ export function officialSourceFallbackSummary(
           title: meeting.title,
           meetingType: meeting.meetingType
         },
-        cards: cards.map(fallbackTranslation)
+        cards: cards.map((card, index) => fallbackTranslation(card, reasons[index]))
       }
     }
   };
+}
+
+function hasValidationRejection(raw: unknown) {
+  const seen = new Set<unknown>();
+
+  function visit(value: unknown, depth: number): boolean {
+    if (!value || typeof value !== "object" || depth > 12 || seen.has(value)) return false;
+    seen.add(value);
+
+    if (Array.isArray(value)) return value.some((entry) => visit(entry, depth + 1));
+
+    const record = value as Record<string, unknown>;
+    const validation = record.simplecityValidation;
+    if (validation && typeof validation === "object" && !Array.isArray(validation)) {
+      const issues = (validation as { issues?: unknown }).issues;
+      if (
+        Array.isArray(issues) &&
+        issues.some(
+          (issue) =>
+            issue &&
+            typeof issue === "object" &&
+            (issue as { outcome?: unknown }).outcome !== "warning"
+        )
+      ) {
+        return true;
+      }
+    }
+
+    return Object.values(record).some((entry) => visit(entry, depth + 1));
+  }
+
+  return visit(raw, 0);
 }
 
 function appendSummary(target: SimpleCitySummary, addition: SimpleCitySummary) {
@@ -194,12 +261,15 @@ export async function completeAgendaItemCoverage(
   initial: SummaryResult | null,
   options: {
     generate?: (meeting: LlmReadyMeeting) => Promise<SummaryResult>;
+    initialGenerationFailed?: boolean;
   } = {}
 ) {
   let summary = initial?.summary || officialSourceFallbackSummary(meeting, []);
   const retryRaw: unknown[] = [];
   const retryErrors: string[] = [];
   const retriedItemIds: string[] = [];
+  const validationFailedItemIds = new Set<string>();
+  const generationFailedItemIds = new Set<string>();
 
   const recordRetry = async (items: AgendaItem[]) => {
     if (!options.generate || items.length === 0) return;
@@ -209,8 +279,12 @@ export async function completeAgendaItemCoverage(
     try {
       const retry = await options.generate(agendaItemRetryMeeting(meeting, items));
       retryRaw.push(retry.raw);
+      if (hasValidationRejection(retry.raw)) {
+        for (const item of items) validationFailedItemIds.add(item.externalId);
+      }
       summary = appendSummary(summary, retry.summary);
     } catch (error) {
+      for (const item of items) generationFailedItemIds.add(item.externalId);
       retryErrors.push(
         `${items.map((item) => item.externalId).join(", ")}: ${
           error instanceof Error ? error.message : "Unknown item-summary error"
@@ -220,6 +294,12 @@ export async function completeAgendaItemCoverage(
   };
 
   const uncovered = uncoveredAgendaItems(meeting, summary);
+  if (options.initialGenerationFailed) {
+    for (const item of uncovered) generationFailedItemIds.add(item.externalId);
+  }
+  if (initial && hasValidationRejection(initial.raw)) {
+    for (const item of uncovered) validationFailedItemIds.add(item.externalId);
+  }
   if (options.generate && uncovered.length > 0) {
     // Recover all missing items as one logical request. generateSummaryForMeeting
     // will split this meeting into bounded source-size batches when necessary. This
@@ -240,18 +320,32 @@ export async function completeAgendaItemCoverage(
   }
 
   const missing = uncoveredAgendaItems(meeting, summary);
+  const fallbackReasonForItem = (item: AgendaItem): OfficialSourceFallbackReason => {
+    if (validationFailedItemIds.has(item.externalId)) return "validation_failed";
+    if (generationFailedItemIds.has(item.externalId)) return "generation_failed";
+    return "summary_omitted";
+  };
   if (missing.length > 0) {
-    summary = appendSummary(summary, officialSourceFallbackSummary(meeting, missing));
+    summary = appendSummary(
+      summary,
+      officialSourceFallbackSummary(meeting, missing, fallbackReasonForItem)
+    );
   }
+
+  const fallbackReasons = Object.fromEntries(
+    missing.map((item) => [item.externalId, fallbackReasonForItem(item)])
+  );
 
   return {
     summary,
     raw: {
       primarySummary: initial?.raw || null,
       itemCoverageRetries: retryRaw,
-      officialSourceFallbackItemIds: missing.map((item) => item.externalId)
+      officialSourceFallbackItemIds: missing.map((item) => item.externalId),
+      officialSourceFallbackReasons: fallbackReasons
     },
     fallbackItemIds: missing.map((item) => item.externalId),
+    fallbackReasons,
     retriedItemIds,
     retryErrors
   };

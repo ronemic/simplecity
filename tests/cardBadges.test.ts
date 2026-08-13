@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   commentSummary,
   isOfficialSourceFallbackCard,
+  officialSourceFallbackInfo,
   statusSummary
 } from "../components/SummaryCard";
 import type { SummaryCardRow } from "../lib/types";
@@ -11,13 +12,46 @@ test("official-source fallback cards are identified without affecting normal sum
   assert.equal(
     isOfficialSourceFallbackCard({
       why_it_matters:
-        "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted."
+        "SimpleCity could not verify a generated summary for this item. The official agenda text is shown instead."
     }),
     true
   );
   assert.equal(
     isOfficialSourceFallbackCard({ why_it_matters: "This proposal would add 40 homes." }),
     false
+  );
+});
+
+test("official-source fallback cards explain why the summary was unavailable", () => {
+  assert.deepEqual(
+    officialSourceFallbackInfo(
+      {
+        why_it_matters:
+          "SimpleCity could not verify a generated summary for this item. The official agenda text is shown instead."
+      },
+      "en"
+    ),
+    {
+      reason: "validation_failed",
+      label: "Summary couldn’t be verified"
+    }
+  );
+  assert.equal(
+    officialSourceFallbackInfo(
+      {
+        why_it_matters:
+          "SimpleCity could not generate a summary for this item. The official agenda text is shown instead."
+      },
+      "es"
+    )?.label,
+    "No se generó el resumen"
+  );
+  assert.equal(
+    officialSourceFallbackInfo(
+      { why_it_matters: "This proposal would add 40 homes." },
+      "en"
+    ),
+    null
   );
 });
 

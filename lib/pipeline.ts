@@ -828,6 +828,7 @@ async function runSimpleCityPipelineInternal(
               item.meeting,
               initialSummary,
               {
+                initialGenerationFailed: Boolean(initialSummaryError),
                 generate: initialSummaryError && isLlmRateLimitError(initialSummaryError)
                   ? undefined
                   : (retryMeeting) =>

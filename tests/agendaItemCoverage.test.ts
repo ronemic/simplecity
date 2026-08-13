@@ -112,7 +112,48 @@ test("retries only uncovered items and publishes an official-source fallback whe
   assert.deepEqual(completed.fallbackItemIds, ["2B"]);
   assert.deepEqual(completed.summary.cards.map((card) => card.sourceItemId), ["2A", "2B"]);
   assert.equal(completed.summary.cards[1].confidence, "low");
+  assert.equal(completed.fallbackReasons["2B"], "summary_omitted");
   assert.equal(completed.summary.translations?.es?.cards.length, 2);
+});
+
+test("labels fallback items whose generated cards failed validation", async () => {
+  const source = meeting([item("7B", "Library roof replacement contract")]);
+  const rejectedRaw = {
+    simplecityValidation: {
+      issues: [{ outcome: "reject", reason: "Unsupported value" }]
+    }
+  };
+
+  const completed = await completeAgendaItemCoverage(
+    source,
+    { summary: emptySummary(), raw: rejectedRaw },
+    {
+      generate: async () => ({ summary: emptySummary(), raw: rejectedRaw })
+    }
+  );
+
+  assert.equal(completed.fallbackReasons["7B"], "validation_failed");
+  assert.equal(
+    completed.summary.cards[0].whyItMatters,
+    "SimpleCity could not verify a generated summary for this item. The official agenda text is shown instead."
+  );
+  assert.deepEqual(completed.summary.cards[0].whatIsHappening, [
+    "Library roof replacement contract"
+  ]);
+});
+
+test("labels fallback items when summary generation failed", async () => {
+  const source = meeting([item("7B", "Library roof replacement contract")]);
+
+  const completed = await completeAgendaItemCoverage(source, null, {
+    initialGenerationFailed: true
+  });
+
+  assert.equal(completed.fallbackReasons["7B"], "generation_failed");
+  assert.equal(
+    completed.summary.cards[0].whyItMatters,
+    "SimpleCity could not generate a summary for this item. The official agenda text is shown instead."
+  );
 });
 
 test("retries residual omitted items in one bounded small batch before using fallbacks", async () => {

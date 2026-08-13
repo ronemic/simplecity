@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, MessageSquare } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, Info, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
 import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
@@ -25,15 +25,107 @@ function compactList(items: string[] | null | undefined, locale: Locale) {
   return items.slice(0, 3).join(", ");
 }
 
-const OFFICIAL_SOURCE_FALLBACK_EXPLANATIONS = new Set([
-  "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted.",
-  "SimpleCity todavía está preparando un resumen detallado. El punto de la agenda oficial está disponible ahora para que no se omita."
+type OfficialSourceFallbackReason =
+  | "validation_failed"
+  | "generation_failed"
+  | "summary_omitted"
+  | "legacy";
+
+const OFFICIAL_SOURCE_FALLBACK_REASONS = new Map<string, OfficialSourceFallbackReason>([
+  [
+    "SimpleCity could not verify a generated summary for this item. The official agenda text is shown instead.",
+    "validation_failed"
+  ],
+  [
+    "SimpleCity no pudo verificar un resumen generado para este punto. En su lugar, se muestra el texto de la agenda oficial.",
+    "validation_failed"
+  ],
+  [
+    "SimpleCity could not generate a summary for this item. The official agenda text is shown instead.",
+    "generation_failed"
+  ],
+  [
+    "SimpleCity no pudo generar un resumen para este punto. En su lugar, se muestra el texto de la agenda oficial.",
+    "generation_failed"
+  ],
+  [
+    "This item was omitted from the generated summary. The official agenda text is shown instead.",
+    "summary_omitted"
+  ],
+  [
+    "Este punto se omitió del resumen generado. En su lugar, se muestra el texto de la agenda oficial.",
+    "summary_omitted"
+  ],
+  [
+    "A detailed SimpleCity summary is still being prepared. The official agenda item is available now so it is not omitted.",
+    "legacy"
+  ],
+  [
+    "SimpleCity todavía está preparando un resumen detallado. El punto de la agenda oficial está disponible ahora para que no se omita.",
+    "legacy"
+  ]
 ]);
 
-export function isOfficialSourceFallbackCard(card: Pick<SummaryCardRow, "why_it_matters">) {
-  return OFFICIAL_SOURCE_FALLBACK_EXPLANATIONS.has(
+export function officialSourceFallbackInfo(
+  card: Pick<SummaryCardRow, "why_it_matters">,
+  locale: Locale
+) {
+  const reason = OFFICIAL_SOURCE_FALLBACK_REASONS.get(
     String(card.why_it_matters || "").trim()
   );
+  if (!reason) return null;
+
+  if (locale === "es") {
+    if (reason === "validation_failed") {
+      return {
+        reason,
+        label: "No se pudo verificar el resumen"
+      };
+    }
+    if (reason === "generation_failed") {
+      return {
+        reason,
+        label: "No se generó el resumen"
+      };
+    }
+    if (reason === "summary_omitted") {
+      return {
+        reason,
+        label: "Punto omitido del resumen"
+      };
+    }
+    return {
+      reason,
+      label: "Resumen no disponible"
+    };
+  }
+
+  if (reason === "validation_failed") {
+    return {
+      reason,
+      label: "Summary couldn’t be verified"
+    };
+  }
+  if (reason === "generation_failed") {
+    return {
+      reason,
+      label: "Summary wasn’t generated"
+    };
+  }
+  if (reason === "summary_omitted") {
+    return {
+      reason,
+      label: "Item omitted from summary"
+    };
+  }
+  return {
+    reason,
+    label: "Summary unavailable"
+  };
+}
+
+export function isOfficialSourceFallbackCard(card: Pick<SummaryCardRow, "why_it_matters">) {
+  return Boolean(officialSourceFallbackInfo(card, "en"));
 }
 
 function getCardCommentDeadlineInfo(card: SummaryCardRow) {
@@ -198,16 +290,14 @@ export function SummaryCard({
   defaultOutcomeExpanded?: boolean;
 }) {
   const [open, setOpen] = useState(Boolean(outcome));
-  const [showFullFallbackText, setShowFullFallbackText] = useState(false);
   const isSharePresentation = presentation === "share";
   const showDetails = open || isSharePresentation;
   const TitleTag = isSharePresentation ? "h1" : "h3";
   const meeting = card.meetings;
   const agendaTitle = publicAgendaTitle(card);
   const points = cardSummaryPoints(card, locale);
-  const officialSourceFallback = isOfficialSourceFallbackCard(card);
-  const hasLongFallbackText =
-    officialSourceFallback && points.join(" ").length > 320;
+  const fallbackInfo = officialSourceFallbackInfo(card, locale);
+  const officialSourceFallback = Boolean(fallbackInfo);
   const titlePreview = cardPreviewText(card, locale, highlight);
   const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
   const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
@@ -221,8 +311,10 @@ export function SummaryCard({
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
   const status = statusSummary(card, locale, outcome);
-  const comment = commentSummary(commentDeadline, hasCommentOption, locale);
-  const summaryConfidence = confidenceLabel(card, locale);
+  const comment = officialSourceFallback
+    ? null
+    : commentSummary(commentDeadline, hasCommentOption, locale);
+  const summaryConfidence = officialSourceFallback ? null : confidenceLabel(card, locale);
   const createdTimestamp = formatPacificTimestamp(card.created_at);
   const updatedTimestamp = formatPacificTimestamp(card.updated_at);
   const CommentIcon = comment?.icon;
@@ -272,7 +364,7 @@ export function SummaryCard({
           >
             <HighlightedText text={agendaTitle} query={highlight} />
           </TitleTag>
-          {titlePreview ? (
+          {titlePreview && !officialSourceFallback ? (
             <p
               className={cn(
                 "mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
@@ -286,6 +378,12 @@ export function SummaryCard({
             </p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
+            {fallbackInfo ? (
+              <span className="status-chip border-[#d9a34b] bg-[#fff7e8] text-[#794707]">
+                <Info aria-hidden className="h-3.5 w-3.5" />
+                {fallbackInfo.label}
+              </span>
+            ) : null}
             <span
               className={cn(
                 "status-chip",
@@ -314,7 +412,7 @@ export function SummaryCard({
               </span>
               <HighlightedText text={topicLabel} query={highlight} />
             </span>
-            {!hasCommentOption ? (
+            {!officialSourceFallback && !hasCommentOption ? (
               <span className="inline-flex items-center gap-1.5 text-black/[0.5]">
                 <MessageSquare aria-hidden className="h-4 w-4" />
                 {noCommentLabel}
@@ -347,7 +445,13 @@ export function SummaryCard({
               className={primaryButtonClass}
               aria-expanded={open}
             >
-              {open ? t(locale, "hideSummary") : t(locale, "readSummary")}
+              {officialSourceFallback
+                ? open
+                  ? locale === "es" ? "Ocultar texto oficial" : "Hide official text"
+                  : locale === "es" ? "Mostrar texto oficial" : "Show official text"
+                : open
+                  ? t(locale, "hideSummary")
+                  : t(locale, "readSummary")}
               <ChevronDown
                 aria-hidden
                 className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
@@ -364,90 +468,93 @@ export function SummaryCard({
             isSharePresentation && "px-6 py-7 sm:px-8 sm:py-8"
           )}
         >
-          <div
-            className={cn(
-              "grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]",
-              isSharePresentation && "text-base leading-7 lg:gap-10"
-            )}
-          >
-            <section>
-              <p className="text-xs font-black uppercase text-civic">{t(locale, "whatIsHappening")}</p>
-              <ul className="mt-2 space-y-2">
-                {points.map((point) => (
-                  <li key={point} className="flex gap-2">
-                    <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-civic" />
-                    <span
-                      className={cn(
-                        hasLongFallbackText && !showFullFallbackText && "line-clamp-5"
-                      )}
-                    >
-                      <HighlightedText text={point} query={highlight} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              {hasLongFallbackText ? (
-                <button
-                  type="button"
-                  className="mt-3 text-sm font-bold text-civic underline decoration-civic/35 underline-offset-4 hover:decoration-civic"
-                  onClick={() => setShowFullFallbackText((value) => !value)}
-                >
-                  {showFullFallbackText
-                    ? locale === "es" ? "Mostrar menos" : "Show less"
-                    : locale === "es" ? "Mostrar texto completo de la agenda" : "Show full agenda text"}
-                </button>
-              ) : null}
-            </section>
-
-            <section>
-              <p className="text-xs font-black uppercase text-black/[0.55]">{t(locale, "whyItMatters")}</p>
-              <p className="mt-2">
-                <HighlightedText
-                  text={card.why_it_matters || t(locale, "notListedInSource")}
-                  query={highlight}
-                />
+          {officialSourceFallback ? (
+            <section className={cn("max-w-4xl text-sm leading-6 text-black/75", isSharePresentation && "text-base leading-7")}>
+              <p className="text-xs font-black uppercase tracking-wide text-civic">
+                {locale === "es" ? "Texto de la agenda oficial" : "Official agenda text"}
               </p>
-              <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">{t(locale, "whoIsAffected")}</p>
-              {affectedTags.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {affectedTags.map((resident) => (
-                    <span key={resident} className="meta-chip">
-                      <HighlightedText text={resident} query={highlight} />
-                    </span>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-2"><HighlightedText text={affectedResidents} query={highlight} /></p>
-              )}
-            </section>
-
-            <section>
-              <p className="text-xs font-black uppercase text-[#8e452e]">{t(locale, "howToAct")}</p>
-              <div className="mt-2 grid gap-3">
-                <p>
-                  <span className="font-bold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
-                  <HighlightedText
-                    text={card.how_to_act_attend || t(locale, "notListedInSource")}
-                    query={highlight}
-                  />
-                </p>
-                <p>
-                  <span className="font-bold text-ink">Email: </span>
-                  <HighlightedText
-                    text={card.how_to_act_email || t(locale, "notListedInSource")}
-                    query={highlight}
-                  />
-                </p>
-                <p>
-                  <span className="font-bold text-ink">{t(locale, "submitComment")}: </span>
-                  <HighlightedText
-                    text={card.how_to_act_submit_comment || t(locale, "notListedInSource")}
-                    query={highlight}
-                  />
-                </p>
+              <div className="mt-2 space-y-2">
+                {points.map((point) => (
+                  <p key={point}>
+                    <HighlightedText text={point} query={highlight} />
+                  </p>
+                ))}
               </div>
+              <p className="mt-3 text-xs font-medium text-black/50">
+                {locale === "es"
+                  ? "Basado en la agenda oficial. SimpleCity no ha resumido ni interpretado este texto."
+                  : "Based on the official agenda. SimpleCity has not summarized or interpreted this text."}
+              </p>
             </section>
-          </div>
+          ) : (
+            <div
+              className={cn(
+                "grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]",
+                isSharePresentation && "text-base leading-7 lg:gap-10"
+              )}
+            >
+              <section>
+                <p className="text-xs font-black uppercase text-civic">{t(locale, "whatIsHappening")}</p>
+                <ul className="mt-2 space-y-2">
+                  {points.map((point) => (
+                    <li key={point} className="flex gap-2">
+                      <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-civic" />
+                      <span><HighlightedText text={point} query={highlight} /></span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section>
+                <p className="text-xs font-black uppercase text-black/[0.55]">{t(locale, "whyItMatters")}</p>
+                <p className="mt-2">
+                  <HighlightedText
+                    text={card.why_it_matters || t(locale, "notListedInSource")}
+                    query={highlight}
+                  />
+                </p>
+                <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">{t(locale, "whoIsAffected")}</p>
+                {affectedTags.length > 0 ? (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {affectedTags.map((resident) => (
+                      <span key={resident} className="meta-chip">
+                        <HighlightedText text={resident} query={highlight} />
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-2"><HighlightedText text={affectedResidents} query={highlight} /></p>
+                )}
+              </section>
+
+              <section>
+                <p className="text-xs font-black uppercase text-[#8e452e]">{t(locale, "howToAct")}</p>
+                <div className="mt-2 grid gap-3">
+                  <p>
+                    <span className="font-bold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
+                    <HighlightedText
+                      text={card.how_to_act_attend || t(locale, "notListedInSource")}
+                      query={highlight}
+                    />
+                  </p>
+                  <p>
+                    <span className="font-bold text-ink">Email: </span>
+                    <HighlightedText
+                      text={card.how_to_act_email || t(locale, "notListedInSource")}
+                      query={highlight}
+                    />
+                  </p>
+                  <p>
+                    <span className="font-bold text-ink">{t(locale, "submitComment")}: </span>
+                    <HighlightedText
+                      text={card.how_to_act_submit_comment || t(locale, "notListedInSource")}
+                      query={highlight}
+                    />
+                  </p>
+                </div>
+              </section>
+            </div>
+          )}
 
           <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-wrap items-center gap-3">
@@ -468,7 +575,9 @@ export function SummaryCard({
                   rel="noreferrer"
                   className="action-link"
                 >
-                  {t(locale, "source")}
+                  {officialSourceFallback
+                    ? locale === "es" ? "Ver fuente oficial" : "View official source"
+                    : t(locale, "source")}
                   <ExternalLink aria-hidden className="h-4 w-4" />
                 </a>
               ) : null}
