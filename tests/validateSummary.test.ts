@@ -611,6 +611,63 @@ test("grounds participation details against shared meeting-wide context", () => 
   assert.equal(result.cards.length, 1);
 });
 
+test("grounds a meeting venue when PDF extraction joins the address words", () => {
+  const meeting = itemScopedMeeting();
+  meeting.location = null;
+  meeting.llmInputText = [
+    "Current agenda and meeting-wide participation context:",
+    "Meeting Access",
+    "Board meetings are open to the public at the location shown below.",
+    "DistrictOfficeBoardRoom",
+    "201CovingtonRoad,LosAltos",
+    "A.CALL TO ORDER (6:00 PM)",
+    "Current meeting agenda items (use each block only for its named item):"
+  ].join("\n");
+
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          sourceItemId: "item-parks",
+          howToAct: {
+            attend: "Attend at 201 Covington Road.",
+            email: "Not listed in the source document.",
+            submitComment: "Not listed in the source document."
+          }
+        })
+      ]
+    },
+    validationOptionsForMeeting(meeting)
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
+test("grounds participation details against the structured meeting location", () => {
+  const meeting = itemScopedMeeting();
+  meeting.location = "District Office Board Room, 201 Covington Road";
+
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          sourceItemId: "item-parks",
+          howToAct: {
+            attend: "Attend at 201 Covington Road.",
+            email: "Not listed in the source document.",
+            submitComment: "Not listed in the source document."
+          }
+        })
+      ]
+    },
+    validationOptionsForMeeting(meeting)
+  );
+
+  assert.equal(result.cards.length, 1);
+});
+
 test("does not treat sentence punctuation after a grounded participation URL as part of the URL", () => {
   const result = validateSimpleCitySummary(
     {

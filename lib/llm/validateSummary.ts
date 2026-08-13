@@ -44,6 +44,8 @@ const NUMERIC_VALUE_PATTERN = new RegExp(
 );
 const DATE_VALUE_PATTERN =
   /\b(?:(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}|\d{1,2}\/\d{1,2}\/\d{4})\b/gi;
+const STREET_ADDRESS_VALUE_PATTERN =
+  /^\d{1,6}\s+(?:[A-Z0-9][A-Za-z0-9.'-]*\s+){1,6}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl)$/i;
 const NUMERIC_SCALE: Record<string, number> = {
   thousand: 1_000,
   k: 1_000,
@@ -471,6 +473,16 @@ function isGroundedValue(value: string, sourceText: string) {
       compactNumericSpacing(normalizedValue)
     )
   ) return true;
+  // PDF text extraction frequently joins every word in a meeting-room address
+  // (for example, `201CovingtonRoad`). Only apply this looser whitespace
+  // comparison to values already recognized as complete street addresses; doing
+  // it for arbitrary prose would weaken item-specific grounding.
+  if (
+    STREET_ADDRESS_VALUE_PATTERN.test(value.trim()) &&
+    normalizedSourceText.replace(/\s+/g, "").includes(
+      normalizedValue.replace(/\s+/g, "")
+    )
+  ) return true;
   return (
     hasEquivalentNumericValue(value, sourceText) ||
     hasEquivalentDateValue(value, sourceText)
@@ -593,6 +605,7 @@ function buildMeetingMetadataText(meeting: LlmReadyMeeting) {
     meeting.meetingType,
     meeting.dateText,
     meeting.timeText,
+    meeting.location,
     meeting.status,
     meeting.sourceType,
     meeting.sourceUrl,
@@ -689,6 +702,7 @@ export function validationOptionsForMeeting(
     meeting.llmInputText
   );
   const meetingWideParticipationText = [
+    meeting.location,
     extractedMeetingWideParticipationText,
     derivedParticipationDateEvidence(
       meeting.dateText,
