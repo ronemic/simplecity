@@ -602,6 +602,159 @@ test("does not overwrite a modern card when a distinct source id has the same pu
   assert.equal(persisted.length, 2);
 });
 
+function appendClientForExisting(
+  existingRows: Array<Record<string, unknown>>,
+  updatedRows: Array<{ id: string; values: Record<string, unknown> }>,
+  insertedRows: Array<Record<string, unknown>>
+) {
+  return {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: existingRows, error: null }; } };
+        },
+        update(values: Record<string, unknown>) {
+          return {
+            eq(_column: string, id: string) {
+              updatedRows.push({ id, values });
+              return {
+                select() {
+                  return {
+                    async single() {
+                      return {
+                        data: {
+                          id,
+                          source_item_id: values.source_item_id,
+                          agenda_item: values.agenda_item,
+                          source_url: values.source_url
+                        },
+                        error: null
+                      };
+                    }
+                  };
+                }
+              };
+            }
+          };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return {
+            async select() {
+              return {
+                data: rows.map((row, index) => ({
+                  id: `inserted-${index}`,
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+}
+
+test("adopts an identified row when a regenerated card omits its source item id", async () => {
+  const updatedRows: Array<{ id: string; values: Record<string, unknown> }> = [];
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const existing = {
+    id: "existing-jato",
+    source_item_id: "legistar-item-8071665",
+    agenda_item: "Lease for JATO Aviation office space",
+    source_url: "https://example.test/meeting/agenda",
+    is_published: true,
+    is_featured: false,
+    admin_notes: null
+  };
+  const incomingCards = [
+    {
+      ...card(30),
+      sourceItemId: null,
+      agendaItem: "Lease for JATO Aviation office space at San Carlos Airport",
+      source: existing.source_url
+    }
+  ];
+
+  const persisted = await appendSummaryCardsForMeeting(
+    appendClientForExisting([existing], updatedRows, insertedRows) as never,
+    "meeting-regenerated-without-id",
+    { ...summary(0), cards: incomingCards },
+    { response: "regenerated" },
+    { sourceHash: "regenerated-hash" }
+  );
+
+  assert.equal(insertedRows.length, 0, "the regenerated card must not create a duplicate row");
+  assert.deepEqual(updatedRows.map((row) => row.id), [existing.id]);
+  assert.equal(
+    updatedRows[0].values.source_item_id,
+    existing.source_item_id,
+    "adopting a row must preserve the identity it already carries"
+  );
+  assert.equal(
+    updatedRows[0].values.agenda_item,
+    incomingCards[0].agendaItem,
+    "the adopted row takes the regenerated public copy"
+  );
+  assert.equal(persisted.length, 1);
+});
+
+test("keeps an unidentified card from stealing a row another card in the batch claims", async () => {
+  const updatedRows: Array<{ id: string; values: Record<string, unknown> }> = [];
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const existing = {
+    id: "existing-claimed",
+    source_item_id: "item-claimed",
+    agenda_item: "Lease for JATO Aviation office space",
+    source_url: "https://example.test/meeting/agenda",
+    is_published: true,
+    is_featured: false,
+    admin_notes: null
+  };
+  const incomingCards = [
+    {
+      ...card(31),
+      sourceItemId: null,
+      agendaItem: "Lease for JATO Aviation office space at San Carlos Airport",
+      source: existing.source_url
+    },
+    {
+      ...card(32),
+      sourceItemId: existing.source_item_id,
+      agendaItem: existing.agenda_item,
+      source: existing.source_url
+    }
+  ];
+
+  await appendSummaryCardsForMeeting(
+    appendClientForExisting([existing], updatedRows, insertedRows) as never,
+    "meeting-contested-identity",
+    { ...summary(0), cards: incomingCards },
+    { response: "contested" },
+    { sourceHash: "contested-hash" }
+  );
+
+  assert.deepEqual(
+    updatedRows.map((row) => row.id),
+    [existing.id],
+    "the card that re-emitted the identity owns the row"
+  );
+  assert.equal(updatedRows[0].values.source_item_id, existing.source_item_id);
+  assert.equal(insertedRows.length, 1);
+  assert.equal(insertedRows[0].agenda_item, incomingCards[0].agendaItem);
+  assert.equal(insertedRows[0].source_item_id, null);
+});
+
 test("writes distinct Spanish translations for source-identified cards sharing a legacy key", async () => {
   const sharedTitle = "Neighborhood park maintenance contract";
   const sharedSource = "https://example.test/meeting/agenda";

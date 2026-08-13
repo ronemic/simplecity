@@ -318,8 +318,9 @@ export function SummaryCard({
   return (
     <article
       className={cn(
-        "overflow-hidden",
-        isSharePresentation ? "quiet-card rounded-xl" : "docket-item"
+        // The list card must not clip, so a hover disclosure can open past its
+        // edge. The share view renders that disclosure inline, so it can clip.
+        isSharePresentation ? "quiet-card overflow-hidden rounded-xl" : "docket-item"
       )}
       data-card-id={card.id}
     >

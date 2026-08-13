@@ -148,8 +148,17 @@ p {
    once a row expands into summary sections and an outcome panel, a 1px divider
    cannot say where one decision ends and the next begins. This needs no shadow
    to separate because the page ground is tinted. */
+/* Deliberately NOT overflow-hidden. Clipping the card to its own corners also
+   clipped anything a child needed to open outside it — the interest tooltip was
+   cut off mid-sentence. The bottom corners are kept instead by having whichever
+   section lands last inherit the radius. */
 .docket-item {
-  @apply overflow-hidden rounded-lg border border-rule bg-surface;
+  @apply rounded-lg border border-rule bg-surface;
+}
+
+.docket-item > :last-child {
+  border-end-start-radius: inherit;
+  border-end-end-radius: inherit;
 }
 
 .docket-stack {

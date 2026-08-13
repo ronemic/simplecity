@@ -147,7 +147,12 @@ export function SantaBarbaraInterestButton({
               <Info aria-hidden className="h-4 w-4" />
             </button>
             <div
-              className="pointer-events-none invisible absolute left-full top-1/2 z-30 w-72 max-w-[calc(100vw-2rem)] -translate-y-1/2 pl-2 opacity-0 transition group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100"
+              // Opens below and right-aligned. It used to open rightward from a
+              // button that already sits at the card's right edge, so it ran
+              // straight off the card and the viewport.
+              // Narrower on small screens: right-aligned to a button that sits
+              // near the viewport edge, a full 18rem ran off the left side.
+              className="pointer-events-none invisible absolute right-0 top-full z-40 mt-2 w-[14.5rem] opacity-0 transition group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:opacity-100 sm:w-72"
               id={disclosureId}
               role="tooltip"
             >
