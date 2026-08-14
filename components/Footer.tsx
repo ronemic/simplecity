@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
@@ -28,6 +29,17 @@ function footerDescription(locale: Locale) {
 
 function aboutLabel(locale: Locale) {
   return locale === "es" ? "Acerca de" : "About";
+}
+
+function exploreLabel(locale: Locale) {
+  return locale === "es" ? "Explorar" : "Explore";
+}
+
+function copyrightLabel(locale: Locale) {
+  const year = new Date().getFullYear();
+  return locale === "es"
+    ? `© ${year} SimpleCity. Todos los derechos reservados.`
+    : `© ${year} SimpleCity. All rights reserved.`;
 }
 
 function localizedHref(path: string, locale: Locale) {
@@ -70,32 +82,87 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
 
   return (
     <footer className="mt-10 border-t border-black/10 bg-[#eef3f6]">
-      <div className="section-shell grid gap-6 py-8 text-sm text-black/70 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
-        <div className="max-w-3xl">
-          <p className="text-base font-black text-ink">SimpleCity</p>
-          <p className="mt-3 max-w-2xl leading-6">{footerDescription(currentLocale)}</p>
+      <div className="section-shell py-10 text-sm text-black/70">
+        <div className="grid gap-10 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:gap-10 lg:gap-16">
+          <div className="max-w-sm">
+            <Link
+              href={localizedHref("/", currentLocale)}
+              className="flex items-center gap-2.5 text-base font-black leading-none text-ink focus-visible:focus-ring"
+            >
+              <Image
+                src="/favicon.svg"
+                alt=""
+                width={28}
+                height={28}
+                className="h-7 w-7 shrink-0 rounded-lg"
+              />
+              SimpleCity
+            </Link>
+            <p className="mt-3 leading-6">{footerDescription(currentLocale)}</p>
+          </div>
+
+          <nav aria-label={exploreLabel(currentLocale)} className="min-w-[7rem]">
+            <p className="label-eyebrow">{exploreLabel(currentLocale)}</p>
+            <ul className="mt-3 flex flex-col gap-2.5 font-semibold text-ink/80">
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/decisions", currentLocale)}>
+                  {t(currentLocale, "decisions")}
+                </Link>
+              </li>
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/meetings", currentLocale)}>
+                  {t(currentLocale, "meetings")}
+                </Link>
+              </li>
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/topics", currentLocale)}>
+                  {t(currentLocale, "topics")}
+                </Link>
+              </li>
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/subscribe", currentLocale)}>
+                  {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
+                </Link>
+              </li>
+            </ul>
+          </nav>
+
+          <nav aria-label={aboutLabel(currentLocale)} className="min-w-[7rem]">
+            <p className="label-eyebrow">{aboutLabel(currentLocale)}</p>
+            <ul className="mt-3 flex flex-col gap-2.5 font-semibold text-ink/80">
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/about", currentLocale)}>
+                  {aboutLabel(currentLocale)}
+                </Link>
+              </li>
+              <li>
+                <a className="transition hover:text-civic" href="mailto:simplecityadmin@gmail.com">
+                  {t(currentLocale, "contact")}
+                </a>
+              </li>
+            </ul>
+          </nav>
+
+          <nav aria-label={"Legal"} className="min-w-[7rem]">
+            <p className="label-eyebrow">{"Legal"}</p>
+            <ul className="mt-3 flex flex-col gap-2.5 font-semibold text-ink/80">
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/privacy", currentLocale)}>
+                  {currentLocale === "es" ? "Privacidad" : "Privacy"}
+                </Link>
+              </li>
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/cookies", currentLocale)}>
+                  {currentLocale === "es" ? "Configuración de cookies" : "Cookie settings"}
+                </Link>
+              </li>
+            </ul>
+          </nav>
         </div>
 
-        <nav
-          aria-label={currentLocale === "es" ? "Enlaces del pie de página" : "Footer links"}
-          className="flex flex-wrap gap-2 font-bold md:justify-end"
-        >
-          <Link className="action-ghost" href={localizedHref("/about", currentLocale)}>
-            {aboutLabel(currentLocale)}
-          </Link>
-          <Link className="action-ghost" href={localizedHref("/subscribe", currentLocale)}>
-            {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
-          </Link>
-          <Link className="action-ghost" href={localizedHref("/privacy", currentLocale)}>
-            {currentLocale === "es" ? "Privacidad" : "Privacy"}
-          </Link>
-          <Link className="action-ghost" href={localizedHref("/cookies", currentLocale)}>
-            {currentLocale === "es" ? "Configuración de cookies" : "Cookie settings"}
-          </Link>
-          <a className="action-ghost" href="mailto:simplecityadmin@gmail.com">
-            {t(currentLocale, "contact")}
-          </a>
-        </nav>
+        <p className="mt-10 border-t border-black/10 pt-6 text-xs text-black/50">
+          {copyrightLabel(currentLocale)}
+        </p>
       </div>
     </footer>
   );
