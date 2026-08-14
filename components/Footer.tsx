@@ -35,13 +35,6 @@ function exploreLabel(locale: Locale) {
   return locale === "es" ? "Explorar" : "Explore";
 }
 
-function copyrightLabel(locale: Locale) {
-  const year = new Date().getFullYear();
-  return locale === "es"
-    ? `© ${year} SimpleCity. Todos los derechos reservados.`
-    : `© ${year} SimpleCity. All rights reserved.`;
-}
-
 function localizedHref(path: string, locale: Locale) {
   return `${path}?lang=${locale}`;
 }
@@ -159,10 +152,6 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
             </ul>
           </nav>
         </div>
-
-        <p className="mt-10 border-t border-black/10 pt-6 text-xs text-black/50">
-          {copyrightLabel(currentLocale)}
-        </p>
       </div>
     </footer>
   );
