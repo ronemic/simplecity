@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildGoogleCalendarUrl } from "@/lib/utils/calendar";
-import { formatDisplayDate, hasDisplayableMeetingTime, parseMeetingDate } from "@/lib/utils/date";
+import {
+  formatDisplayDate,
+  hasDisplayableMeetingTime,
+  meetingClockTime,
+  parseMeetingDate
+} from "@/lib/utils/date";
 
 test("date-only meetings render without an invented midnight time", () => {
   const formatted = formatDisplayDate("June 13, 2026", "2026-06-13T07:00:00.000Z");
@@ -15,6 +20,14 @@ test("meetings with a real stored time still render the time", () => {
 
   assert.match(formatted, /10:00 AM/);
   assert.equal(hasDisplayableMeetingTime("June 13, 2026", "2026-06-13T17:00:00.000Z"), true);
+});
+
+test("the masthead's next-meeting time is omitted unless the timestamp holds one", () => {
+  // Midnight civic time is how a date-only agenda lands in the column.
+  assert.equal(meetingClockTime("2026-06-13T07:00:00.000Z"), null);
+  assert.equal(meetingClockTime(null), null);
+  assert.equal(meetingClockTime("not a date"), null);
+  assert.equal(meetingClockTime("2026-06-14T01:00:00.000Z"), "6:00 PM");
 });
 
 test("parser handles agenda-style a.m. and p.m. clock text", () => {

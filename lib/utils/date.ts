@@ -199,6 +199,32 @@ export function hasDisplayableMeetingTime(
   return clock.hour !== 0 || clock.minute !== 0;
 }
 
+/**
+ * The start time alone — "6:00 PM" — or null when the meeting has no real one.
+ *
+ * Stricter than `hasDisplayableMeetingTime`: that helper trusts a clock time
+ * found in `date_text`/`time_text` even when `meeting_datetime` was stored as
+ * midnight, which is the right call when the date carries the answer anyway.
+ * A bare time has no such cover — printing "12:00 AM" would state a wrong hour
+ * with no context to correct it — so this returns null unless the timestamp
+ * itself holds a non-midnight civic clock.
+ */
+export function meetingClockTime(iso?: string | null, locale: "en" | "es" = "en") {
+  if (!iso) return null;
+
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const clock = civicClockParts(parsed);
+  if (clock.hour === 0 && clock.minute === 0) return null;
+
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+    timeZone: CIVIC_TIME_ZONE,
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(parsed);
+}
+
 export function formatDisplayDate(
   dateText?: string | null,
   iso?: string | null,

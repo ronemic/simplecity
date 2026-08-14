@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
@@ -31,6 +31,7 @@ import {
   formatDisplayDate,
   isMeetingInProgress,
   isUpcomingMeetingDate,
+  meetingClockTime,
   meetingDateParts
 } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
@@ -124,10 +125,6 @@ function getMeetingPreviewCards(cards: SummaryCardRow[]) {
     .slice(0, 5);
 }
 
-function pluralize(count: number, singular: string, plural: string) {
-  return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
-}
-
 export default async function Home({
   searchParams
 }: {
@@ -204,13 +201,16 @@ export default async function Home({
   // can I show up?" is the question that brings people here.
   const nextMeetingParts = meetingDateParts(null, nextMeetingIso, locale);
   const nextMeetingUnderway = isMeetingInProgress(null, nextMeetingIso);
+  // Omitted rather than guessed when the scrape gave us only a date: "show up
+  // Aug 14" is useful, "show up Aug 14 at 12:00 AM" is worse than silence.
+  const nextMeetingTime = meetingClockTime(nextMeetingIso, locale);
 
   return (
     <div>
       <section className="civic-hero">
         <div
           className={`section-shell grid gap-x-10 gap-y-6 ${
-            hasSearch ? "py-7" : "py-9 sm:py-11 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center"
+            hasSearch ? "py-7" : "py-8 sm:py-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end"
           }`}
         >
           <div className="max-w-[34ch]">
@@ -226,48 +226,60 @@ export default async function Home({
                 : "Plain-language summaries linked to the official record, and the ways to weigh in before the vote."}
             </p>
 
-            {/* The live state of the docket. Same state vocabulary as the rows
-                below, so the marker colors mean one thing across the page. */}
-            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+            {/* The live state of the docket, said as a sentence. */}
+            <p className="masthead-status mt-5">
               {openForCommentCount > 0 ? (
-                <span className="state state--open">
+                <span>
+                  <strong>{openForCommentCount}</strong>{" "}
                   {locale === "es"
-                    ? pluralize(openForCommentCount, "decisión abierta a comentarios", "decisiones abiertas a comentarios")
-                    : `${openForCommentCount} ${openForCommentCount === 1 ? "decision is" : "decisions are"} open for comment`}
+                    ? openForCommentCount === 1
+                      ? "decisión abierta a comentarios"
+                      : "decisiones abiertas a comentarios"
+                    : `${openForCommentCount === 1 ? "decision" : "decisions"} open for comment`}
                 </span>
               ) : null}
               {nextMeetingParts ? (
-                <span className={nextMeetingUnderway ? "state state--open" : "state state--upcoming"}>
-                  {nextMeetingUnderway
-                    ? locale === "es"
-                      ? "Reunión en curso ahora"
-                      : "Meeting in session now"
-                    : `${locale === "es" ? "Próxima reunión " : "Next meeting "}${nextMeetingParts.month} ${nextMeetingParts.day}`}
-                </span>
+                nextMeetingUnderway ? (
+                  <span className="is-live">
+                    <strong className="is-live">
+                      {locale === "es" ? "Reunión en curso ahora" : "Meeting in session now"}
+                    </strong>
+                  </span>
+                ) : (
+                  <span>
+                    {locale === "es" ? "Próxima reunión " : "Next meeting "}
+                    <strong>
+                      {nextMeetingParts.month} {nextMeetingParts.day}
+                      {nextMeetingTime ? `, ${nextMeetingTime}` : ""}
+                    </strong>
+                  </span>
+                )
               ) : (
                 // Said plainly rather than left blank: an empty status area reads
                 // as broken, and "none posted" is a real answer for a jurisdiction
                 // whose next agenda has not been published yet.
-                <span className="state state--decided">
+                <span>
                   {locale === "es" ? "Ninguna reunión programada aún" : "No upcoming meetings posted yet"}
                 </span>
               )}
-            </div>
+            </p>
 
             {/* Sits with the intro rather than beside the search box: it is part
-                of who we are, not a way to find a decision. */}
+                of who we are, not a way to find a decision. Set as a credit
+                line, not a call to action — the thick underline and external-link
+                glyph gave a press mention the weight of a primary link. */}
             {!hasSearch ? (
-              <a
-                href={FEATURE_ARTICLE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium text-slate underline decoration-[color:var(--rule-strong)] underline-offset-4 transition-colors hover:text-brand hover:decoration-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              >
-                {locale === "es"
-                  ? "Presentado en el Los Altos Town Crier"
-                  : "Featured in the Los Altos Town Crier"}
-                <ExternalLink aria-hidden className="h-3.5 w-3.5 shrink-0" />
-              </a>
+              <p className="mt-6 text-[13px] leading-5 text-quiet">
+                {locale === "es" ? "Presentado en " : "Featured in "}
+                <a
+                  href={FEATURE_ARTICLE_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-slate underline decoration-rule underline-offset-[3px] transition-colors hover:text-brand hover:decoration-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  {locale === "es" ? "el Los Altos Town Crier" : "the Los Altos Town Crier"}
+                </a>
+              </p>
             ) : null}
           </div>
 

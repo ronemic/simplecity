@@ -261,6 +261,33 @@ p {
   color: var(--open);
 }
 
+/* The masthead's live figures. Deliberately NOT .state markers: in a card row a
+   colored square distinguishes one item's status from its neighbours', but here
+   there are no neighbours to distinguish from, so the squares were decoration —
+   two saturated accent colors stacked as badges under the headline. Read as one
+   dateline instead, with only the figures carrying weight. */
+.masthead-status {
+  @apply flex flex-wrap items-baseline gap-y-1 font-prose text-[14.5px] leading-6 text-slate;
+}
+
+.masthead-status > * + *::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 0.8em;
+  margin: 0 0.7rem;
+  background: var(--rule-strong);
+}
+
+.masthead-status strong {
+  @apply font-semibold text-ink;
+}
+
+/* The one figure that is time-critical: a meeting happening right now. */
+.masthead-status .is-live {
+  color: var(--open);
+}
+
 /* ---- State, expressed as text with a marker rather than a colored pill --- */
 
 .state {
@@ -513,21 +540,21 @@ p {
 
 /* ---- Masthead ---------------------------------------------------------- */
 
-/* Replaces the old dark gradient hero. The thesis is the live state of local
-   government, so this stays quiet and lets the status line carry the weight.
-   It sits on the tinted ground rather than a light panel — a full-width light
-   slab at the top of the page was most of the white the old version had. */
+/* No tinted slab and no panel behind the search. A colored band across the top
+   with a white card floating on it is decoration the page does not earn — it
+   read as a template header rather than the front page of a record. The
+   masthead now sits on the same ground as everything below it and is separated
+   by a single rule, so the first real edge on the page is a decision card. */
 .civic-hero {
   position: relative;
-  background: var(--band);
-  border-bottom: 1px solid var(--rule-strong);
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
   color: var(--ink);
 }
 
-/* Groups the search field with its two shortcuts so they read as one control
-   instead of three links floating on the band. */
+/* The field is the only chrome here; the shortcuts hang off it with a rule. */
 .search-panel {
-  @apply rounded-lg border border-rule bg-surface p-4;
+  @apply w-full;
 }
 
 .status-dot-pulse {

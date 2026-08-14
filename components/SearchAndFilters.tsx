@@ -24,7 +24,7 @@ export function SearchAndFilters({
         : `${resultCount ?? 0} results`;
 
   return (
-    <div className="search-panel w-full">
+    <div className="search-panel">
       <form className="relative" action={action} role="search">
         <label>
           <span className="sr-only">{t(locale, "searchDecisionsMeetingsTopics")}</span>
