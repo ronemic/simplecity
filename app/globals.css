@@ -261,31 +261,14 @@ p {
   color: var(--open);
 }
 
-/* The masthead's live figures. Deliberately NOT .state markers: in a card row a
-   colored square distinguishes one item's status from its neighbours', but here
-   there are no neighbours to distinguish from, so the squares were decoration —
-   two saturated accent colors stacked as badges under the headline. Read as one
-   dateline instead, with only the figures carrying weight. */
+/* The masthead's live figures, carried by the same state markers as the rows
+   below so a marker color means one thing across the whole page. */
 .masthead-status {
-  @apply flex flex-wrap items-baseline gap-y-1 font-prose text-[14.5px] leading-6 text-slate;
+  @apply flex flex-wrap items-center gap-x-5 gap-y-2;
 }
 
-.masthead-status > * + *::before {
-  content: "";
-  display: inline-block;
-  width: 1px;
-  height: 0.8em;
-  margin: 0 0.7rem;
-  background: var(--rule-strong);
-}
-
-.masthead-status strong {
-  @apply font-semibold text-ink;
-}
-
-/* The one figure that is time-critical: a meeting happening right now. */
-.masthead-status .is-live {
-  color: var(--open);
+.masthead-status .state {
+  @apply text-[15px] font-semibold;
 }
 
 /* ---- State, expressed as text with a marker rather than a colored pill --- */
@@ -540,16 +523,111 @@ p {
 
 /* ---- Masthead ---------------------------------------------------------- */
 
-/* No tinted slab and no panel behind the search. A colored band across the top
-   with a white card floating on it is decoration the page does not earn — it
-   read as a template header rather than the front page of a record. The
-   masthead now sits on the same ground as everything below it and is separated
-   by a single rule, so the first real edge on the page is a decision card. */
+/* No panel behind the search: the field is the only chrome, and a white card
+   floating inside the band read as a template header. The band itself is dark
+   (below), which is what separates the masthead from the docket. */
+/* The masthead is the one dark band on the page: a navy ground with a warm-lit
+   corner, so the headline reads as a front page rather than as the first row of
+   the docket. Everything below it stays on paper. */
 .civic-hero {
   position: relative;
-  background: var(--paper);
-  border-bottom: 1px solid var(--rule);
-  color: var(--ink);
+  isolation: isolate;
+  background:
+    radial-gradient(115% 95% at 76% -10%, rgba(64, 118, 198, 0.34), transparent 62%),
+    linear-gradient(165deg, #17263f 0%, #101d31 48%, #0a1523 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #eef3f9;
+}
+
+/* A faint survey grid — a hair of texture so the band is not a flat fill. */
+.civic-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(105% 90% at 70% 0%, #000 0%, transparent 72%);
+  pointer-events: none;
+}
+
+/* The type in the band. The palette tokens are light-ground values and the
+   Tailwind color scale is literal hex, so the band restates its own colors
+   rather than trying to re-point either one. */
+.civic-hero .page-title,
+.civic-hero h1 {
+  color: #f7fafd;
+}
+
+.civic-hero .page-copy,
+.civic-hero p {
+  color: #b7c6da;
+}
+
+.civic-hero .label-eyebrow {
+  color: #8fb4e6;
+}
+
+/* The state colors lifted onto the navy ground: the ochre and blue of the light
+   palette go muddy here, so the band carries its own tints of the same two. */
+.civic-hero .state--open {
+  color: #e8b566;
+}
+
+.civic-hero .state--open::before {
+  background: #e8b566;
+}
+
+.civic-hero .state--upcoming {
+  color: #9ec2f4;
+}
+
+.civic-hero .state--upcoming::before {
+  background: #9ec2f4;
+}
+
+.civic-hero .state--decided {
+  color: #a9bad0;
+}
+
+.civic-hero .state--decided::before {
+  background: #a9bad0;
+}
+
+.civic-hero .masthead-credit {
+  color: #c3d2e4;
+  text-decoration-color: rgba(255, 255, 255, 0.34);
+}
+
+.civic-hero .masthead-credit:hover {
+  color: #ffffff;
+  text-decoration-color: #9ec2f4;
+}
+
+.civic-hero .text-slate,
+.civic-hero .text-quiet {
+  color: #a9bad0;
+}
+
+.civic-hero .action-link,
+.civic-hero a.text-slate:hover {
+  color: #9ec2f4;
+}
+
+.civic-hero .border-rule {
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.civic-hero .decoration-rule {
+  text-decoration-color: rgba(255, 255, 255, 0.3);
+}
+
+/* The search field keeps its light ground: it is an input, and inverting it
+   would cost the affordance the band is meant to frame. */
+.civic-hero .input-control {
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 /* The field is the only chrome here; the shortcuts hang off it with a rule. */

@@ -17,7 +17,7 @@ export async function Header() {
   );
 
   return (
-    <header className="sticky top-0 z-50 border-b border-rule bg-paper/92 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-rule bg-paper">
       <div className="section-shell grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 md:flex md:min-h-[62px] md:justify-between md:py-2.5">
         <Link
           href="/"
