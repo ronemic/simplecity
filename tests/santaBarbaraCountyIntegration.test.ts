@@ -413,6 +413,7 @@ test("Legistar API maps stable item ids and official actions without Playwright"
     });
     assert.equal(result.totalMeetingCount, 1);
     assert.equal(result.meetings[0].externalId, "santa-barbara-county:legistar-event:2559");
+    assert.equal(result.meetings[0].agendaItemInventoryComplete, true);
     assert.equal(result.meetings[0].items?.[0].externalId, "legistar-event-item-117535");
     assert.equal(result.meetings[0].items?.[0].action, "Adopted");
     assert.equal(result.meetings[0].items?.[0].result, "Pass");

@@ -116,7 +116,12 @@ export function summaryCardWriteBatches<T>(rows: T[], batchSize = SUMMARY_CARD_W
 }
 
 export function obsoleteAuthoritativeSourceCardIds(
-  cards: Array<{ id: string; source_item_id?: string | null }>,
+  cards: Array<{
+    id: string;
+    source_item_id?: string | null;
+    is_featured?: boolean | null;
+    admin_notes?: string | null;
+  }>,
   authoritativeSourceItemIds: ReadonlySet<string> | null
 ) {
   if (!authoritativeSourceItemIds) return [];
@@ -124,6 +129,8 @@ export function obsoleteAuthoritativeSourceCardIds(
     .filter(
       (card) =>
         Boolean(card.source_item_id) &&
+        card.is_featured !== true &&
+        !card.admin_notes?.trim() &&
         !authoritativeSourceItemIds.has(card.source_item_id as string)
     )
     .map((card) => card.id);
@@ -855,9 +862,21 @@ export async function replaceSummaryCardsForMeeting(
     allowEmptyReplacement?: boolean;
     sourceHash?: string | null;
     jurisdiction?: JurisdictionConfig | null;
+    authoritativeSourceItemIds?: readonly string[];
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
+  const authoritativeSourceItemIds =
+    sourceItemIdAvailable && options.authoritativeSourceItemIds?.length
+      ? new Set(options.authoritativeSourceItemIds)
+      : null;
+  const cardsToInsert = summary.cards
+    .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(
+      ({ card }) =>
+        !authoritativeSourceItemIds ||
+        Boolean(card.sourceItemId && authoritativeSourceItemIds.has(card.sourceItemId))
+    );
   const { data: existingCards, error: existingError } = await supabase
     .from("summary_cards")
     .select("agenda_item,source_url,is_published,is_featured,admin_notes")
@@ -879,7 +898,7 @@ export async function replaceSummaryCardsForMeeting(
     preservedByAgendaKey.set(normalizeCardKey(card.agenda_item), state);
   }
 
-  if (summary.cards.length === 0) {
+  if (cardsToInsert.length === 0) {
     if (existingCards?.length && !options.allowEmptyReplacement) {
       return [];
     }
@@ -904,7 +923,6 @@ export async function replaceSummaryCardsForMeeting(
 
   if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
-  const cardsToInsert = summary.cards.map((card, summaryIndex) => ({ card, summaryIndex }));
   const rows = cardsToInsert.map(({ card }, rowIndex) => {
     const preserved =
       preservedByExactKey.get(exactCardKey(card.agendaItem, card.source)) ||

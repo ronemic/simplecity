@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  authoritativeSantaBarbaraSourceItemIds,
+  authoritativeAgendaItemSourceIds,
   buildLlmReadyMeeting,
   MAX_CHARS_FOR_LLM
 } from "@/lib/scraper/prepareLlmInput";
@@ -12,31 +12,32 @@ function repeatSentence(sentence: string, count: number) {
   return Array.from({ length: count }, () => sentence).join(" ");
 }
 
-test("Santa Barbara uses authoritative Legistar items instead of PDF-derived fragments", async () => {
+test("complete official item inventories replace PDF-derived fragments for any adapter", async () => {
   const meeting = {
-    jurisdictionSlug: "santa-barbara-county",
+    jurisdictionSlug: "example-jurisdiction",
+    agendaItemInventoryComplete: true,
     items: [
       {
-        externalId: "legistar-event-item-118874",
+        externalId: "official-item-118874",
         title: "Consider a catalytic-converter ordinance"
       }
     ]
   } as PrimeGovMeeting;
 
-  assert.deepEqual(authoritativeSantaBarbaraSourceItemIds(meeting), [
-    "legistar-event-item-118874"
+  assert.deepEqual(authoritativeAgendaItemSourceIds(meeting), [
+    "official-item-118874"
   ]);
   assert.equal(
-    authoritativeSantaBarbaraSourceItemIds({
+    authoritativeAgendaItemSourceIds({
       ...meeting,
-      jurisdictionSlug: "san-francisco"
+      agendaItemInventoryComplete: false
     }),
     null
   );
   assert.equal(
-    authoritativeSantaBarbaraSourceItemIds({
+    authoritativeAgendaItemSourceIds({
       ...meeting,
-      items: [{ externalId: "santa-barbara-county:legistar-event:2577-item-5-64" }]
+      agendaItemInventoryComplete: undefined
     } as PrimeGovMeeting),
     null
   );
@@ -63,7 +64,7 @@ test("Santa Barbara uses authoritative Legistar items instead of PDF-derived fra
     ],
     items: [
       {
-        externalId: "legistar-event-item-118874",
+        externalId: "official-item-118874",
         fileNumber: "26-00732",
         agendaNumber: "A-29",
         itemType: "Administrative Item",
@@ -76,8 +77,8 @@ test("Santa Barbara uses authoritative Legistar items instead of PDF-derived fra
     ]
   } as PrimeGovMeeting);
 
-  assert.deepEqual(prepared.items.map((item) => item.externalId), [
-    "legistar-event-item-118874"
+  assert.deepEqual((prepared.items || []).map((item) => item.externalId), [
+    "official-item-118874"
   ]);
   assert.ok(
     prepared.extractionNotes.some((note) =>

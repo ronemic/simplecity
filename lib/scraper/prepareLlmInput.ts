@@ -22,21 +22,19 @@ const MIN_PRIMARY_SOURCE_CHARS = 300;
 const MIN_HTML_AGENDA_CHARS = 500;
 const MIN_ROW_SOURCE_CHARS = 40;
 const MIN_ATTACHMENT_CONTEXT_CHARS = 200;
-const AUTHORITATIVE_LEGISTAR_ITEM_ID = /^legistar-event-item-\d+$/;
-
 /**
- * Santa Barbara's Legistar API already supplies one stable row per real agenda
- * item. The PDF is still valuable as evidence, but its page layout must not be
- * parsed into a second, competing item list: line wrapping can otherwise turn
- * the middle of a recommendation into a synthetic decision.
+ * Some source adapters already supply one stable row per real official agenda
+ * item. Their PDFs are still valuable as evidence, but their page layouts must
+ * not be parsed into a second, competing item list: line wrapping can otherwise
+ * turn the middle of a recommendation into a synthetic decision.
  */
-export function authoritativeSantaBarbaraSourceItemIds(
-  meeting: Pick<PrimeGovMeeting, "jurisdictionSlug" | "items">
+export function authoritativeAgendaItemSourceIds(
+  meeting: Pick<PrimeGovMeeting, "agendaItemInventoryComplete" | "items">
 ) {
-  if (meeting.jurisdictionSlug !== "santa-barbara-county") return null;
+  if (!meeting.agendaItemInventoryComplete) return null;
   const ids = (meeting.items || [])
     .map((item) => item.externalId)
-    .filter((id): id is string => AUTHORITATIVE_LEGISTAR_ITEM_ID.test(id || ""));
+    .filter((id): id is string => Boolean(id?.trim()));
   return ids.length > 0 ? [...new Set(ids)] : null;
 }
 
@@ -545,7 +543,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     }
   }
 
-  const authoritativeSourceItemIds = authoritativeSantaBarbaraSourceItemIds(meeting);
+  const authoritativeSourceItemIds = authoritativeAgendaItemSourceIds(meeting);
   const extractedItems = effectiveCancelled || authoritativeSourceItemIds
     ? []
     : extractAgendaItemsFromText(meeting, selectedText);

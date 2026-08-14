@@ -28,7 +28,7 @@ import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import {
-  authoritativeSantaBarbaraSourceItemIds,
+  authoritativeAgendaItemSourceIds,
   isMeetingCancelled,
   prepareLlmInput
 } from "@/lib/scraper/prepareLlmInput";
@@ -884,7 +884,7 @@ async function runSimpleCityPipelineInternal(
                     raw,
                     {
                       authoritativeSourceItemIds:
-                        authoritativeSantaBarbaraSourceItemIds(item.meeting) || undefined,
+                        authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
                       sourceHash: completedSourceHash
                     }
@@ -896,6 +896,8 @@ async function runSimpleCityPipelineInternal(
                     raw,
                     {
                       allowEmptyReplacement: true,
+                      authoritativeSourceItemIds:
+                        authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
                       sourceHash: completedSourceHash
                     }

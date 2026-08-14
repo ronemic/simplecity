@@ -847,6 +847,7 @@ async function scrapeLegistarDetails(context: BrowserContext, meeting: LegistarM
     }));
 
     meeting.items = items;
+    meeting.agendaItemInventoryComplete = items.length > 0;
     meeting.detailText = cleanText([detail.bodyText, formatLegistarItems(items)].filter(Boolean).join("\n\n"));
     meeting.documents = dedupeDocuments([...meeting.documents, ...detailDocs]);
     meeting.hasPdf = meeting.documents.some((doc) =>
@@ -1704,6 +1705,7 @@ export async function scrapeLegistarApiMeetings(
       hasPdf: documents.length > 0,
       documents,
       items,
+      agendaItemInventoryComplete: items.length > 0,
       detailText: cleanText(
         [
           event.EventComment,

@@ -91,6 +91,12 @@ export type PrimeGovMeeting = {
   htmlAgendaText?: string | null;
   detailText?: string | null;
   items?: AgendaItem[];
+  /**
+   * True only when the source adapter successfully read the official meeting's
+   * complete agenda-item inventory. PDF-derived and attachment-discovered item
+   * lists must leave this unset because they may be partial.
+   */
+  agendaItemInventoryComplete?: boolean;
   extractionNotes?: string[];
   llmInputText?: string;
   publicCommentsInputText?: string | null;

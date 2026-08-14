@@ -94,6 +94,16 @@ test("authoritative reconciliation removes stale identified cards but retains le
       { id: "current", source_item_id: "legistar-event-item-2" },
       { id: "page-break", source_item_id: "legistar-event-item-1" },
       { id: "pdf-fragment", source_item_id: "santa-barbara-event-item-5-64" },
+      {
+        id: "reviewed",
+        source_item_id: "retired-official-item",
+        admin_notes: "Retain after staff review"
+      },
+      {
+        id: "featured",
+        source_item_id: "retired-featured-item",
+        is_featured: true
+      },
       { id: "legacy-cancellation", source_item_id: null }
     ],
     new Set(["legistar-event-item-2"])
@@ -107,6 +117,59 @@ test("authoritative reconciliation removes stale identified cards but retains le
     ),
     []
   );
+});
+
+test("initial replacement persists only cards in a complete official item inventory", async () => {
+  const insertedRows: Array<Record<string, unknown>> = [];
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (columns === "source_item_id") {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [], error: null }; } };
+        },
+        delete() {
+          return { async eq() { return { error: null }; } };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          insertedRows.push(...rows);
+          return {
+            async select() {
+              return {
+                data: rows.map((row, index) => ({
+                  id: `persisted-${index}`,
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const persisted = await replaceSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-authoritative",
+    summary(2),
+    { response: "summary" },
+    {
+      authoritativeSourceItemIds: ["item-1"],
+      sourceHash: "authoritative-source-hash"
+    }
+  );
+
+  assert.deepEqual(insertedRows.map((row) => row.source_item_id), ["item-1"]);
+  assert.equal(persisted.length, 1);
 });
 
 test("stores one raw model payload for a bulk card write", () => {
