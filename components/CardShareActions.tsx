@@ -54,6 +54,9 @@ export function CardShareActions({
     } catch {}
   }
 
+  const idleLabel = locale === "es" ? "Copiar enlace" : "Copy link";
+  const copiedLabel = locale === "es" ? "Enlace copiado" : "Link copied";
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
@@ -63,13 +66,14 @@ export function CardShareActions({
         aria-live="polite"
       >
         {copied ? <Check aria-hidden className="h-4 w-4" /> : <Link2 aria-hidden className="h-4 w-4" />}
-        {copied
-          ? locale === "es"
-            ? "Enlace copiado"
-            : "Link copied"
-          : locale === "es"
-            ? "Copiar enlace"
-            : "Copy link"}
+        {/* Both labels occupy the same grid cell so the button keeps the width
+            of the longer one — swapping them can't reflow the card's layout. */}
+        <span className="grid">
+          <span className="col-start-1 row-start-1 invisible" aria-hidden>
+            {copiedLabel.length > idleLabel.length ? copiedLabel : idleLabel}
+          </span>
+          <span className="col-start-1 row-start-1">{copied ? copiedLabel : idleLabel}</span>
+        </span>
       </button>
     </div>
   );
