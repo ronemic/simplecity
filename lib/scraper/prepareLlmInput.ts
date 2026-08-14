@@ -22,6 +22,23 @@ const MIN_PRIMARY_SOURCE_CHARS = 300;
 const MIN_HTML_AGENDA_CHARS = 500;
 const MIN_ROW_SOURCE_CHARS = 40;
 const MIN_ATTACHMENT_CONTEXT_CHARS = 200;
+const AUTHORITATIVE_LEGISTAR_ITEM_ID = /^legistar-event-item-\d+$/;
+
+/**
+ * Santa Barbara's Legistar API already supplies one stable row per real agenda
+ * item. The PDF is still valuable as evidence, but its page layout must not be
+ * parsed into a second, competing item list: line wrapping can otherwise turn
+ * the middle of a recommendation into a synthetic decision.
+ */
+export function authoritativeSantaBarbaraSourceItemIds(
+  meeting: Pick<PrimeGovMeeting, "jurisdictionSlug" | "items">
+) {
+  if (meeting.jurisdictionSlug !== "santa-barbara-county") return null;
+  const ids = (meeting.items || [])
+    .map((item) => item.externalId)
+    .filter((id): id is string => AUTHORITATIVE_LEGISTAR_ITEM_ID.test(id || ""));
+  return ids.length > 0 ? [...new Set(ids)] : null;
+}
 
 export function normalizeSourceText(text = "") {
   return text
@@ -528,7 +545,15 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     }
   }
 
-  const extractedItems = effectiveCancelled ? [] : extractAgendaItemsFromText(meeting, selectedText);
+  const authoritativeSourceItemIds = authoritativeSantaBarbaraSourceItemIds(meeting);
+  const extractedItems = effectiveCancelled || authoritativeSourceItemIds
+    ? []
+    : extractAgendaItemsFromText(meeting, selectedText);
+  if (authoritativeSourceItemIds) {
+    extractionNotes.push(
+      `Used ${authoritativeSourceItemIds.length} authoritative Legistar agenda item(s); PDF text was retained as evidence but not reparsed into additional items.`
+    );
+  }
   meeting.items = effectiveCancelled
     ? []
     : mergeAgendaItems(meeting.items || [], extractedItems);

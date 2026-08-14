@@ -28,6 +28,7 @@ import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import {
+  authoritativeSantaBarbaraSourceItemIds,
   isMeetingCancelled,
   prepareLlmInput
 } from "@/lib/scraper/prepareLlmInput";
@@ -882,6 +883,8 @@ async function runSimpleCityPipelineInternal(
                     summary,
                     raw,
                     {
+                      authoritativeSourceItemIds:
+                        authoritativeSantaBarbaraSourceItemIds(item.meeting) || undefined,
                       jurisdiction,
                       sourceHash: completedSourceHash
                     }

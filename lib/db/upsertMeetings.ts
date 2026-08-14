@@ -115,6 +115,20 @@ export function summaryCardWriteBatches<T>(rows: T[], batchSize = SUMMARY_CARD_W
   return batches;
 }
 
+export function obsoleteAuthoritativeSourceCardIds(
+  cards: Array<{ id: string; source_item_id?: string | null }>,
+  authoritativeSourceItemIds: ReadonlySet<string> | null
+) {
+  if (!authoritativeSourceItemIds) return [];
+  return cards
+    .filter(
+      (card) =>
+        Boolean(card.source_item_id) &&
+        !authoritativeSourceItemIds.has(card.source_item_id as string)
+    )
+    .map((card) => card.id);
+}
+
 /**
  * Postgres refuses to let one ON CONFLICT DO UPDATE statement touch the same row
  * twice, and a meeting can legitimately list one URL under several document
@@ -936,6 +950,7 @@ export async function appendSummaryCardsForMeeting(
   options: {
     sourceHash?: string | null;
     jurisdiction?: JurisdictionConfig | null;
+    authoritativeSourceItemIds?: readonly string[];
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
@@ -950,6 +965,10 @@ export async function appendSummaryCardsForMeeting(
   if (existingError) throw new Error(`Failed to read existing cards: ${existingError.message}`);
 
   const existingCardRows = (existingCards || []) as unknown as ExistingAppendCard[];
+  const authoritativeSourceItemIds =
+    sourceItemIdAvailable && options.authoritativeSourceItemIds?.length
+      ? new Set(options.authoritativeSourceItemIds)
+      : null;
   const summaryContainsSubstantiveCards = summary.cards.some(
     (card) => !isAgendaUnavailablePlaceholderCard(card)
   );
@@ -966,8 +985,15 @@ export async function appendSummaryCardsForMeeting(
         )
         .map((card) => card.id)
     : [];
+  const obsoleteSourceCardIds = obsoleteAuthoritativeSourceCardIds(
+    existingCardRows,
+    authoritativeSourceItemIds
+  );
+  const existingCardIdsToDelete = [
+    ...new Set([...placeholderIdsToDelete, ...obsoleteSourceCardIds])
+  ];
   const retainedExistingCards = existingCardRows.filter(
-    (card) => !placeholderIdsToDelete.includes(card.id)
+    (card) => !existingCardIdsToDelete.includes(card.id)
   );
   const existingBySourceItemId = new Map(
     retainedExistingCards
@@ -1007,6 +1033,11 @@ export async function appendSummaryCardsForMeeting(
     .map((card, summaryIndex) => ({ card, summaryIndex }))
     .filter(
       ({ card }) =>
+        !authoritativeSourceItemIds ||
+        Boolean(card.sourceItemId && authoritativeSourceItemIds.has(card.sourceItemId))
+    )
+    .filter(
+      ({ card }) =>
         !summaryContainsSubstantiveCards || !isAgendaUnavailablePlaceholderCard(card)
     )
     .filter(({ card }) => {
@@ -1042,14 +1073,14 @@ export async function appendSummaryCardsForMeeting(
     return uniqueMatchWithin(adoptableIdentifiedCards, card, excludedIds);
   };
 
-  if (placeholderIdsToDelete.length > 0) {
+  if (existingCardIdsToDelete.length > 0) {
     const { error: deleteError } = await supabase
       .from("summary_cards")
       .delete()
-      .in("id", placeholderIdsToDelete);
+      .in("id", existingCardIdsToDelete);
 
     if (deleteError) {
-      throw new Error(`Failed to delete obsolete agenda placeholders: ${deleteError.message}`);
+      throw new Error(`Failed to delete obsolete summary cards: ${deleteError.message}`);
     }
   }
 

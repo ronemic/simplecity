@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  authoritativeSantaBarbaraSourceItemIds,
   buildLlmReadyMeeting,
   MAX_CHARS_FOR_LLM
 } from "@/lib/scraper/prepareLlmInput";
@@ -10,6 +11,80 @@ import type { PrimeGovMeeting } from "@/lib/types";
 function repeatSentence(sentence: string, count: number) {
   return Array.from({ length: count }, () => sentence).join(" ");
 }
+
+test("Santa Barbara uses authoritative Legistar items instead of PDF-derived fragments", async () => {
+  const meeting = {
+    jurisdictionSlug: "santa-barbara-county",
+    items: [
+      {
+        externalId: "legistar-event-item-118874",
+        title: "Consider a catalytic-converter ordinance"
+      }
+    ]
+  } as PrimeGovMeeting;
+
+  assert.deepEqual(authoritativeSantaBarbaraSourceItemIds(meeting), [
+    "legistar-event-item-118874"
+  ]);
+  assert.equal(
+    authoritativeSantaBarbaraSourceItemIds({
+      ...meeting,
+      jurisdictionSlug: "san-francisco"
+    }),
+    null
+  );
+  assert.equal(
+    authoritativeSantaBarbaraSourceItemIds({
+      ...meeting,
+      items: [{ externalId: "santa-barbara-county:legistar-event:2577-item-5-64" }]
+    } as PrimeGovMeeting),
+    null
+  );
+
+  const prepared = await buildLlmReadyMeeting({
+    ...meeting,
+    section: "Upcoming Meetings",
+    title: "Board of Supervisors",
+    dateText: "August 18, 2026",
+    timeText: "9:00 AM",
+    rowText: "Board of Supervisors August 18, 2026",
+    hasHtmlAgenda: false,
+    hasPdf: true,
+    documents: [
+      {
+        type: "Agenda",
+        label: "Agenda",
+        url: "https://county.example/agenda.pdf",
+        extractedText: repeatSentence(
+          "5.64 MWh battery energy storage system. A-29) Consider the actual item.",
+          20
+        )
+      }
+    ],
+    items: [
+      {
+        externalId: "legistar-event-item-118874",
+        fileNumber: "26-00732",
+        agendaNumber: "A-29",
+        itemType: "Administrative Item",
+        title: "Consider the Calle Real battery storage project",
+        action: null,
+        result: null,
+        sourceUrl: "https://county.example/item/118874",
+        rowText: "A-29 26-00732 Consider the Calle Real battery storage project"
+      }
+    ]
+  } as PrimeGovMeeting);
+
+  assert.deepEqual(prepared.items.map((item) => item.externalId), [
+    "legistar-event-item-118874"
+  ]);
+  assert.ok(
+    prepared.extractionNotes.some((note) =>
+      note.includes("PDF text was retained as evidence but not reparsed")
+    )
+  );
+});
 
 test("falls back to packet text when the agenda document is unreadable", async () => {
   const packetText = repeatSentence(

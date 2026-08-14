@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   appendSummaryCardsForMeeting,
   isAgendaUnavailablePlaceholderCard,
+  obsoleteAuthoritativeSourceCardIds,
   SUMMARY_CARD_WRITE_BATCH_SIZE,
   rawLlmJsonForBulkRow,
   replaceSummaryCardsForMeeting,
@@ -85,6 +86,27 @@ test("splits large summary-card writes into bounded batches", () => {
   assert.equal(SUMMARY_CARD_WRITE_BATCH_SIZE, 20);
   assert.deepEqual(batches.map((batch) => batch.length), [20, 20, 20, 20, 2]);
   assert.deepEqual(batches.flat(), rows);
+});
+
+test("authoritative reconciliation removes stale identified cards but retains legacy cards", () => {
+  const ids = obsoleteAuthoritativeSourceCardIds(
+    [
+      { id: "current", source_item_id: "legistar-event-item-2" },
+      { id: "page-break", source_item_id: "legistar-event-item-1" },
+      { id: "pdf-fragment", source_item_id: "santa-barbara-event-item-5-64" },
+      { id: "legacy-cancellation", source_item_id: null }
+    ],
+    new Set(["legistar-event-item-2"])
+  );
+
+  assert.deepEqual(ids, ["page-break", "pdf-fragment"]);
+  assert.deepEqual(
+    obsoleteAuthoritativeSourceCardIds(
+      [{ id: "untouched", source_item_id: "item-1" }],
+      null
+    ),
+    []
+  );
 });
 
 test("stores one raw model payload for a bulk card write", () => {
