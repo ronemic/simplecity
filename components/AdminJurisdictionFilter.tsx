@@ -15,7 +15,7 @@ export function AdminJurisdictionFilter({
   return (
     <form className="quiet-card mt-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
       <label className="flex-1">
-        <span className="text-xs font-bold uppercase text-slate">Jurisdiction</span>
+        <span className="text-xs font-bold uppercase text-black/70">Jurisdiction</span>
         <select name="jurisdiction" defaultValue={publicSelected} className="input-control mt-1">
           {options.map((option) => (
             <option key={option.slug} value={option.slug}>

@@ -89,11 +89,11 @@ function AnnouncementEditor({
       {announcement?.id ? <input type="hidden" name="id" value={announcement.id} /> : null}
       <div className="grid gap-3 md:grid-cols-2">
         <label className="block space-y-1 md:col-span-2">
-          <span className="text-xs font-bold uppercase text-slate">Title</span>
+          <span className="text-xs font-bold uppercase text-black/70">Title</span>
           <input name="title" required defaultValue={announcement?.title || ""} className="input-control" />
         </label>
         <label className="block space-y-1 md:col-span-2">
-          <span className="text-xs font-bold uppercase text-slate">Body</span>
+          <span className="text-xs font-bold uppercase text-black/70">Body</span>
           <textarea
             name="body"
             required
@@ -103,7 +103,7 @@ function AnnouncementEditor({
           />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase text-slate">Type</span>
+          <span className="text-xs font-bold uppercase text-black/70">Type</span>
           <select name="type" defaultValue={announcement?.type || "info"} className="input-control">
             <option value="info">Info</option>
             <option value="alert">Alert</option>
@@ -111,7 +111,7 @@ function AnnouncementEditor({
           </select>
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase text-slate">Jurisdiction</span>
+          <span className="text-xs font-bold uppercase text-black/70">Jurisdiction</span>
           <select
             name="jurisdiction"
             defaultValue={announcement ? announcementPublicJurisdiction || "all" : selectedPublicJurisdiction}
@@ -124,23 +124,23 @@ function AnnouncementEditor({
             ))}
           </select>
         </label>
-        <label className="flex items-end gap-2 rounded-lg border border-rule bg-paper px-3 py-3 text-sm font-semibold">
+        <label className="flex items-end gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-3 text-sm font-semibold">
           <input type="checkbox" name="is_published" defaultChecked={Boolean(announcement?.is_published ?? true)} />
           Published
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase text-slate">Starts at</span>
+          <span className="text-xs font-bold uppercase text-black/70">Starts at</span>
           <input type="datetime-local" name="starts_at" defaultValue={announcement?.starts_at ? String(announcement.starts_at).slice(0, 16) : ""} className="input-control" />
         </label>
         <label className="block space-y-1">
-          <span className="text-xs font-bold uppercase text-slate">Ends at</span>
+          <span className="text-xs font-bold uppercase text-black/70">Ends at</span>
           <input type="datetime-local" name="ends_at" defaultValue={announcement?.ends_at ? String(announcement.ends_at).slice(0, 16) : ""} className="input-control" />
         </label>
       </div>
       <button type="submit" disabled={loading} className="action-primary">
         {loading ? (mode === "create" ? "Creating announcement" : "Saving announcement") : mode === "create" ? "Create announcement" : "Save announcement"}
       </button>
-      {message ? <p className="rounded-lg bg-paper p-3 text-sm text-slate">{message}</p> : null}
+      {message ? <p className="rounded-lg bg-black/5 p-3 text-sm text-black/75">{message}</p> : null}
     </form>
   );
 }
@@ -190,11 +190,11 @@ function AnnouncementDeleteButton({
         type="button"
         onClick={onDelete}
         disabled={loading}
-        className="action-secondary px-4 text-deny"
+        className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20"
       >
         {loading ? "Deleting announcement" : "Delete announcement"}
       </button>
-      {message ? <p className="rounded-lg bg-paper p-3 text-sm text-slate">{message}</p> : null}
+      {message ? <p className="rounded-lg bg-black/5 p-3 text-sm text-black/75">{message}</p> : null}
     </div>
   );
 }

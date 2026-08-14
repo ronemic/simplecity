@@ -134,13 +134,13 @@ export function SubscribeForm({
       <div className="grid gap-2.5">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="grid gap-2">
-            <label className="text-sm font-semibold text-ink" htmlFor="subscribe-email">
+            <label className="text-sm font-black text-ink" htmlFor="subscribe-email">
               {t(locale, "subscribeEmailAddress")}
             </label>
             <div className="relative">
               <Mail
                 aria-hidden
-                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-brand"
+                className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-civic"
               />
               <input
                 id="subscribe-email"
@@ -174,7 +174,7 @@ export function SubscribeForm({
               : t(locale, "subscribe")}
           </button>
         </div>
-        <p className="text-sm font-semibold leading-6 text-slate">
+        <p className="text-sm font-semibold leading-6 text-black/60">
           {selectedJurisdictions.length === 0
             ? t(locale, "subscribeFormUnsubscribeHelp")
             : t(locale, "subscribeAlreadySubscribedHelp")}
@@ -191,22 +191,22 @@ export function SubscribeForm({
       />
 
       <fieldset className="grid gap-3">
-        <legend className="text-sm font-semibold text-ink">
+        <legend className="text-sm font-black text-ink">
           {t(locale, "subscribeWeeklyDigestAreas")}
         </legend>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[0.78fr_1.3fr_0.92fr_1fr]">
           {jurisdictionGroups.map((group) => (
             <div
               aria-labelledby={`${group.id}-label`}
-              className="rounded-xl bg-paper p-3.5"
+              className="rounded-xl bg-black/[0.025] p-3.5"
               key={group.id}
               role="group"
             >
               <h2
-                className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.05em] text-slate"
+                className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.05em] text-black/60"
                 id={`${group.id}-label`}
               >
-                <span aria-hidden className="h-4 w-1 rounded-full bg-brand" />
+                <span aria-hidden className="h-4 w-1 rounded-full bg-civic" />
                 {group.label}
               </h2>
               <div className={`grid gap-2 ${group.columns}`}>
@@ -218,13 +218,13 @@ export function SubscribeForm({
                       key={jurisdiction.value}
                       className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold shadow-[0_1px_2px_rgba(23,23,23,0.04)] ring-1 transition ${
                         checked
-                          ? "bg-brand-tint text-brand ring-brand/35"
-                          : "bg-surface text-ink ring-rule hover:bg-brand-tint hover:ring-brand/25"
+                          ? "bg-civic/10 text-civic ring-civic/35"
+                          : "bg-white text-ink ring-black/[0.08] hover:bg-[#f8fbff] hover:ring-civic/25"
                       }`}
                     >
                       <input
                         type="checkbox"
-                        className="h-4 w-4 shrink-0 accent-brand"
+                        className="h-4 w-4 shrink-0 accent-[#2457a6]"
                         checked={checked}
                         onChange={() => toggleJurisdiction(jurisdiction.value)}
                       />
@@ -242,8 +242,8 @@ export function SubscribeForm({
         <div
           className={`rounded-lg border px-4 py-3 text-sm font-bold ${
             status === "success"
-              ? "border-rule bg-paper text-affirm"
-              : "border-rule bg-paper text-deny"
+              ? "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]"
+              : "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]"
           }`}
           role="status"
         >

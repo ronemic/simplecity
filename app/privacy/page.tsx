@@ -35,11 +35,11 @@ export default async function PrivacyPage({
   return (
     <div className="section-shell py-8 sm:py-10">
       <div className="max-w-4xl">
-        <p className="label-eyebrow !text-brand">
+        <p className="label-eyebrow !text-civic">
           {es ? "Privacidad en SimpleCity" : "Privacy at SimpleCity"}
         </p>
         <h1 className="page-title mt-2">{es ? "Política de privacidad" : "Privacy Policy"}</h1>
-        <p className="mt-3 text-sm font-semibold text-quiet">
+        <p className="mt-3 text-sm font-semibold text-black/55">
           {es ? "Vigente desde el 8 de agosto de 2026" : "Effective August 8, 2026"}
         </p>
         <p className="page-copy mt-5">
@@ -121,7 +121,7 @@ export default async function PrivacyPage({
                 : "We retain subscription and delivery records while needed to operate digests, maintain preferences, and prevent abuse. When you unsubscribe, we mark the address unsubscribed so future sends stop. You may ask us to delete your data by emailing us. You can clear saved preferences from Cookie Settings and manage other cookies through your browser."}
             </p>
             <p className="mt-3">
-              <Link className="action-link" href={`/cookies?lang=${locale}`}>
+              <Link className="font-bold text-civic underline underline-offset-4" href={`/cookies?lang=${locale}`}>
                 {es ? "Abrir Configuración de cookies" : "Open Cookie Settings"}
               </Link>
             </p>
@@ -132,7 +132,7 @@ export default async function PrivacyPage({
               {es
                 ? "Podemos actualizar esta política a medida que cambie SimpleCity. Publicaremos aquí la versión revisada y cambiaremos la fecha de vigencia. Para preguntas, solicitudes de acceso o eliminación, contáctanos en "
                 : "We may update this policy as SimpleCity changes. We will post the revised version here and update the effective date. For questions, access requests, or deletion requests, contact us at "}
-              <a className="font-semibold text-brand underline decoration-brand/25 underline-offset-4 transition-colors hover:decoration-brand" href={`mailto:${CONTACT_EMAIL}`}>
+              <a className="font-bold text-civic underline underline-offset-4" href={`mailto:${CONTACT_EMAIL}`}>
                 {CONTACT_EMAIL}
               </a>
               .
@@ -147,8 +147,8 @@ export default async function PrivacyPage({
 function PolicySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="quiet-card p-5 sm:p-6">
-      <h2 className="text-xl font-semibold text-ink">{title}</h2>
-      <div className="mt-3 text-sm font-semibold leading-7 text-slate sm:text-base">{children}</div>
+      <h2 className="text-xl font-black text-ink">{title}</h2>
+      <div className="mt-3 text-sm font-semibold leading-7 text-black/70 sm:text-base">{children}</div>
     </section>
   );
 }

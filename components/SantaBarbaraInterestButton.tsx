@@ -139,7 +139,7 @@ export function SantaBarbaraInterestButton({
           aria-pressed={interested}
           className={cn(
             interested
-              ? "action-secondary-sm !rounded-r-none !border-brand/35 !bg-brand-tint !text-brand"
+              ? "action-secondary-sm !rounded-r-none !border-civic/35 !bg-civic/10 !text-civic"
               : "action-secondary-sm !rounded-r-none"
           )}
           disabled={!loaded || busy}
@@ -167,8 +167,8 @@ export function SantaBarbaraInterestButton({
             aria-expanded={disclosureOpen}
             aria-label={locale === "es" ? "Acerca del programa piloto de interés" : "About the interest pilot"}
             className={cn(
-              "action-secondary-sm !min-h-10 !w-10 !rounded-l-none !px-0 text-quiet",
-              (interested || disclosureOpen) && "!border-brand/35 !bg-brand-tint !text-brand"
+              "action-secondary-sm !min-h-10 !w-10 !rounded-l-none !px-0 text-black/55",
+              (interested || disclosureOpen) && "!border-civic/35 !bg-civic/10 !text-civic"
             )}
             onClick={() => setDisclosureOpen((value) => !value)}
             type="button"
@@ -180,10 +180,10 @@ export function SantaBarbaraInterestButton({
             // used to open rightward from a button that already sits at the
             // card's right edge, so it ran off the card and the viewport.
             <div className="absolute right-0 top-full z-40 mt-2 w-[14.5rem] sm:w-72" id={disclosureId}>
-              <p className="rounded-lg border border-[color:var(--rule-strong)] bg-surface p-3 text-left text-xs font-semibold leading-5 text-slate shadow-[0_8px_24px_rgba(22,32,28,0.14)]">
+              <p className="rounded-lg border border-black/10 bg-white p-3 text-left text-xs font-semibold leading-5 text-black/65 shadow-xl">
                 {disclosure}{" "}
                 <Link
-                  className="font-bold text-brand underline underline-offset-2"
+                  className="font-bold text-civic underline underline-offset-2"
                   href={`/privacy?lang=${locale}`}
                 >
                   {locale === "es" ? "Detalles" : "Details"}
@@ -194,7 +194,7 @@ export function SantaBarbaraInterestButton({
         </div>
       </div>
       {error ? (
-        <p className="mt-1.5 text-xs font-bold leading-5 text-deny" role="status">
+        <p className="mt-1.5 text-xs font-bold leading-5 text-[#9f2a20]" role="status">
           {error}
         </p>
       ) : null}

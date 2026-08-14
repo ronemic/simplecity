@@ -245,7 +245,7 @@ export function HeaderNav({
       <button
         aria-controls="mobile-primary-navigation"
         aria-expanded={isMobileMenuOpen}
-        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-rule bg-surface px-3 py-2 font-bold shadow-sm transition hover:border-brand/30 focus-visible:focus-ring md:hidden"
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 bg-white px-3 py-2 font-bold shadow-sm transition hover:border-civic/30 focus-visible:focus-ring md:hidden"
         onClick={() => {
           setIsMobileMenuOpen((isOpen) => !isOpen);
           setIsJurisdictionMenuOpen(false);
@@ -253,7 +253,7 @@ export function HeaderNav({
         }}
         type="button"
       >
-        <span aria-hidden className="relative h-4 w-4 text-brand">
+        <span aria-hidden className="relative h-4 w-4 text-civic">
           <Menu
             className={`absolute inset-0 h-4 w-4 transition duration-200 ${
               isMobileMenuOpen ? "rotate-90 scale-75 opacity-0" : "rotate-0 scale-100 opacity-100"
@@ -291,9 +291,9 @@ export function HeaderNav({
         >
           <span className="flex min-w-0 items-center gap-2">
             {selectedJurisdiction.isSchoolDistrict ? (
-              <School aria-hidden="true" className="h-4 w-4 shrink-0 text-brand" />
+              <School aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
             ) : (
-              <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-brand" />
+              <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
             )}
             <span
               className="truncate"
@@ -302,11 +302,11 @@ export function HeaderNav({
             </span>
           </span>
           {isJurisdictionPending ? (
-            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-brand" />
+            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
           ) : (
             <ChevronDown
               aria-hidden="true"
-              className={`h-4 w-4 shrink-0 text-slate transition ${
+              className={`h-4 w-4 shrink-0 text-black/60 transition ${
                 isJurisdictionMenuOpen ? "rotate-180" : ""
               }`}
             />
@@ -365,15 +365,15 @@ export function HeaderNav({
           onClick={() => setIsLanguageMenuOpen((isOpen) => !isOpen)}
         >
           <span className="flex min-w-0 items-center gap-2">
-            <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-brand" />
+            <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
             <span className="truncate">{selectedLanguage.label}</span>
           </span>
           {isLanguagePending ? (
-            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-brand" />
+            <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
           ) : (
             <ChevronDown
               aria-hidden="true"
-              className={`h-4 w-4 shrink-0 text-slate transition ${
+              className={`h-4 w-4 shrink-0 text-black/60 transition ${
                 isLanguageMenuOpen ? "rotate-180" : ""
               }`}
             />
@@ -417,8 +417,8 @@ export function HeaderNav({
             onClick={() => setIsMobileMenuOpen(false)}
             className={`relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
               isActive
-                ? "font-semibold text-brand after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-brand"
-                : "text-slate hover:bg-brand-tint hover:text-ink"
+                ? "font-black text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
+                : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
             }`}
           >
             {t(selectedLocale, item.labelKey)}
@@ -436,13 +436,13 @@ export function HeaderNavFallback() {
       aria-label="Primary navigation"
       className="contents text-sm font-semibold text-ink md:ml-auto md:block"
     >
-      <span className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-rule bg-surface px-3 py-2 font-bold shadow-sm md:hidden">
-        <Menu aria-hidden className="h-4 w-4 text-brand" />
+      <span className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 bg-white px-3 py-2 font-bold shadow-sm md:hidden">
+        <Menu aria-hidden className="h-4 w-4 text-civic" />
         Menu
       </span>
       <div className="hidden md:flex md:items-center md:justify-end">
       <label className="menu-trigger md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2">
-        <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-brand" />
+        <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
           defaultValue="san-mateo"
@@ -458,7 +458,7 @@ export function HeaderNavFallback() {
         </select>
       </label>
       <label className="menu-trigger md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-36 lg:mr-2">
-        <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-brand" />
+        <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Language</span>
         <select
           defaultValue="en"
@@ -475,7 +475,7 @@ export function HeaderNavFallback() {
         <Link
           key={item.href}
           href={item.href}
-          className="inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-slate transition hover:bg-brand-tint hover:text-ink focus-visible:focus-ring lg:px-3.5"
+          className="inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5"
         >
           {t("en", item.labelKey)}
         </Link>

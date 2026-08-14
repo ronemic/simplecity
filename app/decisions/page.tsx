@@ -136,16 +136,16 @@ function DecisionResultsCoverage({
     : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
 
   return (
-    <section className="rounded-lg border border-rule bg-surface px-3.5 py-3 shadow-sm" aria-labelledby="decision-results-coverage">
+    <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-3 shadow-sm" aria-labelledby="decision-results-coverage">
       <div>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-brand" />
-            <h2 id="decision-results-coverage" className="text-xs font-semibold uppercase tracking-wide text-ink">
+            <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
+            <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
               {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
             </h2>
           </div>
-          <p className="mt-1 text-xs font-medium leading-4 text-slate">
+          <p className="mt-1 text-xs font-medium leading-4 text-black/70">
             {locale === "es"
               ? "Los resultados siguen a las actas oficiales, que pueden tardar días o semanas en publicarse después de una reunión."
               : "Results follow official minutes, which may take days or weeks to appear after a meeting."}
@@ -155,8 +155,8 @@ function DecisionResultsCoverage({
       <dl className="mt-3 grid gap-1 text-xs sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
         {jurisdictions.map((option) => (
           <div key={option.slug} className="flex min-w-0 items-baseline gap-1.5">
-            <dt className="shrink-0 font-bold text-slate">{option.name}</dt>
-            <dd className="min-w-0 font-semibold text-brand">
+            <dt className="shrink-0 font-bold text-black/60">{option.name}</dt>
+            <dd className="min-w-0 font-black text-civic">
               {freshnessLabel(freshness, option.slug, locale)}
             </dd>
           </div>
@@ -208,7 +208,7 @@ export default async function DecisionsPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-6 max-w-3xl">
-        <p className="label-eyebrow text-brand">{t(locale, "decisions")}</p>
+        <p className="label-eyebrow text-civic">{t(locale, "decisions")}</p>
         <h1 className="page-title mt-2">
           {decisionsTitle(locale, jurisdiction, jurisdictionLabel)}
         </h1>

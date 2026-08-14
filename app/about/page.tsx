@@ -83,7 +83,7 @@ export default async function AboutPage() {
     <div className="section-shell py-10">
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start">
         <div className="max-w-3xl">
-          <p className="label-eyebrow !text-brand">
+          <p className="label-eyebrow !text-civic">
             {locale === "es" ? "Acerca de SimpleCity" : "About SimpleCity"}
           </p>
           <h1 className="page-title mt-2">
@@ -97,7 +97,7 @@ export default async function AboutPage() {
               : "SimpleCity helps residents understand what local governments are deciding, why it matters, when they can participate, and what happens afterward."}
           </p>
           <section className="mt-10">
-            <p className="label-eyebrow !text-brand">
+            <p className="label-eyebrow !text-civic">
               {locale === "es" ? "Por qué construimos SimpleCity" : "Why we built SimpleCity"}
             </p>
             <div className="mt-4 space-y-4">
@@ -117,13 +117,13 @@ export default async function AboutPage() {
                   : "Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
               </p>
             </div>
-            <p className="mt-5 text-sm font-semibold text-slate">
+            <p className="mt-5 text-sm font-semibold text-black/70">
               {locale === "es"
                 ? "¿Tienes una pregunta, corrección o idea? Contáctanos en"
                 : "Have a question, correction, or idea? Contact us at"}{" "}
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
-                className="font-bold text-brand underline decoration-brand/30 underline-offset-4 hover:decoration-brand"
+                className="font-bold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
               >
                 {CONTACT_EMAIL}
               </a>
@@ -132,20 +132,20 @@ export default async function AboutPage() {
         </div>
 
         <section className="lg:pt-6">
-          <p className="label-eyebrow !text-brand">
+          <p className="label-eyebrow !text-civic">
             {locale === "es" ? "SimpleCity en números" : "SimpleCity by the numbers"}
           </p>
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
             {statItems.map((item) => (
               <div key={item.label} className="quiet-card p-3 sm:p-4">
                 <div className="flex items-center justify-between gap-4">
-                  <item.icon aria-hidden className="h-5 w-5 text-brand" />
-                  <p className="label-eyebrow text-quiet">{item.label}</p>
+                  <item.icon aria-hidden className="h-5 w-5 text-civic" />
+                  <p className="label-eyebrow text-black/50">{item.label}</p>
                 </div>
-                <p className="mt-3 text-2xl font-semibold leading-none text-ink">
+                <p className="mt-3 text-2xl font-black leading-none text-ink">
                   {"valueText" in item ? item.valueText : formatStat(item.value, locale)}
                 </p>
-                <p className="mt-1.5 text-sm font-semibold leading-5 text-slate">{item.detail}</p>
+                <p className="mt-1.5 text-sm font-semibold leading-5 text-black/65">{item.detail}</p>
               </div>
             ))}
           </div>
@@ -153,7 +153,7 @@ export default async function AboutPage() {
       </div>
 
       <section className="mt-10 max-w-5xl">
-        <p className="label-eyebrow !text-brand">
+        <p className="label-eyebrow !text-civic">
           {locale === "es" ? "En las noticias" : "In the news"}
         </p>
 
@@ -163,7 +163,7 @@ export default async function AboutPage() {
               <Newspaper aria-hidden className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="label-eyebrow !text-brand">
+              <p className="label-eyebrow !text-civic">
                 {locale === "es" ? "Cobertura destacada" : "Featured coverage"}
               </p>
               <h2 className="mt-1 max-w-3xl text-lg font-bold leading-7 text-ink sm:text-xl">
@@ -171,9 +171,9 @@ export default async function AboutPage() {
                   ? "Estudiantes usan IA para crear un sitio web que resume las agendas de gobiernos locales"
                   : "Using AI, students create website that summarizes local government agendas"}
               </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-slate">
+              <p className="mt-1 text-sm font-semibold leading-6 text-black/60">
                 Los Altos Town Crier
-                <span aria-hidden className="mx-2 text-quiet">·</span>
+                <span aria-hidden className="mx-2 text-black/25">·</span>
                 {locale === "es"
                   ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity"
                   : "Local coverage of the student team behind SimpleCity"}
@@ -193,7 +193,7 @@ export default async function AboutPage() {
       </section>
 
       <section className="mt-10">
-        <p className="label-eyebrow !text-brand">
+        <p className="label-eyebrow !text-civic">
           {locale === "es" ? "Cómo funciona SimpleCity" : "How SimpleCity works"}
         </p>
 
@@ -240,7 +240,7 @@ export default async function AboutPage() {
                 <item.icon aria-hidden className="h-5 w-5" />
               </span>
               <h2 className="mt-4 text-lg font-bold text-ink">{item.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate">{item.body}</p>
+              <p className="mt-2 text-sm leading-6 text-black/75">{item.body}</p>
             </section>
           ))}
         </div>

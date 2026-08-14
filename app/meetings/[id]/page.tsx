@@ -249,7 +249,7 @@ export default async function MeetingDetailPage({
         </Link>
       ) : (
         <div aria-disabled="true" className="action-disabled-sm">
-          <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-quiet" />
+          <ChevronLeft aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
           <span>{locale === "es" ? "Anterior" : "Previous"}</span>
         </div>
       )}
@@ -267,7 +267,7 @@ export default async function MeetingDetailPage({
       ) : (
         <div aria-disabled="true" className="action-disabled-sm">
           <span>{locale === "es" ? "Siguiente" : "Next"}</span>
-          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-quiet" />
+          <ChevronRight aria-hidden className="h-4 w-4 shrink-0 text-black/25" />
         </div>
       )}
     </nav>
@@ -288,7 +288,7 @@ export default async function MeetingDetailPage({
             <span className="chip chip-selected">
               {jurisdictionLabel}
             </span>
-            <span className="text-sm font-semibold text-slate">
+            <span className="text-sm font-semibold text-black/70">
               {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
             </span>
           </div>
@@ -308,7 +308,7 @@ export default async function MeetingDetailPage({
           <MeetingVideoEmbed documents={videoDocuments} locale={locale} />
 
           <div>
-            <p className="label-eyebrow text-brand">{t(locale, "summaryCards")}</p>
+            <p className="label-eyebrow text-civic">{t(locale, "summaryCards")}</p>
             <h2 className="section-title mt-1">
               {locale === "es" ? "Puntos de agenda en lenguaje claro" : "Easy-to-understand decision summaries"}
             </h2>
@@ -334,7 +334,7 @@ export default async function MeetingDetailPage({
                   ? "Aún no hay tarjetas publicadas para esta reunión"
                   : "No published cards for this meeting yet"}
               </h3>
-              <p className="mt-2 text-sm leading-6 text-slate">
+              <p className="mt-2 text-sm leading-6 text-black/70">
                 {locale === "es"
                   ? "Los administradores pueden regenerar resúmenes después de extraer el texto de la agenda."
                   : "Admins can regenerate summaries after agenda text has been extracted."}
@@ -356,32 +356,32 @@ export default async function MeetingDetailPage({
                     rel="noreferrer"
                     className="quiet-card interactive-card flex items-start gap-3 p-4 text-sm focus-visible:focus-ring"
                   >
-                    <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
+                    <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold text-ink">{displayDocumentType(doc, locale)}</span>
-                      <span className="block break-words text-slate">
+                      <span className="block break-words text-black/70">
                         {displayDocumentLabel(doc, locale, t(locale, "officialSource"))}
                       </span>
                     </span>
-                    <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-quiet" />
+                    <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-black/40" />
                   </a>
                 ))
               ) : (
-                <p className="text-sm leading-6 text-slate">{t(locale, "noSourceDocuments")}</p>
+                <p className="text-sm leading-6 text-black/70">{t(locale, "noSourceDocuments")}</p>
               )}
             </div>
           </section>
 
           <section className="quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">{t(locale, "publicCommentInformation")}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate">
+            <p className="mt-2 text-sm leading-6 text-black/75">
               {meeting.public_comments_input_text || t(locale, "notListedInSource")}
             </p>
           </section>
 
           <section className="quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">{t(locale, "sourceNote")}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate">
+            <p className="mt-2 text-sm leading-6 text-black/75">
               {locale === "es"
                 ? "SimpleCity resume documentos oficiales de reuniones públicas. Siempre revisa la fuente original antes de tomar decisiones formales."
                 : "SimpleCity summarizes official public meeting documents. Always check the original source before making formal decisions."}

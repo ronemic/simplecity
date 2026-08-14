@@ -52,7 +52,7 @@ export function DecisionResultSelect({
 
   return (
     <div aria-busy={isPending} className="flex items-center gap-2">
-      {isPending ? <Loader2 aria-hidden className="h-3.5 w-3.5 shrink-0 animate-spin text-brand" /> : null}
+      {isPending ? <Loader2 aria-hidden className="h-3.5 w-3.5 shrink-0 animate-spin text-civic" /> : null}
       <ListboxSelect
         key={`result-${selectedResult || "all"}`}
         name="result"

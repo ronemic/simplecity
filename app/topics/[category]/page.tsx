@@ -142,14 +142,14 @@ export default async function CategoryDetailPage({
         ))}
       </div>
 
-      <div className="docket-stack">
+      <div className="grid gap-4">
         {filtered.map((card) => (
           <SummaryCard key={card.id} card={card} locale={locale} />
         ))}
         {filtered.length === 0 ? (
           <div className="quiet-card p-8 text-center">
             <h2 className="text-xl font-bold text-ink">{t(locale, "noCardsInCategory")}</h2>
-            <p className="mt-2 text-sm leading-6 text-slate">
+            <p className="mt-2 text-sm leading-6 text-black/70">
               {t(locale, "noCardsInCategoryDescription")}
             </p>
           </div>

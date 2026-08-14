@@ -154,7 +154,7 @@ export function DecisionBrowser({
                     ? t(locale, "noMatchingDecisions")
                     : t(locale, "noDecisionsYet")}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-slate">
+                <p className="mt-2 text-sm leading-6 text-black/70">
                   {initialSearch || selectedCategory || selectedResult ? t(locale, "tryChangingFilters") : emptyDescription}
                 </p>
               </div>
@@ -164,7 +164,7 @@ export function DecisionBrowser({
           {pageCount > 1 ? (
             <nav
               aria-label={locale === "es" ? "Paginación de decisiones" : "Decision pagination"}
-              className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-rule pt-5"
+              className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-5"
             >
               <button
                 type="button"

@@ -20,7 +20,7 @@ export function SearchInput({
     <div className="relative">
       <Search
         aria-hidden
-        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-quiet"
+        className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black/45"
       />
       <input
         type="search"
@@ -36,7 +36,7 @@ export function SearchInput({
           type="button"
           onClick={() => onSearchChange("")}
           aria-label={t(locale, "clearSearch")}
-          className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-quiet transition hover:bg-brand-tint hover:text-ink focus-visible:focus-ring"
+          className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-black/50 transition hover:bg-black/[0.05] hover:text-ink focus-visible:focus-ring"
         >
           <X aria-hidden className="h-4 w-4" />
         </button>

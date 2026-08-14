@@ -31,7 +31,7 @@ function statusMessage(status: string | undefined, locale: Locale) {
     return {
       title: t(locale, "subscribeConfirmedTitle"),
       body: t(locale, "subscribeConfirmedBody"),
-      className: "border-rule bg-paper text-affirm"
+      className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]"
     };
   }
 
@@ -39,7 +39,7 @@ function statusMessage(status: string | undefined, locale: Locale) {
     return {
       title: t(locale, "subscribeUnsubscribedTitle"),
       body: t(locale, "subscribeUnsubscribedBody"),
-      className: "border-rule bg-paper text-deny"
+      className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]"
     };
   }
 
@@ -47,7 +47,7 @@ function statusMessage(status: string | undefined, locale: Locale) {
     return {
       title: t(locale, "subscribeInvalidTitle"),
       body: t(locale, "subscribeInvalidBody"),
-      className: "border-rule bg-paper text-deny"
+      className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]"
     };
   }
 
@@ -55,7 +55,7 @@ function statusMessage(status: string | undefined, locale: Locale) {
     return {
       title: t(locale, "subscribeErrorTitle"),
       body: t(locale, "subscribeErrorBody"),
-      className: "border-rule bg-paper text-deny"
+      className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]"
     };
   }
 
@@ -78,15 +78,15 @@ export default async function SubscribePage({
     <div className="section-shell py-8 sm:py-10">
       <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-end lg:gap-12">
         <div className="max-w-2xl">
-          <p className="label-eyebrow text-brand">{t(locale, "subscribeEyebrow")}</p>
+          <p className="label-eyebrow text-civic">{t(locale, "subscribeEyebrow")}</p>
           <h1 className="page-title mt-2">{t(locale, "subscribePageTitle")}</h1>
         </div>
         <p className="page-copy text-base lg:pb-1">{t(locale, "subscribePageDescription")}</p>
 
         {message ? (
           <div className={`rounded-lg border px-4 py-3 lg:col-span-2 ${message.className}`}>
-            <h2 className="text-base font-semibold">{message.title}</h2>
-            <p className="mt-1 text-sm font-semibold leading-6 text-current">{message.body}</p>
+            <h2 className="text-base font-black">{message.title}</h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-current/80">{message.body}</p>
           </div>
         ) : null}
       </div>

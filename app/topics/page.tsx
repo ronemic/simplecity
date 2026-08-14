@@ -34,7 +34,7 @@ export default async function TopicsPage() {
   return (
     <div className="section-shell py-10">
       <div className="mb-8 max-w-3xl">
-        <p className="label-eyebrow text-brand">{t(locale, "topics")}</p>
+        <p className="label-eyebrow text-civic">{t(locale, "topics")}</p>
         <h1 className="page-title mt-2">{t(locale, "everydayImpactTitle")}</h1>
         <p className="page-copy mt-3 text-base">
           {locale === "es"
@@ -57,8 +57,8 @@ export default async function TopicsPage() {
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <h2 className="mt-4 text-xl font-bold text-ink">{categoryLabel(locale, category)}</h2>
-              <p className="mt-2 text-sm leading-6 text-slate">{categoryDescription(locale, category)}</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-brand">
+              <p className="mt-2 text-sm leading-6 text-black/70">{categoryDescription(locale, category)}</p>
+              <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-civic">
                 {t(locale, "viewCards")} <ArrowRight aria-hidden className="h-4 w-4 transition group-hover:translate-x-0.5" />
               </span>
             </Link>

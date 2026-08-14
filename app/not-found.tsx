@@ -9,14 +9,14 @@ export default async function NotFound() {
     <div className="section-shell py-10">
       <div className="quiet-card mx-auto max-w-xl p-6 text-center">
         <h1 className="text-2xl font-bold text-ink">{t(locale, "pageNotFound")}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate">
+        <p className="mt-2 text-sm leading-6 text-black/75">
           {locale === "es"
             ? "Es posible que esta página no exista, haya cambiado de ubicación o ya no esté disponible."
             : "This page may not exist, may have moved, or may no longer be available."}
         </p>
         <Link
           href="/"
-          className="action-primary mt-5"
+          className="action-primary-sm mt-5"
         >
           {t(locale, "goHome")}
         </Link>

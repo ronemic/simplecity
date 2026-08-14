@@ -115,10 +115,10 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
   return (
     <article className="quiet-card p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="rounded-full border border-rule bg-paper px-2.5 py-1 text-xs font-bold text-brand">
+        <span className="rounded-full border border-civic/15 bg-[#eef5ff] px-2.5 py-1 text-xs font-bold text-[#1646b8]">
           {jurisdictionLabel}
         </span>
-        <span className="text-xs font-semibold text-quiet">
+        <span className="text-xs font-semibold text-black/55">
           {card.meetings?.title || "Meeting not linked"}
         </span>
       </div>
@@ -126,21 +126,21 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
         <input type="hidden" name="id" value={card.id} />
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-slate">Agenda item</span>
+            <span className="text-xs font-bold uppercase text-black/70">Agenda item</span>
             <input name="agenda_item" defaultValue={card.agenda_item || ""} className="input-control" />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-slate">What is happening</span>
+            <span className="text-xs font-bold uppercase text-black/70">What is happening</span>
             <textarea
               name="what_is_happening"
               defaultValue={normalizeSummaryPoints(card.what_is_happening).join("\n")}
               rows={3}
               className="input-control input-control--textarea"
             />
-            <span className="block text-xs text-quiet">Enter one bullet point per line, up to three.</span>
+            <span className="block text-xs text-black/50">Enter one bullet point per line, up to three.</span>
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-slate">Why it matters</span>
+            <span className="text-xs font-bold uppercase text-black/70">Why it matters</span>
             <textarea
               name="why_it_matters"
               defaultValue={card.why_it_matters || ""}
@@ -149,11 +149,11 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Status</span>
+            <span className="text-xs font-bold uppercase text-black/70">Status</span>
             <input name="status" defaultValue={card.status || ""} className="input-control" />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Who it affects</span>
+            <span className="text-xs font-bold uppercase text-black/70">Who it affects</span>
             <input
               name="who_it_affects"
               defaultValue={(card.who_it_affects || []).join(", ")}
@@ -161,16 +161,16 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Source URL</span>
+            <span className="text-xs font-bold uppercase text-black/70">Source URL</span>
             <input name="source_url" defaultValue={card.source_url || ""} className="input-control" />
           </label>
           <fieldset className="md:col-span-2">
-            <legend className="text-xs font-bold uppercase text-slate">Topics</legend>
-            <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-rule bg-paper p-2">
+            <legend className="text-xs font-bold uppercase text-black/70">Topics</legend>
+            <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.02] p-2">
               {availableCategories.map((category) => (
                 <label
                   key={category}
-                  className="inline-flex items-center gap-2 rounded-lg border border-rule bg-surface px-3 py-2 text-sm shadow-sm"
+                  className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-white px-3 py-2 text-sm shadow-sm"
                 >
                   <input
                     type="checkbox"
@@ -184,7 +184,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             </div>
           </fieldset>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Comment opens</span>
+            <span className="text-xs font-bold uppercase text-black/70">Comment opens</span>
             <input
               name="comment_window_opens"
               defaultValue={card.comment_window_opens || ""}
@@ -192,7 +192,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Comment closes</span>
+            <span className="text-xs font-bold uppercase text-black/70">Comment closes</span>
             <input
               name="comment_window_closes"
               defaultValue={card.comment_window_closes || ""}
@@ -200,7 +200,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Attend</span>
+            <span className="text-xs font-bold uppercase text-black/70">Attend</span>
             <textarea
               name="how_to_act_attend"
               defaultValue={card.how_to_act_attend || ""}
@@ -209,7 +209,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-slate">Email</span>
+            <span className="text-xs font-bold uppercase text-black/70">Email</span>
             <textarea
               name="how_to_act_email"
               defaultValue={card.how_to_act_email || ""}
@@ -218,7 +218,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-slate">Submit comment</span>
+            <span className="text-xs font-bold uppercase text-black/70">Submit comment</span>
             <textarea
               name="how_to_act_submit_comment"
               defaultValue={card.how_to_act_submit_comment || ""}
@@ -226,16 +226,16 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
               className="input-control input-control--textarea"
             />
           </label>
-          <label className="inline-flex items-center gap-2 rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-semibold">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-sm font-semibold">
             <input type="checkbox" name="is_published" defaultChecked={Boolean(card.is_published)} />
             Published
           </label>
-          <label className="inline-flex items-center gap-2 rounded-lg border border-rule bg-paper px-3 py-2 text-sm font-semibold">
+          <label className="inline-flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-sm font-semibold">
             <input type="checkbox" name="is_featured" defaultChecked={Boolean(card.is_featured)} />
             Featured
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-slate">Admin notes</span>
+            <span className="text-xs font-bold uppercase text-black/70">Admin notes</span>
             <textarea
               name="admin_notes"
               defaultValue={card.admin_notes || ""}
@@ -250,13 +250,13 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
           </button>
         </div>
       </form>
-      {message ? <p className="mt-3 rounded-lg bg-paper p-3 text-sm text-slate">{message}</p> : null}
+      {message ? <p className="mt-3 rounded-lg bg-black/5 p-3 text-sm text-black/75">{message}</p> : null}
       <div className="mt-3">
         <button
           type="button"
           onClick={submitDelete}
           disabled={saving || deleting}
-          className="action-secondary px-4 text-deny"
+          className="action-secondary border-clay/20 bg-clay/10 px-4 text-clay hover:bg-clay/20"
         >
           {buttonLabel("Delete card", deleting, "Deleting card")}
         </button>

@@ -99,7 +99,7 @@ export default async function MeetingsPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-6 max-w-3xl">
-        <p className="label-eyebrow text-brand">{t(locale, "meetings")}</p>
+        <p className="label-eyebrow text-civic">{t(locale, "meetings")}</p>
         <h1 className="page-title mt-2">
           {meetingsTitle(locale, jurisdiction, jurisdictionLabel)}
         </h1>

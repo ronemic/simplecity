@@ -30,7 +30,7 @@ export function DecisionFilters({
 
   return (
     <section aria-label={locale === "es" ? "Filtros de decisiones" : "Decision filters"}>
-      <nav aria-label={locale === "es" ? "Filtrar por tema" : "Filter by topic"} className="border-b border-rule py-5">
+      <nav aria-label={locale === "es" ? "Filtrar por tema" : "Filter by topic"} className="border-b border-black/10 py-5">
         <p className="mb-3 text-sm font-bold text-ink">
           {locale === "es" ? "Filtrar por tema" : "Filter by topic"}
         </p>

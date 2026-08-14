@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronDown, ExternalLink } from "lucide-react";
+import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, Info, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
 import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
 import { PendingLink } from "@/components/PendingLink";
 import { HighlightedText } from "@/components/HighlightedText";
+import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
 import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import { getCommentDeadlineInfo, hasCommentOptionInfo, type CommentDeadlineInfo } from "@/lib/utils/commentDeadline";
@@ -16,8 +17,7 @@ import {
   formatCompactDisplayDate,
   formatDisplayDate,
   formatPacificTimestamp,
-  isUpcomingMeetingDate,
-  meetingDateParts
+  isUpcomingMeetingDate
 } from "@/lib/utils/date";
 import { cn } from "@/lib/utils/cn";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
@@ -111,6 +111,11 @@ function hasCardCommentOptionInfo(card: SummaryCardRow) {
   });
 }
 
+function getPrimaryCategory(card: SummaryCardRow) {
+  const category = (card.category_tags || []).find((item) => item in CATEGORY_DEFINITIONS);
+  return category as CategoryName | undefined;
+}
+
 export function statusSummary(
   card: SummaryCardRow,
   locale: Locale,
@@ -125,7 +130,7 @@ export function statusSummary(
   if (status === "Cancelled" || status === "Canceled" || card.meetings?.status === "Cancelled") {
     return {
       label: t(locale, "meetingCanceled"),
-      className: "state--alert",
+      className: "border-[#e5b6b3] bg-[#fff1f0] text-[#9f2a20]",
       icon: null
     };
   }
@@ -133,8 +138,8 @@ export function statusSummary(
   if (isAwaitingDecisionResult(card, outcome)) {
     return {
       label: locale === "es" ? "Esperando resultado oficial" : "Awaiting official result",
-      className: "state--upcoming",
-      icon: null
+      className: "border-[#aabce6] bg-[#eef2ff] text-[#354f9b]",
+      icon: Hourglass
     };
   }
 
@@ -150,7 +155,7 @@ export function statusSummary(
             : locale === "es"
               ? `Reunión ${compactMeetingDate}`
               : `Meeting ${compactMeetingDate}`,
-      className: "state--upcoming",
+      className: "border-[#f0c75e] bg-[#fff9e9] text-[#a54f00]",
       icon: null
     };
   }
@@ -158,7 +163,7 @@ export function statusSummary(
   if (status === "Information only") {
     return {
       label: statusLabel(locale, "Info only"),
-      className: "state--decided",
+      className: "border-[#92dfaa] bg-[#effbf3] text-[#16743b]",
       icon: null
     };
   }
@@ -166,23 +171,18 @@ export function statusSummary(
   if (status === "Routine approval") {
     return {
       label: statusLabel(locale, status),
-      className: "state--decided",
+      className: "border-[#c6cbd8] bg-[#f4f5f8] text-[#4b5367]",
       icon: null
     };
   }
 
   return {
     label: statusLabel(locale, status),
-    className: "state--decided",
+    className: "border-black/15 bg-black/[0.035] text-black/[0.65]",
     icon: null
   };
 }
 
-/**
- * Ochre marks the one thing a reader can still do something about: a meeting
- * that has not happened yet and has a way to comment. Once the meeting is past,
- * the same comment path is history, so it drops to neutral.
- */
 export function commentSummary(
   commentDeadline: CommentDeadlineInfo | null,
   hasCommentOption: boolean,
@@ -194,24 +194,26 @@ export function commentSummary(
   if (!isUpcoming) {
     return {
       label: locale === "es" ? "El plazo de comentarios ya pasó" : "Comment period has passed",
-      className: "state--decided",
-      icon: null
+      className: "border-black/15 bg-black/[0.035] text-black/[0.65]",
+      icon: MessageSquare
     };
   }
 
   if (commentDeadline) {
     return {
       label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value)}`,
-      className: "state--open",
-      icon: null
+      className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
+      icon: Clock
     };
   }
-
-  return {
-    label: locale === "es" ? "Abierto a comentarios" : "Open for comment",
-    className: "state--open",
-    icon: null
-  };
+  if (hasCommentOption) {
+    return {
+      label: locale === "es" ? "Abierto a comentarios" : "Open for comment",
+      className: "border-[#9fc6b2] bg-[#f1fbf4] text-[#24613c]",
+      icon: MessageSquare
+    };
+  }
+  return null;
 }
 
 function jurisdictionLabel(card: SummaryCardRow) {
@@ -279,6 +281,9 @@ export function SummaryCard({
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
   const topicLabel = categoryTags[0] ? categoryLabel(locale, categoryTags[0]) : t(locale, "topicNotListed");
+  const primaryCategory = getPrimaryCategory(card);
+  const categoryDefinition = primaryCategory ? CATEGORY_DEFINITIONS[primaryCategory] : null;
+  const TopicIcon = categoryDefinition?.icon || FileText;
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
   const status = statusSummary(card, locale, outcome);
@@ -293,9 +298,12 @@ export function SummaryCard({
   const summaryConfidence = officialSourceFallback ? null : confidenceLabel(card, locale);
   const createdTimestamp = formatPacificTimestamp(card.created_at);
   const updatedTimestamp = formatPacificTimestamp(card.updated_at);
+  const CommentIcon = comment?.icon;
+  const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card);
   const meetingPageHref = meetingHref(card);
-  const primaryButtonClass = "action-emphasis-sm";
+  const primaryButtonClass = "action-primary-sm font-black";
+  const noCommentLabel = t(locale, "noCommentOptionListed");
   const showSantaBarbaraInterest =
     (card.jurisdiction_slug || meeting?.jurisdiction_slug) ===
     SANTA_BARBARA_INTEREST_JURISDICTION;
@@ -303,64 +311,32 @@ export function SummaryCard({
     card.updated_at,
     outcome?.updated_at
   );
-  const dateParts = meetingDateParts(meeting?.date_text, meeting?.meeting_datetime, locale);
-  // One source of truth for "the reader can still act on this", so the rail tick,
-  // the rail note and the state line can never disagree. Gating only on
-  // commentDeadline previously flagged past items as open.
-  const isOpenForComment = isUpcoming && hasCommentOption && !officialSourceFallback;
-  // The rail tick encodes where this item sits in its lifecycle, so the column
-  // reads at a glance: ochre = you can still act, blue = ahead but no comment
-  // path listed, plain = already happened.
-  const railVariant = isOpenForComment
-    ? "date-rail--open"
-    : isUpcoming
-      ? "date-rail--upcoming"
-      : "";
 
   return (
     <article
-      // Both views use .docket-item so neither clips its own hover disclosure;
-      // the share view only differs in corner radius.
-      className={cn("docket-item", isSharePresentation && "rounded-xl")}
+      className={cn("quiet-card overflow-hidden", isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)]")}
       data-card-id={card.id}
     >
       <div
         className={cn(
-          isSharePresentation
-            ? "grid gap-4 p-6 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-8"
-            : "docket-row"
+          "grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5",
+          isSharePresentation && "p-6 sm:p-8"
         )}
       >
-        {!isSharePresentation ? (
-          <div className={cn("date-rail", railVariant)}>
-            {dateParts ? (
-              <>
-                <span className="rail-month">{dateParts.month}</span>
-                <span className="rail-day">{dateParts.day}</span>
-              </>
-            ) : (
-              <span className="rail-month">—</span>
-            )}
-            {isOpenForComment ? (
-              <span className="rail-note rail-note--open">
-                {locale === "es" ? "Abierto" : "Open"}
-              </span>
-            ) : null}
-          </div>
-        ) : null}
-
         <div className="min-w-0">
-          <p className="committee-eyebrow">
-            <HighlightedText
-              text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
-              query={highlight}
-            />
-            <span aria-hidden className="mx-1.5 text-[color:var(--rule-strong)]">·</span>
-            <HighlightedText text={cardJurisdictionLabel} query={highlight} />
-          </p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
+            <span>
+              <HighlightedText
+                text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
+                query={highlight}
+              />
+            </span>
+            <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
+            <span><HighlightedText text={cardJurisdictionLabel} query={highlight} /></span>
+          </div>
           <TitleTag
             className={cn(
-              "mt-1 line-clamp-3 text-[17px] font-semibold leading-[1.3] tracking-tight text-ink sm:line-clamp-2 sm:text-[18px]",
+              "mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2",
               isSharePresentation &&
                 (officialSourceFallback
                   ? "line-clamp-3 text-3xl sm:line-clamp-3 sm:text-4xl"
@@ -372,48 +348,61 @@ export function SummaryCard({
           {titlePreview && !officialSourceFallback ? (
             <p
               className={cn(
-                "prose-summary mt-1.5 line-clamp-2 max-w-[64ch]",
+                "mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
                 isSharePresentation &&
                   (officialSourceFallback
-                    ? "line-clamp-3 max-w-[70ch] text-[17px] leading-[1.65] sm:line-clamp-3"
-                    : "line-clamp-none max-w-[70ch] text-[17px] leading-[1.65] sm:line-clamp-none")
+                    ? "line-clamp-3 max-w-5xl text-base leading-7 sm:line-clamp-3"
+                    : "line-clamp-none max-w-5xl text-base leading-7 sm:line-clamp-none")
               )}
             >
               <HighlightedText text={titlePreview} query={highlight} />
             </p>
           ) : null}
-          <div className="meta-line mt-2.5">
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
             {fallbackInfo ? (
-              <span className="state state--alert">
-                <HighlightedText text={fallbackInfo.label} query={highlight} />
+              <span className="status-chip border-[#d9a34b] bg-[#fff7e8] text-[#794707]">
+                <Info aria-hidden className="h-3.5 w-3.5" />
+                {fallbackInfo.label}
               </span>
             ) : null}
+            <span
+              className={cn(
+                "status-chip",
+                status.className
+              )}
+            >
+              {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
+              <HighlightedText text={status.label} query={highlight} />
+            </span>
             {comment ? (
-              <span className={cn("state", comment.className)}>
+              <span className={cn("status-chip", comment.className)}>
+                {CommentIcon ? <CommentIcon aria-hidden className="h-3.5 w-3.5" /> : null}
                 <HighlightedText text={comment.label} query={highlight} />
               </span>
-            ) : (
-              <span className={cn("state", status.className)}>
-                <HighlightedText text={status.label} query={highlight} />
+            ) : null}
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
+              <HighlightedText text={compactMeetingDate} query={highlight} />
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                aria-hidden
+                className="icon-badge"
+              >
+                <TopicIcon className="h-3.5 w-3.5" />
               </span>
-            )}
-            <span>
               <HighlightedText text={topicLabel} query={highlight} />
             </span>
-            {isSharePresentation ? (
-              <span>
-                <HighlightedText text={compactMeetingDate} query={highlight} />
+            {!officialSourceFallback && !hasCommentOption ? (
+              <span className="inline-flex items-center gap-1.5 text-black/[0.5]">
+                <MessageSquare aria-hidden className="h-4 w-4" />
+                {noCommentLabel}
               </span>
             ) : null}
           </div>
         </div>
 
-        <div
-          className={cn(
-            "flex flex-wrap items-center gap-2",
-            isSharePresentation ? "sm:justify-end" : "col-start-2 sm:col-start-3 sm:justify-end"
-          )}
-        >
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           {showSantaBarbaraInterest ? (
             <SantaBarbaraInterestButton
               activityAt={interestActivityAt}
@@ -455,14 +444,13 @@ export function SummaryCard({
       {showDetails ? (
         <div
           className={cn(
-            "border-t border-rule bg-paper px-4 py-5 sm:px-5",
-            !isSharePresentation && "sm:pl-[5.25rem]",
+            "border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6",
             isSharePresentation && "px-6 py-7 sm:px-8 sm:py-8"
           )}
         >
           {officialSourceFallback ? (
-            <section className={cn("prose-summary max-w-[70ch]", isSharePresentation && "text-[17px]")}>
-              <p className="label-eyebrow">
+            <section className={cn("max-w-4xl text-sm leading-6 text-black/75", isSharePresentation && "text-base leading-7")}>
+              <p className="text-xs font-black uppercase tracking-wide text-civic">
                 {locale === "es" ? "Texto de la agenda oficial" : "Official agenda text"}
               </p>
               <div className="mt-2 space-y-2">
@@ -472,7 +460,7 @@ export function SummaryCard({
                   </p>
                 ))}
               </div>
-              <p className="mt-3 font-sans text-[12.5px] font-normal text-quiet">
+              <p className="mt-3 text-xs font-medium text-black/50">
                 {locale === "es"
                   ? "Basado en la agenda oficial. SimpleCity no ha resumido ni interpretado este texto."
                   : "Based on the official agenda. SimpleCity has not summarized or interpreted this text."}
@@ -481,31 +469,31 @@ export function SummaryCard({
           ) : (
             <div
               className={cn(
-                "grid gap-6 lg:grid-cols-[1fr_1fr_1.05fr] lg:gap-8",
-                isSharePresentation && "lg:gap-10"
+                "grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]",
+                isSharePresentation && "text-base leading-7 lg:gap-10"
               )}
             >
-              <section className="prose-summary">
-                <p className="label-eyebrow font-sans">{t(locale, "whatIsHappening")}</p>
-                <ul className="mt-2 space-y-1.5">
+              <section>
+                <p className="text-xs font-black uppercase text-civic">{t(locale, "whatIsHappening")}</p>
+                <ul className="mt-2 space-y-2">
                   {points.map((point) => (
                     <li key={point} className="flex gap-2">
-                      <span aria-hidden className="mt-[0.6em] h-1 w-1 shrink-0 rounded-sm bg-[color:var(--rule-strong)]" />
+                      <span aria-hidden className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-civic" />
                       <span><HighlightedText text={point} query={highlight} /></span>
                     </li>
                   ))}
                 </ul>
               </section>
 
-              <section className="prose-summary">
-                <p className="label-eyebrow font-sans">{t(locale, "whyItMatters")}</p>
+              <section>
+                <p className="text-xs font-black uppercase text-black/[0.55]">{t(locale, "whyItMatters")}</p>
                 <p className="mt-2">
                   <HighlightedText
                     text={card.why_it_matters || t(locale, "notListedInSource")}
                     query={highlight}
                   />
                 </p>
-                <p className="label-eyebrow mt-4 font-sans">{t(locale, "whoIsAffected")}</p>
+                <p className="mt-4 text-xs font-black uppercase text-black/[0.55]">{t(locale, "whoIsAffected")}</p>
                 {affectedTags.length > 0 ? (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {affectedTags.map((resident) => (
@@ -519,25 +507,25 @@ export function SummaryCard({
                 )}
               </section>
 
-              <section className="prose-summary">
-                <p className="label-eyebrow font-sans text-open">{t(locale, "howToAct")}</p>
-                <div className="mt-2 grid gap-2.5">
+              <section>
+                <p className="text-xs font-black uppercase text-[#8e452e]">{t(locale, "howToAct")}</p>
+                <div className="mt-2 grid gap-3">
                   <p>
-                    <span className="font-sans text-[13px] font-semibold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
+                    <span className="font-bold text-ink">{locale === "es" ? "Asistir: " : "Attend: "}</span>
                     <HighlightedText
                       text={card.how_to_act_attend || t(locale, "notListedInSource")}
                       query={highlight}
                     />
                   </p>
                   <p>
-                    <span className="font-sans text-[13px] font-semibold text-ink">Email: </span>
+                    <span className="font-bold text-ink">Email: </span>
                     <HighlightedText
                       text={card.how_to_act_email || t(locale, "notListedInSource")}
                       query={highlight}
                     />
                   </p>
                   <p>
-                    <span className="font-sans text-[13px] font-semibold text-ink">{t(locale, "submitComment")}: </span>
+                    <span className="font-bold text-ink">{t(locale, "submitComment")}: </span>
                     <HighlightedText
                       text={card.how_to_act_submit_comment || t(locale, "notListedInSource")}
                       query={highlight}
@@ -548,9 +536,9 @@ export function SummaryCard({
             </div>
           )}
 
-          <div className="mt-5 flex flex-col gap-3 border-t border-rule pt-4 text-[13px] font-normal text-slate sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className="record-value"><HighlightedText text={meetingDate} query={highlight} /></span>
+          <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span><HighlightedText text={meetingDate} query={highlight} /></span>
               {meetingPageHref ? (
                 <PendingLink
                   href={meetingPageHref}
@@ -574,11 +562,13 @@ export function SummaryCard({
                 </a>
               ) : null}
               {summaryConfidence ? (
-                <span className="text-[12.5px] font-normal text-quiet">{summaryConfidence}</span>
+                <span className="meta-chip uppercase tracking-normal text-black/50">
+                  {summaryConfidence}
+                </span>
               ) : null}
             </div>
             {createdTimestamp ? (
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[12px] font-normal text-quiet sm:justify-end sm:text-right">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs font-medium text-black/45 sm:justify-end sm:text-right">
                 <span>
                   {locale === "es" ? "Publicado" : "Posted"}{" "}
                   <HighlightedText text={createdTimestamp} query={highlight} />

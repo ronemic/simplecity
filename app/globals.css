@@ -2,55 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
-  SimpleCity — "the docket"
-
-  The page is organized around the one question a resident brings here: is there
-  still time for me to say something? So time and state are the loudest signals.
-
-  The palette is almost entirely neutral. Only two colors carry meaning:
-
-    brand  the SimpleCity blue — links, buttons, institutional marks
-    open   ochre — a comment window is still open to you
-
-  Ochre is the complement of the brand blue and appears nowhere else, so "you
-  can still act" is the one thing that catches the eye. Hierarchy comes from
-  size and color, never weight: 600 is the top of the weight scale.
-*/
-
 :root {
   color-scheme: light;
-
-  /* Neutrals carry a blue cast so they sit with the brand blue rather than
-     fighting it.
-
-     `paper` is a genuinely tinted ground, not near-white: it means the light
-     surfaces read as bounded panels instead of the page being one white
-     expanse. Panels sit at `surface`, one clear step lighter (1.14:1 — enough
-     to separate, not enough to glare).
-
-     Every text token clears WCAG AA on both grounds, including the tertiary
-     one, which is why it is nowhere near light gray. */
-  --ink: #17202b;
-  --slate: #4a5563;
-  --quiet: #5c6675;
-  --rule: #ccd4de;
-  --rule-strong: #a3aebd;
-  --paper: #e8ecf2;
-  --surface: #f9fafc;
-  --brand: #2457a6;
-  --brand-deep: #1b4381;
-  --brand-tint: #dee8f6;
-  --open: #845010;
-  --open-tint: #f7efdf;
-  --affirm: #276749;
-  --deny: #8c2f21;
-  /* One step deeper than the page so the masthead reads as its own band without
-     going light — the page had no visible separation from it before. */
-  --band: #e0e7f0;
-
-  background: var(--paper);
-  color: var(--ink);
+  background: #f2f5f7;
+  color: #171717;
 }
 
 * {
@@ -64,14 +19,18 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-  background: var(--paper);
-  color: var(--ink);
   font-size: 16px;
-  font-weight: 400;
-  line-height: 1.6;
-  letter-spacing: -0.006em;
+  line-height: 1.65;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(36, 87, 166, 0.1), transparent 32rem),
+    linear-gradient(180deg, #f8fafb 0%, #eef3f6 50%, #f7f8f6 100%);
+  color: #171717;
+}
+
+body::before {
+  display: none;
 }
 
 main {
@@ -97,551 +56,81 @@ h3,
 h4,
 h5,
 h6 {
-  color: var(--ink);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  color: #171717;
+  line-height: 1.08;
 }
 
 p {
-  color: var(--slate);
+  color: rgba(23, 23, 23, 0.84);
 }
 
 ::selection {
   background: rgba(36, 87, 166, 0.18);
 }
 
-/* ---- Focus -------------------------------------------------------------- */
-
 .focus-ring {
-  @apply outline-none ring-2 ring-brand ring-offset-2 ring-offset-paper;
+  @apply outline-none ring-2 ring-civic ring-offset-2 ring-offset-white;
 }
-
-:where(a, button, [role="option"], summary):focus-visible {
-  outline: 2px solid var(--brand);
-  outline-offset: 2px;
-  border-radius: 3px;
-}
-
-/* ---- Structure ---------------------------------------------------------- */
 
 .section-shell {
-  @apply mx-auto w-full max-w-[1120px] px-5 sm:px-6 lg:px-8;
-}
-
-.rule-top {
-  border-top: 1px solid var(--rule);
-}
-
-/* A grouped surface: one panel, hairline-separated rows. For compact rows only —
-   see .docket-item for anything that can expand. */
-.panel {
-  @apply overflow-hidden rounded-lg border border-rule bg-surface;
-}
-
-.panel-rows > * + * {
-  border-top: 1px solid var(--rule);
-}
-
-/* One decision = one bounded panel, stacked with a gap rather than divided by a
-   hairline. A single shared surface reads fine while rows are one line tall, but
-   once a row expands into summary sections and an outcome panel, a 1px divider
-   cannot say where one decision ends and the next begins. This needs no shadow
-   to separate because the page ground is tinted. */
-/* Deliberately NOT overflow-hidden. Clipping the card to its own corners also
-   clipped anything a child needed to open outside it — the interest tooltip was
-   cut off mid-sentence. The bottom corners are kept instead by having whichever
-   section lands last inherit the radius. */
-.docket-item {
-  @apply rounded-lg border border-rule bg-surface;
-}
-
-.docket-item > :last-child {
-  border-end-start-radius: inherit;
-  border-end-end-radius: inherit;
-}
-
-.docket-stack {
-  @apply grid gap-2.5;
+  @apply mx-auto w-full max-w-[1180px] px-4 sm:px-6 lg:px-8;
 }
 
 .quiet-card {
-  @apply rounded-lg border border-rule bg-surface;
+  @apply rounded-lg border border-black/10 bg-white shadow-[0_1px_2px_rgba(23,23,23,0.04),0_12px_34px_rgba(23,23,23,0.025)];
 }
 
 .interactive-card {
-  @apply transition-colors duration-150 hover:border-[color:var(--rule-strong)] hover:bg-[color:var(--brand-tint)];
+  @apply transition duration-200 hover:border-civic/25 hover:bg-[#f7fbff] hover:shadow-[0_18px_50px_rgba(23,23,23,0.08)];
 }
 
-/* ---- Type -------------------------------------------------------------- */
-
 .page-title {
-  @apply text-balance text-[30px] leading-[1.1] tracking-tighter text-ink sm:text-[38px];
+  @apply text-balance text-4xl font-black text-ink sm:text-5xl;
 }
 
 .page-copy {
-  @apply max-w-[62ch] font-prose text-[17px] font-normal leading-[1.65] text-slate;
+  @apply max-w-3xl text-lg leading-8 text-black/80;
 }
 
 .section-title {
-  @apply text-[22px] leading-[1.15] tracking-tight text-ink sm:text-[26px];
+  @apply text-2xl font-black text-ink sm:text-3xl;
 }
 
-.section-intro {
-  @apply mt-2 max-w-[58ch] font-prose text-[15.5px] font-normal leading-[1.6] text-slate;
-}
-
-/* Small caps label. Used sparingly — one per section at most. */
 .label-eyebrow {
-  @apply text-[11.5px] font-semibold uppercase tracking-[0.09em] text-slate;
-}
-
-.committee-eyebrow {
-  color: var(--slate);
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: 0.005em;
-  line-height: 1.3;
-}
-
-/* The plain-language summary — the substance readers came for. */
-.prose-summary {
-  @apply font-prose text-[15.5px] font-normal leading-[1.6] text-slate;
-}
-
-/* Values transcribed from an official record: dates, vote counts, identifiers. */
-.record-value {
-  @apply text-[12.5px] font-medium tabular-nums text-slate;
-}
-
-/* ---- The date + state rail (signature element) -------------------------- */
-
-.docket-row {
-  @apply grid gap-x-4 gap-y-3 bg-surface px-4 py-4 transition-colors duration-150 sm:px-5;
-  grid-template-columns: 3.25rem minmax(0, 1fr);
-}
-
-@media (min-width: 640px) {
-  .docket-row {
-    grid-template-columns: 4rem minmax(0, 1fr) auto;
-    align-items: start;
-  }
-}
-
-.docket-row:hover {
-  background: #f2f5f9;
-}
-
-.date-rail {
-  @apply flex flex-col items-start gap-0.5 self-stretch pl-3;
-  border-left: 3px solid var(--rule-strong);
-}
-
-.date-rail--open {
-  border-left-color: var(--open);
-}
-
-.date-rail--upcoming {
-  border-left-color: var(--brand);
-}
-
-.rail-month {
-  @apply text-[10.5px] font-semibold uppercase leading-none tracking-[0.1em] text-slate;
-}
-
-.rail-day {
-  @apply mt-1 text-[22px] font-semibold leading-none tracking-[-0.03em] text-ink tabular-nums;
-}
-
-.rail-note {
-  @apply mt-1.5 text-[10px] font-semibold uppercase leading-tight tracking-[0.07em] text-quiet;
-}
-
-.rail-note--open {
-  color: var(--open);
-}
-
-/* The masthead's live figures, carried by the same state markers as the rows
-   below so a marker color means one thing across the whole page. */
-.masthead-status {
-  @apply flex flex-wrap items-center gap-x-5 gap-y-2;
-}
-
-.masthead-status .state {
-  @apply text-[15px] font-semibold;
-}
-
-/* ---- State, expressed as text with a marker rather than a colored pill --- */
-
-.state {
-  @apply inline-flex items-center gap-1.5 text-[13px] font-medium leading-5 text-slate;
-}
-
-.state::before {
-  content: "";
-  width: 6px;
-  height: 6px;
-  flex-shrink: 0;
-  border-radius: 1px;
-  background: var(--quiet);
-}
-
-.state--open {
-  color: var(--open);
-  font-weight: 600;
-}
-
-.state--open::before {
-  background: var(--open);
-}
-
-.state--upcoming {
-  color: var(--brand);
-  font-weight: 600;
-}
-
-.state--upcoming::before {
-  background: var(--brand);
-}
-
-.state--decided::before {
-  background: var(--rule-strong);
-}
-
-/* A settled, affirmative result — "Passed", "Approved". Distinct from
-   state--upcoming because it is history, not something still to come. */
-.state--affirm {
-  color: var(--affirm);
-  font-weight: 600;
-}
-
-.state--affirm::before {
-  background: var(--affirm);
-}
-
-.state--alert {
-  color: #8c2f21;
-  font-weight: 600;
-}
-
-.state--alert::before {
-  background: #8c2f21;
-}
-
-.meta-line {
-  @apply flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] font-normal leading-5 text-slate;
-}
-
-.meta-sep {
-  @apply text-[color:var(--rule-strong)];
-}
-
-/* ---- Inputs ------------------------------------------------------------- */
-
-.input-control {
-  @apply min-h-11 w-full rounded border border-rule bg-surface px-3.5 py-2.5 text-[15px] font-normal text-ink transition placeholder:text-quiet hover:border-[color:var(--rule-strong)] focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/25;
-}
-
-.input-control--textarea {
-  @apply min-h-28 py-3;
-}
-
-.input-control--with-icon {
-  padding-left: 2.5rem;
-}
-
-.input-control--search {
-  appearance: none;
-  padding-left: 2.5rem;
-  padding-right: 2.75rem;
-}
-
-.input-control--search::-webkit-search-cancel-button,
-.input-control--search::-webkit-search-decoration {
-  appearance: none;
-}
-
-.input-control--hero-search {
-  min-height: 2.75rem;
-}
-
-/* ---- Actions ------------------------------------------------------------ */
-
-.action-primary {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded border border-brand bg-brand px-4 py-2.5 text-[14px] font-semibold text-white transition-colors hover:border-brand-deep hover:bg-brand-deep focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45;
-}
-
-/* An emphasized action that is still outlined rather than filled.
-   Deliberately NOT named "primary": it exists for actions repeated once per
-   docket row, where a solid button on every row out-shouts the decision titles
-   beside it. A page-level primary action should use .action-primary. */
-.action-emphasis-sm {
-  @apply inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-[color:var(--rule-strong)] bg-surface px-3 py-1.5 text-[13px] font-semibold text-brand transition-colors hover:border-brand hover:bg-brand-tint focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45;
-}
-
-.action-secondary {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded border border-rule bg-surface px-4 py-2.5 text-[14px] font-medium text-ink transition-colors hover:border-[color:var(--rule-strong)] hover:bg-[color:var(--brand-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-secondary-sm {
-  @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-rule bg-surface px-3 py-2 text-[13.5px] font-medium text-ink transition-colors hover:border-[color:var(--rule-strong)] hover:bg-[color:var(--brand-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-secondary-xs {
-  @apply inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-rule bg-surface px-2.5 py-1.5 text-[13px] font-medium text-ink transition-colors hover:border-[color:var(--rule-strong)] hover:bg-[color:var(--brand-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-civic-sm {
-  @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-brand/25 bg-[color:var(--brand-tint)] px-3 py-2 text-[13.5px] font-semibold text-brand transition-colors hover:bg-[#dfe9e2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-civic-xs {
-  @apply inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-brand/25 bg-[color:var(--brand-tint)] px-2.5 py-1 text-[13px] font-semibold text-brand transition-colors hover:bg-[#dfe9e2] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-row-sm {
-  @apply inline-flex min-h-10 w-full items-center justify-between gap-2 rounded border border-rule bg-surface px-3 py-2 text-[13.5px] font-medium text-slate transition-colors hover:border-[color:var(--rule-strong)] hover:bg-[color:var(--brand-tint)] hover:text-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-tertiary {
-  @apply inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded px-3 py-2.5 text-[14px] font-medium text-slate transition-colors hover:bg-[color:var(--brand-tint)] hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-ghost {
-  @apply inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded px-2.5 py-2 text-[13.5px] font-medium text-slate transition-colors hover:bg-[color:var(--brand-tint)] hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-link {
-  @apply inline-flex items-center gap-1.5 text-[14px] font-semibold text-brand underline decoration-brand/25 underline-offset-4 transition-colors hover:decoration-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.action-disabled-sm {
-  @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-rule bg-paper px-3 py-2 text-[13.5px] font-medium text-quiet;
-}
-
-/* ---- Small ornaments --------------------------------------------------- */
-
-.icon-tile,
-.icon-tile-sm,
-.icon-tile-lg {
-  @apply flex shrink-0 items-center justify-center rounded text-brand;
-}
-
-.icon-tile {
-  @apply h-9 w-9;
-}
-
-.icon-tile-sm {
-  @apply h-8 w-8;
-}
-
-.icon-tile-lg {
-  @apply h-10 w-10;
-}
-
-.icon-badge {
-  @apply flex h-4 w-4 shrink-0 items-center justify-center text-quiet;
-}
-
-.chip {
-  @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-rule bg-surface px-2.5 py-1 text-[12.5px] font-medium text-slate;
-}
-
-.chip-action {
-  @apply transition-colors hover:border-[color:var(--rule-strong)] hover:bg-[color:var(--brand-tint)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.chip-compact {
-  @apply px-2 py-0.5 text-[12px];
-}
-
-.chip-lg {
-  @apply min-h-9 px-3 py-1.5 text-[13.5px];
-}
-
-.chip-selected {
-  @apply border-brand bg-brand text-white;
-}
-
-.chip-action.chip-selected {
-  @apply hover:bg-brand-deep hover:text-white;
-}
-
-.meta-chip {
-  @apply inline-flex items-center rounded border border-rule bg-surface px-2 py-0.5 text-[12.5px] font-medium text-slate;
-}
-
-.count-badge {
-  @apply record-value inline-flex items-center text-slate;
-}
-
-/* ---- Menus and selects ------------------------------------------------- */
-
-.menu-trigger {
-  @apply flex min-h-10 w-full items-center justify-between gap-2 rounded border border-rule bg-surface px-3 py-2 text-left text-[13.5px] font-medium text-ink transition-colors hover:border-[color:var(--rule-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.select-trigger {
-  @apply flex min-h-11 w-full items-center justify-between gap-2 rounded border border-rule bg-surface px-3.5 py-2.5 text-left text-[15px] font-normal text-ink transition-colors hover:border-[color:var(--rule-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.select-trigger-compact {
-  @apply flex min-h-9 w-full items-center justify-between gap-2 rounded border border-rule bg-surface px-2.5 py-1.5 text-left text-[13px] font-medium text-ink transition-colors hover:border-[color:var(--rule-strong)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.menu-popover {
-  @apply absolute left-0 top-full z-50 mt-1.5 w-full overflow-hidden rounded-lg border border-[color:var(--rule-strong)] bg-surface py-1 shadow-[0_8px_24px_rgba(22,32,28,0.10)];
-}
-
-.menu-option {
-  @apply grid min-h-10 w-full grid-cols-[1rem_1fr] items-center gap-2 px-3 py-2 text-left text-[13.5px] font-medium text-ink transition-colors hover:bg-[color:var(--brand-tint)] focus-visible:bg-[color:var(--brand-tint)];
-}
-
-.menu-option-child {
-  @apply pl-5 font-normal text-slate;
-}
-
-.menu-section-label {
-  @apply mx-3 mt-1 border-t border-rule px-0.5 pb-1 pt-2 text-[10.5px] font-semibold uppercase tracking-[0.09em] text-quiet;
-}
-
-.menu-option-selected {
-  @apply bg-brand text-white hover:bg-brand focus-visible:bg-brand;
-}
-
-.segmented-control {
-  @apply inline-flex rounded border border-rule bg-surface p-0.5;
-}
-
-.segmented-button {
-  @apply inline-flex min-h-9 items-center gap-2 rounded px-3 py-1.5 text-[13.5px] font-medium capitalize text-slate transition-colors hover:bg-[color:var(--brand-tint)] hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
-}
-
-.segmented-button-selected {
-  @apply bg-brand text-white hover:bg-brand hover:text-white;
-}
-
-/* ---- Masthead ---------------------------------------------------------- */
-
-/* No panel behind the search: the field is the only chrome, and a white card
-   floating inside the band read as a template header. The band itself is dark
-   (below), which is what separates the masthead from the docket. */
-/* The masthead is the one dark band on the page: a navy ground with a warm-lit
-   corner, so the headline reads as a front page rather than as the first row of
-   the docket. Everything below it stays on paper. */
-.civic-hero {
-  position: relative;
-  isolation: isolate;
-  background:
-    radial-gradient(115% 95% at 76% -10%, rgba(64, 118, 198, 0.34), transparent 62%),
-    linear-gradient(165deg, #17263f 0%, #101d31 48%, #0a1523 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  color: #eef3f9;
-}
-
-/* A faint survey grid — a hair of texture so the band is not a flat fill. */
-.civic-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: radial-gradient(105% 90% at 70% 0%, #000 0%, transparent 72%);
-  pointer-events: none;
-}
-
-/* The type in the band. The palette tokens are light-ground values and the
-   Tailwind color scale is literal hex, so the band restates its own colors
-   rather than trying to re-point either one. */
-.civic-hero .page-title,
-.civic-hero h1 {
-  color: #f7fafd;
-}
-
-.civic-hero .page-copy,
-.civic-hero p {
-  color: #b7c6da;
-}
-
-.civic-hero .label-eyebrow {
-  color: #8fb4e6;
-}
-
-/* The state colors lifted onto the navy ground: the ochre and blue of the light
-   palette go muddy here, so the band carries its own tints of the same two. */
-.civic-hero .state--open {
-  color: #e8b566;
-}
-
-.civic-hero .state--open::before {
-  background: #e8b566;
-}
-
-.civic-hero .state--upcoming {
-  color: #9ec2f4;
-}
-
-.civic-hero .state--upcoming::before {
-  background: #9ec2f4;
-}
-
-.civic-hero .state--decided {
-  color: #a9bad0;
-}
-
-.civic-hero .state--decided::before {
-  background: #a9bad0;
-}
-
-.civic-hero .masthead-credit {
-  color: #c3d2e4;
-  text-decoration-color: rgba(255, 255, 255, 0.34);
-}
-
-.civic-hero .masthead-credit:hover {
-  color: #ffffff;
-  text-decoration-color: #9ec2f4;
-}
-
-.civic-hero .text-slate,
-.civic-hero .text-quiet {
-  color: #a9bad0;
-}
-
-.civic-hero .action-link,
-.civic-hero a.text-slate:hover {
-  color: #9ec2f4;
-}
-
-.civic-hero .border-rule {
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.civic-hero .decoration-rule {
-  text-decoration-color: rgba(255, 255, 255, 0.3);
-}
-
-/* The search field keeps its light ground: it is an input, and inverting it
-   would cost the affordance the band is meant to frame. */
-.civic-hero .input-control {
-  border-color: rgba(255, 255, 255, 0.28);
-}
-
-/* The field is the only chrome here; the shortcuts hang off it with a rule. */
-.search-panel {
-  @apply w-full;
+  @apply text-xs font-bold uppercase text-black/[0.65];
 }
 
 .status-dot-pulse {
+  position: relative;
   display: inline-flex;
-  width: 6px;
-  height: 6px;
+  width: 0.625rem;
+  height: 0.625rem;
   flex-shrink: 0;
-  border-radius: 1px;
-  background: var(--open);
+  border-radius: 9999px;
+  background: #2f65e8;
+  box-shadow: 0 0 0 0 rgba(47, 101, 232, 0.42);
+}
+
+.status-dot-pulse::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(47, 101, 232, 0.34);
+  animation: status-dot-ripple 2.2s ease-out infinite;
+}
+
+@keyframes status-dot-ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(3.15);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -657,4 +146,233 @@ p {
     scroll-behavior: auto !important;
     transition-duration: 0.01ms !important;
   }
+
+  .status-dot-pulse::before {
+    animation: none;
+  }
+}
+
+.committee-eyebrow {
+  color: rgba(23, 23, 23, 0.52);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.input-control {
+  @apply min-h-12 w-full rounded-lg border border-black/20 bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm transition placeholder:text-black/50 hover:border-black/30 focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/20;
+}
+
+.input-control--textarea {
+  @apply min-h-28 py-3;
+}
+
+.input-control--with-icon {
+  padding-left: 3rem;
+}
+
+.input-control--search {
+  appearance: none;
+  padding-left: 3rem;
+  padding-right: 3rem;
+}
+
+.input-control--search::-webkit-search-cancel-button,
+.input-control--search::-webkit-search-decoration {
+  appearance: none;
+}
+
+.input-control--hero-search {
+  height: 40px;
+  min-height: 40px;
+  padding-bottom: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.action-primary {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-civic px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4d92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.action-primary-sm {
+  @apply inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-civic px-3.5 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-[#1d4d92] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px disabled:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.action-secondary {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border border-black/15 bg-white px-5 py-3 text-sm font-semibold text-ink shadow-sm transition hover:border-civic/25 hover:bg-[#f7fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px;
+}
+
+.action-secondary-sm {
+  @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-sm transition hover:border-civic/25 hover:bg-[#f7fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px;
+}
+
+.action-secondary-xs {
+  @apply inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-black/15 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-sm transition hover:border-civic/25 hover:bg-[#f7fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px;
+}
+
+.action-civic-sm {
+  @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-civic/20 bg-[#eef5ff] px-3 py-2 text-sm font-black text-civic shadow-sm transition hover:bg-[#e0edff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px;
+}
+
+.action-civic-xs {
+  @apply inline-flex min-h-8 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-civic/20 bg-[#eef5ff] px-2.5 py-1 text-sm font-black text-civic shadow-sm transition hover:bg-[#e0edff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px;
+}
+
+.action-row-sm {
+  @apply inline-flex min-h-10 w-full items-center justify-between gap-2 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/65 shadow-sm transition hover:border-civic/25 hover:bg-[#f7fbff] hover:text-civic focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.action-tertiary {
+  @apply inline-flex min-h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-3 text-sm font-semibold text-black/[0.65] transition hover:bg-black/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white active:translate-y-px;
+}
+
+.action-ghost {
+  @apply inline-flex min-h-10 items-center justify-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.action-link {
+  @apply inline-flex min-h-10 items-center gap-1.5 rounded-md px-2 py-1 text-sm font-bold text-civic transition hover:bg-civic/5 hover:text-[#12365f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.action-disabled-sm {
+  @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/35 shadow-sm;
+}
+
+.icon-tile {
+  @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] shadow-[inset_0_0_0_1px_rgba(36,87,166,0.06)];
+}
+
+.icon-tile-sm {
+  @apply flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] shadow-[inset_0_0_0_1px_rgba(36,87,166,0.06)];
+}
+
+.icon-tile-lg {
+  @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] shadow-[inset_0_0_0_1px_rgba(36,87,166,0.06)];
+}
+
+.icon-badge {
+  @apply flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#eef3f6] text-[#12365f];
+}
+
+.chip {
+  @apply inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-black/15 bg-white px-3 py-1 text-xs font-bold text-black/70 shadow-sm;
+}
+
+.chip-action {
+  @apply transition hover:bg-black/[0.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.chip-compact {
+  @apply px-2.5 py-1 text-xs;
+}
+
+.chip-lg {
+  @apply min-h-9 px-3.5 py-1.5 text-sm;
+}
+
+.chip-selected {
+  @apply border-civic/35 bg-civic/10 text-civic;
+}
+
+.chip-action.chip-selected {
+  @apply hover:bg-civic/15;
+}
+
+.meta-chip {
+  @apply inline-flex items-center rounded-md border border-black/10 bg-white px-2.5 py-1 text-xs font-semibold text-black/70 shadow-sm;
+}
+
+.count-badge {
+  @apply inline-flex items-center rounded-md border border-civic/20 bg-white px-3 py-2 text-sm font-bold text-civic shadow-sm;
+}
+
+.status-chip {
+  @apply inline-flex min-h-8 items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-black shadow-sm;
+}
+
+.status-pill {
+  @apply inline-flex items-center rounded-full border px-3 py-1 text-xs font-bold shadow-sm;
+}
+
+.menu-trigger {
+  @apply flex min-h-11 w-full items-center justify-between gap-2 rounded-lg border border-black/15 bg-white/[0.88] px-3 py-2 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.select-trigger {
+  @apply flex min-h-12 w-full items-center justify-between gap-2 rounded-lg border border-black/20 bg-white px-4 py-3 text-left text-base font-semibold text-ink shadow-sm transition hover:border-civic/30 hover:bg-[#f7fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.select-trigger-compact {
+  @apply flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-black/15 bg-[#f8fafb] px-2.5 py-1.5 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.menu-popover {
+  @apply absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-black/15 bg-white py-1 shadow-[0_18px_46px_rgba(12,24,40,0.14)];
+}
+
+.menu-option {
+  @apply grid min-h-10 w-full grid-cols-[1.25rem_1fr] items-center gap-2 px-3 py-2 text-left text-sm font-bold text-ink transition hover:bg-[#eef4f8] focus-visible:bg-[#eef4f8];
+}
+
+.menu-option-child {
+  @apply pl-6 font-semibold;
+}
+
+.menu-section-label {
+  @apply mx-3 mt-1 border-t border-black/10 px-1 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[0.08em] text-black/45;
+}
+
+.menu-option-selected {
+  @apply bg-[#12365f] text-white hover:bg-[#12365f] focus-visible:bg-[#12365f];
+}
+
+.segmented-control {
+  @apply inline-flex rounded-lg border border-black/10 bg-white p-1 shadow-[0_1px_2px_rgba(23,23,23,0.04)];
+}
+
+.segmented-button {
+  @apply inline-flex min-h-10 items-center gap-2 rounded-md px-3 py-2 text-sm font-black capitalize text-black/65 transition hover:bg-black/[0.04] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.segmented-button-selected {
+  @apply bg-civic text-white shadow-sm hover:bg-civic hover:text-white;
+}
+
+.civic-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(85, 139, 205, 0.34), transparent 26rem),
+    radial-gradient(circle at 84% 0%, rgba(35, 114, 119, 0.2), transparent 24rem),
+    linear-gradient(135deg, #0d1828 0%, #142234 48%, #0a111d 100%);
+  color: #f7f3ea;
+}
+
+.civic-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0,
+      transparent 32px,
+      rgba(255, 255, 255, 0.035) 33px,
+      transparent 34px
+    );
+  background-size: 72px 72px, 72px 72px, 100% 34px;
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.8), transparent 88%);
+  opacity: 0.75;
+}
+
+.civic-hero::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
 }

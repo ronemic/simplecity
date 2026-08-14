@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
 import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
@@ -26,7 +26,7 @@ import {
   publicAgendaTitle,
   selectDiverseCards
 } from "@/lib/utils/civicPriority";
-import { displayMeetingTitle } from "@/lib/utils/meetingDisplay";
+import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 import {
   formatDisplayDate,
   isMeetingInProgress,
@@ -90,14 +90,6 @@ type MeetingPreviewCard = SummaryCardRow & {
   meetings: NonNullable<SummaryCardRow["meetings"]>;
 };
 
-/**
- * Meetings a reader could still attend, soonest first.
- *
- * Timing comes from the parsed date, not the scraped `status` — that column
- * still says "Upcoming" for meetings months past. Cancellation is the one thing
- * `status` is trusted for, since a cancelled meeting is not attendable no matter
- * what its date says.
- */
 function getMeetingPreviewCards(cards: SummaryCardRow[]) {
   const seen = new Set<string>();
   const meetings: MeetingPreviewCard[] = [];
@@ -171,9 +163,6 @@ export default async function Home({
     4
   );
   const visibleCards = hasSearch ? prioritizedCards : decisionCards;
-  // Both figures come from a query over every published card, not from the
-  // preview above — the preview is a bounded pool for ranking, so counting inside
-  // it would report whatever happened to fall in the window.
   const { openForCommentCount, nextMeetingIso } = upcomingSnapshot;
   const meetingPreviewCards = getMeetingPreviewCards(
     publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards
@@ -186,6 +175,31 @@ export default async function Home({
       : locale === "es"
         ? `Reuniones públicas de ${jurisdictionLabel}`
         : `${jurisdictionLabel} public meetings`;
+  const nextMeetingParts = meetingDateParts(null, nextMeetingIso, locale);
+  const nextMeetingUnderway = isMeetingInProgress(null, nextMeetingIso);
+  const nextMeetingTime = meetingClockTime(nextMeetingIso, locale);
+  const summaryItems = [
+    openForCommentCount > 0
+      ? locale === "es"
+        ? pluralize(openForCommentCount, "decisión está abierta a comentarios", "decisiones están abiertas a comentarios")
+        : pluralize(openForCommentCount, "decision is open for comment", "decisions are open for comment")
+      : null,
+    nextMeetingParts
+      ? nextMeetingUnderway
+        ? locale === "es"
+          ? "Reunión en curso ahora"
+          : "Meeting in session now"
+        : `${locale === "es" ? "Próxima reunión " : "Next meeting "}${nextMeetingParts.month} ${nextMeetingParts.day}${
+            nextMeetingTime ? `, ${nextMeetingTime}` : ""
+          }`
+      : null
+  ].filter(Boolean);
+  const summarySentence =
+    summaryItems.length > 0
+      ? summaryItems.join(" · ")
+      : locale === "es"
+        ? `${pluralize(availableCardCount, "decisión publicada", "decisiones publicadas")} disponibles`
+        : `${pluralize(availableCardCount, "published decision", "published decisions")} available`;
   const decisionSectionTitle =
     hasSearch
       ? locale === "es"
@@ -196,92 +210,59 @@ export default async function Home({
         : "Decisions that may affect daily life";
   const decisionSectionDescription = hasSearch
     ? locale === "es"
-      ? `Decisiones que coinciden en ${jurisdictionLabel}, con las votaciones próximas primero.`
-      : `Matching decisions in ${jurisdictionLabel}, with upcoming votes first.`
+      ? "Decisiones coincidentes de la jurisdicción seleccionada, con elementos más recientes y de mayor impacto primero."
+      : "Matching decisions from the currently selected jurisdiction, with newer, higher-impact items ranked first."
     : locale === "es"
-      ? "Primero las próximas votaciones, luego las decisiones recientes que más afectan la vida diaria. Lo que aún acepta comentarios está marcado."
-      : "Upcoming votes first, then the recent decisions most likely to change daily life. Anything still open to comment is marked.";
-  // The soonest meeting on the docket — the masthead leads with it because "when
-  // can I show up?" is the question that brings people here.
-  const nextMeetingParts = meetingDateParts(null, nextMeetingIso, locale);
-  const nextMeetingUnderway = isMeetingInProgress(null, nextMeetingIso);
-  // Omitted rather than guessed when the scrape gave us only a date: "show up
-  // Aug 14" is useful, "show up Aug 14 at 12:00 AM" is worse than silence.
-  const nextMeetingTime = meetingClockTime(nextMeetingIso, locale);
+      ? "Ordenado para mostrar primero decisiones próximas, luego elementos recientes de alto impacto como presupuestos, vivienda, seguridad, transporte, servicios, audiencias públicas, contratos y tarifas antes que elementos ceremoniales o de proceso interno."
+      : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
 
   return (
-    <div>
+    <div className="overflow-hidden">
       <section className="civic-hero">
         <div
-          className={`section-shell grid gap-x-10 gap-y-6 ${
-            hasSearch ? "py-7" : "py-8 sm:py-10 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end"
+          className={`section-shell relative z-10 grid gap-7 ${
+            hasSearch ? "py-7 sm:py-8" : "py-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-end lg:py-14"
           }`}
         >
-          <div className="max-w-[34ch]">
-            <p className="label-eyebrow">{introLabel}</p>
-            <h1 className="page-title mt-2.5">
-              {locale === "es"
-                ? "Mira qué está decidiendo tu gobierno local."
-                : "See what your local government is deciding."}
-            </h1>
-            <p className="page-copy mt-3.5 max-w-[46ch]">
-              {locale === "es"
-                ? "Resúmenes en lenguaje claro, con enlace a la fuente oficial, y las formas de opinar antes de la votación."
-                : "Plain-language summaries linked to the official record, and the ways to weigh in before the vote."}
-            </p>
-
-            {/* The live state of the docket. Same state vocabulary as the rows
-                below, so the marker colors mean one thing across the page. */}
-            <div className="masthead-status mt-5">
-              {openForCommentCount > 0 ? (
-                <span className="state state--open">
-                  {locale === "es"
-                    ? pluralize(
-                        openForCommentCount,
-                        "decisión abierta a comentarios",
-                        "decisiones abiertas a comentarios"
-                      )
-                    : `${openForCommentCount} ${openForCommentCount === 1 ? "decision is" : "decisions are"} open for comment`}
-                </span>
-              ) : null}
-              {nextMeetingParts ? (
-                <span className={nextMeetingUnderway ? "state state--open" : "state state--upcoming"}>
-                  {nextMeetingUnderway
-                    ? locale === "es"
-                      ? "Reunión en curso ahora"
-                      : "Meeting in session now"
-                    : `${locale === "es" ? "Próxima reunión " : "Next meeting "}${nextMeetingParts.month} ${nextMeetingParts.day}${
-                        nextMeetingTime ? `, ${nextMeetingTime}` : ""
-                      }`}
-                </span>
-              ) : (
-                // Said plainly rather than left blank: an empty status area reads
-                // as broken, and "none posted" is a real answer for a jurisdiction
-                // whose next agenda has not been published yet.
-                <span className="state state--decided">
-                  {locale === "es" ? "Ninguna reunión programada aún" : "No upcoming meetings posted yet"}
-                </span>
-              )}
-            </div>
-
-            {/* Sits with the intro rather than beside the search box: it is part
-                of who we are, not a way to find a decision. */}
+          <div className="max-w-2xl">
             {!hasSearch ? (
               <a
                 href={FEATURE_ARTICLE_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="masthead-credit mt-5 inline-flex items-center gap-1.5 text-[13px] font-medium underline underline-offset-4 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-sm text-sm font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
               >
-                {locale === "es"
-                  ? "Presentado en el Los Altos Town Crier"
-                  : "Featured in the Los Altos Town Crier"}
-                <ExternalLink aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  {locale === "es"
+                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
+                    : "Read about SimpleCity in the Los Altos Town Crier"}
+                </span>
+                <ArrowRight
+                  aria-hidden
+                  className="h-4 w-4 shrink-0 text-[#9fc4f4] transition-transform group-hover:translate-x-0.5"
+                />
               </a>
             ) : null}
+            <p className="text-sm font-black uppercase text-[#9fc4f4]">
+              {introLabel}
+            </p>
+            <h1 className="mt-4 text-balance text-[36px] font-black leading-[1.02] text-[#fffaf0] sm:text-[52px] lg:text-[56px]">
+              {locale === "es"
+                ? "Mira qué está decidiendo tu gobierno local."
+                : "See what your local government is deciding."}
+            </h1>
+            <p className="mt-4 max-w-2xl text-balance text-base font-medium leading-7 text-[#d9e2ec] sm:mt-5 sm:text-xl sm:leading-8">
+              {locale === "es"
+                ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
+                : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
+            </p>
+            <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>
           </div>
 
-          <div className="lg:w-[440px] lg:justify-self-end">
+          <div className="rounded-[12px] border border-white/15 bg-[#0c1726]/70 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur sm:p-5 lg:justify-self-stretch">
+            <p className="mb-3 text-xs font-black uppercase text-[#9fc4f4]">
+              {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
+            </p>
             <SearchAndFilters
               action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
               resultCount={filteredCards.length}
@@ -305,13 +286,18 @@ export default async function Home({
         }`}
       >
         <div id="search-results" className="scroll-mt-24">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
-            <div>
-              <h2 className="section-title">{decisionSectionTitle}</h2>
-              <p className="section-intro">{decisionSectionDescription}</p>
+          <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-2xl">
+              <p className="label-eyebrow text-civic">
+                {hasSearch ? t(locale, "searchResults") : t(locale, "topPublicDecisions")}
+              </p>
+              <h2 className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
+                {decisionSectionTitle}
+              </h2>
+              <p className="mt-2 text-base leading-7 text-black/[0.68]">{decisionSectionDescription}</p>
             </div>
             {hasSearch ? (
-              <p className="count-badge shrink-0">
+              <p className="count-badge">
                 {filteredCards.length === 1
                   ? locale === "es"
                     ? "1 decisión coincidente"
@@ -320,128 +306,114 @@ export default async function Home({
                     ? `${filteredCards.length} decisiones coincidentes`
                     : `${filteredCards.length} matching decisions`}
               </p>
-            ) : null}
+            ) : (
+              <p className="max-w-sm text-sm font-semibold leading-6 text-black/60 sm:text-right">
+                {summarySentence}
+              </p>
+            )}
           </div>
         </div>
-        {filteredCards.length > 0 ? (
-          <div className="docket-stack">
-            {visibleCards.map((card) => (
-              <SummaryCard key={card.id} card={card} locale={locale} expandOnOutcome={false} />
-            ))}
-          </div>
-        ) : (
-          <div className="quiet-card px-6 py-10 text-center">
-            <h3 className="text-[17px] font-semibold text-ink">
-              {hasSearch ? t(locale, "noMatchingDecisions") : t(locale, "noCardsYet")}
-            </h3>
-            <p className="prose-summary mx-auto mt-2 max-w-[52ch]">
-              {hasSearch
-                ? t(locale, "trySearching")
-                : locale === "es"
-                  ? `Todavía no hay decisiones publicadas de ${jurisdictionLabel}. Prueba otra jurisdicción en el menú de arriba.`
-                  : `No published decisions for ${jurisdictionLabel} yet. Try another jurisdiction from the menu above.`}
-            </p>
-          </div>
-        )}
+        <div className="grid gap-3">
+          {visibleCards.map((card) => (
+            <SummaryCard key={card.id} card={card} locale={locale} expandOnOutcome={false} />
+          ))}
+          {filteredCards.length === 0 ? (
+            <div className="quiet-card p-8 text-center">
+              <h3 className="text-lg font-semibold text-ink">
+                {hasSearch ? t(locale, "noMatchingDecisions") : t(locale, "noCardsYet")}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-black/70">
+                {hasSearch
+                  ? t(locale, "trySearching")
+                  : locale === "es"
+                    ? `Cuando se ejecuten el recopilador y el resumidor, aparecerán aquí tarjetas oficiales de agenda de ${jurisdictionLabel}.`
+                    : `Once the scraper and summarizer run, official ${jurisdictionLabel} agenda cards will appear here.`}
+              </p>
+            </div>
+          ) : null}
+        </div>
         {!hasSearch && availableCardCount > 4 ? (
-          <Link href="/decisions" className="action-link mt-5">
+          <Link
+            href="/decisions"
+            className="action-link mt-4 font-black underline-offset-4 hover:underline"
+          >
             {t(locale, "viewAllDecisions")}
-            <ArrowRight aria-hidden className="h-3.5 w-3.5" />
+            <ArrowRight aria-hidden className="h-4 w-4" />
           </Link>
         ) : null}
       </section>
 
       {meetingPreviewCards.length > 0 ? (
-        <section className="section-shell rule-top py-9">
-          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-baseline sm:justify-between">
+        <section className="section-shell pb-8 pt-2">
+          <div className="grid gap-5 border-y border-black/10 py-7 lg:grid-cols-[0.72fr_1fr] lg:items-start">
             <div>
-              <h2 className="section-title">
-                {locale === "es" ? "Próximas reuniones públicas" : "Upcoming public meetings"}
+              <p className="label-eyebrow text-civic">{t(locale, "upcomingMeetings")}</p>
+              <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">
+                {locale === "es" ? "Reuniones relacionadas con las decisiones principales" : "Meetings tied to the top decisions"}
               </h2>
-              <p className="section-intro">
+              <p className="mt-3 max-w-md text-base leading-7 text-black/[0.68]">
                 {locale === "es"
-                  ? "Dónde se deciden los puntos anteriores. Todas están abiertas al público."
-                  : "Where the items above get decided. All are open to the public."}
+                  ? "Próximas reuniones conectadas con las tarjetas de mayor impacto que se muestran primero."
+                  : "Upcoming meetings connected to the higher-impact cards shown first."}
               </p>
+              <Link
+                href="/meetings"
+                className="action-link mt-4 font-black underline-offset-4 hover:underline"
+              >
+                {t(locale, "viewAllMeetings")}
+                <ArrowRight aria-hidden className="h-4 w-4" />
+              </Link>
             </div>
-            <Link href="/meetings" className="action-link shrink-0">
-              {t(locale, "viewAllMeetings")}
-              <ArrowRight aria-hidden className="h-3.5 w-3.5" />
-            </Link>
-          </div>
 
-          <div className="docket-stack">
-            {meetingPreviewCards.map((card) => {
-              const meeting = card.meetings;
-              const parts = meetingDateParts(
-                meeting.date_text,
-                meeting.meeting_datetime,
-                locale
-              );
+            <div className="divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white">
+              {meetingPreviewCards.map((card) => {
+                const meeting = card.meetings;
 
-              return (
-                <article key={meeting.id} className="docket-item docket-row">
-                  <div className="date-rail date-rail--upcoming">
-                    {parts ? (
-                      <>
-                        <span className="rail-month">{parts.month}</span>
-                        <span className="rail-day">{parts.day}</span>
-                      </>
-                    ) : (
-                      <span className="rail-month">—</span>
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="committee-eyebrow">
-                      {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
-                    </p>
-                    <h3 className="mt-1 line-clamp-2 text-[17px] font-semibold leading-[1.3] tracking-tight text-ink">
-                      {displayMeetingTitle(
-                        meeting,
-                        locale === "es" ? "Reunión no indicada" : "Meeting not listed",
-                        locale
-                      )}
-                    </h3>
-                    <p className="meta-line mt-2">
-                      <span className="record-value">
-                        {formatDisplayDate(
-                          meeting.date_text,
-                          meeting.meeting_datetime,
-                          meeting.time_text
-                        )}
-                      </span>
-                      <span className="min-w-0">
-                        {t(locale, "connectedDecision")}:{" "}
-                        <Link
-                          href={`/cards/${card.id}`}
-                          className="font-medium text-brand underline decoration-brand/30 underline-offset-4 transition-colors hover:decoration-brand focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-                        >
-                          {publicAgendaTitle(card)}
-                        </Link>
-                      </span>
-                    </p>
-                  </div>
-                  <Link
-                    href={`/meetings/${meeting.id}`}
-                    className="action-secondary-sm col-start-2 w-fit sm:col-start-3"
+                return (
+                  <article
+                    key={meeting.id}
+                    className="grid gap-3 p-4 sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-center"
                   >
-                    {t(locale, "meetingDetails")}
-                  </Link>
-                </article>
-              );
-            })}
+                    <div className="flex items-center gap-2 text-sm font-black text-[#12365f]">
+                      <CalendarDays aria-hidden className="h-4 w-4" />
+                      <span>{formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="line-clamp-2 text-base font-black leading-snug text-ink">
+                        {displayMeetingTitle(
+                          meeting,
+                          locale === "es" ? "Reunión no indicada" : "Meeting not listed",
+                          locale
+                        )}
+                      </h3>
+                      <p className="mt-1 text-sm font-semibold text-black/[0.58]">
+                        {displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)} ·{" "}
+                        {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
+                      </p>
+                      <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">
+                        {t(locale, "connectedDecision")}: {publicAgendaTitle(card)}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/meetings/${meeting.id}`}
+                      className="action-secondary-sm"
+                    >
+                      {t(locale, "meetingDetails")}
+                    </Link>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         </section>
       ) : null}
 
-      <section className="section-shell rule-top py-9 pb-14">
-        <h2 className="section-title">{t(locale, "everydayImpactTitle")}</h2>
-        <p className="section-intro">
-          {locale === "es"
-            ? "Sigue un tema que te importe."
-            : "Follow a subject you care about."}
-        </p>
-        <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="section-shell pb-16 pt-8">
+        <div className="mb-5 max-w-2xl">
+          <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>
+          <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">{t(locale, "everydayImpactTitle")}</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {CATEGORIES.map((category) => {
             const definition = CATEGORY_DEFINITIONS[category];
             const Icon = definition.icon;
@@ -449,10 +421,12 @@ export default async function Home({
               <Link
                 key={category}
                 href={`/topics/${definition.slug}`}
-                className="quiet-card interactive-card group flex items-center gap-2.5 px-3 py-2.5 focus-visible:focus-ring"
+                className="quiet-card interactive-card group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 px-4 py-4 focus-visible:focus-ring"
               >
-                <Icon aria-hidden className="h-4 w-4 shrink-0 text-quiet transition-colors group-hover:text-brand" />
-                <span className="text-[14px] font-medium leading-5 text-ink">
+                <span className="icon-tile transition group-hover:bg-civic/10 group-hover:text-civic">
+                  <Icon aria-hidden className="h-5 w-5" />
+                </span>
+                <span className="text-base font-black leading-5 text-ink">
                   {categoryShortLabel(locale, category)}
                 </span>
               </Link>

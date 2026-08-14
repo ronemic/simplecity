@@ -25,41 +25,38 @@ function decidedAtLabel(value: string, locale: "en" | "es") {
   }).format(parsed);
 }
 
-// A recorded outcome is history, so the panel itself stays neutral — five
-// colored washes made every decided item shout louder than the live ones. The
-// verdict rides on the icon and label instead, which also keeps it legible
-// without relying on color alone.
-// The expanded summary body above this is also on `paper`, so the seam between
-// them needs the stronger rule to register as a new section.
-const OUTCOME_CONTAINER = "border-[color:var(--rule-strong)] bg-paper";
-
 const outcomeStyles: Record<
   DecisionOutcomeKind,
-  { icon: string; label: string; Icon: typeof Check }
+  { container: string; icon: string; label: string; Icon: typeof Check }
 > = {
   approved: {
-    icon: "bg-affirm text-white",
-    label: "text-affirm",
+    container: "border-[#9fc6b2] bg-[#f1fbf4]",
+    icon: "bg-[#237a49] text-white",
+    label: "text-[#17683b]",
     Icon: Check
   },
   rejected: {
-    icon: "bg-deny text-white",
-    label: "text-deny",
+    container: "border-[#e2b4b0] bg-[#fff4f2]",
+    icon: "bg-[#a83a31] text-white",
+    label: "text-[#8f2e26]",
     Icon: Ban
   },
   continued: {
-    icon: "bg-open text-white",
-    label: "text-open",
+    container: "border-[#e7c879] bg-[#fff9ea]",
+    icon: "bg-[#a56308] text-white",
+    label: "text-[#86500b]",
     Icon: Pause
   },
   amended: {
-    icon: "bg-brand text-white",
-    label: "text-brand",
+    container: "border-[#a9c2e7] bg-[#f1f6fd]",
+    icon: "bg-civic text-white",
+    label: "text-civic",
     Icon: ClipboardCheck
   },
   other: {
-    icon: "bg-slate text-white",
-    label: "text-slate",
+    container: "border-[#bcc8d1] bg-[#f5f8fa]",
+    icon: "bg-[#42677f] text-white",
+    label: "text-[#31546c]",
     Icon: CircleDot
   }
 };
@@ -95,7 +92,7 @@ export function DecisionOutcomePanel({
   return (
     <section
       aria-label={updateLabel}
-      className={cn("relative border-t px-4 py-3.5 sm:px-5 sm:py-4", OUTCOME_CONTAINER)}
+      className={cn("relative border-t px-4 py-3.5 sm:px-5 sm:py-4", style.container)}
     >
       <div
         aria-hidden
@@ -114,15 +111,15 @@ export function DecisionOutcomePanel({
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-3xl">
-            <p className={cn("text-xs font-semibold uppercase tracking-[0.08em]", style.label)}>
+            <p className={cn("text-xs font-black uppercase tracking-[0.08em]", style.label)}>
               {updateLabel}
             </p>
-            <h4 className={cn("mt-0.5 text-lg font-semibold leading-tight sm:text-xl", style.label)}>
+            <h4 className={cn("mt-0.5 text-lg font-black leading-tight sm:text-xl", style.label)}>
               {outcome.headline}
             </h4>
             <p
               className={cn(
-                "mt-1 max-w-3xl text-sm font-semibold leading-6 text-slate",
+                "mt-1 max-w-3xl text-sm font-semibold leading-6 text-black/70",
                 hasLongSummary && !summaryExpanded && "line-clamp-3"
               )}
             >
@@ -145,7 +142,7 @@ export function DecisionOutcomePanel({
             ) : null}
           </div>
           {outcome.decided_at ? (
-            <p className="shrink-0 text-xs font-bold text-quiet sm:pt-0.5">
+            <p className="shrink-0 text-xs font-bold text-black/50 sm:pt-0.5">
               {locale === "es" ? "Decidido" : "Decided"}{" "}
               {decidedAtLabel(outcome.decided_at, locale)}
               <span className="sr-only">.</span>
@@ -171,26 +168,26 @@ export function DecisionOutcomePanel({
             {expanded ? (
               <div className="mt-2">
                 {outcome.vote || outcome.next_step ? (
-                  <dl className="grid overflow-hidden rounded-md border border-rule bg-surface sm:grid-cols-[0.8fr_1.6fr]">
+                  <dl className="grid overflow-hidden rounded-md border border-current/15 bg-white/75 sm:grid-cols-[0.8fr_1.6fr]">
                     {outcome.vote ? (
-                      <div className="flex gap-2.5 px-3 py-2.5 sm:border-r sm:border-rule">
+                      <div className="flex gap-2.5 px-3 py-2.5 sm:border-r sm:border-current/15">
                         <Users aria-hidden className={cn("mt-0.5 h-4 w-4 shrink-0", style.label)} />
                         <div>
-                          <dt className="text-xs font-bold uppercase tracking-[0.06em] text-quiet">
+                          <dt className="text-xs font-bold uppercase tracking-[0.06em] text-black/45">
                             {locale === "es" ? "Votación" : "Vote"}
                           </dt>
-                          <dd className="mt-0.5 text-sm font-semibold text-ink">{outcome.vote}</dd>
+                          <dd className="mt-0.5 text-sm font-black text-ink">{outcome.vote}</dd>
                         </div>
                       </div>
                     ) : null}
                     {outcome.next_step ? (
-                      <div className="flex gap-2.5 border-t border-rule px-3 py-2.5 sm:border-t-0">
+                      <div className="flex gap-2.5 border-t border-current/15 px-3 py-2.5 sm:border-t-0">
                         <ClipboardCheck
                           aria-hidden
                           className={cn("mt-0.5 h-4 w-4 shrink-0", style.label)}
                         />
                         <div>
-                          <dt className="text-xs font-bold uppercase tracking-[0.06em] text-quiet">
+                          <dt className="text-xs font-bold uppercase tracking-[0.06em] text-black/45">
                             {locale === "es" ? "Lo que sigue" : "What happens next"}
                           </dt>
                           <dd className="mt-0.5 text-sm font-semibold leading-5 text-ink">

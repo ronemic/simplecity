@@ -17,7 +17,7 @@ export function AdminNav({ jurisdiction = "san-mateo" }: { jurisdiction?: string
   const publicJurisdiction = publicJurisdictionSlug(jurisdiction);
 
   return (
-    <nav className="flex flex-wrap gap-2 rounded-lg border border-rule bg-surface p-2 shadow-sm">
+    <nav className="flex flex-wrap gap-2 rounded-lg border border-black/10 bg-white p-2 shadow-sm">
       {items.map((item) => (
         <Link
           key={item.href}

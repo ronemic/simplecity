@@ -18,13 +18,11 @@ export default function ErrorPage({
         <h1 className="text-2xl font-bold text-ink">
           {locale === "es" ? "Algo salió mal" : "Something went wrong"}
         </h1>
-        <p className="mt-3 flex justify-center">
-          <span className="state state--alert text-left">{error.message}</span>
-        </p>
+        <p className="mt-2 text-sm leading-6 text-black/75">{error.message}</p>
         <button
           type="button"
           onClick={reset}
-          className="action-primary mt-5"
+          className="action-primary-sm mt-5"
         >
           <RotateCcw aria-hidden className="h-4 w-4" />
           {t(locale, "tryAgain")}

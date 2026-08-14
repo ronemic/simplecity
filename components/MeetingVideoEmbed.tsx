@@ -135,23 +135,23 @@ export function MeetingVideoEmbed({
   return (
     <section className="quiet-card overflow-hidden">
       <details className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-brand-tint focus-visible:focus-ring sm:px-6 [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 transition hover:bg-[#f7fbff] focus-visible:focus-ring sm:px-6 [&::-webkit-details-marker]:hidden">
           <span>
-            <span className="label-eyebrow block text-brand">
+            <span className="label-eyebrow block text-civic">
               {locale === "es" ? "Video de la reunión" : "Meeting video"}
             </span>
             <span className="mt-1 block text-xl font-bold text-ink">
               {locale === "es" ? "Ver la grabación oficial" : "Watch the official recording"}
             </span>
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-rule bg-surface px-2.5 py-1 text-sm font-bold text-slate">
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-black/10 bg-white px-2.5 py-1 text-sm font-bold text-black/65">
             <span className="group-open:hidden">{locale === "es" ? "Mostrar video" : "Show video"}</span>
             <span className="hidden group-open:inline">{locale === "es" ? "Ocultar video" : "Hide video"}</span>
             <ChevronDown aria-hidden className="h-4 w-4 transition group-open:rotate-180" />
           </span>
         </summary>
 
-        <div className="aspect-video border-t border-rule bg-ink">
+        <div className="aspect-video border-t border-black/10 bg-[#0c1726]">
           <iframe
             src={primaryVideo.embedUrl}
             title={videoLabel(primaryVideo.document, locale)}
@@ -163,9 +163,9 @@ export function MeetingVideoEmbed({
           />
         </div>
 
-        <div className="border-t border-rule px-5 py-4 sm:px-6">
+        <div className="border-t border-black/10 px-5 py-4 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-quiet">
+            <span className="text-xs font-black uppercase tracking-[0.08em] text-black/45">
               {locale === "es" ? "Enlaces de grabación" : "Recording links"}
             </span>
             <a
@@ -181,7 +181,7 @@ export function MeetingVideoEmbed({
 
           {additionalVideoLinks.length > 0 ? (
             <details className="group/links mt-3">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-rule bg-surface px-3 py-2 text-sm font-bold text-slate transition hover:border-brand/25 hover:bg-brand-tint hover:text-brand focus-visible:focus-ring [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-md border border-black/10 bg-white px-3 py-2 text-sm font-bold text-black/70 transition hover:border-civic/25 hover:bg-[#f7fbff] hover:text-civic focus-visible:focus-ring [&::-webkit-details-marker]:hidden">
                 <span>
                   {locale === "es"
                     ? `${additionalVideoLinks.length} enlaces adicionales`
@@ -192,7 +192,7 @@ export function MeetingVideoEmbed({
               <div className="mt-3 grid gap-3">
                 {agendaClipLinks.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-quiet">
+                    <p className="mb-2 text-[11px] font-black uppercase tracking-[0.08em] text-black/45">
                       {locale === "es" ? "Clips de agenda" : "Agenda clips"}
                     </p>
                     <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
@@ -215,7 +215,7 @@ export function MeetingVideoEmbed({
 
                 {audioLinks.length > 0 ? (
                   <div>
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-quiet">
+                    <p className="mb-2 text-[11px] font-black uppercase tracking-[0.08em] text-black/45">
                       {locale === "es" ? "Audio" : "Audio"}
                     </p>
                     <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
