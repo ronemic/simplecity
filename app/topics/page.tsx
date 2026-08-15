@@ -76,15 +76,15 @@ export default async function TopicsPage({
                 jurisdiction: publicJurisdiction,
                 ...(query.lang ? { lang: query.lang } : {})
               }).toString()}`}
-              className="quiet-card interactive-card group block p-5 focus-visible:focus-ring"
+              className="quiet-card topic-card group flex h-full flex-col p-5 focus-visible:focus-ring"
             >
-              <span className="icon-tile">
+              <span className="icon-tile transition-colors duration-150 group-hover:bg-[#e6f0ff] group-hover:text-civic">
                 <Icon aria-hidden className="h-5 w-5" />
               </span>
               <h2 className="mt-4 text-xl font-bold text-ink">{categoryLabel(locale, category)}</h2>
               <p className="mt-2 text-sm leading-6 text-black/70">{categoryDescription(locale, category)}</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-sm font-bold text-civic">
-                {t(locale, "viewCards")} <ArrowRight aria-hidden className="h-4 w-4 transition group-hover:translate-x-0.5" />
+              <span className="mt-auto inline-flex items-center gap-1 pt-4 text-sm font-bold text-civic">
+                {t(locale, "viewCards")} <ArrowRight aria-hidden className="h-4 w-4 transition-transform duration-150 group-hover:translate-x-0.5" />
               </span>
             </Link>
           );

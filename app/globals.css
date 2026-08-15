@@ -84,6 +84,10 @@ p {
   @apply transition duration-200 hover:border-civic/25 hover:bg-[#f7fbff] hover:shadow-[0_18px_50px_rgba(23,23,23,0.08)];
 }
 
+.topic-card {
+  @apply transition-[border-color,background-color] duration-150 hover:border-civic/30 hover:bg-[#f7fbff];
+}
+
 .page-title {
   @apply text-balance text-4xl font-black text-ink sm:text-5xl;
 }

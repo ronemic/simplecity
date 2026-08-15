@@ -428,9 +428,9 @@ export default async function Home({
                   jurisdiction: toPublicJurisdictionSlug(jurisdiction),
                   ...(params.lang ? { lang: params.lang } : {})
                 }).toString()}`}
-                className="quiet-card interactive-card group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 px-4 py-4 focus-visible:focus-ring"
+                className="quiet-card topic-card group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 px-4 py-4 focus-visible:focus-ring"
               >
-                <span className="icon-tile transition group-hover:bg-civic/10 group-hover:text-civic">
+                <span className="icon-tile transition-colors duration-150 group-hover:bg-[#e6f0ff] group-hover:text-civic">
                   <Icon aria-hidden className="h-5 w-5" />
                 </span>
                 <span className="text-base font-black leading-5 text-ink">
