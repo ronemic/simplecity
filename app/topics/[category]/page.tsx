@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
-import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
+import { ALL_CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
 import { getCategoryCards } from "@/lib/db/queries";
 import { cookies } from "next/headers";
 import {
@@ -21,7 +21,7 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 export const revalidate = 300;
 
 function categoryFromSlug(slug: string) {
-  return CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
+  return ALL_CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
 }
 
 export async function generateMetadata({

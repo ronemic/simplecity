@@ -3,9 +3,10 @@ import { headers } from "next/headers";
 import { getConfiguredAppUrl, isLocalAppUrl, normalizeAppUrl } from "@/lib/appUrl";
 import {
   ALL_JURISDICTIONS_SLUG,
-  PUBLIC_JURISDICTION_OPTIONS
+  PUBLIC_JURISDICTION_OPTIONS,
+  isSchoolDistrictJurisdiction
 } from "@/lib/config/jurisdictions";
-import { CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
+import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,20 @@ export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
 
     for (const option of PUBLIC_JURISDICTION_OPTIONS) {
       if (option.slug === ALL_JURISDICTIONS_SLUG) continue;
+      if (isSchoolDistrictJurisdiction(option.slug)) continue;
+      routes.push({
+        url: jurisdictionUrl(appUrl, categoryPath, option.slug),
+        lastModified: now,
+        changeFrequency: "daily",
+        priority: 0.7
+      });
+    }
+  }
+
+  for (const category of SCHOOL_CATEGORIES) {
+    const categoryPath = `/topics/${CATEGORY_DEFINITIONS[category].slug}`;
+    for (const option of PUBLIC_JURISDICTION_OPTIONS) {
+      if (!isSchoolDistrictJurisdiction(option.slug)) continue;
       routes.push({
         url: jurisdictionUrl(appUrl, categoryPath, option.slug),
         lastModified: now,

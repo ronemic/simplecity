@@ -550,6 +550,14 @@ export function getPublicJurisdictionOptions(): JurisdictionPublicOption[] {
   return PUBLIC_JURISDICTION_OPTIONS;
 }
 
+export function isSchoolDistrictJurisdiction(slug: string | null | undefined) {
+  const publicSlug = slug === "san-mateo-city" ? "san-mateo" : slug;
+  return PUBLIC_JURISDICTION_OPTIONS.some(
+    (jurisdiction) =>
+      jurisdiction.slug === publicSlug && jurisdiction.kind === "school-district"
+  );
+}
+
 export function getDefaultJurisdiction() {
   const jurisdiction = getJurisdictionBySlug("san-mateo-city");
   if (!jurisdiction) throw new Error("Default jurisdiction san-mateo-city is not configured.");

@@ -14,6 +14,17 @@ test("sitemap exposes discovery pages without individual content", () => {
   assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo&lang=en"));
   assert.ok(urls.includes("https://simplecity.app/decisions?jurisdiction=san-mateo&lang=es"));
   assert.ok(urls.includes("https://simplecity.app/topics/housing?jurisdiction=san-mateo&lang=en"));
+  assert.ok(
+    urls.includes(
+      "https://simplecity.app/topics/teaching-learning?jurisdiction=los-altos-school-district&lang=en"
+    )
+  );
+  assert.equal(
+    urls.includes(
+      "https://simplecity.app/topics/housing?jurisdiction=los-altos-school-district&lang=en"
+    ),
+    false
+  );
   assert.ok(urls.includes("https://simplecity.app/subscribe?lang=es"));
   assert.ok(urls.includes("https://simplecity.app/privacy?lang=en"));
   assert.ok(urls.includes("https://simplecity.app/cookies?lang=es"));

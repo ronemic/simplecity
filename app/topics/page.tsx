@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { ArrowRight } from "lucide-react";
-import { CATEGORY_DEFINITIONS, CATEGORIES } from "@/lib/constants";
+import { CATEGORY_DEFINITIONS, CATEGORIES, SCHOOL_CATEGORIES } from "@/lib/constants";
+import {
+  JURISDICTION_PREFERENCE_COOKIE,
+  isSchoolDistrictJurisdiction,
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
+} from "@/lib/config/jurisdictions";
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
@@ -28,8 +35,23 @@ export async function generateMetadata({
   };
 }
 
-export default async function TopicsPage() {
-  const locale = await getRequestLocale();
+export default async function TopicsPage({
+  searchParams
+}: {
+  searchParams: Promise<{ jurisdiction?: string; lang?: string }>;
+}) {
+  const [query, locale, cookieStore] = await Promise.all([
+    searchParams,
+    getRequestLocale(),
+    cookies()
+  ]);
+  const jurisdiction = normalizeJurisdictionSelection(
+    query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
+  const categories = isSchoolDistrictJurisdiction(jurisdiction)
+    ? SCHOOL_CATEGORIES
+    : CATEGORIES;
+  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
 
   return (
     <div className="section-shell py-10">
@@ -44,13 +66,16 @@ export default async function TopicsPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {CATEGORIES.map((category) => {
+        {categories.map((category) => {
           const definition = CATEGORY_DEFINITIONS[category];
           const Icon = definition.icon;
           return (
             <Link
               key={category}
-              href={`/topics/${definition.slug}`}
+              href={`/topics/${definition.slug}?${new URLSearchParams({
+                jurisdiction: publicJurisdiction,
+                ...(query.lang ? { lang: query.lang } : {})
+              }).toString()}`}
               className="quiet-card interactive-card group block p-5 focus-visible:focus-ring"
             >
               <span className="icon-tile">

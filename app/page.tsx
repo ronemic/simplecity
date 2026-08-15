@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
-import { CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
+import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import {
   getActiveAnnouncements,
   getDecisionCardPage,
@@ -17,6 +17,7 @@ import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
+  isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
@@ -136,6 +137,9 @@ export default async function Home({
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const topicCategories = isSchoolDistrictJurisdiction(jurisdiction)
+    ? SCHOOL_CATEGORIES
+    : CATEGORIES;
   const hasSearch = search.length > 0;
   const cardResultPromise = hasSearch
     ? getDecisionCardPage({ jurisdiction, locale, search })
@@ -414,13 +418,16 @@ export default async function Home({
           <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">{t(locale, "everydayImpactTitle")}</h2>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {CATEGORIES.map((category) => {
+          {topicCategories.map((category) => {
             const definition = CATEGORY_DEFINITIONS[category];
             const Icon = definition.icon;
             return (
               <Link
                 key={category}
-                href={`/topics/${definition.slug}`}
+                href={`/topics/${definition.slug}?${new URLSearchParams({
+                  jurisdiction: toPublicJurisdictionSlug(jurisdiction),
+                  ...(params.lang ? { lang: params.lang } : {})
+                }).toString()}`}
                 className="quiet-card interactive-card group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 px-4 py-4 focus-visible:focus-ring"
               >
                 <span className="icon-tile transition group-hover:bg-civic/10 group-hover:text-civic">

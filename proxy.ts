@@ -21,7 +21,7 @@ export function proxy(request: NextRequest) {
   const locale = queryLocale(request.nextUrl.searchParams.get("lang"));
   const legacyJurisdiction =
     request.nextUrl.searchParams.get("jurisdiction") === "san-mateo-city";
-  const ignoresJurisdiction = ["/about", "/subscribe", "/topics"].includes(pathname);
+  const ignoresJurisdiction = ["/about", "/subscribe"].includes(pathname);
   const hasIgnoredJurisdiction =
     ignoresJurisdiction && request.nextUrl.searchParams.has("jurisdiction");
   const invalidLanguageParam = hasLanguageParam && !locale;

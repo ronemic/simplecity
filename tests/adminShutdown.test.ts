@@ -74,11 +74,22 @@ test("invalid language parameters are removed without setting a preference", () 
 });
 
 test("static navigation pages discard irrelevant jurisdiction parameters", () => {
-  for (const path of ["/about", "/subscribe", "/topics"]) {
+  for (const path of ["/about", "/subscribe"]) {
     const response = proxy(
       new NextRequest(`https://simplecity.example${path}?jurisdiction=san-mateo`)
     );
     assert.equal(response.status, 307, path);
     assert.equal(response.headers.get("location"), `https://simplecity.example${path}`, path);
   }
+});
+
+test("topic navigation keeps its jurisdiction parameter", () => {
+  const response = proxy(
+    new NextRequest(
+      "https://simplecity.example/topics?jurisdiction=los-altos-school-district&lang=en"
+    )
+  );
+
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("x-middleware-next"), "1");
 });

@@ -6,6 +6,7 @@ import {
   getJurisdictionBySlug,
   getPublicJurisdictionOptions,
   getServiceSupabaseClientForJurisdiction,
+  isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
   requireValidJurisdictionSlug,
   SAN_FRANCISCO_MISSING_SUPABASE_CONFIG_MESSAGE,
@@ -204,6 +205,8 @@ test("Los Altos School District is a distinct Simbli jurisdiction in the Santa C
   assert.equal(options[optionIndex]?.kind, "school-district");
   assert.equal(options[optionIndex - 1]?.slug, "santa-barbara-county");
   assert.equal(options.at(-1)?.slug, "los-altos-school-district");
+  assert.equal(isSchoolDistrictJurisdiction("los-altos-school-district"), true);
+  assert.equal(isSchoolDistrictJurisdiction("los-altos"), false);
 });
 
 test("Los Altos jurisdictions use only Santa Clara regional Supabase credentials", () => {

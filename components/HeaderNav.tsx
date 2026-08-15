@@ -151,7 +151,7 @@ export function HeaderNav({
 
   function hrefWithJurisdiction(href: string) {
     const params = new URLSearchParams();
-    if (href === "/decisions" || href === "/meetings") {
+    if (href === "/decisions" || href === "/meetings" || href === "/topics") {
       params.set("jurisdiction", selected);
     }
     const lang = searchParams.get("lang");
