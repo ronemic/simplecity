@@ -104,6 +104,29 @@ test("past decision cards without a result clearly show that the official result
   assert.match(statusSummary(card, "en").className, /bg-\[#eef2ff\]/);
 });
 
+test("Santa Barbara Planning Commission cards use advisory recommendation language", () => {
+  const pastCard = {
+    jurisdiction_slug: "santa-barbara-county",
+    status: "Upcoming vote",
+    outcome: null,
+    meetings: {
+      jurisdiction_slug: "santa-barbara-county",
+      meeting_type: "County Planning Commission",
+      title: "Planning Commission",
+      status: "Past",
+      date_text: "Aug 12, 2026",
+      meeting_datetime: null
+    }
+  } as SummaryCardRow;
+  const upcomingCard = {
+    ...pastCard,
+    meetings: { ...pastCard.meetings!, status: "Upcoming" }
+  } as SummaryCardRow;
+
+  assert.equal(statusSummary(pastCard, "en").label, "Awaiting official recommendation");
+  assert.equal(statusSummary(upcomingCard, "en").label, "Recommendation scheduled Aug 12");
+});
+
 test("an attached result takes precedence over the awaiting-result state", () => {
   const card = {
     status: "Upcoming vote",

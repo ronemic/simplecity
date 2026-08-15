@@ -25,6 +25,7 @@ import { cardPreviewText, cardSummaryPoints } from "@/lib/utils/cardShare";
 import { isAwaitingDecisionResult } from "@/lib/utils/decisionResultFilter";
 import { SantaBarbaraInterestButton } from "@/components/SantaBarbaraInterestButton";
 import { latestIsoTimestamp, SANTA_BARBARA_INTEREST_JURISDICTION } from "@/lib/interests/santaBarbara";
+import { isSantaBarbaraPlanningCard } from "@/lib/utils/santaBarbaraBody";
 
 function compactList(items: string[] | null | undefined, locale: Locale) {
   if (!items || items.length === 0) return t(locale, "notListed");
@@ -122,6 +123,7 @@ export function statusSummary(
   outcome: DecisionOutcome | null = card.outcome || null
 ) {
   const status = card.status || card.meetings?.status || "Info only";
+  const advisory = isSantaBarbaraPlanningCard(card);
   const compactMeetingDate = formatCompactDisplayDate(
     card.meetings?.date_text,
     card.meetings?.meeting_datetime
@@ -137,7 +139,9 @@ export function statusSummary(
 
   if (isAwaitingDecisionResult(card, outcome)) {
     return {
-      label: locale === "es" ? "Esperando resultado oficial" : "Awaiting official result",
+      label: advisory
+        ? locale === "es" ? "Esperando recomendación oficial" : "Awaiting official recommendation"
+        : locale === "es" ? "Esperando resultado oficial" : "Awaiting official result",
       className: "border-[#aabce6] bg-[#eef2ff] text-[#354f9b]",
       icon: Hourglass
     };
@@ -149,9 +153,13 @@ export function statusSummary(
         compactMeetingDate === "Date not listed"
           ? t(locale, "voteUpcoming")
           : status === "Upcoming vote"
-            ? locale === "es"
-              ? `Votación programada ${compactMeetingDate}`
-              : `Vote scheduled ${compactMeetingDate}`
+            ? advisory
+              ? locale === "es"
+                ? `Recomendación programada ${compactMeetingDate}`
+                : `Recommendation scheduled ${compactMeetingDate}`
+              : locale === "es"
+                ? `Votación programada ${compactMeetingDate}`
+                : `Vote scheduled ${compactMeetingDate}`
             : locale === "es"
               ? `Reunión ${compactMeetingDate}`
               : `Meeting ${compactMeetingDate}`,
@@ -287,6 +295,7 @@ export function SummaryCard({
   const commentDeadline = getCardCommentDeadlineInfo(card);
   const hasCommentOption = hasCardCommentOptionInfo(card);
   const status = statusSummary(card, locale, outcome);
+  const isAdvisoryPlanningCard = isSantaBarbaraPlanningCard(card);
   const isUpcoming = isUpcomingMeetingDate(
     meeting?.date_text,
     meeting?.meeting_datetime,
@@ -333,6 +342,11 @@ export function SummaryCard({
             </span>
             <span aria-hidden className="h-1 w-1 rounded-full bg-black/25" />
             <span><HighlightedText text={cardJurisdictionLabel} query={highlight} /></span>
+            {isAdvisoryPlanningCard ? (
+              <span className="rounded-full border border-[#b8a06a] bg-[#fff8e7] px-2 py-0.5 text-[0.68rem] font-black uppercase tracking-[0.06em] text-[#765514]">
+                {locale === "es" ? "Órgano asesor" : "Advisory body"}
+              </span>
+            ) : null}
           </div>
           <TitleTag
             className={cn(
@@ -589,6 +603,7 @@ export function SummaryCard({
         <DecisionOutcomePanel
           outcome={outcome}
           locale={locale}
+          advisory={isAdvisoryPlanningCard}
           defaultExpanded={defaultOutcomeExpanded || isSharePresentation}
         />
       ) : null}

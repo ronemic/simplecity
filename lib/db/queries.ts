@@ -44,6 +44,10 @@ import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
 import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
 import type { DecisionResultFilter } from "@/lib/utils/decisionResultFilter";
+import {
+  matchesSantaBarbaraBody,
+  type SantaBarbaraBodyView
+} from "@/lib/utils/santaBarbaraBody";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,updated_at";
@@ -136,6 +140,7 @@ type DecisionCardPageFilters = {
   search: string;
   category?: CategoryName;
   result?: DecisionResultFilter;
+  body?: SantaBarbaraBodyView;
   page: number;
   pageSize: number;
 };
@@ -802,17 +807,30 @@ const getCachedPublishedCardCount = unstable_cache(
 );
 
 const getCachedDecisionResultFreshness = unstable_cache(
-  async (): Promise<DecisionResultFreshness> => {
+  async (
+    santaBarbaraBody: SantaBarbaraBodyView | "" = ""
+  ): Promise<DecisionResultFreshness> => {
     const clients = getSafePublicClients(ALL_JURISDICTIONS_SLUG);
     if (clients.length === 0) return {};
 
     const results = await Promise.all(
       clients.map(async ({ jurisdiction, supabase }) => {
-        const { data, error } = await supabase
+        const meetingIds =
+          jurisdiction.slug === "santa-barbara-county" && santaBarbaraBody
+            ? await getSantaBarbaraMeetingIdsForBody(supabase, santaBarbaraBody)
+            : null;
+        if (meetingIds && meetingIds.length === 0) {
+          return [jurisdiction.slug, null] as const;
+        }
+
+        let query = supabase
           .from("decision_outcomes")
           .select("decided_at")
           .eq("jurisdiction_slug", jurisdiction.slug)
-          .not("decided_at", "is", null)
+          .not("decided_at", "is", null);
+        if (meetingIds) query = query.in("meeting_id", meetingIds);
+
+        const { data, error } = await query
           .order("decided_at", { ascending: false, nullsFirst: false })
           .limit(1)
           .maybeSingle();
@@ -829,7 +847,7 @@ const getCachedDecisionResultFreshness = unstable_cache(
 
     return Object.fromEntries(results.filter((result) => result !== null));
   },
-  ["decision-result-freshness"],
+  ["decision-result-freshness-v2"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -926,6 +944,28 @@ async function getMatchingMeetingIdsForSearch(
     .filter((id): id is string => Boolean(id));
 }
 
+async function getSantaBarbaraMeetingIdsForBody(
+  supabase: SupabaseClient,
+  body: SantaBarbaraBodyView
+) {
+  const pattern = body === "planning" ? "%Planning Commission%" : "%Board of Supervisors%";
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id")
+    .eq("jurisdiction_slug", "santa-barbara-county")
+    .ilike("meeting_type", pattern)
+    .limit(1000);
+
+  if (error) {
+    logQueryError(`Failed to filter Santa Barbara ${body} meetings`, error);
+    return [] as string[];
+  }
+
+  return ((data || []) as Array<{ id?: string | null }>)
+    .map((row) => row.id)
+    .filter((id): id is string => Boolean(id));
+}
+
 async function loadDecisionCardCandidatesForJurisdiction(
   {
     jurisdiction,
@@ -948,6 +988,13 @@ async function loadDecisionCardCandidatesForJurisdiction(
         pattern
       )
     : [];
+  const bodyMeetingIds =
+    jurisdiction.slug === "santa-barbara-county" && filters.body
+      ? await getSantaBarbaraMeetingIdsForBody(supabase, filters.body)
+      : null;
+  if (bodyMeetingIds && bodyMeetingIds.length === 0) {
+    return { cards: [] as SummaryCardRow[], count: 0, paginationSupported: true };
+  }
   let query = supabase
     .from("summary_cards")
     .select(PAGED_PUBLIC_SUMMARY_CARD_SELECT, { count: "exact" })
@@ -956,6 +1003,10 @@ async function loadDecisionCardCandidatesForJurisdiction(
 
   if (filters.category) {
     query = query.contains("category_tags", [filters.category]);
+  }
+
+  if (bodyMeetingIds) {
+    query = query.in("meeting_id", bodyMeetingIds);
   }
 
   if (pattern) {
@@ -998,13 +1049,18 @@ async function loadLegacyDecisionCardPage(
   search: string,
   category: CategoryName | "",
   result: DecisionResultFilter | "",
+  body: SantaBarbaraBodyView | "",
   page: number,
   pageSize: number
 ): Promise<DecisionCardPageResult> {
   const offset = (page - 1) * pageSize;
   const matchingCards = sortCards(
     (await loadPublishedCardsForSelection(selection, locale)).filter((card) =>
-      matchesDecisionFilters(card, search, category || undefined, result || undefined)
+      matchesDecisionFilters(card, search, category || undefined, result || undefined) &&
+      (!body ||
+        (card.meetings
+          ? matchesSantaBarbaraBody(card.meetings, body)
+          : false))
     )
   );
   const totalCount = matchingCards.length;
@@ -1025,6 +1081,7 @@ const getCachedDecisionCardPage = unstable_cache(
     search: string,
     category: CategoryName | "",
     result: DecisionResultFilter | "",
+    body: SantaBarbaraBodyView | "",
     page: number,
     pageSize: number
   ): Promise<DecisionCardPageResult> => {
@@ -1040,6 +1097,7 @@ const getCachedDecisionCardPage = unstable_cache(
         normalizedSearch,
         category,
         result,
+        body,
         normalizedPage,
         normalizedPageSize
       );
@@ -1071,6 +1129,7 @@ const getCachedDecisionCardPage = unstable_cache(
           {
             search: "",
             category: category || undefined,
+            body: body || undefined,
             page: normalizedPage,
             pageSize: normalizedPageSize
           },
@@ -1086,6 +1145,7 @@ const getCachedDecisionCardPage = unstable_cache(
         "",
         category,
         "",
+        body,
         normalizedPage,
         normalizedPageSize
       );
@@ -1105,12 +1165,17 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v7"],
+  ["decision-card-page-rendered-search-v8"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
 const getCachedMeetings = unstable_cache(
-  async (selection: JurisdictionSelection, search: string, locale: Locale) => {
+  async (
+    selection: JurisdictionSelection,
+    search: string,
+    locale: Locale,
+    body: SantaBarbaraBodyView | ""
+  ) => {
     const clients = getSafePublicClients(selection);
     if (clients.length === 0) return [] as MeetingRow[];
 
@@ -1133,13 +1198,15 @@ const getCachedMeetings = unstable_cache(
           withMeetingJurisdictionFallback(row, jurisdiction)
         );
         const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
-        return translatedRows.filter((row) => matchesMeetingFilters(row, search, locale));
+        return translatedRows
+          .filter((row) => !body || matchesSantaBarbaraBody(row, body))
+          .filter((row) => matchesMeetingFilters(row, search, locale));
       })
     );
 
     return sortMeetings(results.flat());
   },
-  ["public-meetings-rendered-search-v3"],
+  ["public-meetings-rendered-search-v4"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1224,7 +1291,8 @@ const getCachedAdjacentMeetings = unstable_cache(
     selection: JurisdictionSelection,
     currentMeetingId: string,
     currentMeetingDatetime: string,
-    locale: Locale
+    locale: Locale,
+    body: SantaBarbaraBodyView | ""
   ): Promise<AdjacentMeetings> => {
     const currentTime = rowTime(currentMeetingDatetime);
     if (!currentTime) {
@@ -1253,7 +1321,7 @@ const getCachedAdjacentMeetings = unstable_cache(
             .neq("id", currentMeetingId)
             .gt("meeting_datetime", currentMeetingDatetime)
             .order("meeting_datetime", { ascending: true, nullsFirst: false })
-            .limit(1),
+            .limit(body ? 25 : 1),
           supabase
             .from("meetings")
             .select(PUBLIC_MEETING_LIST_COLUMNS)
@@ -1262,7 +1330,7 @@ const getCachedAdjacentMeetings = unstable_cache(
             .neq("id", currentMeetingId)
             .lt("meeting_datetime", currentMeetingDatetime)
             .order("meeting_datetime", { ascending: false, nullsFirst: false })
-            .limit(1)
+            .limit(body ? 25 : 1)
         ]);
 
         logQueryError(`Failed to load newer ${jurisdiction.name} meeting for ${currentMeetingId}`, newer.error);
@@ -1273,7 +1341,7 @@ const getCachedAdjacentMeetings = unstable_cache(
         );
         const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
 
-        return translatedRows;
+        return translatedRows.filter((row) => !body || matchesSantaBarbaraBody(row, body));
       })
     );
 
@@ -1428,8 +1496,10 @@ export async function getUpcomingDecisionSnapshot(
   return getCachedUpcomingDecisionSnapshot(selection);
 }
 
-export async function getDecisionResultFreshness() {
-  return getCachedDecisionResultFreshness();
+export async function getDecisionResultFreshness(
+  santaBarbaraBody: SantaBarbaraBodyView | "" = ""
+) {
+  return getCachedDecisionResultFreshness(santaBarbaraBody);
 }
 
 export async function getPublishedDecisionCards(
@@ -1482,6 +1552,7 @@ export async function getDecisionCardPage({
   search = "",
   category,
   result,
+  body,
   page = 1,
   pageSize = DECISION_CARD_PAGE_SIZE
 }: {
@@ -1490,6 +1561,7 @@ export async function getDecisionCardPage({
   search?: string;
   category?: CategoryName;
   result?: DecisionResultFilter;
+  body?: SantaBarbaraBodyView;
   page?: number;
   pageSize?: number;
 }) {
@@ -1499,6 +1571,7 @@ export async function getDecisionCardPage({
     normalizeSearch(search),
     category || "",
     result || "",
+    body || "",
     normalizePositiveInteger(page, 1),
     normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE)
   );
@@ -1509,12 +1582,18 @@ export async function getActiveAnnouncements(selection: JurisdictionSelection = 
 }
 
 export async function getMeetings(
-  filters: { search?: string; jurisdiction?: JurisdictionSelection; locale?: Locale } = {}
+  filters: {
+    search?: string;
+    jurisdiction?: JurisdictionSelection;
+    locale?: Locale;
+    body?: SantaBarbaraBodyView;
+  } = {}
 ) {
   return getCachedMeetings(
     filters.jurisdiction || getDefaultJurisdiction().slug,
     normalizeSearch(filters.search),
-    filters.locale || "en"
+    filters.locale || "en",
+    filters.body || ""
   );
 }
 
@@ -1531,8 +1610,15 @@ export async function getAdjacentMeetingsForMeeting(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug,
   locale: Locale = "en"
 ): Promise<AdjacentMeetings> {
+  const santaBarbaraBody: SantaBarbaraBodyView | "" =
+    meeting.jurisdiction_slug === "santa-barbara-county"
+      ? matchesSantaBarbaraBody(meeting, "planning")
+        ? "planning"
+        : "board"
+      : "";
+
   if (!meeting.meeting_datetime) {
-    const meetings = await getCachedMeetings(selection, "", locale);
+    const meetings = await getCachedMeetings(selection, "", locale, santaBarbaraBody);
     const currentIndex = meetings.findIndex((row) => row.id === meeting.id);
 
     return {
@@ -1544,7 +1630,13 @@ export async function getAdjacentMeetingsForMeeting(
     };
   }
 
-  return getCachedAdjacentMeetings(selection, meeting.id, meeting.meeting_datetime, locale);
+  return getCachedAdjacentMeetings(
+    selection,
+    meeting.id,
+    meeting.meeting_datetime,
+    locale,
+    santaBarbaraBody
+  );
 }
 
 export async function getMeetingRawVideoDocuments(

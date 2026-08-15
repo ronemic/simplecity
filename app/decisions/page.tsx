@@ -24,13 +24,15 @@ import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 import { CATEGORIES, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
+import { PendingLink } from "@/components/PendingLink";
 
 export const revalidate = 300;
 
 export async function generateMetadata({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; category?: string; result?: string; jurisdiction?: string; page?: string; lang?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; result?: string; body?: string; jurisdiction?: string; page?: string; lang?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
   const locale = seoLocale(params.lang);
@@ -52,7 +54,7 @@ export async function generateMetadata({
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
   const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, locale);
-  const isFiltered = Boolean(params.q || params.category || params.result || params.page);
+  const isFiltered = Boolean(params.q || params.category || params.result || params.body || params.page);
 
   return {
     title,
@@ -89,10 +91,33 @@ function parsePage(value: string | undefined) {
   return Number.isFinite(page) && page > 0 ? page : 1;
 }
 
+function santaBarbaraBodyHref(
+  params: {
+    q?: string;
+    category?: string;
+    result?: string;
+    body?: string;
+    jurisdiction?: string;
+    page?: string;
+    lang?: string;
+  },
+  body: "all" | "board" | "planning"
+) {
+  const nextParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) nextParams.set(key, value);
+  }
+  nextParams.set("body", body);
+  nextParams.delete("page");
+  if (body === "planning") nextParams.delete("result");
+  return `/decisions?${nextParams.toString()}`;
+}
+
 function freshnessLabel(
   freshness: DecisionResultFreshness,
   slug: string,
-  locale: "en" | "es"
+  locale: "en" | "es",
+  advisory = false
 ) {
   const internalSlug = toInternalJurisdictionSlug(slug);
   if (!internalSlug || !Object.prototype.hasOwnProperty.call(freshness, internalSlug)) {
@@ -100,7 +125,11 @@ function freshnessLabel(
   }
 
   const value = freshness[internalSlug as keyof DecisionResultFreshness];
-  if (!value) return locale === "es" ? "Aún no hay resultados" : "No results yet";
+  if (!value) {
+    return advisory
+      ? locale === "es" ? "Aún no hay recomendaciones" : "No recommendations yet"
+      : locale === "es" ? "Aún no hay resultados" : "No results yet";
+  }
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
@@ -114,21 +143,27 @@ function freshnessLabel(
     year: "numeric"
   }).format(parsed);
 
-  return locale === "es"
-    ? `Resultados hasta el ${formattedDate}`
-    : `Results through ${formattedDate}`;
+  return advisory
+    ? locale === "es"
+      ? `Recomendaciones hasta el ${formattedDate}`
+      : `Recommendations through ${formattedDate}`
+    : locale === "es"
+      ? `Resultados hasta el ${formattedDate}`
+      : `Results through ${formattedDate}`;
 }
 
 function DecisionResultsCoverage({
   jurisdiction,
   jurisdictionLabel,
   freshness,
-  locale
+  locale,
+  advisory = false
 }: {
   jurisdiction: JurisdictionSelection;
   jurisdictionLabel: string;
   freshness: DecisionResultFreshness;
   locale: "en" | "es";
+  advisory?: boolean;
 }) {
   const isAll = jurisdiction === ALL_JURISDICTIONS_SLUG;
   const jurisdictions = isAll
@@ -136,32 +171,36 @@ function DecisionResultsCoverage({
     : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
 
   return (
-    <section className="rounded-lg border border-civic/20 bg-[#f4f8fc] px-3.5 py-3 shadow-sm" aria-labelledby="decision-results-coverage">
-      <div>
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
-            <h2 id="decision-results-coverage" className="text-xs font-black uppercase tracking-wide text-ink">
-              {locale === "es" ? "Resultados más recientes" : "Latest decision results"}
-            </h2>
-          </div>
-          <p className="mt-1 text-xs font-medium leading-4 text-black/70">
-            {locale === "es"
-              ? "Los resultados siguen a las actas oficiales, que pueden tardar días o semanas en publicarse después de una reunión."
-              : "Results follow official minutes, which may take days or weeks to appear after a meeting."}
-          </p>
+    <section className="border-b border-black/10 pb-2.5" aria-labelledby="decision-results-coverage">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
+        <div className="flex items-center gap-1.5">
+          <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
+          <h2 id="decision-results-coverage" className="font-black text-ink">
+            {advisory
+              ? locale === "es" ? "Recomendaciones recientes" : "Latest recommendations"
+              : locale === "es" ? "Resultados recientes" : "Latest results"}
+          </h2>
         </div>
-      </div>
-      <dl className="mt-3 grid gap-1 text-xs sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-1">
+        <dl className="flex flex-wrap gap-x-3 gap-y-1">
         {jurisdictions.map((option) => (
           <div key={option.slug} className="flex min-w-0 items-baseline gap-1.5">
-            <dt className="shrink-0 font-bold text-black/60">{option.name}</dt>
+            <dt className="shrink-0 font-bold text-black/55">{option.name}</dt>
             <dd className="min-w-0 font-black text-civic">
-              {freshnessLabel(freshness, option.slug, locale)}
+              {freshnessLabel(freshness, option.slug, locale, advisory)}
             </dd>
           </div>
         ))}
-      </dl>
+        </dl>
+        <p className="font-medium text-black/55">
+          {advisory
+            ? locale === "es"
+              ? "Las recomendaciones son asesoras, no decisiones finales."
+              : "Recommendations are advisory, not final decisions."
+            : locale === "es"
+              ? "Las actas oficiales pueden tardar días o semanas en publicarse."
+              : "Official minutes may take days or weeks to appear."}
+        </p>
+      </div>
     </section>
   );
 }
@@ -173,6 +212,7 @@ export default async function DecisionsPage({
     q?: string;
     category?: string;
     result?: string;
+    body?: string;
     jurisdiction?: string;
     page?: string;
     lang?: string;
@@ -187,11 +227,17 @@ export default async function DecisionsPage({
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const isAllJurisdictions = jurisdiction === ALL_JURISDICTIONS_SLUG;
   const isSchoolDistrict = jurisdiction === "los-altos-school-district";
+  const isSantaBarbara = jurisdiction === "santa-barbara-county";
+  const santaBarbaraBody = normalizeSantaBarbaraBodyView(params.body);
   const topicCategories = isSchoolDistrict ? SCHOOL_CATEGORIES : CATEGORIES;
   const search = (params.q || "").trim();
   const selectedCategory = categoryFromSlug(params.category, topicCategories);
-  const selectedResult = decisionResultFilterFromSlug(params.result);
+  const selectedResult =
+    isSantaBarbara && santaBarbaraBody === "planning"
+      ? undefined
+      : decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
   const [result, decisionResultFreshness] = await Promise.all([
     getDecisionCardPage({
@@ -200,25 +246,87 @@ export default async function DecisionsPage({
       search,
       category: selectedCategory,
       result: selectedResult,
+      body:
+        isSantaBarbara && santaBarbaraBody !== "all"
+          ? santaBarbaraBody
+          : undefined,
       page: currentPage
     }),
-    getDecisionResultFreshness()
+    getDecisionResultFreshness(
+      isSantaBarbara && santaBarbaraBody !== "all" ? santaBarbaraBody : ""
+    )
   ]);
 
   return (
-    <div className="section-shell py-10">
-      <div className="mb-6 max-w-3xl">
-        <p className="label-eyebrow text-civic">{t(locale, "decisions")}</p>
-        <h1 className="page-title mt-2">
-          {decisionsTitle(locale, jurisdiction, jurisdictionLabel)}
-        </h1>
-        <p className="page-copy mt-3 text-base">
-          {t(locale, "decisionsDescription")}
+    <div className="section-shell py-8">
+      <div className="mb-5 max-w-4xl">
+        <p className="label-eyebrow text-civic">
+          {isSantaBarbara ? jurisdictionLabel : t(locale, "decisions")}
+        </p>
+        {isSantaBarbara ? (
+          <h1 className="mt-2 text-balance text-3xl font-black text-ink sm:text-4xl">
+            {locale === "es" ? "Decisiones" : "Decisions"}
+          </h1>
+        ) : (
+          <h1 className="mt-2 text-balance text-3xl font-black text-ink sm:text-4xl">
+            {decisionsTitle(locale, jurisdiction, jurisdictionLabel)}
+          </h1>
+        )}
+        <p className="mt-2 max-w-4xl text-base font-medium leading-7 text-black/70">
+          {isSantaBarbara
+              ? locale === "es"
+                ? "Entiende lo que consideran los líderes del condado y lo que decidieron."
+                : "Understand what county leaders are considering—and what they decided."
+            : t(locale, "decisionsDescription")}
         </p>
       </div>
 
+      {isSantaBarbara ? (
+        <nav
+          aria-label={locale === "es" ? "Órgano del condado" : "County body"}
+          className="mb-5 flex flex-wrap items-end gap-x-7 gap-y-2 border-b border-black/10"
+        >
+          <PendingLink
+            href={santaBarbaraBodyHref(params, "all")}
+            pendingLabel={locale === "es" ? "Abriendo todas" : "Opening all"}
+            aria-current={santaBarbaraBody === "all" ? "page" : undefined}
+            className={`border-b-2 pb-2.5 text-sm font-black transition ${
+              santaBarbaraBody === "all"
+                ? "border-civic text-civic"
+                : "border-transparent text-black/60 hover:text-ink"
+            }`}
+          >
+            {locale === "es" ? "Todas" : "All"}
+          </PendingLink>
+          <PendingLink
+            href={santaBarbaraBodyHref(params, "board")}
+            pendingLabel={locale === "es" ? "Abriendo Junta de Supervisores" : "Opening Board of Supervisors"}
+            aria-current={santaBarbaraBody === "board" ? "page" : undefined}
+            className={`border-b-2 pb-2.5 text-sm font-black transition ${
+              santaBarbaraBody === "board"
+                ? "border-civic text-civic"
+                : "border-transparent text-black/60 hover:text-ink"
+            }`}
+          >
+            {locale === "es" ? "Junta de Supervisores" : "Board of Supervisors"}
+          </PendingLink>
+          <PendingLink
+            href={santaBarbaraBodyHref(params, "planning")}
+            pendingLabel={locale === "es" ? "Abriendo Comisión de Planificación" : "Opening Planning Commission"}
+            aria-current={santaBarbaraBody === "planning" ? "page" : undefined}
+            className={`border-b-2 pb-2.5 text-sm font-black transition ${
+              santaBarbaraBody === "planning"
+                ? "border-civic text-civic"
+                : "border-transparent text-black/60 hover:text-ink"
+            }`}
+          >
+            {locale === "es" ? "Comisión de Planificación" : "Planning Commission"}
+          </PendingLink>
+        </nav>
+      ) : null}
+
       <DecisionBrowser
-        key={`${jurisdiction}-${selectedCategory || "all"}-${selectedResult || "all"}-${search}`}
+        key={`${jurisdiction}-${isSantaBarbara ? santaBarbaraBody : "all-bodies"}-${selectedCategory || "all"}-${selectedResult || "all"}-${search}`}
         cards={result.cards}
         initialSearch={search}
         currentPage={result.page}
@@ -230,14 +338,40 @@ export default async function DecisionsPage({
         selectedResult={selectedResult}
         locale={locale}
         emptyDescription={noCardsDescription(locale, jurisdiction, jurisdictionLabel)}
-        resultFilter={<DecisionResultSelect selectedResult={selectedResult} locale={locale} />}
+        resultFilter={
+          isSantaBarbara && santaBarbaraBody === "planning"
+            ? undefined
+            : <DecisionResultSelect selectedResult={selectedResult} locale={locale} />
+        }
         resultsCoverage={
+          isAllJurisdictions ?
           <DecisionResultsCoverage
             jurisdiction={jurisdiction}
             jurisdictionLabel={jurisdictionLabel}
             freshness={decisionResultFreshness}
             locale={locale}
+            advisory={false}
           />
+          : undefined
+        }
+        resultsCoverageInline={
+          !isAllJurisdictions && !(isSantaBarbara && santaBarbaraBody === "planning") ? (
+            <>
+              <span className="font-bold text-civic">
+                {freshnessLabel(
+                  decisionResultFreshness,
+                  toPublicJurisdictionSlug(jurisdiction),
+                  locale
+                )}
+              </span>
+              <span aria-hidden className="mx-1.5 text-black/25">·</span>
+              <span>
+                {locale === "es"
+                  ? "Las actas oficiales pueden tardar días o semanas."
+                  : "Official minutes may take days or weeks."}
+              </span>
+            </>
+          ) : undefined
         }
         showSantaBarbaraInterestPilot={jurisdiction === "santa-barbara-county"}
       />

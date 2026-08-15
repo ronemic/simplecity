@@ -65,14 +65,30 @@ export function isLongDecisionOutcomeSummary(summary: string) {
   return summary.trim().length > 240;
 }
 
+export function advisoryOutcomeHeadline(headline: string, locale: "en" | "es") {
+  const value = headline.trim();
+  if (/\b(?:approv(?:ed|al)|adopted|passed)\b/i.test(value)) {
+    return locale === "es" ? "Recomendó la aprobación" : "Recommended approval";
+  }
+  if (/\b(?:reject(?:ed|ion)|denied|failed|defeated)\b/i.test(value)) {
+    return locale === "es" ? "Recomendó la denegación" : "Recommended denial";
+  }
+  if (/\bamended\b/i.test(value)) {
+    return locale === "es" ? "Recomendación modificada" : "Recommendation amended";
+  }
+  return value;
+}
+
 export function DecisionOutcomePanel({
   outcome,
   locale = "en",
-  defaultExpanded = false
+  defaultExpanded = false,
+  advisory = false
 }: {
   outcome: DecisionOutcome;
   locale?: "en" | "es";
   defaultExpanded?: boolean;
+  advisory?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
@@ -80,7 +96,12 @@ export function DecisionOutcomePanel({
   const OutcomeIcon = style.Icon;
   const hasLongSummary = isLongDecisionOutcomeSummary(outcome.summary);
   const hasDetails = Boolean(outcome.vote || outcome.next_step || outcome.source_url);
-  const updateLabel = locale === "es" ? "Actualización de la decisión" : "Decision update";
+  const updateLabel = advisory
+    ? locale === "es" ? "Recomendación de la Comisión" : "Planning Commission recommendation"
+    : locale === "es" ? "Actualización de la decisión" : "Decision update";
+  const displayedHeadline = advisory
+    ? advisoryOutcomeHeadline(outcome.headline, locale)
+    : outcome.headline;
   const detailLabel = expanded
     ? locale === "es"
       ? "Ocultar detalles"
@@ -115,8 +136,15 @@ export function DecisionOutcomePanel({
               {updateLabel}
             </p>
             <h4 className={cn("mt-0.5 text-lg font-black leading-tight sm:text-xl", style.label)}>
-              {outcome.headline}
+              {displayedHeadline}
             </h4>
+            {advisory ? (
+              <p className="mt-1 text-xs font-bold leading-5 text-black/60">
+                {locale === "es"
+                  ? "Esta recomendación es asesora; no es una decisión final del condado."
+                  : "This is an advisory recommendation, not a final county decision."}
+              </p>
+            ) : null}
             <p
               className={cn(
                 "mt-1 max-w-3xl text-sm font-semibold leading-6 text-black/70",
@@ -143,7 +171,9 @@ export function DecisionOutcomePanel({
           </div>
           {outcome.decided_at ? (
             <p className="shrink-0 text-xs font-bold text-black/50 sm:pt-0.5">
-              {locale === "es" ? "Decidido" : "Decided"}{" "}
+              {advisory
+                ? locale === "es" ? "Recomendado" : "Recommended"
+                : locale === "es" ? "Decidido" : "Decided"}{" "}
               {decidedAtLabel(outcome.decided_at, locale)}
               <span className="sr-only">.</span>
             </p>
@@ -206,7 +236,9 @@ export function DecisionOutcomePanel({
                     rel="noreferrer"
                     className={cn("mt-2 action-link text-sm", style.label)}
                   >
-                    {locale === "es" ? "Ver resultado de la reunión" : "View meeting result"}
+                    {advisory
+                      ? locale === "es" ? "Ver acta de la recomendación" : "View recommendation record"
+                      : locale === "es" ? "Ver resultado de la reunión" : "View meeting result"}
                     <ExternalLink aria-hidden className="h-4 w-4" />
                   </a>
                 ) : null}

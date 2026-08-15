@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { DecisionFilters } from "@/components/DecisionFilters";
@@ -38,6 +38,7 @@ export function DecisionBrowser({
   emptyDescription,
   resultFilter,
   resultsCoverage,
+  resultsCoverageInline,
   showTopicFilters = true,
   showSantaBarbaraInterestPilot = false
 }: {
@@ -54,6 +55,7 @@ export function DecisionBrowser({
   emptyDescription: string;
   resultFilter?: ReactNode;
   resultsCoverage?: ReactNode;
+  resultsCoverageInline?: ReactNode;
   showTopicFilters?: boolean;
   showSantaBarbaraInterestPilot?: boolean;
 }) {
@@ -63,6 +65,8 @@ export function DecisionBrowser({
   const [search, setSearch] = useState(initialSearch);
   const [pendingPage, setPendingPage] = useState<number | null>(null);
   const [santaBarbaraView, setSantaBarbaraView] = useState<SantaBarbaraDecisionView>("all");
+  const [showSearch, setShowSearch] = useState(Boolean(initialSearch));
+  const [showFilters, setShowFilters] = useState(Boolean(selectedCategory || selectedResult));
   const [isPending, startTransition] = useTransition();
   const resultStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const resultEnd = totalCount === 0 ? 0 : resultStart + cards.length - 1;
@@ -103,7 +107,7 @@ export function DecisionBrowser({
 
   return (
     <>
-      {showSantaBarbaraInterestPilot ? (
+      {showSantaBarbaraInterestPilot && santaBarbaraView === "interests" ? (
         <SantaBarbaraInterestHub
           activeView={santaBarbaraView}
           locale={locale}
@@ -113,37 +117,88 @@ export function DecisionBrowser({
 
       {santaBarbaraView === "all" ? (
         <>
-          <div className="mb-5 grid gap-3">
+          <div className="mb-5">
             {resultsCoverage}
-            <div className="grid gap-2.5 sm:flex sm:items-center sm:justify-between">
-              <div className="min-w-0">{resultFilter}</div>
-              <div className="flex min-w-0 sm:justify-end">
-                <p aria-live="polite" className="count-badge w-full justify-center gap-2 text-center sm:w-auto sm:whitespace-nowrap">
-                  {isPending ? (
+            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 border-b border-black/10 py-3">
+              <div>
+                <h2 className="text-lg font-black text-ink">
+                  {locale === "es" ? "Decisiones recientes" : "Latest decisions"}
+                </h2>
+                <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-black/50">
+                  <p aria-live="polite" className="inline-flex items-center gap-2">
+                    {isPending ? (
+                      <>
+                        <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
+                        {locale === "es" ? "Actualizando resultados" : "Updating results"}
+                      </>
+                    ) : resultSummary(locale, resultStart, resultEnd, totalCount)}
+                  </p>
+                  {resultsCoverageInline ? (
                     <>
-                      <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
-                      {locale === "es" ? "Actualizando resultados" : "Updating results"}
+                      <span aria-hidden className="text-black/25">·</span>
+                      <p>{resultsCoverageInline}</p>
                     </>
-                  ) : (
-                    resultSummary(locale, resultStart, resultEnd, totalCount)
-                  )}
-                </p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <button
+                  type="button"
+                  aria-expanded={showSearch}
+                  onClick={() => setShowSearch((value) => !value)}
+                  className="action-link text-sm"
+                >
+                  <Search aria-hidden className="h-4 w-4" />
+                  {locale === "es" ? "Buscar" : "Search"}
+                </button>
+                <button
+                  type="button"
+                  aria-expanded={showFilters}
+                  onClick={() => setShowFilters((value) => !value)}
+                  className="action-link text-sm"
+                >
+                  <SlidersHorizontal aria-hidden className="h-4 w-4" />
+                  {locale === "es" ? "Filtros" : "Filters"}
+                  {selectedCategory || selectedResult ? (
+                    <span className="tabular-nums text-black/45">
+                      {[selectedCategory, selectedResult].filter(Boolean).length}
+                    </span>
+                  ) : null}
+                </button>
+                {showSantaBarbaraInterestPilot ? (
+                  <SantaBarbaraInterestHub
+                    activeView="all"
+                    locale={locale}
+                    onViewChange={setSantaBarbaraView}
+                    inline
+                  />
+                ) : null}
               </div>
             </div>
+
+            {showSearch ? (
+              <div className="max-w-3xl border-b border-black/10 py-3" aria-busy={isPending}>
+                <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
+              </div>
+            ) : null}
+
+            {showFilters ? (
+              <div className="border-b border-black/10 py-3">
+                {resultFilter ? <div className="max-w-xs">{resultFilter}</div> : null}
+                {showTopicFilters ? (
+                  <div className={resultFilter ? "mt-3" : ""}>
+                    <DecisionFilters
+                      selectedCategory={selectedCategory}
+                      categories={topicCategories}
+                      locale={locale}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
 
-          <div aria-busy={isPending}>
-            <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
-          </div>
-          {showTopicFilters ? (
-            <DecisionFilters
-              selectedCategory={selectedCategory}
-              categories={topicCategories}
-              locale={locale}
-            />
-          ) : null}
-
-          <div className="mt-6 grid gap-3" aria-live="polite">
+          <div className="grid gap-3" aria-live="polite">
             {cards.map((card) => (
               <SummaryCard key={card.id} card={card} highlight={highlight} locale={locale} />
             ))}

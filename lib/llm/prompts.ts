@@ -178,7 +178,15 @@ School-district guidance:
 - Do not infer or expose confidential student, discipline, special-education, personnel, or closed-session details beyond what the public source explicitly reports.
 - Virtual viewing does not imply virtual public comment. Follow only the participation method stated in the current meeting source.
 `
-    : "";
+    : meeting.jurisdictionSlug === "santa-barbara-county" && /planning commission/i.test(meeting.meetingType)
+      ? `
+Santa Barbara County Planning Commission guidance:
+- The Planning Commission is an advisory body. Its actions are recommendations, not final county decisions.
+- Clearly describe what the Commission is being asked to recommend and identify the Board of Supervisors or other responsible authority as the final decision-maker when the source supports that next step.
+- Never describe a Planning Commission action as final approval, final denial, or a final county decision.
+- The required status value may remain “Upcoming vote” for schema compatibility, but all public-facing explanation must call the action a recommendation.
+`
+      : "";
 
   return `Meeting metadata:
 Title: ${meeting.title}

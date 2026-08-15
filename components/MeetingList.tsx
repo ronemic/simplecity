@@ -33,6 +33,7 @@ import {
   MEETING_VIEW_STORAGE_KEY,
   type MeetingView
 } from "@/lib/config/meetingView";
+import { isSantaBarbaraPlanningMeeting } from "@/lib/utils/santaBarbaraBody";
 
 type MeetingCalendarProps = {
   meetings: MeetingRow[];
@@ -267,6 +268,7 @@ function MeetingLine({
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
   const meetingType = displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale);
   const meetingJurisdiction = jurisdictionLabel(meeting);
+  const advisory = isSantaBarbaraPlanningMeeting(meeting);
   const searchMatch = meetingSearchMatch(meeting, highlight || "", locale);
   const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight || "", locale);
   const showCompactSearchMatch =
@@ -301,10 +303,15 @@ function MeetingLine({
         >
           <HighlightedText text={displayMeetingTitle(meeting, meetingTitleFallback, locale)} query={highlight} />
         </PendingLink>
-        <p className="mt-0.5 text-xs font-semibold leading-5 text-black/55">
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs font-semibold leading-5 text-black/55">
           <HighlightedText text={meetingType} query={highlight} />
-          {" · "}
+          <span aria-hidden>·</span>
           <HighlightedText text={meetingJurisdiction} query={highlight} />
+          {advisory ? (
+            <span className="rounded-full border border-[#b8a06a] bg-[#fff8e7] px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-[0.05em] text-[#765514]">
+              {locale === "es" ? "Asesora" : "Advisory"}
+            </span>
+          ) : null}
         </p>
         {showCompactSearchMatch ? (
           <p className="mt-0.5 text-xs font-bold leading-5 text-civic">

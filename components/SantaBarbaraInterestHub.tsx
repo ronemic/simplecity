@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers3, Loader2, Star, Trash2 } from "lucide-react";
+import { ArrowLeft, Loader2, Star, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SummaryCard } from "@/components/SummaryCard";
@@ -18,18 +18,19 @@ import {
 } from "@/lib/interests/santaBarbara";
 import type { Locale } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
-import { cn } from "@/lib/utils/cn";
 
 export type SantaBarbaraDecisionView = "all" | "interests";
 
 export function SantaBarbaraInterestHub({
   locale,
   activeView,
-  onViewChange
+  onViewChange,
+  inline = false
 }: {
   locale: Locale;
   activeView: SantaBarbaraDecisionView;
   onViewChange: (view: SantaBarbaraDecisionView) => void;
+  inline?: boolean;
 }) {
   const [interests, setInterests] = useState<SavedSantaBarbaraInterest[]>([]);
   const [updates, setUpdates] = useState<Record<string, SantaBarbaraInterestCardUpdate>>({});
@@ -142,35 +143,34 @@ export function SantaBarbaraInterestHub({
   }
 
   return (
-    <section className="mb-5 border-b border-black/10 pb-4" aria-label={locale === "es" ? "Vistas de decisiones" : "Decision views"}>
-      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
-        <div className="segmented-control w-full sm:w-auto" role="group" aria-label={locale === "es" ? "Mostrar decisiones" : "Show decisions"}>
+    <section className={inline ? "" : "mb-3"} aria-label={locale === "es" ? "Vistas de decisiones" : "Decision views"}>
+      <div className="flex justify-end">
+        <div>
+          {activeView === "interests" ? (
           <button
-            aria-pressed={activeView === "all"}
-            className={cn("segmented-button flex-1 justify-center sm:flex-none", activeView === "all" && "segmented-button-selected")}
+            className="action-link text-sm"
             onClick={() => onViewChange("all")}
             type="button"
           >
-            <Layers3 aria-hidden className="h-4 w-4" />
-            {locale === "es" ? "Todas las decisiones" : "All decisions"}
+            <ArrowLeft aria-hidden className="h-4 w-4" />
+            {locale === "es" ? "Volver a todas las decisiones" : "Back to all decisions"}
           </button>
+          ) : (
           <button
-            aria-pressed={activeView === "interests"}
-            className={cn("segmented-button flex-1 justify-center sm:flex-none", activeView === "interests" && "segmented-button-selected")}
+            className="action-link text-sm"
             onClick={() => onViewChange("interests")}
             type="button"
           >
             <Star aria-hidden className="h-4 w-4" />
             {locale === "es" ? "Mis intereses" : "My interests"}
-            <span className={cn("tabular-nums", activeView === "interests" ? "text-white/80" : "text-black/45")}>
-              {interests.length}
-            </span>
+            <span className="tabular-nums text-black/45">{interests.length}</span>
             {updatedCount > 0 ? (
-              <span className={cn("h-2 w-2 rounded-full", activeView === "interests" ? "bg-white" : "bg-civic")}>
+              <span className="h-2 w-2 rounded-full bg-civic">
                 <span className="sr-only">{updatedCount} {locale === "es" ? "actualizaciones" : "updates"}</span>
               </span>
             ) : null}
           </button>
+          )}
         </div>
       </div>
 

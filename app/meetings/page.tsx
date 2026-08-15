@@ -16,6 +16,8 @@ import {
   MEETING_VIEW_PREFERENCE_COOKIE,
   normalizeMeetingView
 } from "@/lib/config/meetingView";
+import { SantaBarbaraBodyHeading } from "@/components/SantaBarbaraBodyHeading";
+import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 
 export const revalidate = 300;
 
@@ -27,6 +29,7 @@ export async function generateMetadata({
     month?: string;
     date?: string;
     view?: string;
+    body?: string;
     jurisdiction?: string;
     lang?: string;
   }>;
@@ -51,7 +54,7 @@ export async function generateMetadata({
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
   const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, locale);
-  const isFiltered = Boolean(params.q || params.month || params.date || params.view);
+  const isFiltered = Boolean(params.q || params.month || params.date || params.view || params.body);
 
   return {
     title,
@@ -79,6 +82,7 @@ export default async function MeetingsPage({
     month?: string;
     date?: string;
     view?: string;
+    body?: string;
     jurisdiction?: string;
     lang?: string;
   }>;
@@ -90,21 +94,38 @@ export default async function MeetingsPage({
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const isSantaBarbara = jurisdiction === "santa-barbara-county";
+  const santaBarbaraBody = normalizeSantaBarbaraBodyView(params.body);
   const search = params.q || "";
   const view = normalizeMeetingView(
     params.view || cookieStore.get(MEETING_VIEW_PREFERENCE_COOKIE)?.value
   );
-  const meetings = await getMeetings({ jurisdiction, locale });
+  const meetings = await getMeetings({
+    jurisdiction,
+    locale,
+    body:
+      isSantaBarbara && santaBarbaraBody !== "all"
+        ? santaBarbaraBody
+        : undefined
+  });
 
   return (
     <div className="section-shell py-10">
       <div className="mb-6 max-w-3xl">
         <p className="label-eyebrow text-civic">{t(locale, "meetings")}</p>
-        <h1 className="page-title mt-2">
-          {meetingsTitle(locale, jurisdiction, jurisdictionLabel)}
-        </h1>
+        {isSantaBarbara ? (
+          <SantaBarbaraBodyHeading activeBody={santaBarbaraBody} locale={locale} page="meetings" />
+        ) : (
+          <h1 className="page-title mt-2">
+            {meetingsTitle(locale, jurisdiction, jurisdictionLabel)}
+          </h1>
+        )}
         <p className="page-copy mt-3 text-base">
-          {t(locale, "meetingsDescription")}
+          {isSantaBarbara && santaBarbaraBody === "planning"
+            ? locale === "es"
+              ? "La Comisión de Planificación es un órgano asesor; sus acciones no son decisiones finales del condado."
+              : "The Planning Commission is an advisory body; its actions are not final county decisions."
+            : t(locale, "meetingsDescription")}
         </p>
       </div>
 

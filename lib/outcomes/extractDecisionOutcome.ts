@@ -205,10 +205,19 @@ function isCommitteeMeeting(meeting: Pick<LlmReadyMeeting, "title">) {
   return /\bcommittee\b/i.test(meeting.title);
 }
 
+function isSantaBarbaraPlanningCommission(
+  meeting: Pick<LlmReadyMeeting, "jurisdictionSlug" | "title" | "meetingType">
+) {
+  return (
+    meeting.jurisdictionSlug === "santa-barbara-county" &&
+    /planning commission/i.test(`${meeting.meetingType} ${meeting.title}`)
+  );
+}
+
 export function interpretOfficialAction(
   action: string | null | undefined,
   result: string | null | undefined,
-  meeting: Pick<LlmReadyMeeting, "jurisdictionSlug" | "title">
+  meeting: Pick<LlmReadyMeeting, "jurisdictionSlug" | "title" | "meetingType">
 ): CanonicalDecisionOutcome {
   const actionText = compactOutcomeText(action);
   const resultText = compactOutcomeText(result);
@@ -217,6 +226,50 @@ export function interpretOfficialAction(
   const lowerResult = resultText.toLowerCase();
   const lowerSource = sourceText.toLowerCase();
   const failed = /\b(?:fail(?:ed)?|denied|rejected|defeated)\b/.test(lowerSource);
+
+  if (isSantaBarbaraPlanningCommission(meeting)) {
+    const advisoryKind = classifyDecisionOutcome(sourceText);
+    if (advisoryKind === "continued") {
+      return {
+        kind: "continued",
+        canonicalStatus: "continued",
+        headline: outcomeHeadline("continued", sourceText),
+        nextStep: extractNextStep(sourceText, "continued")
+      };
+    }
+    if (advisoryKind === "approved") {
+      return {
+        kind: "other",
+        canonicalStatus: "recommended",
+        headline: "Recommended approval",
+        nextStep: "This is an advisory recommendation, not a final county decision."
+      };
+    }
+    if (advisoryKind === "rejected") {
+      return {
+        kind: "other",
+        canonicalStatus: "recommended",
+        headline: "Recommended denial",
+        nextStep: "This is an advisory recommendation, not a final county decision."
+      };
+    }
+    if (advisoryKind === "amended") {
+      return {
+        kind: "other",
+        canonicalStatus: "recommended",
+        headline: "Recommendation amended",
+        nextStep: "This is an advisory recommendation, not a final county decision."
+      };
+    }
+    return {
+      kind: "other",
+      canonicalStatus: "recorded",
+      headline: /\bno action(?: taken)?\b/.test(lowerSource)
+        ? "No recommendation made"
+        : "Advisory action recorded",
+      nextStep: "This is an advisory action, not a final county decision."
+    };
+  }
 
   if (/\brecommend(?:ed|ation)?\b/.test(lowerAction)) {
     return {

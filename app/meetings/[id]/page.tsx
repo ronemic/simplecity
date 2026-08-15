@@ -27,6 +27,7 @@ import { getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { localizedSeoUrls, seoLocale, serializeJsonLd } from "@/lib/seo";
 import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
+import { isSantaBarbaraPlanningMeeting } from "@/lib/utils/santaBarbaraBody";
 
 export const revalidate = 300;
 
@@ -210,6 +211,7 @@ export default async function MeetingDetailPage({
   const jurisdictionLabel = getJurisdictionDisplayLabel(
     meeting.jurisdiction_slug || meeting.jurisdiction_name
   );
+  const isAdvisoryPlanningMeeting = isSantaBarbaraPlanningMeeting(meeting);
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
   const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
   canonicalUrl.searchParams.set("jurisdiction", publicJurisdiction);
@@ -294,6 +296,14 @@ export default async function MeetingDetailPage({
           </div>
           <h1 className="page-title mt-3">{displayMeetingTitle(meeting, meetingTitleFallback, locale)}</h1>
           <p className="page-copy mt-3 text-base">{displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)}</p>
+          {isAdvisoryPlanningMeeting ? (
+            <div className="mt-4 max-w-3xl rounded-lg border border-[#d6bd7d] bg-[#fff8e7] px-4 py-3 text-sm font-semibold leading-6 text-[#684b13]">
+              <strong>{locale === "es" ? "Órgano asesor:" : "Advisory body:"}</strong>{" "}
+              {locale === "es"
+                ? "las recomendaciones de la Comisión de Planificación no son decisiones finales del condado."
+                : "Planning Commission recommendations are not final county decisions."}
+            </div>
+          ) : null}
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <AddToGoogleCalendarLink meeting={meeting} locale={locale} />
             {renderMeetingNavigation("flex flex-wrap items-center gap-2 lg:hidden")}

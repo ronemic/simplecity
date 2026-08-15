@@ -156,6 +156,25 @@ test("interprets Legistar pass flags in the context of their procedural action",
   );
 });
 
+test("Santa Barbara Planning Commission actions remain advisory recommendations", () => {
+  const planningCommission = meeting("santa-barbara-county", {
+    title: "County Planning Commission"
+  });
+
+  assert.deepEqual(interpretOfficialAction("APPROVED", "Pass", planningCommission), {
+    kind: "other",
+    canonicalStatus: "recommended",
+    headline: "Recommended approval",
+    nextStep: "This is an advisory recommendation, not a final county decision."
+  });
+  assert.deepEqual(interpretOfficialAction("DENIED", "Fail", planningCommission), {
+    kind: "other",
+    canonicalStatus: "recommended",
+    headline: "Recommended denial",
+    nextStep: "This is an advisory recommendation, not a final county decision."
+  });
+});
+
 test("treats explicitly failed procedural actions as rejected", () => {
   const board = meeting("san-francisco", { title: "Board of Supervisors" });
 

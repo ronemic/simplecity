@@ -29,7 +29,7 @@ export function SearchInput({
         placeholder={placeholder}
         aria-label={ariaLabel}
         autoComplete="off"
-        className="input-control input-control--search"
+        className="input-control input-control--search input-control--hero-search"
       />
       {search ? (
         <button
@@ -57,7 +57,7 @@ export function DecisionSearchForm({
   locale?: Locale;
 }) {
   return (
-    <div className="quiet-card p-4 sm:p-5" role="search">
+    <div role="search">
       <SearchInput
         search={search}
         onSearchChange={onSearchChange}

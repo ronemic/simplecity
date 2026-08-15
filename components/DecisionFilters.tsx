@@ -30,8 +30,8 @@ export function DecisionFilters({
 
   return (
     <section aria-label={locale === "es" ? "Filtros de decisiones" : "Decision filters"}>
-      <nav aria-label={locale === "es" ? "Filtrar por tema" : "Filter by topic"} className="border-b border-black/10 py-5">
-        <p className="mb-3 text-sm font-bold text-ink">
+      <nav aria-label={locale === "es" ? "Filtrar por tema" : "Filter by topic"}>
+        <p className="mb-2 text-sm font-bold text-ink">
           {locale === "es" ? "Filtrar por tema" : "Filter by topic"}
         </p>
         <div className="flex gap-2.5 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
@@ -56,7 +56,6 @@ export function DecisionFilters({
           ))}
         </div>
       </nav>
-
     </section>
   );
 }
