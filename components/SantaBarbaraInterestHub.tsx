@@ -148,7 +148,7 @@ export function SantaBarbaraInterestHub({
         <div>
           {activeView === "interests" ? (
           <button
-            className="action-link text-sm"
+            className={inline ? "action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm" : "action-link text-sm"}
             onClick={() => onViewChange("all")}
             type="button"
           >
@@ -157,11 +157,11 @@ export function SantaBarbaraInterestHub({
           </button>
           ) : (
           <button
-            className="action-link text-sm"
+            className={inline ? "action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm" : "action-link text-sm"}
             onClick={() => onViewChange("interests")}
             type="button"
           >
-            <Star aria-hidden className="h-4 w-4" />
+            <Star aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             {locale === "es" ? "Mis intereses" : "My interests"}
             <span className="tabular-nums text-black/45">{interests.length}</span>
             {updatedCount > 0 ? (

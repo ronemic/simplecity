@@ -119,9 +119,9 @@ export function DecisionBrowser({
         <>
           <div className="mb-5">
             {resultsCoverage}
-            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 border-b border-black/10 py-3">
+            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 border-b border-black/10 py-2.5 sm:py-3">
               <div>
-                <h2 className="text-lg font-black text-ink">
+                <h2 className="text-base font-black text-ink sm:text-lg">
                   {locale === "es" ? "Decisiones recientes" : "Latest decisions"}
                 </h2>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-black/50">
@@ -141,23 +141,23 @@ export function DecisionBrowser({
                   ) : null}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 sm:w-auto sm:gap-x-4">
                 <button
                   type="button"
                   aria-expanded={showSearch}
                   onClick={() => setShowSearch((value) => !value)}
-                  className="action-link text-sm"
+                  className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
                 >
-                  <Search aria-hidden className="h-4 w-4" />
+                  <Search aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {locale === "es" ? "Buscar" : "Search"}
                 </button>
                 <button
                   type="button"
                   aria-expanded={showFilters}
                   onClick={() => setShowFilters((value) => !value)}
-                  className="action-link text-sm"
+                  className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
                 >
-                  <SlidersHorizontal aria-hidden className="h-4 w-4" />
+                  <SlidersHorizontal aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   {locale === "es" ? "Filtros" : "Filters"}
                   {selectedCategory || selectedResult ? (
                     <span className="tabular-nums text-black/45">

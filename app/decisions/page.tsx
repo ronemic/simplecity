@@ -258,25 +258,25 @@ export default async function DecisionsPage({
   ]);
 
   return (
-    <div className="section-shell py-8">
-      <div className="mb-5 max-w-4xl">
+    <div className="section-shell py-5 sm:py-8">
+      <div className="mb-3 max-w-4xl sm:mb-5">
         <p className="label-eyebrow text-civic">
           {isSantaBarbara ? jurisdictionLabel : t(locale, "decisions")}
         </p>
         {isSantaBarbara ? (
-          <h1 className="mt-2 text-balance text-3xl font-black text-ink sm:text-4xl">
+          <h1 className="mt-2 text-balance text-2xl font-black text-ink sm:text-4xl">
             {locale === "es" ? "Decisiones" : "Decisions"}
           </h1>
         ) : (
-          <h1 className="mt-2 text-balance text-3xl font-black text-ink sm:text-4xl">
+          <h1 className="mt-2 text-balance text-2xl font-black text-ink sm:text-4xl">
             {decisionsTitle(locale, jurisdiction, jurisdictionLabel)}
           </h1>
         )}
         <p className="mt-2 max-w-4xl text-base font-medium leading-7 text-black/70">
           {isSantaBarbara
-              ? locale === "es"
-                ? "Entiende lo que consideran los líderes del condado y lo que decidieron."
-                : "Understand what county leaders are considering—and what they decided."
+            ? locale === "es"
+              ? "Entiende lo que consideran los líderes del condado y lo que decidieron."
+              : "Understand what county leaders are considering—and what they decided."
             : t(locale, "decisionsDescription")}
         </p>
       </div>
@@ -284,13 +284,13 @@ export default async function DecisionsPage({
       {isSantaBarbara ? (
         <nav
           aria-label={locale === "es" ? "Órgano del condado" : "County body"}
-          className="mb-5 flex flex-wrap items-end gap-x-7 gap-y-2 border-b border-black/10"
+          className="mb-4 flex items-end gap-x-4 overflow-x-auto border-b border-black/10 sm:mb-5 sm:gap-x-7"
         >
           <PendingLink
             href={santaBarbaraBodyHref(params, "all")}
             pendingLabel={locale === "es" ? "Abriendo todas" : "Opening all"}
             aria-current={santaBarbaraBody === "all" ? "page" : undefined}
-            className={`border-b-2 pb-2.5 text-sm font-black transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 pb-2.5 text-[13px] font-black transition sm:text-sm ${
               santaBarbaraBody === "all"
                 ? "border-civic text-civic"
                 : "border-transparent text-black/60 hover:text-ink"
@@ -302,19 +302,22 @@ export default async function DecisionsPage({
             href={santaBarbaraBodyHref(params, "board")}
             pendingLabel={locale === "es" ? "Abriendo Junta de Supervisores" : "Opening Board of Supervisors"}
             aria-current={santaBarbaraBody === "board" ? "page" : undefined}
-            className={`border-b-2 pb-2.5 text-sm font-black transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 pb-2.5 text-[13px] font-black transition sm:text-sm ${
               santaBarbaraBody === "board"
                 ? "border-civic text-civic"
                 : "border-transparent text-black/60 hover:text-ink"
             }`}
           >
-            {locale === "es" ? "Junta de Supervisores" : "Board of Supervisors"}
+            <span className="sm:hidden">{locale === "es" ? "Junta" : "Board"}</span>
+            <span className="hidden sm:inline">
+              {locale === "es" ? "Junta de Supervisores" : "Board of Supervisors"}
+            </span>
           </PendingLink>
           <PendingLink
             href={santaBarbaraBodyHref(params, "planning")}
             pendingLabel={locale === "es" ? "Abriendo Comisión de Planificación" : "Opening Planning Commission"}
             aria-current={santaBarbaraBody === "planning" ? "page" : undefined}
-            className={`border-b-2 pb-2.5 text-sm font-black transition ${
+            className={`shrink-0 whitespace-nowrap border-b-2 pb-2.5 text-[13px] font-black transition sm:text-sm ${
               santaBarbaraBody === "planning"
                 ? "border-civic text-civic"
                 : "border-transparent text-black/60 hover:text-ink"
@@ -364,8 +367,8 @@ export default async function DecisionsPage({
                   locale
                 )}
               </span>
-              <span aria-hidden className="mx-1.5 text-black/25">·</span>
-              <span>
+              <span aria-hidden className="mx-1.5 hidden text-black/25 sm:inline">·</span>
+              <span className="hidden sm:inline">
                 {locale === "es"
                   ? "Las actas oficiales pueden tardar días o semanas."
                   : "Official minutes may take days or weeks."}
