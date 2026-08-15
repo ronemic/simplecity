@@ -92,7 +92,6 @@ export function HeaderNav({
   const [pendingSelector, setPendingSelector] = useState<"jurisdiction" | "language" | null>(null);
   const jurisdictionMenuRef = useRef<HTMLDivElement>(null);
   const languageMenuRef = useRef<HTMLDivElement>(null);
-  const mobileMenuRef = useRef<HTMLElement>(null);
   const isJurisdictionPending = isPending && pendingSelector === "jurisdiction";
   const isLanguagePending = isPending && pendingSelector === "language";
   const selected = isJurisdictionPending ? optimisticJurisdiction : routeSelectedJurisdiction;
@@ -149,34 +148,6 @@ export function HeaderNav({
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, [isLanguageMenuOpen]);
-
-  useEffect(() => {
-    if (!isMobileMenuOpen) return;
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!mobileMenuRef.current?.contains(event.target as Node)) {
-        setIsMobileMenuOpen(false);
-        setIsJurisdictionMenuOpen(false);
-        setIsLanguageMenuOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setIsMobileMenuOpen(false);
-        setIsJurisdictionMenuOpen(false);
-        setIsLanguageMenuOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMobileMenuOpen]);
 
   function hrefWithJurisdiction(href: string) {
     const params = new URLSearchParams();
@@ -238,7 +209,6 @@ export function HeaderNav({
 
   return (
     <nav
-      ref={mobileMenuRef}
       aria-label="Primary navigation"
       className="contents text-sm font-semibold text-ink md:ml-auto md:block"
     >
