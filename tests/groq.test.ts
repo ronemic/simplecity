@@ -7,6 +7,7 @@ import {
   runSummaryBatchesSequentially
 } from "@/lib/llm/groq";
 import {
+  configuredLlmRequestTimeoutMs,
   fetchLlmResponse,
   formatLlmProcessRunSummary,
   getLlmProcessBudgetUsage,
@@ -27,6 +28,21 @@ const meetingSummary = {
 
 test("bounds primary LLM requests at five minutes", () => {
   assert.equal(LLM_REQUEST_TIMEOUT_MS, 300_000);
+});
+
+test("allows a jurisdiction workflow to lower, but not raise, the LLM timeout", (t) => {
+  const original = process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS;
+  t.after(() => {
+    if (original === undefined) delete process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS;
+    else process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS = original;
+  });
+
+  process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS = "180000";
+  assert.equal(configuredLlmRequestTimeoutMs(), 180_000);
+  process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS = "600000";
+  assert.equal(configuredLlmRequestTimeoutMs(), 300_000);
+  process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS = "1000";
+  assert.equal(configuredLlmRequestTimeoutMs(), 30_000);
 });
 
 function card(overrides: Partial<SimpleCitySummary["cards"][number]> = {}) {

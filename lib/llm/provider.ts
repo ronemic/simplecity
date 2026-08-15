@@ -21,6 +21,16 @@ export const GROQ_MAX_ESTIMATED_INPUT_TOKENS = 6_000;
 export const GROQ_SAFE_TOTAL_TOKENS = 7_500;
 export const GROQ_MAX_FAILOVER_KEYS_PER_REQUEST = 2;
 
+export function configuredLlmRequestTimeoutMs(
+  fallback = LLM_REQUEST_TIMEOUT_MS
+) {
+  const raw = process.env.SIMPLECITY_LLM_REQUEST_TIMEOUT_MS;
+  if (!raw) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(30_000, Math.min(fallback, Math.floor(parsed)));
+}
+
 export class LlmProcessBudgetExceededError extends Error {
   readonly code = "LLM_PROCESS_BUDGET_EXCEEDED";
   readonly retryable = false;

@@ -4,6 +4,7 @@ import path from "node:path";
 import type { BrowserContext } from "playwright";
 import type { PrimeGovDocument, PrimeGovMeeting } from "@/lib/types";
 import { isUsableOfficialSourceText } from "./documentUsability";
+import { extractPdfTextForDocument } from "./pdfText";
 import {
   buildDownloadFilename,
   isUsablePrimeGovHtmlAgendaText,
@@ -41,8 +42,16 @@ async function downloadOfficialDocumentWithRetries(
   streamOptions: Parameters<typeof streamDownloadToTemp>[3],
   log: (message: string) => void
 ) {
+  const attempts = Math.max(
+    1,
+    Math.min(
+      5,
+      Math.floor(options.downloadAttempts || OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS)
+    )
+  );
+  const retryDelayMs = Math.max(0, Math.min(5_000, options.retryDelayMs ?? 250));
   let lastError: unknown;
-  for (let attempt = 1; attempt <= OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
     if (options.shouldStop?.()) {
       throw new Error("Document transfer stopped because the pipeline deadline is near.");
     }
@@ -51,17 +60,17 @@ async function downloadOfficialDocumentWithRetries(
     } catch (error) {
       lastError = error;
       if (
-        attempt === OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS ||
+        attempt === attempts ||
         !isTransientOfficialDocumentError(error)
       ) {
         throw error;
       }
       log(
-        `Transient official-document download failure for ${url}; retrying (${attempt + 1}/${OFFICIAL_DOCUMENT_DOWNLOAD_ATTEMPTS}): ${
+        `Transient official-document download failure for ${url}; retrying (${attempt + 1}/${attempts}): ${
           error instanceof Error ? error.message : "Unknown download error"
         }`
       );
-      await new Promise((resolve) => setTimeout(resolve, attempt * 250));
+      await new Promise((resolve) => setTimeout(resolve, attempt * retryDelayMs));
     }
   }
   throw lastError;
@@ -91,6 +100,10 @@ export type DownloadDocumentsOptions = {
   documentFilter?: (document: PrimeGovDocument) => boolean;
   userAgent?: string;
   plainTextFallbackUrl?: (documentUrl: string) => string | null;
+  validatePdfTextBeforeAccept?: boolean;
+  requestHeaders?: Record<string, string>;
+  downloadAttempts?: number;
+  retryDelayMs?: number;
   fetchImpl?: typeof fetch;
   statfsImpl?: (directory: string) => Promise<{ bavail: number | bigint; bsize: number | bigint }>;
   downloadBudget?: StreamDownloadBudget;
@@ -638,7 +651,8 @@ export async function downloadOfficialSiteDocuments(
 
       const requestHeaders = {
         "User-Agent": options.userAgent || "Mozilla/5.0 SimpleCity official-site agenda scraper",
-        Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url
+        Referer: meeting.sectionUrl || meeting.sourceUrl || doc.url,
+        ...options.requestHeaders
       };
       let primaryError: string | null = null;
 
@@ -658,9 +672,45 @@ export async function downloadOfficialSiteDocuments(
           } else if (streamed.prefix.subarray(0, 5).toString() === "%PDF-") {
             const filePath = path.join(docsDir, `${baseFilename}.pdf`);
             await streamed.commit(filePath);
-            downloaded += 1;
             doc.localPath = filePath;
             doc.downloadError = null;
+
+            const fallbackUrl = options.plainTextFallbackUrl?.(doc.url);
+            if (options.validatePdfTextBeforeAccept && fallbackUrl) {
+              const extracted = await extractPdfTextForDocument(doc);
+              if (!extracted?.text) {
+                try {
+                  const fallbackPath = path.join(docsDir, `${baseFilename}.txt`);
+                  const fallback = await downloadOfficialPlainTextFallback(
+                    context,
+                    fallbackUrl,
+                    targetPath,
+                    fallbackPath,
+                    options,
+                    budget,
+                    requestHeaders
+                  );
+                  await fs.unlink(filePath).catch(() => undefined);
+                  downloaded += 1;
+                  doc.localPath = fallbackPath;
+                  doc.bytes = fallback.bytes;
+                  doc.extractedText = fallback.text;
+                  doc.extractionCharacterCount = fallback.text.length;
+                  doc.isScanned = false;
+                  doc.downloadError = null;
+                  log(`Saved official plain-text fallback for unreadable PDF: ${fallbackPath}`);
+                  continue;
+                } catch (error) {
+                  log(
+                    `Plain-text fallback for unreadable PDF failed for ${doc.url}: ${
+                      error instanceof Error ? error.message : "Unknown fallback error"
+                    }`
+                  );
+                }
+              }
+            }
+
+            downloaded += 1;
             log(`Downloaded: ${filePath}`);
             continue;
           } else {

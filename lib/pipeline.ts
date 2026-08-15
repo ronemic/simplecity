@@ -29,6 +29,7 @@ import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutc
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
 import {
   authoritativeAgendaItemSourceIds,
+  isCancellationNoticeText,
   isMeetingCancelled,
   prepareLlmInput
 } from "@/lib/scraper/prepareLlmInput";
@@ -191,8 +192,12 @@ export function agendaIngestionErrors(meetings: PrimeGovMeeting[]) {
 
   for (const meeting of meetings) {
     // A stale agenda or packet may remain published after the cancellation notice.
-    // That is not an ingestion failure and must not trigger recovery/LLM work.
-    if (isMeetingCancelled(meeting)) continue;
+    // CivicClerk can also label a short cancellation PDF as an agenda while leaving
+    // the event card itself active, so inspect already-extracted official text here.
+    const hasOfficialCancellationNotice = meeting.documents.some((document) =>
+      isCancellationNoticeText(document.extractedText || "")
+    );
+    if (isMeetingCancelled(meeting) || hasOfficialCancellationNotice) continue;
 
     const agendaDocuments = meeting.documents.filter(
       (document) =>
@@ -298,6 +303,41 @@ export function filterResultsCoverageErrors(
         options.summarize !== false &&
         MISSING_SUMMARY_PROVIDER_ERROR_PATTERN.test(error))
   );
+}
+
+export function formatResultsCoverageFailure(errors: string[]) {
+  const counts = {
+    ingestion: 0,
+    matching: 0,
+    summarization: 0,
+    deadline: 0,
+    configuration: 0,
+    other: 0
+  };
+
+  for (const error of errors) {
+    if (/Agenda ingestion incomplete|Minutes ingestion incomplete/i.test(error)) {
+      counts.ingestion += 1;
+    } else if (/Outcome coverage incomplete|Decision outcome reconciliation failed/i.test(error)) {
+      counts.matching += 1;
+    } else if (/Summary coverage incomplete|LLM failed for/i.test(error)) {
+      counts.summarization += 1;
+    } else if (/Pipeline stopped early/i.test(error)) {
+      counts.deadline += 1;
+    } else if (/No LLM provider API key is configured/i.test(error)) {
+      counts.configuration += 1;
+    } else {
+      counts.other += 1;
+    }
+  }
+
+  const breakdown = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .map(([category, count]) => `${category} ${count}`)
+    .join(", ");
+  return `Results coverage gate failed with ${errors.length} error(s)${
+    breakdown ? `: ${breakdown}` : ""
+  }.`;
 }
 
 export function runSimpleCityPipeline(

@@ -4,6 +4,7 @@ import type { LlmReadyMeeting, PrimeGovMeeting } from "@/lib/types";
 import {
   agendaIngestionErrors,
   filterResultsCoverageErrors,
+  formatResultsCoverageFailure,
   getPipelineLlmBudgetLimits,
   minutesIngestionErrors,
   shouldReconcileMinutesWithoutGeneratingCards,
@@ -269,6 +270,26 @@ test("agenda coverage ignores stale unusable agendas for cancelled meetings", ()
   );
 });
 
+test("agenda coverage recognizes a short CivicClerk cancellation PDF", () => {
+  assert.deepEqual(
+    agendaIngestionErrors([
+      meeting([
+        {
+          type: "Agenda",
+          label: "Agenda",
+          url: "https://example.com/cancellation.pdf",
+          extractedText: [
+            "PLANNING COMMISSION MEETING",
+            "CANCELLATION NOTICE",
+            "The regular meeting has been cancelled."
+          ].join("\n")
+        }
+      ])
+    ]),
+    []
+  );
+});
+
 test("challenge, short, and failed minutes cannot bypass card generation", () => {
   const usableMinutes =
     "The City Council approved the annual pavement contract by a unanimous vote of the members.";
@@ -379,6 +400,17 @@ test("results coverage retains existing ingestion and matching gates", () => {
       summarize: false
     }),
     coverageErrors
+  );
+});
+
+test("results coverage reports failure categories separately", () => {
+  assert.equal(
+    formatResultsCoverageFailure([
+      "Agenda ingestion incomplete for City Council.",
+      "Outcome coverage incomplete for City Council.",
+      "Pipeline stopped early during LLM summarization."
+    ]),
+    "Results coverage gate failed with 3 error(s): ingestion 1, matching 1, deadline 1."
   );
 });
 

@@ -560,7 +560,8 @@ export async function scrapeCivicClerkMeetings(
           document.url.includes("/Meetings/GetMeetingFileStream"),
         validateFinalUrl: (url) => isOfficialCivicClerkUrl(url, portalUrl),
         userAgent: "Mozilla/5.0 SimpleCity CivicClerk agenda scraper",
-        plainTextFallbackUrl: civicClerkPlainTextFileUrl
+        plainTextFallbackUrl: civicClerkPlainTextFileUrl,
+        validatePdfTextBeforeAccept: true
       });
       log(`CivicClerk document downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
     }

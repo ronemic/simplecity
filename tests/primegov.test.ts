@@ -731,6 +731,39 @@ test("uses a strict official text fallback after primary HTTP failure", async ()
   }
 });
 
+test("uses the official text fallback when a downloaded CivicClerk PDF is unreadable", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-unreadable-pdf-"));
+  const documentUrl = "https://city.example/agenda.pdf";
+  const fallbackUrl = "https://city.example/agenda.txt";
+  const officialText =
+    "City Council agenda item 8: approve the official affordable housing agreement.";
+  const meeting = primeGovMeeting([
+    { type: "Agenda", label: "Agenda", url: documentUrl }
+  ]);
+
+  try {
+    const result = await downloadOfficialSiteDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      validatePdfTextBeforeAccept: true,
+      plainTextFallbackUrl: () => fallbackUrl,
+      fetchImpl: (async (url) => String(url) === documentUrl
+        ? fetchResponse("%PDF-not-a-readable-test-document")
+        : fetchResponse(JSON.stringify({ plainText: officialText }), {
+            headers: { "content-type": "application/json" }
+          })) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(meeting.documents[0].extractedText, officialText);
+    assert.equal(meeting.documents[0].downloadError, null);
+    assert.ok(meeting.documents[0].localPath?.endsWith(".txt"));
+    assert.equal((await fs.readdir(outputDir)).some((name) => name.endsWith(".pdf")), false);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("retries transient official-document transport failures before marking ingestion incomplete", async () => {
   const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-official-retry-"));
   const documentUrl = "https://city.example/agenda.pdf";
@@ -754,6 +787,36 @@ test("retries transient official-document transport failures before marking inge
     assert.ok(meeting.documents[0].localPath?.endsWith(".pdf"));
     assert.equal(isTransientOfficialDocumentError(new Error("fetch failed")), true);
     assert.equal(isTransientOfficialDocumentError(new Error("HTTP 404")), false);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("allows a source to use additional delayed retries and browser-like headers", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-source-retries-"));
+  const documentUrl = "https://city.example/agenda.pdf";
+  const meeting = primeGovMeeting([{ type: "Agenda", label: "Agenda", url: documentUrl }]);
+  let attempts = 0;
+
+  try {
+    const result = await downloadOfficialSiteDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      downloadAttempts: 5,
+      retryDelayMs: 0,
+      requestHeaders: { Accept: "application/pdf", Connection: "close" },
+      fetchImpl: (async (_url, init) => {
+        attempts += 1;
+        const headers = new Headers(init?.headers);
+        assert.equal(headers.get("accept"), "application/pdf");
+        assert.equal(headers.get("connection"), "close");
+        if (attempts < 5) throw new TypeError("fetch failed");
+        return fetchResponse("%PDF-1.7\nOfficial agenda content");
+      }) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(attempts, 5);
   } finally {
     await fs.rm(outputDir, { recursive: true, force: true });
   }

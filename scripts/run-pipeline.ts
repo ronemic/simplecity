@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import {
   filterResultsCoverageErrors,
+  formatResultsCoverageFailure,
   runJurisdictionPipelines,
   runSimpleCityPipeline
 } from "@/lib/pipeline";
@@ -107,9 +108,7 @@ async function main() {
   if (process.argv.includes("--require-results-coverage")) {
     const coverageErrors = filterResultsCoverageErrors(result.errors, sharedOptions);
     if (coverageErrors.length > 0) {
-      console.error(
-        `Results coverage gate failed with ${coverageErrors.length} ingestion or matching error(s).`
-      );
+      console.error(formatResultsCoverageFailure(coverageErrors));
       process.exit(1);
     }
   }

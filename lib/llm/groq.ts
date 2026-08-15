@@ -7,6 +7,7 @@ import {
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { attachSourceItemIds } from "@/lib/utils/cardSourceIdentity";
 import {
+  configuredLlmRequestTimeoutMs,
   fetchLlmResponse,
   getLlmProvidersForInput,
   hasConfiguredLlmProvider,
@@ -419,7 +420,7 @@ ${sourceContext}`;
       response_format: { type: "json_object" }
     }),
     signal: options.signal
-  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
+  }, configuredLlmRequestTimeoutMs(LLM_OPTIONAL_REQUEST_TIMEOUT_MS), {
     label: `${provider.label} targeted repair for ${meeting.title}`,
     provider: provider.name,
     group: options.requestGroup || meeting.id,
@@ -535,7 +536,7 @@ async function requestSummary(
       }
     }),
     signal: options.signal
-  }, LLM_REQUEST_TIMEOUT_MS, {
+  }, configuredLlmRequestTimeoutMs(LLM_REQUEST_TIMEOUT_MS), {
     label: `${provider.label} summary for ${meeting.title}`,
     provider: provider.name,
     group: options.requestGroup || meeting.id,
@@ -647,7 +648,7 @@ async function requestTopicValidation(
       response_format: { type: "json_object" }
     }),
     signal: options.signal
-  }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
+  }, configuredLlmRequestTimeoutMs(LLM_OPTIONAL_REQUEST_TIMEOUT_MS), {
     label: `${provider.label} topic validation for ${candidates.length} card(s)`,
     provider: provider.name,
     group: options.requestGroup,

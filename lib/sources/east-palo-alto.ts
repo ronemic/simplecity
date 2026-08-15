@@ -353,7 +353,10 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
   // The city's CDN intermittently advertises HTTP/2 and then closes the stream.
   // Chromium's HTTP/1.1 path is stable and is also what the official page serves to curl.
   const browser = await chromium.launch({ headless: !options.headful, args: ["--disable-http2"] });
-  const context = await browser.newContext({ userAgent: "Mozilla/5.0 SimpleCity East Palo Alto official-site scraper" });
+  const browserUserAgent =
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+    "(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+  const context = await browser.newContext({ userAgent: browserUserAgent });
   try {
     log(`Starting East Palo Alto official-site scraper for ${portalUrl}.`);
     log(`Database target: ${jurisdiction.regionSlug}; platform: ${jurisdiction.platform}.`);
@@ -424,7 +427,19 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
     }
     if (options.downloadDocuments) {
       const { downloadOfficialSiteDocuments } = await import("@/lib/scraper/downloadDocuments");
-      const result = await downloadOfficialSiteDocuments(context, meetings, { outputDir: options.documentOutputDir, log, shouldStop: options.shouldStop });
+      const result = await downloadOfficialSiteDocuments(context, meetings, {
+        outputDir: options.documentOutputDir,
+        log,
+        shouldStop: options.shouldStop,
+        userAgent: browserUserAgent,
+        requestHeaders: {
+          Accept: "application/pdf,text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9",
+          Connection: "close"
+        },
+        downloadAttempts: 5,
+        retryDelayMs: 1_000
+      });
       log(`East Palo Alto document downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
     }
     return {
