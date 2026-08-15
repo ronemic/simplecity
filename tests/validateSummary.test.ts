@@ -1088,3 +1088,67 @@ test("keeps at most two unique supported topics in model order", () => {
 
   assert.deepEqual(result.cards[0].categoryTags, ["Transportation", "City Services"]);
 });
+
+test("rejects English cards that leaked Spanish translation text", () => {
+  const issues: Array<{ reason: string; repairable?: boolean }> = [];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          commentWindow: {
+            opens: "Not listed in the source document.",
+            closes: "5:00 PM del 17 de agosto de 2026"
+          },
+          howToAct: {
+            attend: "Asistir en persona en el Edificio de Administración del Condado.",
+            email: "Not listed in the source document.",
+            submitComment: "Enviar comentario escrito antes de las 5:00 PM al correo del Secretario."
+          }
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM. Written comments are due by 5:00 PM on August 17, 2026 at the County Administration Building.",
+      onIssue: (issue) => issues.push(issue)
+    }
+  );
+
+  assert.equal(result.cards.length, 0);
+  assert.equal(
+    issues.some((issue) => issue.repairable && /leaked Spanish/.test(issue.reason)),
+    true
+  );
+});
+
+test("keeps English cards that carry Spanish place names", () => {
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [
+        groundedCard({
+          howToAct: {
+            attend: "Attend in person at De La Guerra Plaza in Santa Barbara.",
+            email: "Not listed in the source document.",
+            submitComment: "Not listed in the source document."
+          }
+        })
+      ]
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4 - Contract approval. The council will consider a $100 contract at De La Guerra Plaza in Santa Barbara."
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(
+    result.cards[0].howToAct.attend,
+    "Attend in person at De La Guerra Plaza in Santa Barbara."
+  );
+});

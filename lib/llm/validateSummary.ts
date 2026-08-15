@@ -56,6 +56,55 @@ const NUMERIC_SCALE: Record<string, number> = {
 };
 const REPEATED_PUNCTUATION_PATTERN = /([^\p{L}\p{N}\s])(?:\s*\1){5,}/u;
 
+/**
+ * The summary prompt asks for the English cards and their Spanish translations in
+ * one response, so a model can bleed translated text back into the English card —
+ * usually the participation boilerplate. Those fields are stored as the canonical
+ * English record, and the public English page never consults the translation
+ * tables, so the leak surfaces as Spanish on an English card.
+ *
+ * Detection compares Spanish and English function words, counting only tokens that
+ * appear lowercase so capitalized Spanish place and street names common in
+ * California civic text ("De La Guerra Plaza", "Los Alamos") do not register.
+ */
+const SPANISH_FUNCTION_WORDS = new Set([
+  "al", "antes", "cada", "como", "con", "cuando", "de", "del", "desde", "donde",
+  "el", "esa", "ese", "esta", "estas", "este", "estos", "hasta", "hay", "la",
+  "las", "los", "mas", "para", "pero", "por", "puede", "pueden", "que", "se",
+  "segun", "sin", "sobre", "solo", "su", "sus", "tambien", "una", "unas", "unos",
+  "y"
+]);
+const ENGLISH_FUNCTION_WORDS = new Set([
+  "a", "about", "after", "all", "also", "an", "and", "any", "are", "as", "at",
+  "be", "been", "before", "both", "but", "by", "can", "during", "each", "for",
+  "from", "had", "has", "have", "how", "if", "in", "into", "is", "it", "its",
+  "may", "must", "not", "of", "on", "or", "over", "per", "should", "than",
+  "that", "the", "their", "then", "there", "these", "this", "those", "through",
+  "to", "under", "was", "were", "when", "where", "which", "will", "with",
+  "would", "you", "your"
+]);
+
+function lowercaseWordTokens(value: string) {
+  return (value.match(/[A-Za-zÀ-ÿ]+/g) || []).filter((token) => /^[a-zà-ÿ]/.test(token));
+}
+
+function stripAccents(value: string) {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+}
+
+function isLikelySpanishText(value: string) {
+  let spanish = 0;
+  let english = 0;
+
+  for (const token of lowercaseWordTokens(value)) {
+    const word = stripAccents(token.toLowerCase());
+    if (SPANISH_FUNCTION_WORDS.has(word)) spanish += 1;
+    else if (ENGLISH_FUNCTION_WORDS.has(word)) english += 1;
+  }
+
+  return spanish >= 2 && spanish > english;
+}
+
 const CardSchema = z.object({
   sourceItemId: z.string().trim().min(1).nullable().default(null),
   agendaItem: z.string().min(1),
@@ -243,8 +292,8 @@ function findCorruptedGeneratedField(fields: Array<[label: string, value: string
   return fields.find(([, value]) => hasLikelyGeneratedTextCorruption(value))?.[0] || null;
 }
 
-function findCardTextCorruption(card: z.infer<typeof CardSchema>) {
-  return findCorruptedGeneratedField([
+function cardGeneratedFields(card: z.infer<typeof CardSchema>) {
+  return [
     ["agenda item", card.agendaItem],
     ...card.whatIsHappening.map(
       (point, index) => [`what-is-happening point ${index + 1}`, point] as [string, string]
@@ -258,7 +307,15 @@ function findCardTextCorruption(card: z.infer<typeof CardSchema>) {
     ["attendance instructions", card.howToAct.attend],
     ["email instructions", card.howToAct.email],
     ["comment-submission instructions", card.howToAct.submitComment]
-  ]);
+  ] as Array<[label: string, value: string]>;
+}
+
+function findCardTextCorruption(card: z.infer<typeof CardSchema>) {
+  return findCorruptedGeneratedField(cardGeneratedFields(card));
+}
+
+function findCardSpanishLeak(card: z.infer<typeof CardSchema>) {
+  return cardGeneratedFields(card).find(([, value]) => isLikelySpanishText(value))?.[0] || null;
 }
 
 function findTranslationTextCorruption(
@@ -841,6 +898,18 @@ export function validateSimpleCitySummary(
         options.onIssue?.({
           agendaItem: card.agendaItem.slice(0, 120),
           reason: `Card contained malformed generated text in its ${corruptedField}.`,
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
+        });
+        return null;
+      }
+
+      const spanishLeakField = findCardSpanishLeak(card);
+      if (spanishLeakField) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem.slice(0, 120),
+          reason: `Card leaked Spanish translation text into its English ${spanishLeakField}. Every English card field must be written in English; Spanish belongs only in translations.es.`,
           cardIndex: index,
           repairable: true,
           outcome: "reject"
