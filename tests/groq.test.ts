@@ -537,7 +537,8 @@ test("Groq attempts do not consume the OpenRouter request or token budget", asyn
     requests: 0,
     requestLimit: 1,
     tokens: 0,
-    tokenLimit: 10
+    tokenLimit: 10,
+    exhausted: false
   });
   const summary = getLlmProcessRunSummary();
   assert.equal(summary.dispatched, 2);

@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import type { LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
 import { MEETING_WIDE_CONTEXT_HEADING } from "@/lib/scraper/agendaItemContext";
 
-export const SIMPLECITY_SUMMARIZER_VERSION = "item-scoped-no-public-comments-v2";
+export const SIMPLECITY_SUMMARIZER_VERSION =
+  "item-scoped-no-public-comments-v3-status-independent";
+const PREVIOUS_SUMMARIZER_VERSION = "item-scoped-no-public-comments-v2";
 const PUBLIC_COMMENT_DOCUMENT_TYPES = new Set(["Public Comment", "Public Comments"]);
 
 function contentHash(value?: string | null) {
@@ -71,7 +73,18 @@ export function legacyMeetingSourceHashV1(meeting: LlmReadyMeeting) {
 }
 
 export function compatibleLegacyMeetingSourceHashes(meeting: LlmReadyMeeting) {
-  return [legacyMeetingSourceHashV1(meeting)];
+  const transitionStatuses = meeting.status === "Cancelled"
+    ? [meeting.status]
+    : [meeting.status, "Upcoming", "Past", "Unknown"];
+  const uniqueStatuses = [...new Set(transitionStatuses)];
+  return [
+    ...uniqueStatuses.map((status) =>
+      legacyMeetingSourceHashV1({ ...meeting, status } as LlmReadyMeeting)
+    ),
+    ...uniqueStatuses.map((status) =>
+      previousMeetingSourceHashV2(meeting, status)
+    )
+  ];
 }
 
 function stableAgendaItemShape(meeting: LlmReadyMeeting) {
@@ -108,7 +121,28 @@ export function meetingSourceHash(meeting: LlmReadyMeeting) {
     dateText: meeting.dateText,
     timeText: meeting.timeText,
     location: meeting.location,
-    status: meeting.status,
+    sourceType: meeting.sourceType,
+    sourceUrl: meeting.sourceUrl,
+    llmInputText: meeting.llmInputText,
+    documents: stableDocumentShape(meeting),
+    items: stableAgendaItemShape(meeting)
+  };
+
+  return crypto.createHash("sha256").update(JSON.stringify(source)).digest("hex");
+}
+
+function previousMeetingSourceHashV2(
+  meeting: LlmReadyMeeting,
+  status: LlmReadyMeeting["status"] | string
+) {
+  const source = {
+    summarizerVersion: PREVIOUS_SUMMARIZER_VERSION,
+    title: meeting.title,
+    meetingType: meeting.meetingType,
+    dateText: meeting.dateText,
+    timeText: meeting.timeText,
+    location: meeting.location,
+    status,
     sourceType: meeting.sourceType,
     sourceUrl: meeting.sourceUrl,
     llmInputText: meeting.llmInputText,

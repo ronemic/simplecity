@@ -60,6 +60,7 @@ type LlmProcessBudgetState = {
   tokenLimit: number;
   requestCount: number;
   tokenCount: number;
+  exhausted: boolean;
   requestStats: {
     dispatched: number;
     successful: number;
@@ -80,6 +81,7 @@ function createLlmProcessBudgetState(
     tokenLimit: limits?.tokens ?? LLM_MAX_PROCESS_TOKENS,
     requestCount: 0,
     tokenCount: 0,
+    exhausted: false,
     requestStats: {
       dispatched: 0,
       successful: 0,
@@ -144,6 +146,7 @@ function reserveProcessBudget(
   const nextRequestCount = state.requestCount + 1;
   const nextTokenCount = state.tokenCount + estimatedInputTokens;
   if (nextRequestCount > state.requestLimit || nextTokenCount > state.tokenLimit) {
+    state.exhausted = true;
     throw new LlmProcessBudgetExceededError(
       `LLM process budget exhausted before dispatch ` +
       `(requests ${state.requestCount}/${state.requestLimit}, ` +
@@ -197,8 +200,24 @@ export function getLlmProcessBudgetUsage() {
     requests: state.requestCount,
     requestLimit: state.requestLimit,
     tokens: state.tokenCount,
-    tokenLimit: state.tokenLimit
+    tokenLimit: state.tokenLimit,
+    exhausted: state.exhausted
   };
+}
+
+export function isLlmProcessBudgetExhausted() {
+  return currentLlmProcessBudgetState().exhausted;
+}
+
+export function isLlmProcessBudgetExceededError(
+  error: unknown
+): error is LlmProcessBudgetExceededError {
+  return error instanceof LlmProcessBudgetExceededError || Boolean(
+    error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "LLM_PROCESS_BUDGET_EXCEEDED"
+  );
 }
 
 export function getLlmProcessRunSummary() {

@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { LlmReadyMeeting, SimpleCityCard, SimpleCitySummary } from "@/lib/types";
+import type {
+  LlmReadyMeeting,
+  PrimeGovDocument,
+  SimpleCityCard,
+  SimpleCitySummary
+} from "@/lib/types";
 import {
   usesRegionalSupabase,
   type JurisdictionConfig
@@ -16,6 +21,7 @@ import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
+import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 
 type UpsertedMeeting = {
   externalId: string;
@@ -417,6 +423,57 @@ function canonicalMeetingSourceUrl(meeting: LlmReadyMeeting) {
 
 function chunks<T>(values: T[], size: number) {
   return summaryCardWriteBatches(values, size);
+}
+
+export async function restoreArchivedDocumentExtractions(
+  supabase: SupabaseClient,
+  meetings: Array<{ documents: PrimeGovDocument[] }>,
+  jurisdiction?: JurisdictionConfig | null
+) {
+  const candidates = meetings.flatMap((meeting) =>
+    meeting.documents.filter(
+      (document) =>
+        !isUsableOfficialSourceText(document.extractedText) &&
+        !["Video", "Calendar", "Meeting Details"].includes(document.type) &&
+        Boolean(document.url)
+    )
+  );
+  if (candidates.length === 0) return 0;
+
+  const byUrl = new Map<string, typeof candidates>();
+  for (const document of candidates) {
+    byUrl.set(document.url, [...(byUrl.get(document.url) || []), document]);
+  }
+
+  let restored = 0;
+  for (const batch of chunks([...byUrl.keys()], 50)) {
+    let query = supabase
+      .from("documents")
+      .select("source_url,extracted_text,extraction_character_count,is_scanned")
+      .in("source_url", batch);
+    if (jurisdiction && usesRegionalSupabase(jurisdiction)) {
+      query = query.eq("jurisdiction_slug", jurisdiction.slug);
+    }
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to restore archived official document text: ${error.message}`);
+    }
+
+    for (const row of data || []) {
+      if (!row.source_url || !isUsableOfficialSourceText(row.extracted_text)) continue;
+      for (const document of byUrl.get(row.source_url) || []) {
+        document.extractedText = row.extracted_text;
+        document.extractionCharacterCount =
+          row.extraction_character_count || row.extracted_text.length;
+        document.isScanned = Boolean(row.is_scanned);
+        // A transient current download failure does not invalidate text that
+        // was successfully extracted from this exact official URL earlier.
+        document.downloadError = undefined;
+        restored += 1;
+      }
+    }
+  }
+  return restored;
 }
 
 type MeetingDetailsIdentityInput = Pick<

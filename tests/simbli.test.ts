@@ -120,11 +120,14 @@ test("matches same-day regular and special archives without crossing their docum
   assert.ok(meetings[1].documents.some((document) => document.url.endsWith("special-minutes.pdf")));
 });
 
-test("replaces blocked canonical Simbli minutes with direct archive minutes", () => {
+test("does not treat the blocked Simbli viewer as parsed minutes and uses direct archive minutes", () => {
   const meetings = normalizeSimbliRows([
     row({ minutesAction: 'ViewMinutes("36030305","76138",event)' })
   ], jurisdiction);
-  assert.equal(meetings[0].documents.filter((document) => document.type === "Minutes").length, 1);
+  assert.equal(meetings[0].documents.filter((document) => document.type === "Minutes").length, 0);
+  assert.ok(meetings[0].documents.some((document) =>
+    document.type === "Document" && document.label === "Official minutes page"
+  ));
 
   attachLasdArchiveDocuments(meetings, [{
     dateText: "August 3, 2026",

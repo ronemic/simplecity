@@ -1267,6 +1267,30 @@ test("prefers an exact source-item outcome over a fuzzy legacy duplicate", () =>
   assert.equal(resolved.rejectedAmbiguous, 0);
 });
 
+test("resolves duplicate cards with the same exact official source-item identity", () => {
+  const original = {
+    matchedItemKey: "H1",
+    cardId: "original",
+    matchMethod: "source_item_id" as const,
+    matchScore: 1,
+    cardCreatedAt: "2026-08-01T12:00:00.000Z",
+    cardSourceUrl: "https://example.com/item/H1"
+  };
+  const duplicate = {
+    ...original,
+    cardId: "duplicate",
+    cardCreatedAt: "2026-08-01T12:05:00.000Z"
+  };
+  const resolved = resolveCanonicalOutcomeAssignments(
+    [duplicate, original],
+    new Set<string>()
+  );
+
+  assert.deepEqual(resolved.selected, [original]);
+  assert.equal(resolved.duplicateCardsResolved, 1);
+  assert.equal(resolved.rejectedAmbiguous, 0);
+});
+
 test("late official minutes reconcile outcomes without generating another card set", () => {
   const meetingRecord = menloParkMay12Meeting();
   assert.equal(
@@ -1791,7 +1815,7 @@ test("official card queries and pipeline runs attach verified outcomes outside t
   assert.match(queries, /\.from\("decision_outcome_translations"\)/);
   assert.match(queries, /applyDecisionOutcomeTranslation\(outcome, translation\)/);
   assert.match(queries, /outcome: outcomes\.get\(row\.id\) \|\| null/);
-  assert.match(pipeline, /translateWithLlm: true/);
+  assert.match(pipeline, /translateWithLlm: !isLlmProcessBudgetExhausted\(\)/);
   assert.match(translator, /Translate every non-null public field in outcomes\[\]/);
   assert.match(summaryCard, /outcome = card\.outcome/);
   assert.match(summaryCard, /<DecisionOutcomePanel/);

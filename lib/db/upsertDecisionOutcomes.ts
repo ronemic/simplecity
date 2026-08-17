@@ -136,6 +136,35 @@ export function resolveCanonicalOutcomeAssignments<
       }))
       .sort((left, right) => right.rank - left.rank || right.score - left.score);
     if (
+      rankedByIdentity[0].rank === methodPriority.source_item_id &&
+      rankedByIdentity.every(
+        (candidate) => candidate.rank === methodPriority.source_item_id
+      )
+    ) {
+      // Two cards carrying the same exact official source-item identity are
+      // duplicates, not an ambiguous fuzzy match. Retain the earliest card so
+      // existing links remain stable and attach the official result once.
+      const canonical = group
+        .map((proposal) => ({
+          proposal,
+          timestamp: Date.parse(String(proposal.cardCreatedAt || ""))
+        }))
+        .sort((left, right) => {
+          const leftTime = Number.isFinite(left.timestamp)
+            ? left.timestamp
+            : Number.POSITIVE_INFINITY;
+          const rightTime = Number.isFinite(right.timestamp)
+            ? right.timestamp
+            : Number.POSITIVE_INFINITY;
+          return leftTime - rightTime;
+        })[0]?.proposal;
+      if (canonical) {
+        selected.push(canonical);
+        duplicateCardsResolved += group.length - 1;
+        continue;
+      }
+    }
+    if (
       rankedByIdentity[0].rank >= methodPriority.source_url &&
       (rankedByIdentity[1]?.rank ?? -1) < rankedByIdentity[0].rank
     ) {

@@ -21,6 +21,7 @@ import {
 import {
   appendSummaryCardsForMeeting,
   replaceSummaryCardsForMeeting,
+  restoreArchivedDocumentExtractions,
   setMeetingSummarizedSourceHash,
   upsertMeetings
 } from "@/lib/db/upsertMeetings";
@@ -61,6 +62,8 @@ import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 import {
   formatLlmProcessRunSummary,
   getLlmProcessBudgetUsage,
+  isLlmProcessBudgetExceededError,
+  isLlmProcessBudgetExhausted,
   runWithLlmProcessBudget
 } from "@/lib/llm/provider";
 
@@ -187,6 +190,32 @@ function agendaDocumentMinimumCharacters(type: string) {
   return type === "Accessible Agenda" ? 500 : 300;
 }
 
+function isDownloadedScannedPdf(document: PrimeGovMeeting["documents"][number]) {
+  return Boolean(
+    !document.downloadError &&
+      document.isScanned &&
+      document.localPath &&
+      /\.pdf$/i.test(document.localPath)
+  );
+}
+
+export function agendaIngestionWarnings(meetings: PrimeGovMeeting[]) {
+  const warnings: string[] = [];
+  for (const meeting of meetings) {
+    const scanned = meeting.documents.filter(
+      (document) =>
+        AGENDA_DOCUMENT_TYPES.has(document.type) &&
+        isDownloadedScannedPdf(document)
+    );
+    if (scanned.length > 0) {
+      warnings.push(
+        `Agenda OCR warning for ${meeting.title}: ${scanned.length} downloaded agenda document(s) are image-only; official links remain available.`
+      );
+    }
+  }
+  return warnings;
+}
+
 export function agendaIngestionErrors(meetings: PrimeGovMeeting[]) {
   const errors: string[] = [];
 
@@ -222,6 +251,11 @@ export function agendaIngestionErrors(meetings: PrimeGovMeeting[]) {
     if (hasStructuredOfficialItems || hasUsableHtmlAgenda || hasUsableAgendaDocument) {
       continue;
     }
+
+    // A successfully downloaded image-only PDF is a legitimate official
+    // source, not a broken ingestion request. Keep it visible as an OCR warning
+    // without failing the entire jurisdiction's results-coverage gate.
+    if (agendaDocuments.some(isDownloadedScannedPdf)) continue;
 
     const documentCount = Math.max(agendaDocuments.length, 1);
     errors.push(
@@ -635,9 +669,33 @@ async function runSimpleCityPipelineInternal(
       }
     }
 
+    if (canPersist && supabase) {
+      try {
+        const restored = await restoreArchivedDocumentExtractions(
+          supabase,
+          scrapeResult.meetings,
+          jurisdiction
+        );
+        if (restored > 0) {
+          log(
+            `Restored ${restored} unchanged official document extraction(s) from the database after transient download/parser misses.`
+          );
+        }
+      } catch (error) {
+        log(
+          `Could not restore archived document text; current scrape data will be used: ${
+            error instanceof Error ? error.message : "Unknown archived extraction error"
+          }`
+        );
+      }
+    }
+
     for (const agendaError of agendaIngestionErrors(scrapeResult.meetings)) {
       errors.push(agendaError);
       log(agendaError);
+    }
+    for (const agendaWarning of agendaIngestionWarnings(scrapeResult.meetings)) {
+      log(agendaWarning);
     }
     for (const minutesError of minutesIngestionErrors(scrapeResult.meetings)) {
       errors.push(minutesError);
@@ -713,7 +771,11 @@ async function runSimpleCityPipelineInternal(
           item.id,
           item.meeting,
           jurisdiction,
-          { explainWithLlm: true, translateWithLlm: true, log }
+          {
+            explainWithLlm: !isLlmProcessBudgetExhausted(),
+            translateWithLlm: !isLlmProcessBudgetExhausted(),
+            log
+          }
         );
         outcomesUpserted += reconciliation.outcomesUpserted;
         outcomesRejectedAmbiguous += reconciliation.outcomesRejectedAmbiguous;
@@ -784,8 +846,9 @@ async function runSimpleCityPipelineInternal(
 
         const summarizeTarget = async (
           item: (typeof summaryTargets)[number]
-        ): Promise<boolean | null> => {
+        ): Promise<"ok" | "rate-limit" | "budget-exhausted" | null> => {
           if (isMeetingCancelled(item.meeting)) {
+            if (item.id) reconciledOutcomeMeetingIds.add(item.id);
             summaryProgress.cancelled += 1;
             log(
               item.existingCardCount > 0
@@ -795,35 +858,9 @@ async function runSimpleCityPipelineInternal(
             return null;
           }
 
-          if (!item.meeting.llmInputText) {
-            summaryProgress.noInput += 1;
-            log(`Skipping ${item.meeting.title}; no LLM input text.`);
-            if (persistSummaries) await reconcileOutcomesForItem(item);
-            return null;
-          }
-
           try {
             const shouldAppendToExisting =
               Boolean(persistSummaries && supabase && item.id && item.existingCardCount > 0);
-
-            if (
-              shouldAppendToExisting &&
-              supabase &&
-              shouldReconcileMinutesWithoutGeneratingCards(
-                item.meeting,
-                item.existingCardCount
-              )
-            ) {
-              if (item.sourceHash) {
-                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
-              }
-              log(
-                `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; official minutes will update those cards without generating duplicates.`
-              );
-              summaryProgress.minutesOnly += 1;
-              await reconcileOutcomesForItem(item);
-              return null;
-            }
 
             if (
               shouldSkipUnchangedSummary(
@@ -853,7 +890,37 @@ async function runSimpleCityPipelineInternal(
                   : `Skipping ${item.meeting.title}; source unchanged and the prior summary produced no cards.`
               );
               summaryProgress.unchanged += 1;
+              // An identical source hash means the same official results were
+              // already reconciled. Mark this meeting handled so the final
+              // safety pass cannot repeat historical explanation/translation
+              // work during an extended Monday lookback.
+              if (item.id) reconciledOutcomeMeetingIds.add(item.id);
+              return null;
+            }
+
+            if (!item.meeting.llmInputText) {
+              summaryProgress.noInput += 1;
+              log(`Skipping ${item.meeting.title}; no LLM input text.`);
               if (persistSummaries) await reconcileOutcomesForItem(item);
+              return null;
+            }
+
+            if (
+              shouldAppendToExisting &&
+              supabase &&
+              shouldReconcileMinutesWithoutGeneratingCards(
+                item.meeting,
+                item.existingCardCount
+              )
+            ) {
+              if (item.sourceHash) {
+                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
+              }
+              log(
+                `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; changed official minutes will update those cards without generating duplicates.`
+              );
+              summaryProgress.minutesOnly += 1;
+              await reconcileOutcomesForItem(item);
               return null;
             }
 
@@ -870,7 +937,10 @@ async function runSimpleCityPipelineInternal(
               initialSummary,
               {
                 initialGenerationFailed: Boolean(initialSummaryError),
-                generate: initialSummaryError && isLlmRateLimitError(initialSummaryError)
+                generate: initialSummaryError && (
+                  isLlmRateLimitError(initialSummaryError) ||
+                  isLlmProcessBudgetExceededError(initialSummaryError)
+                )
                   ? undefined
                   : (retryMeeting) =>
                       generateWithinPipelineBudget(retryMeeting, "agenda-item-recovery")
@@ -912,9 +982,13 @@ async function runSimpleCityPipelineInternal(
               log(`Summary warning: ${message}`);
             }
 
-            const completedSourceHash = coverage.fallbackItemIds.length > 0
-              ? null
-              : item.sourceHash;
+            // Recovery has already been attempted for every uncovered item.
+            // Treat the official-source fallback as the completed result for
+            // this exact source version; otherwise unchanged fallback cards
+            // are regenerated every day (and especially across Monday's
+            // three-month window). A changed agenda/minutes hash still makes
+            // the meeting eligible again.
+            const completedSourceHash = item.sourceHash;
             if (persistSummaries && supabase && item.id) {
               const inserted = shouldAppendToExisting
                 ? await appendSummaryCardsForMeeting(
@@ -957,7 +1031,12 @@ async function runSimpleCityPipelineInternal(
               });
             }
             summaryProgress.generated += 1;
-            return Boolean(initialSummaryError && isLlmRateLimitError(initialSummaryError));
+            if (initialSummaryError && isLlmProcessBudgetExceededError(initialSummaryError)) {
+              return "budget-exhausted";
+            }
+            return initialSummaryError && isLlmRateLimitError(initialSummaryError)
+              ? "rate-limit"
+              : "ok";
           } catch (error) {
             summaryProgress.failed += 1;
             const message = error instanceof Error ? error.message : "Unknown LLM error";
@@ -966,7 +1045,8 @@ async function runSimpleCityPipelineInternal(
             if (persistSummaries && item.existingCardCount > 0) {
               await reconcileOutcomesForItem(item);
             }
-            return isLlmRateLimitError(error);
+            if (isLlmProcessBudgetExceededError(error)) return "budget-exhausted";
+            return isLlmRateLimitError(error) ? "rate-limit" : "ok";
           }
         };
 
@@ -982,9 +1062,9 @@ async function runSimpleCityPipelineInternal(
             nextSummaryIndex += 1;
             if (!item) return;
 
-            let rateLimited: boolean | null = null;
+            let outcome: "ok" | "rate-limit" | "budget-exhausted" | null = null;
             try {
-              rateLimited = await summarizeTarget(item);
+              outcome = await summarizeTarget(item);
             } finally {
               summaryProgress.completed += 1;
               const usage = getLlmProcessBudgetUsage();
@@ -998,8 +1078,15 @@ async function runSimpleCityPipelineInternal(
                 `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`
               );
             }
-            if (rateLimited === null) continue;
-            consecutiveRateLimitFailures = rateLimited
+            if (outcome === "budget-exhausted") {
+              log(
+                "Stopping detailed LLM summaries because the OpenRouter safety budget is exhausted; completed work and official-source fallbacks are retained."
+              );
+              stopSummaries = true;
+              return;
+            }
+            if (outcome === null) continue;
+            consecutiveRateLimitFailures = outcome === "rate-limit"
               ? consecutiveRateLimitFailures + 1
               : 0;
             if (consecutiveRateLimitFailures >= maxConsecutiveRateLimitFailures) {
@@ -1032,6 +1119,22 @@ async function runSimpleCityPipelineInternal(
 
     if (canPersist && supabase && upserted.length > 0) {
       for (const item of upserted) {
+        // The summary workers already reconciled unchanged/cancelled meetings.
+        // Re-check here because a provider stop can leave later queue entries
+        // untouched; the final safety pass must not turn those historical
+        // entries into another round of result explanation/translation calls.
+        if (
+          isMeetingCancelled(item.meeting) ||
+          shouldSkipUnchangedSummary(
+            item.sourceHash,
+            item.summarizedSourceHash,
+            item.existingCardCount,
+            item.meeting.items?.length || 0,
+            item.compatibleSourceHashes
+          )
+        ) {
+          continue;
+        }
         if (recordDeadline("decision outcome reconciliation")) break;
         await reconcileOutcomesForItem(item);
       }

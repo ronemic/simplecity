@@ -95,7 +95,7 @@ test("legacy hash compatibility exactly reproduces the pre-item-scoped algorithm
   const original = meeting();
   const legacyHash = legacyMeetingSourceHashV1(original);
 
-  assert.deepEqual(compatibleLegacyMeetingSourceHashes(original), [legacyHash]);
+  assert.ok(compatibleLegacyMeetingSourceHashes(original).includes(legacyHash));
   assert.notEqual(legacyHash, meetingSourceHash(original));
 
   const officialTextChanged = meeting();
@@ -105,4 +105,16 @@ test("legacy hash compatibility exactly reproduces the pre-item-scoped algorithm
   const documentChanged = meeting();
   documentChanged.documents[0].bytes = 42_000;
   assert.notEqual(legacyMeetingSourceHashV1(documentChanged), legacyHash);
+});
+
+test("routine upcoming-to-past status transitions do not regenerate unchanged summaries", () => {
+  const upcoming = meeting();
+  const past = { ...meeting(), status: "Past" as const };
+
+  assert.equal(meetingSourceHash(upcoming), meetingSourceHash(past));
+  assert.ok(
+    compatibleLegacyMeetingSourceHashes(upcoming).some((hash) =>
+      compatibleLegacyMeetingSourceHashes(past).includes(hash)
+    )
+  );
 });

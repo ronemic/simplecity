@@ -48,6 +48,35 @@ test("pipeline exposes summary queue progress and live LLM usage", () => {
   assert.match(pipeline, /estimated\/actual tokens/);
 });
 
+test("unchanged meetings bypass Monday minutes and outcome LLM work", () => {
+  const workerStart = pipeline.indexOf("const summarizeTarget = async");
+  const unchangedCheck = pipeline.indexOf("shouldSkipUnchangedSummary(", workerStart);
+  const minutesCheck = pipeline.indexOf(
+    "shouldReconcileMinutesWithoutGeneratingCards(",
+    workerStart
+  );
+  assert.ok(unchangedCheck >= 0);
+  assert.ok(minutesCheck > unchangedCheck);
+  assert.match(
+    pipeline,
+    /source unchanged[\s\S]*reconciledOutcomeMeetingIds\.add\(item\.id\)/
+  );
+  assert.match(
+    pipeline,
+    /if \(canPersist[\s\S]*for \(const item of upserted\)[\s\S]*shouldSkipUnchangedSummary\([\s\S]*continue;/
+  );
+});
+
+test("paid budget exhaustion stops the summary queue instead of fanning out blocked attempts", () => {
+  assert.match(pipeline, /isLlmProcessBudgetExceededError/);
+  assert.match(pipeline, /outcome === "budget-exhausted"/);
+  assert.match(pipeline, /Stopping detailed LLM summaries because the OpenRouter safety budget is exhausted/);
+});
+
+test("official-source fallbacks complete the current source version", () => {
+  assert.match(pipeline, /const completedSourceHash = item\.sourceHash/);
+});
+
 test("every scraper workflow exposes all five Groq keys for hybrid routing", () => {
   for (const workflow of dedicatedWorkflows) {
     for (const suffix of ["", "_2", "_3", "_4", "_5"]) {

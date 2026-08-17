@@ -3,6 +3,7 @@ import test from "node:test";
 import type { LlmReadyMeeting, PrimeGovMeeting } from "@/lib/types";
 import {
   agendaIngestionErrors,
+  agendaIngestionWarnings,
   filterResultsCoverageErrors,
   formatResultsCoverageFailure,
   getPipelineLlmBudgetLimits,
@@ -166,6 +167,24 @@ test("agenda coverage reports a discovered agenda family with no usable official
       "Agenda ingestion incomplete for City Council: 2 published agenda document(s) had no usable official text."
     ]
   );
+});
+
+test("downloaded image-only agenda PDFs warn without failing results coverage", () => {
+  const record = meeting([
+    {
+      type: "Agenda Packet",
+      label: "Agenda packet",
+      url: "https://example.com/scanned-agenda.pdf",
+      localPath: "/tmp/scanned-agenda.pdf",
+      isScanned: true,
+      extractedText: ""
+    }
+  ]);
+
+  assert.deepEqual(agendaIngestionErrors([record]), []);
+  assert.deepEqual(agendaIngestionWarnings([record]), [
+    "Agenda OCR warning for City Council: 1 downloaded agenda document(s) are image-only; official links remain available."
+  ]);
 });
 
 test("agenda coverage accepts a usable alternate official agenda", () => {

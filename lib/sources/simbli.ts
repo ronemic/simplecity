@@ -133,7 +133,15 @@ export function normalizeSimbliRows(
     const minutesSourceUrl = row.minutesUrl || simbliMinutesUrl(row.minutesAction, portalUrl);
     if (minutesSourceUrl) {
       const url = absoluteUrl(minutesSourceUrl, portalUrl);
-      if (url) documents.push({ type: "Minutes", label: "Minutes", url });
+      // Simbli's T=1 target is an HTML viewer protected by Incapsula, not a
+      // downloadable minutes document. Keep it as an official reference link,
+      // but do not advertise it to ingestion/result coverage as parsed minutes.
+      // A direct LASD archive PDF, when published, is attached as Minutes below.
+      if (url) documents.push({
+        type: "Document",
+        label: "Official minutes page",
+        url
+      });
     }
     meetings.push({
       externalId: `${jurisdiction.slug}-simbli-meeting-${meetingId}`,
@@ -182,16 +190,6 @@ export function attachLasdArchiveDocuments(meetings: PrimeGovMeeting[], rows: La
     }
     if (candidates.length !== 1) continue;
     const meeting = candidates[0];
-    const hasDirectMinutes = row.links.some((link) =>
-      documentType(link.label, link.url) === "Minutes" && /\.pdf(?:$|[?#])/i.test(link.url)
-    );
-    if (hasDirectMinutes) {
-      meeting.documents = meeting.documents.filter((document) => !(
-        document.type === "Minutes" &&
-        new URL(document.url).hostname === "simbli.eboardsolutions.com" &&
-        /\/SB_Meetings\/ViewMeeting\.aspx/i.test(new URL(document.url).pathname)
-      ));
-    }
     for (const link of row.links) {
       if (meeting.documents.some((document) => document.url === link.url)) continue;
       meeting.documents.push({ type: documentType(link.label, link.url), label: cleanText(link.label), url: link.url });

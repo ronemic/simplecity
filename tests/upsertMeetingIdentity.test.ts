@@ -7,12 +7,56 @@ import {
   documentExtractedTextForStorage,
   documentWriteBatches,
   isTransientSupabaseWriteError,
+  restoreArchivedDocumentExtractions,
   upsertMeetings,
   retryTransientSupabaseWrite,
   uniqueExistingExternalIdsByMeetingDetailsUrl,
   uniqueMeetingDetailsIdentityUrls
 } from "@/lib/db/upsertMeetings";
-import type { LlmReadyMeeting } from "@/lib/types";
+import type { LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
+
+test("restores archived extraction text after a transient current download miss", async () => {
+  const document: PrimeGovDocument = {
+    type: "Minutes" as const,
+    label: "Minutes",
+    url: "https://example.com/minutes.pdf",
+    downloadError: "HTTP 503"
+  };
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "documents");
+      return {
+        select() {
+          return {
+            async in(column: string, urls: string[]) {
+              assert.equal(column, "source_url");
+              assert.deepEqual(urls, [document.url]);
+              return {
+                data: [{
+                  source_url: document.url,
+                  extracted_text:
+                    "The board approved the official minutes and recorded the vote unanimously.",
+                  extraction_character_count: 76,
+                  is_scanned: false
+                }],
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const restored = await restoreArchivedDocumentExtractions(
+    supabase as never,
+    [{ documents: [document] }]
+  );
+
+  assert.equal(restored, 1);
+  assert.match(document.extractedText || "", /approved the official minutes/);
+  assert.equal(document.downloadError, undefined);
+});
 
 test("does not treat a shared Menlo Park section URL as a meeting identity", () => {
   const sectionUrl = "https://www.menlopark.gov/Agendas-and-minutes#section-3";
