@@ -229,24 +229,6 @@ export default async function Home({
           }`}
         >
           <div className="max-w-2xl">
-            {!hasSearch ? (
-              <a
-                href={FEATURE_ARTICLE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-sm text-sm font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
-              >
-                <span>
-                  {locale === "es"
-                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
-                    : "Read about SimpleCity in the Los Altos Town Crier"}
-                </span>
-                <ArrowRight
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 text-[#9fc4f4] transition-transform group-hover:translate-x-0.5"
-                />
-              </a>
-            ) : null}
             <p className="text-sm font-black uppercase text-[#9fc4f4]">
               {introLabel}
             </p>
@@ -261,9 +243,27 @@ export default async function Home({
                 : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
             <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>
+            {!hasSearch ? (
+              <a
+                href={FEATURE_ARTICLE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="group mt-5 inline-flex max-w-full items-center gap-2 rounded-sm text-[15px] font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
+              >
+                <span>
+                  {locale === "es"
+                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
+                    : "Read about SimpleCity in the Los Altos Town Crier"}
+                </span>
+                <ArrowRight
+                  aria-hidden
+                  className="h-4 w-4 shrink-0 text-[#9fc4f4] transition-transform group-hover:translate-x-0.5"
+                />
+              </a>
+            ) : null}
           </div>
 
-          <div className="rounded-[12px] border border-white/15 bg-[#0c1726]/70 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur sm:p-5 lg:justify-self-stretch">
+          <div className="rounded-[12px] border border-white/15 bg-[#0c1726]/70 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur sm:p-5 lg:mb-5 lg:justify-self-stretch">
             <p className="mb-3 text-xs font-black uppercase text-[#9fc4f4]">
               {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
             </p>
