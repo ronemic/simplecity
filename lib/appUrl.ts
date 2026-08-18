@@ -63,13 +63,43 @@ export function getConfiguredAppUrl() {
   return configured || LOCAL_APP_URL;
 }
 
-export function getPublicAppUrlForRequest(
-  request: Request,
-  configuredAppUrl = getConfiguredAppUrl()
+/**
+ * Resolve the public origin from request headers.
+ *
+ * `Host` and `X-Forwarded-Host` are attacker-controlled, so they are only
+ * honoured when the configured app URL is local -- that is, in development,
+ * where there is nothing to forge. Every deployed environment resolves to the
+ * configured origin and ignores the headers entirely.
+ *
+ * Every caller that needs a request-derived origin must go through this
+ * function. Re-deriving it from headers elsewhere is how a forged Host ends up
+ * in generated links.
+ */
+export function getPublicAppUrlFromHeaders(
+  getHeader: (name: string) => string | null | undefined,
+  configuredAppUrl = getConfiguredAppUrl(),
+  fallback: { host?: string; protocol?: string } = {}
 ) {
   const configured = normalizeAppUrl(configuredAppUrl);
   if (!isLocalAppUrl(configured)) return configured;
 
+  const host =
+    firstForwardedValue(getHeader("x-forwarded-host") ?? null) ||
+    firstForwardedValue(getHeader("host") ?? null) ||
+    fallback.host ||
+    "";
+
+  if (!host || isLocalHost(host)) return configured;
+
+  const forwardedProto = firstForwardedValue(getHeader("x-forwarded-proto") ?? null);
+  const protocol = forwardedProto || fallback.protocol || "https";
+  return normalizeAppUrl(`${protocol}://${host}`);
+}
+
+export function getPublicAppUrlForRequest(
+  request: Request,
+  configuredAppUrl = getConfiguredAppUrl()
+) {
   let requestUrl: URL | null = null;
   try {
     requestUrl = new URL(request.url);
@@ -77,16 +107,8 @@ export function getPublicAppUrlForRequest(
     requestUrl = null;
   }
 
-  const forwardedHost = firstForwardedValue(request.headers.get("x-forwarded-host"));
-  const host =
-    forwardedHost ||
-    firstForwardedValue(request.headers.get("host")) ||
-    requestUrl?.host ||
-    "";
-
-  if (!host || isLocalHost(host)) return configured;
-
-  const forwardedProto = firstForwardedValue(request.headers.get("x-forwarded-proto"));
-  const protocol = forwardedProto || requestUrl?.protocol.replace(/:$/, "") || "https";
-  return normalizeAppUrl(`${protocol}://${host}`);
+  return getPublicAppUrlFromHeaders((name) => request.headers.get(name), configuredAppUrl, {
+    host: requestUrl?.host,
+    protocol: requestUrl?.protocol.replace(/:$/, "")
+  });
 }

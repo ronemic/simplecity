@@ -14,16 +14,81 @@ type LocalRateLimitEntry = {
   requestCount: number;
   blockedUntil: number;
   updatedAt: number;
+  /**
+   * The point after which this entry can no longer affect a decision: its
+   * window has rolled over and any block has lifted. Reaching it means the next
+   * lookup would start a fresh window anyway, so dropping the entry early is
+   * indistinguishable from keeping it.
+   */
+  expiresAt: number;
 };
 
 const globalForRateLimits = globalThis as typeof globalThis & {
   simpleCityLocalRateLimits?: Map<string, LocalRateLimitEntry>;
   simpleCityRateLimitFallbackWarned?: boolean;
   simpleCityDatabaseRateLimitsUnavailable?: boolean;
+  simpleCityLocalRateLimitSweepAt?: number;
 };
 
 const localRateLimits = globalForRateLimits.simpleCityLocalRateLimits ?? new Map<string, LocalRateLimitEntry>();
 globalForRateLimits.simpleCityLocalRateLimits = localRateLimits;
+
+/**
+ * The fallback store is only reachable when the Supabase rate-limit migration
+ * is missing, and that fallback latches for the life of the process. Without a
+ * sweep every distinct scope/identifier pair -- which includes per-IP and
+ * per-card keys -- would be retained forever and grow until the process runs
+ * out of memory.
+ */
+const LOCAL_RATE_LIMIT_MAX_ENTRIES = 20_000;
+/**
+ * Sweeping down to a target below the cap, rather than to the cap exactly,
+ * keeps the cost amortized: one pass buys room for many inserts instead of
+ * running a full scan on every request once the store is full.
+ */
+const LOCAL_RATE_LIMIT_TARGET_ENTRIES = 18_000;
+const LOCAL_RATE_LIMIT_SWEEP_INTERVAL_MS = 60_000;
+
+function localRateLimitExpiry(
+  windowStartedAt: number,
+  windowSeconds: number,
+  blockedUntil: number
+) {
+  return Math.max(windowStartedAt + windowSeconds * 1000, blockedUntil);
+}
+
+function sweepLocalRateLimits(now: number) {
+  for (const [key, entry] of localRateLimits) {
+    if (entry.expiresAt <= now) localRateLimits.delete(key);
+  }
+
+  if (localRateLimits.size <= LOCAL_RATE_LIMIT_MAX_ENTRIES) return;
+
+  // Everything still here is live, so the store is under pressure from many
+  // distinct identifiers at once. Shed in insertion order, which is also window
+  // order: an entry's window is fixed at creation, so the oldest entries are
+  // the ones closest to expiring anyway.
+  //
+  // Trade-off worth knowing: shedding a live entry forgives the requests it had
+  // counted, so an attacker able to mint enough distinct identifiers can flush
+  // the store and reset their own counter. Bounded memory is the priority on a
+  // path that only runs when the database limiter is missing, and the database
+  // limiter has no such ceiling.
+  let excess = localRateLimits.size - LOCAL_RATE_LIMIT_TARGET_ENTRIES;
+  for (const key of localRateLimits.keys()) {
+    if (excess <= 0) break;
+    localRateLimits.delete(key);
+    excess -= 1;
+  }
+}
+
+function maybeSweepLocalRateLimits(now: number) {
+  const dueAt = globalForRateLimits.simpleCityLocalRateLimitSweepAt ?? 0;
+  if (localRateLimits.size <= LOCAL_RATE_LIMIT_MAX_ENTRIES && now < dueAt) return;
+
+  sweepLocalRateLimits(now);
+  globalForRateLimits.simpleCityLocalRateLimitSweepAt = now + LOCAL_RATE_LIMIT_SWEEP_INTERVAL_MS;
+}
 
 export type RateLimitResult = {
   allowed: boolean;
@@ -67,6 +132,8 @@ export function consumeLocalRateLimit(
   options: Pick<RateLimitOptions, "limit" | "windowSeconds" | "blockSeconds">,
   now = Date.now()
 ): RateLimitResult {
+  maybeSweepLocalRateLimits(now);
+
   const current = localRateLimits.get(keyHash);
   if (current?.blockedUntil && current.blockedUntil > now) {
     return {
@@ -81,7 +148,8 @@ export function consumeLocalRateLimit(
       windowStartedAt: now,
       requestCount: 1,
       blockedUntil: 0,
-      updatedAt: now
+      updatedAt: now,
+      expiresAt: localRateLimitExpiry(now, options.windowSeconds, 0)
     });
     return { allowed: true, retryAfterSeconds: 0 };
   }
@@ -89,12 +157,27 @@ export function consumeLocalRateLimit(
   if (current.requestCount >= options.limit) {
     current.blockedUntil = now + options.blockSeconds * 1000;
     current.updatedAt = now;
+    current.expiresAt = localRateLimitExpiry(
+      current.windowStartedAt,
+      options.windowSeconds,
+      current.blockedUntil
+    );
     return { allowed: false, retryAfterSeconds: options.blockSeconds };
   }
 
   current.requestCount += 1;
   current.updatedAt = now;
+  current.expiresAt = localRateLimitExpiry(
+    current.windowStartedAt,
+    options.windowSeconds,
+    current.blockedUntil
+  );
   return { allowed: true, retryAfterSeconds: 0 };
+}
+
+/** Exposed so tests can assert the fallback store does not grow without bound. */
+export function localRateLimitEntryCount() {
+  return localRateLimits.size;
 }
 
 export async function consumeRateLimit(options: RateLimitOptions): Promise<RateLimitResult> {

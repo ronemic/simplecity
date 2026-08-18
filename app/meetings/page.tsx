@@ -87,9 +87,11 @@ export default async function MeetingsPage({
     lang?: string;
   }>;
 }) {
-  const params = await searchParams;
-  const locale = await getRequestLocale();
-  const cookieStore = await cookies();
+  const [params, locale, cookieStore] = await Promise.all([
+    searchParams,
+    getRequestLocale(),
+    cookies()
+  ]);
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );

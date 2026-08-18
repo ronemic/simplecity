@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildSitemapEntries } from "@/app/sitemap";
+import { getPublicAppUrlFromHeaders } from "@/lib/appUrl";
 
 test("sitemap exposes discovery pages without individual content", () => {
   const entries = buildSitemapEntries("https://simplecity.app");
@@ -43,4 +44,28 @@ test("sitemap exposes discovery pages without individual content", () => {
     "es-US": "https://simplecity.app/about?lang=es",
     "x-default": "https://simplecity.app/about"
   });
+});
+
+test("a forged Host cannot rewrite the sitemap origin on a deployed app", () => {
+  const forged = (name: string) =>
+    ({
+      host: "evil.example",
+      "x-forwarded-host": "evil.example",
+      "x-forwarded-proto": "https"
+    })[name] || null;
+
+  assert.equal(
+    getPublicAppUrlFromHeaders(forged, "https://simplecity.app"),
+    "https://simplecity.app"
+  );
+});
+
+test("forwarded host is still honoured for local development", () => {
+  const forwarded = (name: string) =>
+    ({ "x-forwarded-host": "preview.simplecity.app", "x-forwarded-proto": "https" })[name] || null;
+
+  assert.equal(
+    getPublicAppUrlFromHeaders(forwarded, "http://localhost:3000"),
+    "https://preview.simplecity.app"
+  );
 });

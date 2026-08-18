@@ -19,6 +19,22 @@ import {
 
 export const DECISION_CARD_PAGE_SIZE = 12;
 
+/**
+ * Upper bounds for caller-supplied pagination.
+ *
+ * The aggregate ("all jurisdictions") decision view cannot use a database
+ * offset, because it merges rows from every jurisdiction before it knows what
+ * lands on a given page. It instead fetches `page * pageSize` candidates from
+ * each jurisdiction and slices in memory, so an unbounded page number turns one
+ * request into a multi-million-row scan against every configured project.
+ *
+ * These caps sit far above any realistic catalogue size (500 pages of 12 is
+ * 6,000 cards per jurisdiction) while keeping the worst case finite. They also
+ * bound the `unstable_cache` key space, which is keyed on page and page size.
+ */
+export const MAX_DECISION_CARD_PAGE = 500;
+export const MAX_DECISION_CARD_PAGE_SIZE = 48;
+
 export const CATEGORIES = [
   "Housing",
   "Transportation",

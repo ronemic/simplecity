@@ -1,6 +1,10 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
-import { getConfiguredAppUrl, isLocalAppUrl, normalizeAppUrl } from "@/lib/appUrl";
+import {
+  getConfiguredAppUrl,
+  getPublicAppUrlFromHeaders,
+  isLocalAppUrl
+} from "@/lib/appUrl";
 import {
   ALL_JURISDICTIONS_SLUG,
   PUBLIC_JURISDICTION_OPTIONS,
@@ -106,21 +110,19 @@ export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
 }
 
 async function sitemapAppUrl() {
+  const configured = getConfiguredAppUrl();
+  // A deployed origin is authoritative, so skip the headers entirely: trusting
+  // them here would let any visitor publish a sitemap pointing at their own
+  // domain just by sending a forged Host.
+  if (!isLocalAppUrl(configured)) return configured;
+
   try {
     const headersList = await headers();
-    const host = headersList.get("x-forwarded-host") || headersList.get("host");
-    if (host) {
-      const proto =
-        headersList.get("x-forwarded-proto") ||
-        (host.includes("localhost") || host.includes("127.0.0.1") ? "http" : "https");
-      const requestAppUrl = normalizeAppUrl(`${proto}://${host}`);
-      if (!isLocalAppUrl(requestAppUrl)) return requestAppUrl;
-    }
+    return getPublicAppUrlFromHeaders((name) => headersList.get(name), configured);
   } catch {
     // Static builds do not provide request headers.
+    return configured;
   }
-
-  return getConfiguredAppUrl();
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

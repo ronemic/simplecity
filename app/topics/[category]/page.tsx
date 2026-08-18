@@ -70,12 +70,15 @@ export default async function CategoryDetailPage({
   params: Promise<{ category: string }>;
   searchParams: Promise<{ period?: string; jurisdiction?: string; lang?: string }>;
 }) {
-  const [{ category: slug }, query] = await Promise.all([params, searchParams]);
-  const locale = await getRequestLocale();
+  const [{ category: slug }, query, locale, cookieStore] = await Promise.all([
+    params,
+    searchParams,
+    getRequestLocale(),
+    cookies()
+  ]);
   const category = categoryFromSlug(slug);
   if (!category) notFound();
 
-  const cookieStore = await cookies();
   const jurisdiction = normalizeJurisdictionSelection(
     query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );

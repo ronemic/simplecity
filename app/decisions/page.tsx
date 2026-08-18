@@ -23,7 +23,7 @@ import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
-import { CATEGORIES, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 import { PendingLink } from "@/components/PendingLink";
 
@@ -88,7 +88,8 @@ function noCardsDescription(locale: "en" | "es", jurisdiction: string, jurisdict
 
 function parsePage(value: string | undefined) {
   const page = Number.parseInt(value || "", 10);
-  return Number.isFinite(page) && page > 0 ? page : 1;
+  if (!Number.isFinite(page) || page < 1) return 1;
+  return Math.min(page, MAX_DECISION_CARD_PAGE);
 }
 
 function santaBarbaraBodyHref(

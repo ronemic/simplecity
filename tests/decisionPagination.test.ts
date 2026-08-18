@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { DECISION_CARD_PAGE_SIZE } from "@/lib/constants";
+import {
+  DECISION_CARD_PAGE_SIZE,
+  MAX_DECISION_CARD_PAGE,
+  MAX_DECISION_CARD_PAGE_SIZE
+} from "@/lib/constants";
 import type { SummaryCardRow } from "@/lib/types";
 import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
 import { matchesDecisionFilters } from "@/lib/utils/decisionFilters";
@@ -83,4 +87,20 @@ test("decisions use bounded server pagination with a database sort key", () => {
   assert.match(migration, /summary_cards_decision_page_idx/);
   assert.match(migration, /sync_meeting_decision_sort_at/);
   assert.equal(DECISION_CARD_PAGE_SIZE, 12);
+});
+
+test("decision pagination is bounded at the route and in the query layer", () => {
+  const page = readFileSync(new URL("../app/decisions/page.tsx", import.meta.url), "utf8");
+  const queries = readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
+
+  // The aggregate view fetches page * pageSize candidates per jurisdiction, so
+  // an unbounded page number turns one request into a full multi-database scan.
+  assert.match(page, /Math\.min\(page, MAX_DECISION_CARD_PAGE\)/);
+  assert.match(queries, /function normalizeDecisionPage\(/);
+  assert.match(queries, /function normalizeDecisionPageSize\(/);
+  assert.doesNotMatch(queries, /normalizePositiveInteger\(page, 1\)/);
+  assert.doesNotMatch(queries, /normalizePositiveInteger\(pageSize, DECISION_CARD_PAGE_SIZE\)/);
+
+  assert.equal(MAX_DECISION_CARD_PAGE * DECISION_CARD_PAGE_SIZE <= 6_000, true);
+  assert.equal(MAX_DECISION_CARD_PAGE_SIZE >= DECISION_CARD_PAGE_SIZE, true);
 });

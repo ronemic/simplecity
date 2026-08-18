@@ -1,6 +1,11 @@
 import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DECISION_CARD_PAGE_SIZE, type CategoryName } from "@/lib/constants";
+import {
+  DECISION_CARD_PAGE_SIZE,
+  MAX_DECISION_CARD_PAGE,
+  MAX_DECISION_CARD_PAGE_SIZE,
+  type CategoryName
+} from "@/lib/constants";
 import {
   ALL_JURISDICTIONS_SLUG,
   getDefaultJurisdiction,
@@ -226,6 +231,23 @@ async function withFallbackTimeout<T>(
 
 function normalizePositiveInteger(value: number, fallback: number) {
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : fallback;
+}
+
+/**
+ * Pagination has to be clamped here as well as at the route, because the
+ * aggregate view's candidate fetch scales with the page number and the cache
+ * key is built from these values. An unclamped page reaching this layer costs a
+ * multi-million-row scan per jurisdiction and a permanent cache entry.
+ */
+function normalizeDecisionPage(value: number) {
+  return Math.min(normalizePositiveInteger(value, 1), MAX_DECISION_CARD_PAGE);
+}
+
+function normalizeDecisionPageSize(value: number) {
+  return Math.min(
+    normalizePositiveInteger(value, DECISION_CARD_PAGE_SIZE),
+    MAX_DECISION_CARD_PAGE_SIZE
+  );
 }
 
 function getSafePublicClients(selection: JurisdictionSelection) {
@@ -1085,8 +1107,8 @@ const getCachedDecisionCardPage = unstable_cache(
     page: number,
     pageSize: number
   ): Promise<DecisionCardPageResult> => {
-    const normalizedPage = normalizePositiveInteger(page, 1);
-    const normalizedPageSize = normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE);
+    const normalizedPage = normalizeDecisionPage(page);
+    const normalizedPageSize = normalizeDecisionPageSize(pageSize);
     const offset = (normalizedPage - 1) * normalizedPageSize;
     const normalizedSearch = normalizeSearch(search);
 
@@ -1572,8 +1594,8 @@ export async function getDecisionCardPage({
     category || "",
     result || "",
     body || "",
-    normalizePositiveInteger(page, 1),
-    normalizePositiveInteger(pageSize, DECISION_CARD_PAGE_SIZE)
+    normalizeDecisionPage(page),
+    normalizeDecisionPageSize(pageSize)
   );
 }
 
