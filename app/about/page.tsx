@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import {
   ExternalLink,
   FileSearch,
@@ -42,6 +43,8 @@ export const revalidate = 300;
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
+const FEATURE_IMAGE_URL =
+  "https://bloximages.newyork1.vip.townnews.com/losaltosonline.com/content/tncms/assets/v3/editorial/e/b2/eb267b69-9b78-4c8c-b5e0-0882d6aa24c7/6a5a8dac111ef.image.jpg?resize=2008%2C669";
 const CONTACT_EMAIL = "simplecityadmin@gmail.com";
 
 function formatStat(value: number, locale: "en" | "es") {
@@ -108,13 +111,8 @@ export default async function AboutPage() {
               </p>
               <p className="page-copy">
                 {locale === "es"
-                  ? "Construimos SimpleCity para que las decisiones locales sean más fáciles de entender y para que los registros oficiales sigan siendo fáciles de encontrar por transparencia."
-                  : "We built SimpleCity to make local decisions easier to understand while ensuring that official records remain easily accessible for transparency."}
-              </p>
-              <p className="page-copy">
-                {locale === "es"
-                  ? "Nuestro objetivo no es reemplazar los registros oficiales, sino ayudar a residentes a descubrirlos y entenderlos para mantenerse informados sobre su comunidad y participar cuando sea necesario."
-                  : "Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
+                  ? "Construimos SimpleCity para que las decisiones locales sean más fáciles de entender y para que los registros oficiales sigan siendo fáciles de encontrar por transparencia. Nuestro objetivo no es reemplazar los registros oficiales, sino ayudar a residentes a descubrirlos y entenderlos para mantenerse informados sobre su comunidad y participar cuando sea necesario."
+                  : "We built SimpleCity to make local decisions easier to understand while ensuring that official records remain easily accessible for transparency. Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
               </p>
             </div>
             <p className="mt-5 text-sm font-semibold text-black/70">
@@ -158,12 +156,28 @@ export default async function AboutPage() {
         </p>
 
         <article className="quiet-card mt-4 p-5 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center">
-            <span className="icon-tile-sm">
-              <Newspaper aria-hidden className="h-5 w-5" />
-            </span>
+          <div className="grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)_auto] sm:items-center">
+            <a
+              href={FEATURE_ARTICLE_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={locale === "es" ? "Leer la cobertura de Los Altos Town Crier" : "Read the Los Altos Town Crier coverage"}
+              className="block overflow-hidden rounded-lg border border-black/10 bg-black/[0.02]"
+            >
+              <Image
+                src={FEATURE_IMAGE_URL}
+                width={2008}
+                height={669}
+                sizes="(max-width: 639px) calc(100vw - 4.5rem), 220px"
+                alt={locale === "es"
+                  ? "Ruiwen, Patrick y Samuel, el equipo estudiantil detrás de SimpleCity"
+                  : "Ruiwen, Patrick, and Samuel, the student team behind SimpleCity"}
+                className="h-auto w-full"
+              />
+            </a>
             <div className="min-w-0">
-              <p className="label-eyebrow !text-civic">
+              <p className="label-eyebrow !text-civic flex items-center gap-2">
+                <Newspaper aria-hidden className="h-4 w-4" />
                 {locale === "es" ? "Cobertura destacada" : "Featured coverage"}
               </p>
               <h2 className="mt-1 max-w-3xl text-lg font-bold leading-7 text-ink sm:text-xl">

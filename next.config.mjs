@@ -57,6 +57,17 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "bloximages.newyork1.vip.townnews.com",
+        port: "",
+        pathname:
+          "/losaltosonline.com/content/tncms/assets/v3/editorial/e/b2/eb267b69-9b78-4c8c-b5e0-0882d6aa24c7/**"
+      }
+    ]
+  },
   async headers() {
     return [
       {
