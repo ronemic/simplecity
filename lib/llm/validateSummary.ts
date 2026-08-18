@@ -573,6 +573,10 @@ function cardItemGroundingText(card: z.infer<typeof CardSchema>) {
     card.agendaItem,
     ...card.whatIsHappening,
     card.whyItMatters,
+    // Audience claims are published on the card just like the summary text, so
+    // a figure the model invented here must be grounded in exactly the same way
+    // it would be inside what-is-happening.
+    ...card.whoItAffects,
     card.status
   ].filter(Boolean).join(" ");
 }

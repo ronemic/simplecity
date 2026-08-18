@@ -23,6 +23,23 @@ export const DECISION_OUTCOME_JURISDICTIONS = new Set<string>(KNOWN_JURISDICTION
 const OUTCOME_TERMS =
   "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|determined|reported|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?";
 const OUTCOME_TERM_PATTERN = new RegExp(`\\b(?:${OUTCOME_TERMS})\\b`, "i");
+const APPROVAL_TERMS = "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed";
+const APPROVAL_TERM_PATTERN = new RegExp(`\\b(?:${APPROVAL_TERMS})\\b`, "i");
+const FAILURE_TERM_PATTERN = /\b(?:denied|rejected|fail(?:ed)?|defeated)\b/i;
+/**
+ * Bare "no" is deliberately excluded: official records use "no action taken" as
+ * a real outcome, and treating it as a negator would erase it.
+ */
+const NEGATOR = "(?:\\bnot\\b|\\bnever\\b|\\bnor\\b|n['’]t\\b)";
+const NEGATED_LINKING_VERB = "(?:\\s+(?:be|been|being|yet))?";
+const NEGATED_OUTCOME_TERM_PATTERN = new RegExp(
+  `${NEGATOR}${NEGATED_LINKING_VERB}\\s+(?:${OUTCOME_TERMS})\\b`,
+  "gi"
+);
+const NEGATED_APPROVAL_PATTERN = new RegExp(
+  `${NEGATOR}${NEGATED_LINKING_VERB}\\s+(?:${APPROVAL_TERMS})\\b`,
+  "i"
+);
 const RESULT_PARAGRAPH_FRAGMENT = "(?:(?!\\n\\n)[\\s\\S])";
 const RESULT_MARKER_PATTERN = new RegExp(
   `\\b(?:action|result|decision|motion)\\s*[:\\-]\\s*${RESULT_PARAGRAPH_FRAGMENT}{0,700}?(?:${OUTCOME_TERMS})${RESULT_PARAGRAPH_FRAGMENT}{0,350}`,
@@ -123,11 +140,21 @@ function sentenceCase(value: string) {
 }
 
 export function classifyDecisionOutcome(value: string): DecisionOutcomeKind {
-  const text = value.toLowerCase();
-  if (/\bamend(?:ed|ment|ments)?\b/.test(text)) return "amended";
+  const raw = value.toLowerCase();
+  // "The motion did not pass" must never read as a passage. Strip negated
+  // outcome terms before matching so the surviving terms describe what the body
+  // actually did, and remember a negated approval so it lands on rejection
+  // rather than falling through to an unclassified outcome.
+  const negatedApproval = NEGATED_APPROVAL_PATTERN.test(raw);
+  const text = raw.replace(NEGATED_OUTCOME_TERM_PATTERN, " ");
+  // An amendment that was denied is a rejection, not an amendment, so the
+  // amendment branch must yield whenever the record also carries a failure.
+  if (/\bamend(?:ed|ment|ments)?\b/.test(text) && !FAILURE_TERM_PATTERN.test(text)) {
+    return "amended";
+  }
   if (/\b(?:continued|postponed|tabled|deferred|referred)\b/.test(text)) return "continued";
-  if (/\b(?:denied|rejected|fail(?:ed)?|defeated)\b/.test(text)) return "rejected";
-  if (/\b(?:approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed)\b/.test(text)) {
+  if (FAILURE_TERM_PATTERN.test(text) || negatedApproval) return "rejected";
+  if (APPROVAL_TERM_PATTERN.test(text)) {
     return "approved";
   }
   return "other";

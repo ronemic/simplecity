@@ -129,6 +129,43 @@ test("classifies official outcome language and extracts vote details", () => {
   assert.equal(extractVoteDetail("The motion carried unanimously"), "Unanimous");
 });
 
+test("never reads a negated outcome term as the outcome it negates", () => {
+  assert.equal(classifyDecisionOutcome("The motion did not pass."), "rejected");
+  assert.equal(classifyDecisionOutcome("Motion to approve was not adopted."), "rejected");
+  assert.equal(classifyDecisionOutcome("The item has not been adopted by the Council."), "rejected");
+  assert.equal(classifyDecisionOutcome("The ordinance will not be approved this cycle."), "rejected");
+  assert.equal(classifyDecisionOutcome("The motion didn't pass."), "rejected");
+
+  // "no action taken" is a real recorded outcome, not a negated approval.
+  assert.equal(classifyDecisionOutcome("No action taken."), "other");
+  assert.equal(
+    classifyDecisionOutcome("Meeting adjourned for lack of a quorum; no action taken."),
+    "other"
+  );
+
+  // A negated approval must not outrank a continuance the record also states.
+  assert.equal(
+    classifyDecisionOutcome("The motion was not approved; the item was continued to June 10."),
+    "continued"
+  );
+
+  assert.equal(
+    interpretOfficialAction(null, "The motion did not pass.", {
+      jurisdictionSlug: "mountain-view",
+      title: "City Council Regular Meeting",
+      meetingType: "City Council"
+    }).canonicalStatus,
+    "rejected"
+  );
+});
+
+test("classifies a failed amendment as a rejection rather than an amendment", () => {
+  assert.equal(classifyDecisionOutcome("The amendment was denied."), "rejected");
+  assert.equal(classifyDecisionOutcome("Motion to approve as amended failed 2-3."), "rejected");
+  // An amendment without a failure term still reads as an amendment.
+  assert.equal(classifyDecisionOutcome("Approved the contract, as amended, 5-0."), "amended");
+});
+
 test("interprets Legistar pass flags in the context of their procedural action", () => {
   const committee = meeting("san-francisco", { title: "Budget and Finance Committee" });
 
