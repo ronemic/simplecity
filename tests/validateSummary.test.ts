@@ -109,6 +109,47 @@ test("drops cards with exact values that are not grounded in the source text", (
   assert.equal(issues[0]?.value, "$250");
 });
 
+test("grounds who-it-affects values the same way as the rest of the card", () => {
+  const options = {
+    fallbackSource: "https://city.example/agendas/4",
+    allowedSourceUrls: ["https://city.example/agendas/4"],
+    sourceText:
+      "Item 4 - Contract approval. The council will consider a $100 contract serving 1,200 households at 7:00 PM."
+  };
+
+  const issues: Array<{ reason: string; value?: string }> = [];
+  const fabricated = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ whoItAffects: ["$8.5 million in affected property value"] })]
+    },
+    { ...options, onIssue: (issue) => issues.push(issue) }
+  );
+
+  assert.equal(fabricated.cards.length, 0);
+  assert.match(issues[0]?.reason || "", /exact values/);
+  assert.equal(issues[0]?.value, "$8.5 million");
+
+  const grounded = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ whoItAffects: ["1,200 households"] })]
+    },
+    options
+  );
+  assert.equal(grounded.cards.length, 1);
+
+  // Plain audience descriptors carry no groundable values and stay unaffected.
+  const descriptors = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard({ whoItAffects: ["Renters", "Park users", "Local businesses"] })]
+    },
+    options
+  );
+  assert.equal(descriptors.cards.length, 1);
+});
+
 test("accepts an explicitly day-prior comment deadline derived from the meeting date", () => {
   const meeting = itemScopedMeeting();
   const issues: Array<{ reason: string; value?: string }> = [];
