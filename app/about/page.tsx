@@ -45,6 +45,7 @@ const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 const FEATURE_IMAGE_URL =
   "https://bloximages.newyork1.vip.townnews.com/losaltosonline.com/content/tncms/assets/v3/editorial/e/b2/eb267b69-9b78-4c8c-b5e0-0882d6aa24c7/6a5a8dac111ef.image.jpg?resize=2008%2C669";
+const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
 const CONTACT_EMAIL = "simplecityadmin@gmail.com";
 
 function formatStat(value: number, locale: "en" | "es") {
@@ -125,6 +126,24 @@ export default async function AboutPage() {
               >
                 {CONTACT_EMAIL}
               </a>
+            </p>
+
+            <p className="mt-4 flex max-w-2xl items-start gap-2 text-sm font-semibold leading-6 text-black/60">
+              <ShieldCheck aria-hidden className="mt-1 h-4 w-4 shrink-0 text-civic" />
+              <span>
+                {locale === "es"
+                  ? "SimpleCity cuenta con el patrocinio fiscal de Hack Club, una organización sin fines de lucro 501(c)(3)."
+                  : "SimpleCity is fiscally sponsored by Hack Club, a 501(c)(3) nonprofit."}{" "}
+                <a
+                  href={DONATION_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 font-bold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
+                >
+                  {locale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
+                  <ExternalLink aria-hidden className="h-3.5 w-3.5" />
+                </a>
+              </span>
             </p>
           </section>
         </div>

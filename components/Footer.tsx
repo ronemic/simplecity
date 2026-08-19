@@ -2,6 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   LOCALE_CHANGE_EVENT,
@@ -11,6 +13,8 @@ import {
   type Locale,
   t
 } from "@/lib/i18n";
+
+const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
 
 function readCookieLocale() {
   const localeCookie = document.cookie
@@ -41,6 +45,8 @@ function localizedHref(path: string, locale: Locale) {
 
 export function Footer({ locale = "en" }: { locale?: Locale }) {
   const [currentLocale, setCurrentLocale] = useState(locale);
+  const pathname = usePathname();
+  const showSupportCallout = pathname !== "/";
 
   useEffect(() => {
     function syncLocale(nextLocale?: string | null) {
@@ -74,7 +80,36 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
   }, []);
 
   return (
-    <footer className="mt-10 border-t border-black/10 bg-[#eef3f6]">
+    <>
+      {showSupportCallout ? (
+        <section className="section-shell mt-6 pb-10">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="text-lg font-black text-ink">
+                {currentLocale === "es"
+                  ? "Ayuda a que SimpleCity siga siendo gratuito y continúe creciendo"
+                  : "Help keep SimpleCity free and growing"}
+              </h2>
+              <p className="mt-1 text-sm font-semibold leading-6 text-black/[0.62]">
+                {currentLocale === "es"
+                  ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes."
+                  : "Your support helps us cover more communities and maintain reliable, source-linked summaries."}
+              </p>
+            </div>
+            <a
+              href={DONATION_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="action-primary-sm w-fit shrink-0"
+            >
+              {currentLocale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
+              <ArrowRight aria-hidden className="h-4 w-4" />
+            </a>
+          </div>
+        </section>
+      ) : null}
+
+      <footer className={`${showSupportCallout ? "mt-0" : "mt-10"} border-t border-black/10 bg-[#eef3f6]`}>
       <div className="section-shell py-10 text-sm text-black/70">
         <div className="grid gap-10 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:gap-10 lg:gap-16">
           <div className="max-w-sm">
@@ -91,7 +126,12 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
               />
               SimpleCity
             </Link>
-            <p className="mt-3 leading-6">{footerDescription(currentLocale)}</p>
+            <p className="mt-3 leading-6">
+              {footerDescription(currentLocale)}{" "}
+              {currentLocale === "es"
+                ? "SimpleCity cuenta con el patrocinio fiscal de Hack Club, una organización sin fines de lucro 501(c)(3)."
+                : "SimpleCity is fiscally sponsored by Hack Club, a 501(c)(3) nonprofit."}
+            </p>
           </div>
 
           <nav aria-label={exploreLabel(currentLocale)} className="min-w-[7rem]">
@@ -133,6 +173,16 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                   {t(currentLocale, "contact")}
                 </a>
               </li>
+              <li>
+                <a
+                  className="font-bold text-civic transition hover:text-ink"
+                  href={DONATION_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {currentLocale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
+                </a>
+              </li>
             </ul>
           </nav>
 
@@ -153,6 +203,7 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
           </nav>
         </div>
       </div>
-    </footer>
+      </footer>
+    </>
   );
 }

@@ -43,6 +43,7 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
+const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
 
 export const revalidate = 300;
 
@@ -284,10 +285,38 @@ export default async function Home({
       ) : null}
 
       <section
-        id="decisions"
-        className={`section-shell scroll-mt-24 pb-6 sm:pb-8 ${
+        className={`section-shell pb-6 sm:pb-8 ${
           announcements.length === 0 ? "pt-6 sm:pt-8" : "pt-0"
         }`}
+      >
+        <div className="flex flex-col gap-4 border-b border-black/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-lg font-black text-ink">
+              {locale === "es"
+                ? "Ayuda a que SimpleCity siga siendo gratuito y continúe creciendo"
+                : "Help keep SimpleCity free and growing"}
+            </h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-black/[0.62]">
+              {locale === "es"
+                ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes."
+                : "Your support helps us cover more communities and maintain reliable, source-linked summaries."}
+            </p>
+          </div>
+          <a
+            href={DONATION_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="action-primary-sm w-fit shrink-0"
+          >
+            {locale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
+            <ArrowRight aria-hidden className="h-4 w-4" />
+          </a>
+        </div>
+      </section>
+
+      <section
+        id="decisions"
+        className="section-shell scroll-mt-24 pb-6 pt-0 sm:pb-8"
       >
         <div id="search-results" className="scroll-mt-24">
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -441,6 +470,7 @@ export default async function Home({
           })}
         </div>
       </section>
+
     </div>
   );
 }
