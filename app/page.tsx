@@ -298,8 +298,8 @@ export default async function Home({
             </h2>
             <p className="mt-1 text-sm font-semibold leading-6 text-black/[0.62]">
               {locale === "es"
-                ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes."
-                : "Your support helps us cover more communities and maintain reliable, source-linked summaries."}
+                ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes. Las donaciones son deducibles de impuestos."
+                : "Your support helps us cover more communities and maintain reliable, source-linked summaries. Donations are tax-deductible."}
             </p>
           </div>
           <a
