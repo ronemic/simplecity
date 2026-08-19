@@ -39,6 +39,7 @@ export function buildContentSecurityPolicy(environment = process.env.NODE_ENV) {
 const contentSecurityPolicy = buildContentSecurityPolicy();
 
 const securityHeaders = [
+  { key: "X-Accel-Buffering", value: "no" },
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "X-Content-Type-Options", value: "nosniff" },
