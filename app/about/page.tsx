@@ -42,6 +42,7 @@ const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 const FEATURE_IMAGE_URL =
   "https://bloximages.newyork1.vip.townnews.com/losaltosonline.com/content/tncms/assets/v3/editorial/e/b2/eb267b69-9b78-4c8c-b5e0-0882d6aa24c7/6a5a8dac111ef.image.jpg?resize=2008%2C669";
+const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
 const CONTACT_EMAIL = "simplecityadmin@gmail.com";
 
 export default async function AboutPage() {
@@ -68,7 +69,16 @@ export default async function AboutPage() {
             <span>
               {locale === "es"
                 ? "SimpleCity cuenta con el patrocinio fiscal de Hack Club, una organización sin fines de lucro 501(c)(3)."
-                : "SimpleCity is fiscally sponsored by Hack Club, a 501(c)(3) nonprofit."}
+                : "SimpleCity is fiscally sponsored by Hack Club, a 501(c)(3) nonprofit."}{" "}
+              <a
+                href={DONATION_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-bold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
+              >
+                {locale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
+                <ExternalLink aria-hidden className="h-3.5 w-3.5" />
+              </a>
             </span>
           </p>
           <section className="mt-10">
@@ -87,6 +97,17 @@ export default async function AboutPage() {
                   : "We built SimpleCity to make local decisions easier to understand while ensuring that official records remain easily accessible for transparency. Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
               </p>
             </div>
+            <p className="mt-5 text-sm font-semibold text-black/70">
+              {locale === "es"
+                ? "¿Tienes una pregunta, corrección o idea? Contáctanos en"
+                : "Have a question, correction, or idea? Contact us at"}{" "}
+              <a
+                href={`mailto:${CONTACT_EMAIL}`}
+                className="font-bold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
+              >
+                {CONTACT_EMAIL}
+              </a>
+            </p>
           </section>
       </div>
 
@@ -199,17 +220,6 @@ export default async function AboutPage() {
           ))}
         </div>
 
-        <p className="mt-6 text-sm font-semibold text-black/70">
-          {locale === "es"
-            ? "¿Tienes una pregunta, corrección o idea? Contáctanos en"
-            : "Have a question, correction, or idea? Contact us at"}{" "}
-          <a
-            href={`mailto:${CONTACT_EMAIL}`}
-            className="font-bold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
-          >
-            {CONTACT_EMAIL}
-          </a>
-        </p>
       </section>
     </div>
   );
