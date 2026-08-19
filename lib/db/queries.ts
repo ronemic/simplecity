@@ -12,13 +12,19 @@ import {
   getJurisdictions,
   getJurisdictionSlugFromRow,
   getPublicSupabaseClientsForSelection,
-  getServiceSupabaseClientForJurisdiction,
+  getPublicSupabaseProjectsForSelection,
   getServiceSupabaseClientsForSelection,
+  getServiceSupabaseProjectsForSelection,
   type JurisdictionConfig,
+  type JurisdictionProject,
   type JurisdictionSelection,
   type JurisdictionSlug
 } from "@/lib/config/jurisdictions";
-import { PUBLIC_CACHE_REVALIDATE_SECONDS, PUBLIC_CONTENT_CACHE_TAG } from "@/lib/db/publicCache";
+import {
+  PUBLIC_CACHE_REVALIDATE_SECONDS,
+  PUBLIC_CONTENT_CACHE_TAG,
+  PUBLIC_STATS_CACHE_REVALIDATE_SECONDS
+} from "@/lib/db/publicCache";
 import {
   meetingTranslationFingerprint,
   summaryCardTranslationFingerprint
@@ -277,6 +283,53 @@ function getSafeServiceClients(selection: JurisdictionSelection) {
 
     throw error;
   }
+}
+
+function getSafePublicProjects(selection: JurisdictionSelection) {
+  return groupSelectionProjects(selection, getPublicSupabaseProjectsForSelection, "public");
+}
+
+function getSafeServiceProjects(selection: JurisdictionSelection) {
+  return groupSelectionProjects(selection, getServiceSupabaseProjectsForSelection, "service");
+}
+
+function groupSelectionProjects(
+  selection: JurisdictionSelection,
+  resolve: (selection: JurisdictionSelection) => JurisdictionProject[],
+  scope: "public" | "service"
+) {
+  try {
+    return resolve(selection);
+  } catch (error) {
+    if (selection === getDefaultJurisdiction().slug) {
+      logQueryError(`Failed to create ${scope} Supabase client`, error);
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+/**
+ * Rows from a grouped query arrive interleaved from several jurisdictions, so the
+ * jurisdiction fallbacks have to be keyed off each row's own slug instead of a
+ * single config. An `in("jurisdiction_slug", slugs)` filter cannot match a null
+ * slug, so every row is guaranteed to resolve; the last-resort fallback only
+ * guards against a slug that is somehow outside the queried set.
+ */
+function jurisdictionResolver(jurisdictions: JurisdictionConfig[]) {
+  const bySlug = new Map(jurisdictions.map((jurisdiction) => [jurisdiction.slug, jurisdiction]));
+  return (slug: string | null | undefined) =>
+    bySlug.get(String(slug || "") as JurisdictionSlug) || jurisdictions[0];
+}
+
+function projectSlugs(project: JurisdictionProject) {
+  return project.jurisdictions.map((jurisdiction) => jurisdiction.slug);
+}
+
+/** Names the jurisdictions a grouped query covered, for error logging. */
+function projectLabel(project: JurisdictionProject) {
+  return project.jurisdictions.map((jurisdiction) => jurisdiction.name).join(", ");
 }
 
 function withMeetingJurisdictionFallback<T extends Partial<MeetingRow>>(
@@ -605,7 +658,16 @@ async function enrichPublicCards(
   }));
 }
 
-async function loadPublishedCardsForJurisdiction(
+/**
+ * Reads one jurisdiction's cards without enriching them.
+ *
+ * The fetch has to stay per jurisdiction because `options.limit` is a
+ * per-jurisdiction pool (see HOME_CARD_PREVIEW_BUDGET) -- a shared `in(...)`
+ * limit would let one busy jurisdiction crowd out the rest. Enrichment has no
+ * such constraint, so callers hand the combined rows to enrichPublicCards once
+ * per database instead of once per jurisdiction.
+ */
+async function loadPublishedCardRowsForJurisdiction(
   {
     jurisdiction,
     supabase
@@ -613,7 +675,6 @@ async function loadPublishedCardsForJurisdiction(
     jurisdiction: JurisdictionConfig;
     supabase: SupabaseClient;
   },
-  locale: Locale,
   options: { limit?: number } = {}
 ) {
   // Ordered by decision date, not row-creation date.
@@ -655,21 +716,40 @@ async function loadPublishedCardsForJurisdiction(
     return [] as SummaryCardRow[];
   }
 
-  const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+  return ((data || []) as unknown as SummaryCardRow[]).map((row) =>
     withCardJurisdictionFallback(row, jurisdiction)
   );
-  return enrichPublicCards(supabase, rows, locale);
+}
+
+/**
+ * Fetches each of a database's jurisdictions separately to preserve the
+ * per-jurisdiction pool, then enriches the whole batch in one pass so the
+ * translation and decision-outcome lookups cost one round trip per database
+ * rather than one per jurisdiction.
+ */
+async function loadPublishedCardsForProject(
+  project: JurisdictionProject,
+  locale: Locale,
+  options: { limit?: number } = {}
+) {
+  const rowGroups = await Promise.all(
+    project.jurisdictions.map((jurisdiction) =>
+      loadPublishedCardRowsForJurisdiction({ jurisdiction, supabase: project.supabase }, options)
+    )
+  );
+
+  return enrichPublicCards(project.supabase, rowGroups.flat(), locale);
 }
 
 async function loadPublishedCardsForSelection(
   selection: JurisdictionSelection,
   locale: Locale
 ) {
-  const clients = getSafePublicClients(selection);
-  if (clients.length === 0) return [] as SummaryCardRow[];
+  const projects = getSafePublicProjects(selection);
+  if (projects.length === 0) return [] as SummaryCardRow[];
 
   const results = await Promise.all(
-    clients.map((client) => loadPublishedCardsForJurisdiction(client, locale))
+    projects.map((project) => loadPublishedCardsForProject(project, locale))
   );
 
   return sortCards(results.flat());
@@ -677,12 +757,18 @@ async function loadPublishedCardsForSelection(
 
 const getCachedPublishedCardPreview = unstable_cache(
   async (selection: JurisdictionSelection, locale: Locale) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return [] as SummaryCardRow[];
+    const projects = getSafePublicProjects(selection);
+    if (projects.length === 0) return [] as SummaryCardRow[];
 
-    const limit = homeCardPreviewLimit(clients.length);
+    // The pool is budgeted per jurisdiction, not per database, so the divisor
+    // stays the jurisdiction count however those jurisdictions are grouped.
+    const jurisdictionCount = projects.reduce(
+      (total, project) => total + project.jurisdictions.length,
+      0
+    );
+    const limit = homeCardPreviewLimit(jurisdictionCount);
     const results = await Promise.all(
-      clients.map((client) => loadPublishedCardsForJurisdiction(client, locale, { limit }))
+      projects.map((project) => loadPublishedCardsForProject(project, locale, { limit }))
     );
 
     return sortCards(results.flat());
@@ -724,13 +810,15 @@ function isAttendableUpcomingMeeting(meeting: UpcomingMeetingShape | null | unde
 const getCachedUpcomingDecisionSnapshot = unstable_cache(
   async (selection: JurisdictionSelection) => {
     const empty = { openForCommentCount: 0, nextMeetingIso: null as string | null };
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return empty;
+    const projects = getSafePublicProjects(selection);
+    if (projects.length === 0) return empty;
 
     const since = new Date(Date.now() - UPCOMING_LOOKBACK_MS).toISOString();
 
     const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
+      projects.map(async (project) => {
+        const { supabase } = project;
+        const slugs = projectSlugs(project);
         // Two separate questions, so two separate sources.
         //
         // The next meeting comes from the meetings table, because a resident
@@ -742,10 +830,13 @@ const getCachedUpcomingDecisionSnapshot = unstable_cache(
         // The open-for-comment count comes from published cards, because that
         // claim is about decisions we actually summarized.
         const [meetingResult, cardResult] = await Promise.all([
+          // The scan limit is now per project rather than per jurisdiction. Only
+          // the single earliest meeting is ever read off this list, and the rows
+          // come back in ascending order, so a shared window still contains it.
           supabase
             .from("meetings")
             .select("meeting_datetime,date_text,time_text,status")
-            .eq("jurisdiction_slug", jurisdiction.slug)
+            .in("jurisdiction_slug", slugs)
             .gte("meeting_datetime", since)
             .order("meeting_datetime", { ascending: true })
             .limit(UPCOMING_MEETING_SCAN_LIMIT),
@@ -754,20 +845,20 @@ const getCachedUpcomingDecisionSnapshot = unstable_cache(
             .select(
               "comment_window_closes,how_to_act_email,how_to_act_submit_comment,meetings!inner(meeting_datetime,date_text,time_text,status)"
             )
-            .eq("jurisdiction_slug", jurisdiction.slug)
+            .in("jurisdiction_slug", slugs)
             .eq("is_published", true)
             .gte("meetings.meeting_datetime", since)
         ]);
 
         if (meetingResult.error) {
           logQueryError(
-            `Failed to load ${jurisdiction.name} upcoming meetings`,
+            `Failed to load ${projectLabel(project)} upcoming meetings`,
             meetingResult.error
           );
         }
         if (cardResult.error) {
           logQueryError(
-            `Failed to load ${jurisdiction.name} upcoming decisions`,
+            `Failed to load ${projectLabel(project)} upcoming decisions`,
             cardResult.error
           );
         }
@@ -805,19 +896,22 @@ const getCachedUpcomingDecisionSnapshot = unstable_cache(
 
 const getCachedPublishedCardCount = unstable_cache(
   async (selection: JurisdictionSelection) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return 0;
+    const projects = getSafePublicProjects(selection);
+    if (projects.length === 0) return 0;
 
     const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
-        const { count, error } = await supabase
+      projects.map(async (project) => {
+        const { count, error } = await project.supabase
           .from("summary_cards")
           .select("id", { count: "exact", head: true })
-          .eq("jurisdiction_slug", jurisdiction.slug)
+          .in("jurisdiction_slug", projectSlugs(project))
           .eq("is_published", true);
 
         if (error) {
-          logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, error);
+          logQueryError(
+            `Failed to count ${projectLabel(project)} published summary cards`,
+            error
+          );
           return 0;
         }
 
@@ -913,20 +1007,23 @@ const getCachedPublishedCard = unstable_cache(
 
 const getCachedActiveAnnouncements = unstable_cache(
   async (selection: JurisdictionSelection) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return [] as AnnouncementRow[];
+    // This query carries no jurisdiction filter -- announcements are scoped in JS
+    // below -- so fanning out per jurisdiction sent one database the byte-identical
+    // request up to five times per render. Grouping asks each project once.
+    const projects = getSafePublicProjects(selection);
+    if (projects.length === 0) return [] as AnnouncementRow[];
 
     const now = Date.now();
     const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
-        const { data, error } = await supabase
+      projects.map(async (project) => {
+        const { data, error } = await project.supabase
           .from("announcements")
           .select(PUBLIC_ANNOUNCEMENT_COLUMNS)
           .eq("is_published", true)
           .order("created_at", { ascending: false });
 
         if (error) {
-          logQueryError(`Failed to load ${jurisdiction.name} announcements`, error);
+          logQueryError(`Failed to load ${projectLabel(project)} announcements`, error);
           return [] as AnnouncementRow[];
         }
 
@@ -1201,26 +1298,28 @@ const getCachedMeetings = unstable_cache(
     locale: Locale,
     body: SantaBarbaraBodyView | ""
   ) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return [] as MeetingRow[];
+    const projects = getSafePublicProjects(selection);
+    if (projects.length === 0) return [] as MeetingRow[];
 
     const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
+      projects.map(async (project) => {
+        const { supabase } = project;
         const query = supabase
           .from("meetings")
           .select(PUBLIC_MEETING_LIST_COLUMNS)
-          .eq("jurisdiction_slug", jurisdiction.slug)
+          .in("jurisdiction_slug", projectSlugs(project))
           .order("meeting_datetime", { ascending: false, nullsFirst: false });
 
         const { data, error } = await query;
 
         if (error) {
-          logQueryError(`Failed to load ${jurisdiction.name} meetings`, error);
+          logQueryError(`Failed to load ${projectLabel(project)} meetings`, error);
           return [] as MeetingRow[];
         }
 
+        const resolveJurisdiction = jurisdictionResolver(project.jurisdictions);
         const rows = ((data || []) as unknown as MeetingRow[]).map((row) =>
-          withMeetingJurisdictionFallback(row, jurisdiction)
+          withMeetingJurisdictionFallback(row, resolveJurisdiction(row.jurisdiction_slug))
         );
         const translatedRows = await applyMeetingTranslations(supabase, rows, locale);
         return translatedRows
@@ -1383,27 +1482,29 @@ const getCachedAdjacentMeetings = unstable_cache(
 
 const getCachedCategoryCards = unstable_cache(
   async (selection: JurisdictionSelection, category: string, locale: Locale) => {
-    const clients = getSafePublicClients(selection);
-    if (clients.length === 0) return [] as SummaryCardRow[];
+    const projects = getSafePublicProjects(selection);
+    if (projects.length === 0) return [] as SummaryCardRow[];
 
     const results = await Promise.all(
-      clients.map(async ({ jurisdiction, supabase }) => {
+      projects.map(async (project) => {
+        const { supabase } = project;
         const { data, error } = await supabase
           .from("summary_cards")
           .select(PUBLIC_SUMMARY_CARD_SELECT)
-          .eq("jurisdiction_slug", jurisdiction.slug)
+          .in("jurisdiction_slug", projectSlugs(project))
           .eq("is_published", true)
           .contains("category_tags", [category])
           .order("is_featured", { ascending: false })
           .order("created_at", { ascending: false });
 
         if (error) {
-          logQueryError(`Failed to load ${jurisdiction.name} category ${category}`, error);
+          logQueryError(`Failed to load ${projectLabel(project)} category ${category}`, error);
           return [] as SummaryCardRow[];
         }
 
+        const resolveJurisdiction = jurisdictionResolver(project.jurisdictions);
         const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
-          withCardJurisdictionFallback(row, jurisdiction)
+          withCardJurisdictionFallback(row, resolveJurisdiction(row.jurisdiction_slug))
         );
         return enrichPublicCards(supabase, rows, locale);
       })
@@ -1419,63 +1520,72 @@ const getCachedCategoryCards = unstable_cache(
 // Rendering a failed read as 0 is how the homepage came to advertise "0+".
 const UNAVAILABLE_JURISDICTION_STATS = {
   agendaItemsAnalyzed: null,
-  meetingsAnalyzed: null
+  meetingsAnalyzed: null,
+  publishedCards: null
 } as const;
 
 const getCachedPublicStats = unstable_cache(
   async () => {
-    const jurisdictions = getJurisdictions();
-    const jurisdictionsSupported = jurisdictions.length;
+    const jurisdictionsSupported = getJurisdictions().length;
+    const projects = getSafeServiceProjects(ALL_JURISDICTIONS_SLUG);
 
     const results = await Promise.all(
-      jurisdictions.map(async (jurisdiction) => {
-        let supabase;
-        try {
-          supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
-        } catch (error) {
-          logQueryError(`Failed to create ${jurisdiction.name} service Supabase client`, error);
-          return UNAVAILABLE_JURISDICTION_STATS;
-        }
+      projects.map(async (project) => {
+        const { supabase } = project;
+        const slugs = projectSlugs(project);
+        const label = projectLabel(project);
 
-        const emptyStats = UNAVAILABLE_JURISDICTION_STATS;
         return withFallbackTimeout<{
           agendaItemsAnalyzed: number | null;
           meetingsAnalyzed: number | null;
+          publishedCards: number | null;
         }>(
           Promise.all([
             supabase
               .from("summary_cards")
               .select("id", { count: "exact", head: true })
-              .eq("jurisdiction_slug", jurisdiction.slug)
+              .in("jurisdiction_slug", slugs)
               .eq("is_published", true)
               .not("meeting_id", "is", null),
             supabase
               .from("meetings")
               .select("id", { count: "exact", head: true })
-              .eq("jurisdiction_slug", jurisdiction.slug)
+              .in("jurisdiction_slug", slugs)
               .not("cards_generated_at", "is", null),
             supabase
               .from("meetings")
               .select("id,summary_cards!inner(id)", { count: "exact", head: true })
-              .eq("jurisdiction_slug", jurisdiction.slug)
+              .in("jurisdiction_slug", slugs)
               .is("cards_generated_at", null)
-              .eq("summary_cards.is_published", true)
-          ]).then(([cards, meetings, legacyMeetingsWithCards]) => {
-            logQueryError(`Failed to count ${jurisdiction.name} published summary cards`, cards.error);
-            logQueryError(`Failed to count ${jurisdiction.name} analyzed meetings`, meetings.error);
+              .eq("summary_cards.is_published", true),
+            // Published cards including those with no meeting attached. The
+            // homepage needs this to state the agenda-item total, and reading it
+            // here rather than through getPublishedCardCount(ALL) keeps a second
+            // whole-estate fan-out off the request path. Anon RLS exposes exactly
+            // the published rows, so the service client counts the same set.
+            supabase
+              .from("summary_cards")
+              .select("id", { count: "exact", head: true })
+              .in("jurisdiction_slug", slugs)
+              .eq("is_published", true)
+          ]).then(([cards, meetings, legacyMeetingsWithCards, publishedCards]) => {
+            logQueryError(`Failed to count ${label} published summary cards`, cards.error);
+            logQueryError(`Failed to count ${label} analyzed meetings`, meetings.error);
             logQueryError(
-              `Failed to count ${jurisdiction.name} legacy meetings with published cards`,
+              `Failed to count ${label} legacy meetings with published cards`,
               legacyMeetingsWithCards.error
             );
+            logQueryError(`Failed to count ${label} published cards`, publishedCards.error);
 
             return {
               agendaItemsAnalyzed: cards.count || 0,
-              meetingsAnalyzed: (meetings.count || 0) + (legacyMeetingsWithCards.count || 0)
+              meetingsAnalyzed: (meetings.count || 0) + (legacyMeetingsWithCards.count || 0),
+              publishedCards: publishedCards.count || 0
             };
           }),
           PUBLIC_STATS_QUERY_TIMEOUT_MS,
-          emptyStats,
-          `Public stats for ${jurisdiction.name}`
+          UNAVAILABLE_JURISDICTION_STATS,
+          `Public stats for ${label}`
         );
       })
     );
@@ -1491,11 +1601,15 @@ const getCachedPublicStats = unstable_cache(
     return {
       agendaItemsAnalyzed: sumAvailable((result) => result.agendaItemsAnalyzed),
       meetingsAnalyzed: sumAvailable((result) => result.meetingsAnalyzed),
+      publishedCards: sumAvailable((result) => result.publishedCards),
       jurisdictionsSupported
     };
   },
-  ["public-stats"],
-  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+  ["public-stats-v2"],
+  {
+    revalidate: PUBLIC_STATS_CACHE_REVALIDATE_SECONDS,
+    tags: [PUBLIC_CONTENT_CACHE_TAG]
+  }
 );
 
 export async function getPublishedCards(

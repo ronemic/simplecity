@@ -830,14 +830,52 @@ export function getServiceSupabaseClientsForSelection(selection: JurisdictionSel
   ];
 }
 
-export function getUniqueServiceSupabaseClientsForSelection(selection: JurisdictionSelection) {
-  const clients = getServiceSupabaseClientsForSelection(selection);
-  const seen = new Set<string>();
+export type JurisdictionProject = {
+  /** Every selected jurisdiction whose rows live in this one Supabase project. */
+  jurisdictions: JurisdictionConfig[];
+  supabase: SupabaseClient;
+};
 
-  return clients.filter(({ jurisdiction }) => {
+/**
+ * Thirteen jurisdictions share five Supabase projects -- the Santa Clara region
+ * alone holds five of them. Fanning a query out per jurisdiction therefore sends
+ * one database five separate round trips to answer one question, and a single
+ * "all jurisdictions" homepage render was measured at 109 round trips. Grouping
+ * by project lets a caller ask each database once with
+ * `in("jurisdiction_slug", slugs)`.
+ *
+ * Only safe for queries whose limits are not per-jurisdiction: counts,
+ * aggregates, and unbounded lists. The homepage card preview deliberately draws
+ * a fixed-size pool from every jurisdiction so that a busy one cannot crowd out
+ * the rest, so it has to keep fanning out.
+ *
+ * The grouping key comes from the config rather than the client, because
+ * supabase-js does not expose its URL as public API.
+ */
+function groupClientsByProject(
+  clients: { jurisdiction: JurisdictionConfig; supabase: SupabaseClient }[]
+): JurisdictionProject[] {
+  const projects = new Map<string, JurisdictionProject>();
+
+  for (const { jurisdiction, supabase } of clients) {
     const key = jurisdiction.supabaseUrl || jurisdiction.slug;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+    const existing = projects.get(key);
+
+    if (existing) {
+      existing.jurisdictions.push(jurisdiction);
+      continue;
+    }
+
+    projects.set(key, { jurisdictions: [jurisdiction], supabase });
+  }
+
+  return [...projects.values()];
+}
+
+export function getPublicSupabaseProjectsForSelection(selection: JurisdictionSelection) {
+  return groupClientsByProject(getPublicSupabaseClientsForSelection(selection));
+}
+
+export function getServiceSupabaseProjectsForSelection(selection: JurisdictionSelection) {
+  return groupClientsByProject(getServiceSupabaseClientsForSelection(selection));
 }

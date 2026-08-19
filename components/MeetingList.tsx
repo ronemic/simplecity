@@ -44,6 +44,17 @@ type MeetingCalendarProps = {
   locale?: Locale;
 };
 
+/**
+ * The list view renders into the document even while the calendar is showing --
+ * it is only hidden with a CSS class -- so every meeting ever scraped was landing
+ * in the HTML. Across all jurisdictions that made /meetings a 4.4MB response.
+ *
+ * Rendering a page at a time fixes the payload without weakening the feature:
+ * search and the calendar still work against the full set held in memory, and the
+ * count in the heading still reports every match.
+ */
+const LIST_PAGE_SIZE = 60;
+
 const CALENDAR_AVAILABLE_HEIGHT = 248;
 const CALENDAR_CARD_GAP = 6;
 const CALENDAR_MORE_CONTROL_HEIGHT = 28;
@@ -347,6 +358,7 @@ export function MeetingList({
     const initialMonth = isValidMonthKey(month) ? month : todayKey.slice(0, 7);
     return firstDateInMonth(initialMonth, selectedDate, todayKey);
   });
+  const [listPaging, setListPaging] = useState({ search: "", pages: 1 });
   const [openCalendarPopoverDate, setOpenCalendarPopoverDate] = useState<string | null>(null);
   const [calendarColumnWidth, setCalendarColumnWidth] = useState(0);
   const calendarPopoverRef = useRef<HTMLDivElement>(null);
@@ -554,6 +566,13 @@ export function MeetingList({
     if (rightTime === Number.POSITIVE_INFINITY) return -1;
     return rightTime - leftTime;
   });
+  // A new search is a new result set, so paging starts over rather than carrying
+  // however far the reader had expanded the previous one. Recording which search
+  // the count belongs to lets that reset happen during render, with no effect and
+  // no cascading re-render.
+  const listPages = listPaging.search === highlight ? listPaging.pages : 1;
+  const visibleListMeetings = sortedMeetings.slice(0, listPages * LIST_PAGE_SIZE);
+  const hiddenListCount = sortedMeetings.length - visibleListMeetings.length;
   const activeDateMeetings = meetingsByDate.get(activeDate) || [];
   const monthMeetingCount = monthDays
     .filter((day) => day.startsWith(activeMonth))
@@ -873,7 +892,7 @@ export function MeetingList({
               </p>
             </div>
             <div className="divide-y divide-black/10">
-              {sortedMeetings.map((meeting) => (
+              {visibleListMeetings.map((meeting) => (
                 <article key={meeting.id} className="grid gap-2 p-5 sm:p-6">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
                     <StatusPill status={meeting.status} locale={locale} highlight={highlight} />
@@ -889,6 +908,24 @@ export function MeetingList({
                 </article>
               ))}
             </div>
+            {hiddenListCount > 0 ? (
+              <div className="border-t border-black/10 p-5 text-center">
+                <button
+                  type="button"
+                  onClick={() => setListPaging({ search: highlight, pages: listPages + 1 })}
+                  className="action-secondary-sm"
+                >
+                  {locale === "es"
+                    ? `Mostrar ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} reuniones más`
+                    : `Show ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} more meetings`}
+                </button>
+                <p className="mt-2 text-sm font-semibold text-black/55">
+                  {locale === "es"
+                    ? `Mostrando ${visibleListMeetings.length} de ${sortedMeetings.length}.`
+                    : `Showing ${visibleListMeetings.length} of ${sortedMeetings.length}.`}
+                </p>
+              </div>
+            ) : null}
           </section>
         </>
       )}

@@ -172,12 +172,11 @@ export default async function Home({
         cards: previewCards,
         totalCount: Math.max(publishedCardCount, previewCards.length)
       }));
-  const [cardResult, announcements, upcomingSnapshot, publicStats, publishedAgendaItemCount] = await Promise.all([
+  const [cardResult, announcements, upcomingSnapshot, publicStats] = await Promise.all([
     cardResultPromise,
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG),
     getUpcomingDecisionSnapshot(jurisdiction),
-    getPublicStats(),
-    getPublishedCardCount(ALL_JURISDICTIONS_SLUG)
+    getPublicStats()
   ]);
   const cards = cardResult.cards;
   const availableCardCount = cardResult.totalCount;
@@ -260,11 +259,14 @@ export default async function Home({
     },
     {
       icon: FileText,
-      // publicStats counts only published cards joined to a meeting, so cards
-      // published without one are missing from it; the all-jurisdiction
-      // published count covers them. Take whichever read saw more, treating a
-      // failed (null) stats read as no contribution rather than as a zero.
-      value: statValue(Math.max(publicStats.agendaItemsAnalyzed ?? 0, publishedAgendaItemCount), locale),
+      // agendaItemsAnalyzed counts only published cards joined to a meeting, so
+      // cards published without one are missing from it; publishedCards covers
+      // them. Take whichever read saw more, treating a failed (null) read as no
+      // contribution rather than as a zero.
+      value: statValue(
+        Math.max(publicStats.agendaItemsAnalyzed ?? 0, publicStats.publishedCards ?? 0),
+        locale
+      ),
       label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
     }
   ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
