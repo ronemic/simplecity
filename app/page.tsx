@@ -44,7 +44,27 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
-const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
+// Manually maintained from analytics -- not derived from the database like the
+// other "at a glance" stats. Last checked 2026-08-19; update the date when you
+// revise the figure so it is obvious when it has gone stale.
+const APPROX_USER_COUNT = "500+";
+
+// Rounds down to a round hundred and adds "+" once there is a hundred to show;
+// below that the exact count is honest and "0+" is never rendered. Returns null
+// for a stat with nothing worth stating -- null count (read failed) or zero.
+function statValue(count: number | null, locale: string) {
+  if (count === null || count <= 0) {
+    return null;
+  }
+
+  const formatter = new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US");
+
+  if (count >= 100) {
+    return `${formatter.format(Math.floor(count / 100) * 100)}+`;
+  }
+
+  return formatter.format(count);
+}
 
 export const revalidate = 300;
 
@@ -223,6 +243,27 @@ export default async function Home({
       ? "Ordenado para mostrar primero decisiones próximas, luego elementos recientes de alto impacto como presupuestos, vivienda, seguridad, transporte, servicios, audiencias públicas, contratos y tarifas antes que elementos ceremoniales o de proceso interno."
       : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
 
+  // A stat with no value is one whose read failed or whose count is zero;
+  // drop it rather than advertise it. APPROX_USER_COUNT is not read from the
+  // database and so is always present.
+  const glanceStats = [
+    {
+      icon: Users,
+      value: APPROX_USER_COUNT,
+      label: locale === "es" ? "usuarios" : "users"
+    },
+    {
+      icon: Landmark,
+      value: statValue(publicStats.jurisdictionsSupported, locale),
+      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
+    },
+    {
+      icon: FileText,
+      value: statValue(publicStats.agendaItemsAnalyzed, locale),
+      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
+    }
+  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
+
   return (
     <div className="overflow-hidden">
       <section className="civic-hero">
@@ -267,33 +308,17 @@ export default async function Home({
           </div>
 
           <div className="space-y-5 lg:justify-self-stretch">
-            {!hasSearch ? (
+            {!hasSearch && glanceStats.length > 0 ? (
               <div className="py-1 lg:-translate-y-4">
                 <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
                   {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
                 </p>
-                <div className="grid grid-cols-3 divide-x divide-white/15">
-                  {[
-                    {
-                      icon: Users,
-                      value: "500+",
-                      label: locale === "es" ? "usuarios" : "users"
-                    },
-                    {
-                      icon: Landmark,
-                      value: new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(
-                        publicStats.jurisdictionsSupported
-                      ),
-                      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
-                    },
-                    {
-                      icon: FileText,
-                      value: `${new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(
-                        Math.floor(publicStats.agendaItemsAnalyzed / 100) * 100
-                      )}+`,
-                      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
-                    }
-                  ].map((item) => (
+                <div
+                  className={`grid divide-x divide-white/15 ${
+                    glanceStats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"
+                  }`}
+                >
+                  {glanceStats.map((item) => (
                     <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
                       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
                         <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
@@ -332,38 +357,10 @@ export default async function Home({
       ) : null}
 
       <section
-        className={`section-shell pb-6 sm:pb-8 ${
+        id="decisions"
+        className={`section-shell scroll-mt-24 pb-6 sm:pb-8 ${
           announcements.length === 0 ? "pt-6 sm:pt-8" : "pt-0"
         }`}
-      >
-        <div className="flex flex-col gap-4 border-b border-black/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="max-w-2xl">
-            <h2 className="text-lg font-black text-ink">
-              {locale === "es"
-                ? "Ayuda a que SimpleCity siga siendo gratuito y continúe creciendo"
-                : "Help keep SimpleCity free and growing"}
-            </h2>
-            <p className="mt-1.5 text-[15px] font-medium leading-6 text-black/65">
-              {locale === "es"
-                ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes. Las donaciones son deducibles de impuestos."
-                : "Your support helps us cover more communities and maintain reliable, source-linked summaries. Donations are tax-deductible."}
-            </p>
-          </div>
-          <a
-            href={DONATION_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="action-primary-sm w-fit shrink-0"
-          >
-            {locale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
-            <ArrowRight aria-hidden className="h-4 w-4" />
-          </a>
-        </div>
-      </section>
-
-      <section
-        id="decisions"
-        className="section-shell scroll-mt-24 pb-6 pt-0 sm:pb-8"
       >
         <div id="search-results" className="scroll-mt-24">
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
@@ -386,11 +383,7 @@ export default async function Home({
                     ? `${filteredCards.length} decisiones coincidentes`
                     : `${filteredCards.length} matching decisions`}
               </p>
-            ) : (
-              <p className="max-w-sm text-sm font-semibold leading-6 text-black/60 sm:text-right">
-                {summarySentence}
-              </p>
-            )}
+            ) : null}
           </div>
         </div>
         <div className="grid gap-3">

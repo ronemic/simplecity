@@ -3,6 +3,7 @@ import Script from "next/script";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { SupportCallout } from "@/components/SupportCallout";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -66,6 +67,7 @@ export default async function RootLayout({
         </Script>
         <Header />
         <main>{children}</main>
+        <SupportCallout locale={locale} />
         <Footer locale={locale} />
         <ServiceWorkerRegistration />
       </body>

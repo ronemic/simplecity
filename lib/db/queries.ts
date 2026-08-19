@@ -115,7 +115,10 @@ function homeCardPreviewLimit(clientCount: number) {
   );
 }
 const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
-const PUBLIC_STATS_QUERY_TIMEOUT_MS = 4_000;
+// The triple count-query below measures ~3s per jurisdiction, so the old 4s
+// budget tripped under any contention and silently reported 0. These stats are
+// cached for PUBLIC_CACHE_REVALIDATE_SECONDS, so the latency is not user-facing.
+const PUBLIC_STATS_QUERY_TIMEOUT_MS = 12_000;
 const PUBLIC_DECISION_OUTCOME_COLUMNS = [
   "id",
   "summary_card_id",
@@ -1412,6 +1415,13 @@ const getCachedCategoryCards = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
+// null means "could not read", which is NOT the same as a real count of 0.
+// Rendering a failed read as 0 is how the homepage came to advertise "0+".
+const UNAVAILABLE_JURISDICTION_STATS = {
+  agendaItemsAnalyzed: null,
+  meetingsAnalyzed: null
+} as const;
+
 const getCachedPublicStats = unstable_cache(
   async () => {
     const jurisdictions = getJurisdictions();
@@ -1424,14 +1434,14 @@ const getCachedPublicStats = unstable_cache(
           supabase = getServiceSupabaseClientForJurisdiction(jurisdiction.slug);
         } catch (error) {
           logQueryError(`Failed to create ${jurisdiction.name} service Supabase client`, error);
-          return {
-            agendaItemsAnalyzed: 0,
-            meetingsAnalyzed: 0
-          };
+          return UNAVAILABLE_JURISDICTION_STATS;
         }
 
-        const emptyStats = { agendaItemsAnalyzed: 0, meetingsAnalyzed: 0 };
-        return withFallbackTimeout(
+        const emptyStats = UNAVAILABLE_JURISDICTION_STATS;
+        return withFallbackTimeout<{
+          agendaItemsAnalyzed: number | null;
+          meetingsAnalyzed: number | null;
+        }>(
           Promise.all([
             supabase
               .from("summary_cards")
@@ -1470,9 +1480,17 @@ const getCachedPublicStats = unstable_cache(
       })
     );
 
+    // Sum whatever was readable: these are displayed rounded down with a "+",
+    // so a partial sum is a truthful lower bound. Only when every jurisdiction
+    // failed is there no number to show at all, and null says so explicitly.
+    const sumAvailable = (pick: (result: (typeof results)[number]) => number | null) => {
+      const available = results.map(pick).filter((value): value is number => value !== null);
+      return available.length === 0 ? null : available.reduce((sum, value) => sum + value, 0);
+    };
+
     return {
-      agendaItemsAnalyzed: results.reduce((sum, result) => sum + result.agendaItemsAnalyzed, 0),
-      meetingsAnalyzed: results.reduce((sum, result) => sum + result.meetingsAnalyzed, 0),
+      agendaItemsAnalyzed: sumAvailable((result) => result.agendaItemsAnalyzed),
+      meetingsAnalyzed: sumAvailable((result) => result.meetingsAnalyzed),
       jurisdictionsSupported
     };
   },

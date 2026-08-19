@@ -2,8 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ArrowRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   LOCALE_CHANGE_EVENT,
@@ -31,8 +29,18 @@ function footerDescription(locale: Locale) {
     : "SimpleCity is an independent, student-led platform, not an official local government website. It summarizes public meeting documents to make them easier to understand. Always review the original source before making formal decisions.";
 }
 
+function fiscalSponsorNote(locale: Locale) {
+  return locale === "es"
+    ? "SimpleCity cuenta con el patrocinio fiscal de Hack Club, una organización sin fines de lucro 501(c)(3)."
+    : "SimpleCity is fiscally sponsored by Hack Club, a 501(c)(3) nonprofit.";
+}
+
 function aboutLabel(locale: Locale) {
   return locale === "es" ? "Acerca de" : "About";
+}
+
+function getInvolvedLabel(locale: Locale) {
+  return locale === "es" ? "Participa" : "Get involved";
 }
 
 function exploreLabel(locale: Locale) {
@@ -45,8 +53,6 @@ function localizedHref(path: string, locale: Locale) {
 
 export function Footer({ locale = "en" }: { locale?: Locale }) {
   const [currentLocale, setCurrentLocale] = useState(locale);
-  const pathname = usePathname();
-  const showSupportCallout = pathname !== "/";
 
   useEffect(() => {
     function syncLocale(nextLocale?: string | null) {
@@ -80,39 +86,10 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
   }, []);
 
   return (
-    <>
-      {showSupportCallout ? (
-        <section className="section-shell mt-6 pb-10">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="max-w-2xl">
-              <h2 className="text-lg font-black text-ink">
-                {currentLocale === "es"
-                  ? "Ayuda a que SimpleCity siga siendo gratuito y continúe creciendo"
-                  : "Help keep SimpleCity free and growing"}
-              </h2>
-              <p className="mt-1.5 text-[15px] font-medium leading-6 text-black/65">
-                {currentLocale === "es"
-                  ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes. Las donaciones son deducibles de impuestos."
-                  : "Your support helps us cover more communities and maintain reliable, source-linked summaries. Donations are tax-deductible."}
-              </p>
-            </div>
-            <a
-              href={DONATION_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="action-primary-sm w-fit shrink-0"
-            >
-              {currentLocale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
-              <ArrowRight aria-hidden className="h-4 w-4" />
-            </a>
-          </div>
-        </section>
-      ) : null}
-
-      <footer className={`${showSupportCallout ? "mt-0" : "mt-10"} border-t border-black/10 bg-[#eef3f6]`}>
+    <footer className="border-t border-black/10 bg-[#eef3f6]">
       <div className="section-shell py-10 text-sm text-black/70">
-        <div className="grid gap-10 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto] sm:gap-10 lg:gap-16">
-          <div className="max-w-sm">
+        <div className="grid gap-10 sm:grid-cols-2 sm:gap-10 lg:grid-cols-[minmax(0,24rem)_repeat(3,minmax(0,1fr))] lg:gap-12">
+          <div>
             <Link
               href={localizedHref("/", currentLocale)}
               className="flex items-center gap-2.5 text-base font-black leading-none text-ink focus-visible:focus-ring"
@@ -126,15 +103,10 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
               />
               SimpleCity
             </Link>
-            <p className="mt-3 leading-6">
-              {footerDescription(currentLocale)}{" "}
-              {currentLocale === "es"
-                ? "SimpleCity cuenta con el patrocinio fiscal de Hack Club, una organización sin fines de lucro 501(c)(3)."
-                : "SimpleCity is fiscally sponsored by Hack Club, a 501(c)(3) nonprofit."}
-            </p>
+            <p className="mt-3 max-w-prose leading-6">{footerDescription(currentLocale)}</p>
           </div>
 
-          <nav aria-label={exploreLabel(currentLocale)} className="min-w-[7rem]">
+          <nav aria-label={exploreLabel(currentLocale)}>
             <p className="label-eyebrow">{exploreLabel(currentLocale)}</p>
             <ul className="mt-3 flex flex-col gap-2.5 font-semibold text-ink/80">
               <li>
@@ -152,30 +124,20 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                   {t(currentLocale, "topics")}
                 </Link>
               </li>
-              <li>
-                <Link className="transition hover:text-civic" href={localizedHref("/subscribe", currentLocale)}>
-                  {currentLocale === "es" ? "Suscribirse" : "Subscribe"}
-                </Link>
-              </li>
             </ul>
           </nav>
 
-          <nav aria-label={aboutLabel(currentLocale)} className="min-w-[7rem]">
-            <p className="label-eyebrow">{aboutLabel(currentLocale)}</p>
+          <nav aria-label={getInvolvedLabel(currentLocale)}>
+            <p className="label-eyebrow">{getInvolvedLabel(currentLocale)}</p>
             <ul className="mt-3 flex flex-col gap-2.5 font-semibold text-ink/80">
               <li>
-                <Link className="transition hover:text-civic" href={localizedHref("/about", currentLocale)}>
-                  {aboutLabel(currentLocale)}
+                <Link className="transition hover:text-civic" href={localizedHref("/subscribe", currentLocale)}>
+                  {t(currentLocale, "subscribe")}
                 </Link>
               </li>
               <li>
-                <a className="transition hover:text-civic" href="mailto:simplecityadmin@gmail.com">
-                  {t(currentLocale, "contact")}
-                </a>
-              </li>
-              <li>
                 <a
-                  className="font-bold text-civic transition hover:text-ink"
+                  className="transition hover:text-civic"
                   href={DONATION_URL}
                   target="_blank"
                   rel="noreferrer"
@@ -183,12 +145,22 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                   {currentLocale === "es" ? "Apoya a SimpleCity" : "Support SimpleCity"}
                 </a>
               </li>
+              <li>
+                <a className="transition hover:text-civic" href="mailto:simplecityadmin@gmail.com">
+                  {t(currentLocale, "contact")}
+                </a>
+              </li>
             </ul>
           </nav>
 
-          <nav aria-label={"Legal"} className="min-w-[7rem]">
-            <p className="label-eyebrow">{"Legal"}</p>
+          <nav aria-label={aboutLabel(currentLocale)}>
+            <p className="label-eyebrow">{aboutLabel(currentLocale)}</p>
             <ul className="mt-3 flex flex-col gap-2.5 font-semibold text-ink/80">
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/about", currentLocale)}>
+                  {aboutLabel(currentLocale)}
+                </Link>
+              </li>
               <li>
                 <Link className="transition hover:text-civic" href={localizedHref("/privacy", currentLocale)}>
                   {currentLocale === "es" ? "Privacidad" : "Privacy"}
@@ -202,8 +174,11 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
             </ul>
           </nav>
         </div>
+
+        <div className="mt-10 border-t border-black/10 pt-6 text-xs leading-5 text-black/[0.6]">
+          <p className="max-w-prose">{fiscalSponsorNote(currentLocale)}</p>
+        </div>
       </div>
-      </footer>
-    </>
+    </footer>
   );
 }
