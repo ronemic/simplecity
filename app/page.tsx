@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays } from "lucide-react";
+import { ArrowRight, CalendarDays, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
@@ -9,6 +9,7 @@ import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/const
 import {
   getActiveAnnouncements,
   getDecisionCardPage,
+  getPublicStats,
   getPublishedCardCount,
   getPublishedCardPreview,
   getUpcomingDecisionSnapshot
@@ -151,10 +152,11 @@ export default async function Home({
         cards: previewCards,
         totalCount: Math.max(publishedCardCount, previewCards.length)
       }));
-  const [cardResult, announcements, upcomingSnapshot] = await Promise.all([
+  const [cardResult, announcements, upcomingSnapshot, publicStats] = await Promise.all([
     cardResultPromise,
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG),
-    getUpcomingDecisionSnapshot(jurisdiction)
+    getUpcomingDecisionSnapshot(jurisdiction),
+    getPublicStats()
   ]);
   const cards = cardResult.cards;
   const availableCardCount = cardResult.totalCount;
@@ -264,16 +266,61 @@ export default async function Home({
             <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>
           </div>
 
-          <div className="rounded-[12px] border border-white/15 bg-[#0c1726]/70 p-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur sm:p-5 lg:justify-self-stretch">
-            <p className="mb-3 text-xs font-black uppercase text-[#9fc4f4]">
-              {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
-            </p>
-            <SearchAndFilters
-              action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
-              resultCount={filteredCards.length}
-              search={search}
-              locale={locale}
-            />
+          <div className="space-y-5 lg:justify-self-stretch">
+            {!hasSearch ? (
+              <div className="py-1 lg:-translate-y-4">
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+                  {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
+                </p>
+                <div className="grid grid-cols-3 divide-x divide-white/15">
+                  {[
+                    {
+                      icon: Users,
+                      value: "500+",
+                      label: locale === "es" ? "usuarios" : "users"
+                    },
+                    {
+                      icon: Landmark,
+                      value: new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(
+                        publicStats.jurisdictionsSupported
+                      ),
+                      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
+                    },
+                    {
+                      icon: FileText,
+                      value: `${new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(
+                        Math.floor(publicStats.agendaItemsAnalyzed / 100) * 100
+                      )}+`,
+                      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
+                    }
+                  ].map((item) => (
+                    <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
+                        <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
+                      </span>
+                      <p className="min-w-0 leading-tight">
+                        <span className="block text-lg font-black text-white sm:text-xl">{item.value}</span>
+                        <span className="block text-[11px] font-semibold text-[#d9e2ec] sm:text-xs">
+                          {item.label}
+                        </span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div>
+              <p className="mb-4 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+                {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
+              </p>
+              <SearchAndFilters
+                action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
+                resultCount={filteredCards.length}
+                search={search}
+                locale={locale}
+              />
+            </div>
           </div>
         </div>
       </section>
@@ -296,7 +343,7 @@ export default async function Home({
                 ? "Ayuda a que SimpleCity siga siendo gratuito y continúe creciendo"
                 : "Help keep SimpleCity free and growing"}
             </h2>
-            <p className="mt-1 text-sm font-semibold leading-6 text-black/[0.62]">
+            <p className="mt-1.5 text-[15px] font-medium leading-6 text-black/65">
               {locale === "es"
                 ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes. Las donaciones son deducibles de impuestos."
                 : "Your support helps us cover more communities and maintain reliable, source-linked summaries. Donations are tax-deductible."}

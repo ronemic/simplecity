@@ -90,7 +90,7 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                   ? "Ayuda a que SimpleCity siga siendo gratuito y continúe creciendo"
                   : "Help keep SimpleCity free and growing"}
               </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-black/[0.62]">
+              <p className="mt-1.5 text-[15px] font-medium leading-6 text-black/65">
                 {currentLocale === "es"
                   ? "Tu apoyo nos ayuda a cubrir más comunidades y mantener resúmenes confiables con enlaces a fuentes. Las donaciones son deducibles de impuestos."
                   : "Your support helps us cover more communities and maintain reliable, source-linked summaries. Donations are tax-deductible."}
