@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
-import { Suspense } from "react";
+import { Suspense, cache } from "react";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
@@ -168,15 +168,18 @@ function loadHomepageData({
   };
 }
 
-type HomepageData = ReturnType<typeof loadHomepageData>;
+const getHomepageData = cache(loadHomepageData);
 
 async function HeroStatus({
-  data,
-  locale
+  jurisdiction,
+  locale,
+  search
 }: {
-  data: HomepageData;
+  jurisdiction: JurisdictionSelection;
   locale: Locale;
+  search: string;
 }) {
+  const data = getHomepageData({ jurisdiction, locale, search });
   const [cardResult, upcomingSnapshot] = await Promise.all([
     data.cardResultPromise,
     data.upcomingSnapshotPromise
@@ -312,18 +315,19 @@ function HomepageContentLoading({ locale }: { locale: Locale }) {
 }
 
 async function HomepageDataContent({
-  data,
   hasSearch,
+  jurisdiction,
   jurisdictionLabel,
   locale,
   search
 }: {
-  data: HomepageData;
   hasSearch: boolean;
+  jurisdiction: JurisdictionSelection;
   jurisdictionLabel: string;
   locale: Locale;
   search: string;
 }) {
+  const data = getHomepageData({ jurisdiction, locale, search });
   const cardResult = await data.cardResultPromise;
   const cards = cardResult.cards;
   const availableCardCount = cardResult.totalCount;
@@ -488,7 +492,6 @@ export default async function Home({
     ? SCHOOL_CATEGORIES
     : CATEGORIES;
   const hasSearch = search.length > 0;
-  const data = loadHomepageData({ jurisdiction, locale, search });
   const introLabel =
     jurisdiction === "all"
       ? locale === "es"
@@ -541,7 +544,7 @@ export default async function Home({
             <Suspense
               fallback={<div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />}
             >
-              <HeroStatus data={data} locale={locale} />
+              <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} />
             </Suspense>
           </div>
 
@@ -568,8 +571,8 @@ export default async function Home({
 
       <Suspense fallback={<HomepageContentLoading locale={locale} />}>
         <HomepageDataContent
-          data={data}
           hasSearch={hasSearch}
+          jurisdiction={jurisdiction}
           jurisdictionLabel={jurisdictionLabel}
           locale={locale}
           search={search}
