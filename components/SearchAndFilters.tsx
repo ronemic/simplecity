@@ -48,7 +48,7 @@ export function SearchAndFilters({
         </button>
       </form>
 
-      {hasSearch ? (
+      {hasSearch && resultCount !== undefined ? (
         <div
           role="status"
           className="mt-3 flex flex-col items-start justify-between gap-2 rounded-lg border border-white/[0.16] bg-white/10 px-4 py-3 text-sm font-semibold text-[#e9f2ff] sm:flex-row"

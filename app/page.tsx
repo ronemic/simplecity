@@ -2,25 +2,24 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, CalendarDays, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
-import { AnnouncementBanner } from "@/components/AnnouncementBanner";
+import { Suspense } from "react";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import {
-  getActiveAnnouncements,
   getDecisionCardPage,
-  getPublicStats,
   getPublishedCardCount,
   getPublishedCardPreview,
   getUpcomingDecisionSnapshot
 } from "@/lib/db/queries";
 import {
-  ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
+  getJurisdictions,
   getJurisdictionLabel,
   isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  toPublicJurisdictionSlug,
+  type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import {
   compareCardsByPublicInterest,
@@ -37,17 +36,17 @@ import {
   meetingDateParts
 } from "@/lib/utils/date";
 import type { SummaryCardRow } from "@/lib/types";
-import { categoryShortLabel, t } from "@/lib/i18n";
+import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
-// Manually maintained from analytics -- not derived from the database like the
-// other "at a glance" stats. Last checked 2026-08-19; update the date when you
-// revise the figure so it is obvious when it has gone stale.
+// Manually maintained display totals. Last checked 2026-08-19; update the date
+// when revising either figure so it is obvious when they have gone stale.
 const APPROX_USER_COUNT = "500+";
+const APPROX_AGENDA_ITEM_COUNT = "6,800+";
 
 // Rounds down to a round hundred and adds "+" once there is a hundred to show;
 // below that the exact count is honest and "0+" is never rendered. Returns null
@@ -144,26 +143,16 @@ function pluralize(count: number, singular: string, plural: string) {
   return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
 }
 
-export default async function Home({
-  searchParams
+function loadHomepageData({
+  jurisdiction,
+  locale,
+  search
 }: {
-  searchParams: Promise<{ q?: string; jurisdiction?: string; lang?: string }>;
+  jurisdiction: JurisdictionSelection;
+  locale: Locale;
+  search: string;
 }) {
-  const [params, locale, cookieStore] = await Promise.all([
-    searchParams,
-    getRequestLocale(),
-    cookies()
-  ]);
-  const search = (params.q || "").trim();
-  const jurisdiction = normalizeJurisdictionSelection(
-    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
-  );
-  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
-  const topicCategories = isSchoolDistrictJurisdiction(jurisdiction)
-    ? SCHOOL_CATEGORIES
-    : CATEGORIES;
-  const hasSearch = search.length > 0;
-  const cardResultPromise = hasSearch
+  const cardResultPromise = search
     ? getDecisionCardPage({ jurisdiction, locale, search })
     : Promise.all([
         getPublishedCardPreview(jurisdiction, locale),
@@ -172,36 +161,27 @@ export default async function Home({
         cards: previewCards,
         totalCount: Math.max(publishedCardCount, previewCards.length)
       }));
-  const [cardResult, announcements, upcomingSnapshot, publicStats] = await Promise.all([
+
+  return {
     cardResultPromise,
-    getActiveAnnouncements(ALL_JURISDICTIONS_SLUG),
-    getUpcomingDecisionSnapshot(jurisdiction),
-    getPublicStats()
+    upcomingSnapshotPromise: getUpcomingDecisionSnapshot(jurisdiction)
+  };
+}
+
+type HomepageData = ReturnType<typeof loadHomepageData>;
+
+async function HeroStatus({
+  data,
+  locale
+}: {
+  data: HomepageData;
+  locale: Locale;
+}) {
+  const [cardResult, upcomingSnapshot] = await Promise.all([
+    data.cardResultPromise,
+    data.upcomingSnapshotPromise
   ]);
-  const cards = cardResult.cards;
-  const availableCardCount = cardResult.totalCount;
-  const filteredCards = hasSearch
-    ? cards
-    : cards.filter((card) => matchesSearch(card, search));
-  const prioritizedCards = [...filteredCards].sort(compareCardsByPublicInterest);
-  const publicInterestCards = prioritizedCards.filter(isPublicInterestCard);
-  const decisionCards = selectDiverseCards(
-    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards,
-    4
-  );
-  const visibleCards = hasSearch ? prioritizedCards : decisionCards;
   const { openForCommentCount, nextMeetingIso } = upcomingSnapshot;
-  const meetingPreviewCards = getMeetingPreviewCards(
-    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards
-  );
-  const introLabel =
-    jurisdiction === "all"
-      ? locale === "es"
-        ? "Reuniones públicas de varias jurisdicciones"
-        : "Public meetings across jurisdictions"
-      : locale === "es"
-        ? `Reuniones públicas de ${jurisdictionLabel}`
-        : `${jurisdictionLabel} public meetings`;
   const nextMeetingParts = meetingDateParts(null, nextMeetingIso, locale);
   const nextMeetingUnderway = isMeetingInProgress(null, nextMeetingIso);
   const nextMeetingTime = meetingClockTime(nextMeetingIso, locale);
@@ -225,16 +205,68 @@ export default async function Home({
     summaryItems.length > 0
       ? summaryItems.join(" · ")
       : locale === "es"
-        ? `${pluralize(availableCardCount, "decisión publicada", "decisiones publicadas")} disponibles`
-        : `${pluralize(availableCardCount, "published decision", "published decisions")} available`;
-  const decisionSectionTitle =
-    hasSearch
-      ? locale === "es"
-        ? `Resultados para "${search}"`
-        : `Results for "${search}"`
-      : locale === "es"
-        ? "Decisiones que pueden afectar la vida diaria"
-        : "Decisions that may affect daily life";
+        ? `${pluralize(cardResult.totalCount, "decisión publicada", "decisiones publicadas")} disponibles`
+        : `${pluralize(cardResult.totalCount, "published decision", "published decisions")} available`;
+
+  return <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>;
+}
+
+function HomepageContentLoading({ locale }: { locale: Locale }) {
+  return (
+    <section
+      className="section-shell scroll-mt-24 pb-6 pt-6 sm:pb-8 sm:pt-8"
+      aria-busy="true"
+      aria-label={locale === "es" ? "Cargando decisiones" : "Loading decisions"}
+    >
+      <div className="mb-5 border-b border-black/10 pb-5">
+        <div className="h-3 w-32 animate-pulse rounded bg-black/10" />
+        <div className="mt-3 h-9 max-w-xl animate-pulse rounded bg-black/10" />
+        <div className="mt-3 h-5 max-w-2xl animate-pulse rounded bg-black/[0.07]" />
+      </div>
+      <div className="grid gap-3">
+        {[0, 1, 2, 3].map((item) => (
+          <div key={item} className="quiet-card h-28 animate-pulse bg-black/[0.035]" />
+        ))}
+      </div>
+      <p className="sr-only">{locale === "es" ? "Cargando las decisiones más recientes…" : "Loading the latest decisions…"}</p>
+    </section>
+  );
+}
+
+async function HomepageDataContent({
+  data,
+  hasSearch,
+  jurisdictionLabel,
+  locale,
+  search
+}: {
+  data: HomepageData;
+  hasSearch: boolean;
+  jurisdictionLabel: string;
+  locale: Locale;
+  search: string;
+}) {
+  const cardResult = await data.cardResultPromise;
+  const cards = cardResult.cards;
+  const availableCardCount = cardResult.totalCount;
+  const filteredCards = hasSearch ? cards : cards.filter((card) => matchesSearch(card, search));
+  const prioritizedCards = [...filteredCards].sort(compareCardsByPublicInterest);
+  const publicInterestCards = prioritizedCards.filter(isPublicInterestCard);
+  const decisionCards = selectDiverseCards(
+    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards,
+    4
+  );
+  const visibleCards = hasSearch ? prioritizedCards : decisionCards;
+  const meetingPreviewCards = getMeetingPreviewCards(
+    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards
+  );
+  const decisionSectionTitle = hasSearch
+    ? locale === "es"
+      ? `Resultados para "${search}"`
+      : `Results for "${search}"`
+    : locale === "es"
+      ? "Decisiones que pueden afectar la vida diaria"
+      : "Decisions that may affect daily life";
   const decisionSectionDescription = hasSearch
     ? locale === "es"
       ? "Decisiones coincidentes de la jurisdicción seleccionada, con elementos más recientes y de mayor impacto primero."
@@ -243,132 +275,9 @@ export default async function Home({
       ? "Ordenado para mostrar primero decisiones próximas, luego elementos recientes de alto impacto como presupuestos, vivienda, seguridad, transporte, servicios, audiencias públicas, contratos y tarifas antes que elementos ceremoniales o de proceso interno."
       : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
 
-  // A stat with no value is one whose read failed or whose count is zero;
-  // drop it rather than advertise it. APPROX_USER_COUNT is not read from the
-  // database and so is always present.
-  const glanceStats = [
-    {
-      icon: Users,
-      value: APPROX_USER_COUNT,
-      label: locale === "es" ? "usuarios" : "users"
-    },
-    {
-      icon: Landmark,
-      value: statValue(publicStats.jurisdictionsSupported, locale),
-      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
-    },
-    {
-      icon: FileText,
-      // agendaItemsAnalyzed counts only published cards joined to a meeting, so
-      // cards published without one are missing from it; publishedCards covers
-      // them. Take whichever read saw more, treating a failed (null) read as no
-      // contribution rather than as a zero.
-      value: statValue(
-        Math.max(publicStats.agendaItemsAnalyzed ?? 0, publicStats.publishedCards ?? 0),
-        locale
-      ),
-      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
-    }
-  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
-
   return (
-    <div className="overflow-hidden">
-      <section className="civic-hero">
-        <div
-          className={`section-shell relative z-10 grid gap-7 ${
-            hasSearch ? "py-7 sm:py-8" : "py-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-end lg:py-14"
-          }`}
-        >
-          <div className="max-w-2xl">
-            {!hasSearch ? (
-              <a
-                href={FEATURE_ARTICLE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-sm text-sm font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
-              >
-                <span>
-                  {locale === "es"
-                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
-                    : "Read about SimpleCity in the Los Altos Town Crier"}
-                </span>
-                <ArrowRight
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 text-[#9fc4f4] transition-transform group-hover:translate-x-0.5"
-                />
-              </a>
-            ) : null}
-            <p className="text-sm font-black uppercase text-[#9fc4f4]">
-              {introLabel}
-            </p>
-            <h1 className="mt-4 text-balance text-[36px] font-black leading-[1.02] text-[#fffaf0] sm:text-[52px] lg:text-[56px]">
-              {locale === "es"
-                ? "Mira qué está decidiendo tu gobierno local."
-                : "See what your local government is deciding."}
-            </h1>
-            <p className="mt-4 max-w-2xl text-balance text-base font-medium leading-7 text-[#d9e2ec] sm:mt-5 sm:text-xl sm:leading-8">
-              {locale === "es"
-                ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
-                : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
-            </p>
-            <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>
-          </div>
-
-          <div className="space-y-5 lg:justify-self-stretch">
-            {!hasSearch && glanceStats.length > 0 ? (
-              <div className="py-1 lg:-translate-y-4">
-                <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-                  {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
-                </p>
-                <div
-                  className={`grid divide-x divide-white/15 ${
-                    glanceStats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"
-                  }`}
-                >
-                  {glanceStats.map((item) => (
-                    <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
-                        <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
-                      </span>
-                      <p className="min-w-0 leading-tight">
-                        <span className="block text-lg font-black text-white sm:text-xl">{item.value}</span>
-                        <span className="block text-[11px] font-semibold text-[#d9e2ec] sm:text-xs">
-                          {item.label}
-                        </span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            <div>
-              <p className="mb-4 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-                {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
-              </p>
-              <SearchAndFilters
-                action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
-                resultCount={filteredCards.length}
-                search={search}
-                locale={locale}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {announcements.length > 0 ? (
-        <section className="section-shell py-6 sm:py-8">
-          <AnnouncementBanner announcements={announcements} locale={locale} />
-        </section>
-      ) : null}
-
-      <section
-        id="decisions"
-        className={`section-shell scroll-mt-24 pb-6 sm:pb-8 ${
-          announcements.length === 0 ? "pt-6 sm:pt-8" : "pt-0"
-        }`}
-      >
+    <>
+      <section id="decisions" className="section-shell scroll-mt-24 pb-6 pt-6 sm:pb-8 sm:pt-8">
         <div id="search-results" className="scroll-mt-24">
           <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-2xl">
@@ -413,10 +322,7 @@ export default async function Home({
           ) : null}
         </div>
         {!hasSearch && availableCardCount > 4 ? (
-          <Link
-            href="/decisions"
-            className="action-link mt-4 font-black underline-offset-4 hover:underline"
-          >
+          <Link href="/decisions" className="action-link mt-4 font-black underline-offset-4 hover:underline">
             {t(locale, "viewAllDecisions")}
             <ArrowRight aria-hidden className="h-4 w-4" />
           </Link>
@@ -436,10 +342,7 @@ export default async function Home({
                   ? "Próximas reuniones conectadas con las tarjetas de mayor impacto que se muestran primero."
                   : "Upcoming meetings connected to the higher-impact cards shown first."}
               </p>
-              <Link
-                href="/meetings"
-                className="action-link mt-4 font-black underline-offset-4 hover:underline"
-              >
+              <Link href="/meetings" className="action-link mt-4 font-black underline-offset-4 hover:underline">
                 {t(locale, "viewAllMeetings")}
                 <ArrowRight aria-hidden className="h-4 w-4" />
               </Link>
@@ -474,10 +377,7 @@ export default async function Home({
                         {t(locale, "connectedDecision")}: {publicAgendaTitle(card)}
                       </p>
                     </div>
-                    <Link
-                      href={`/meetings/${meeting.id}`}
-                      className="action-secondary-sm"
-                    >
+                    <Link href={`/meetings/${meeting.id}`} className="action-secondary-sm">
                       {t(locale, "meetingDetails")}
                     </Link>
                   </article>
@@ -487,7 +387,157 @@ export default async function Home({
           </div>
         </section>
       ) : null}
+    </>
+  );
+}
 
+export default async function Home({
+  searchParams
+}: {
+  searchParams: Promise<{ q?: string; jurisdiction?: string; lang?: string }>;
+}) {
+  const [params, locale, cookieStore] = await Promise.all([
+    searchParams,
+    getRequestLocale(),
+    cookies()
+  ]);
+  const search = (params.q || "").trim();
+  const jurisdiction = normalizeJurisdictionSelection(
+    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+  );
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const topicCategories = isSchoolDistrictJurisdiction(jurisdiction)
+    ? SCHOOL_CATEGORIES
+    : CATEGORIES;
+  const hasSearch = search.length > 0;
+  const data = loadHomepageData({ jurisdiction, locale, search });
+  const introLabel =
+    jurisdiction === "all"
+      ? locale === "es"
+        ? "Reuniones públicas de varias jurisdicciones"
+        : "Public meetings across jurisdictions"
+      : locale === "es"
+        ? `Reuniones públicas de ${jurisdictionLabel}`
+        : `${jurisdictionLabel} public meetings`;
+
+  // Jurisdiction coverage comes from local configuration; the other display
+  // totals are maintained above and do not block rendering on database counts.
+  const glanceStats = [
+    {
+      icon: Users,
+      value: APPROX_USER_COUNT,
+      label: locale === "es" ? "usuarios" : "users"
+    },
+    {
+      icon: Landmark,
+      value: statValue(getJurisdictions().length, locale),
+      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
+    },
+    {
+      icon: FileText,
+      value: APPROX_AGENDA_ITEM_COUNT,
+      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
+    }
+  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
+
+  return (
+    <div className="overflow-hidden">
+      <section className="civic-hero">
+        <div
+          className={`section-shell relative z-10 grid gap-7 ${
+            hasSearch ? "py-7 sm:py-8" : "py-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-end lg:py-14"
+          }`}
+        >
+          <div className="max-w-2xl">
+            {!hasSearch ? (
+              <a
+                href={FEATURE_ARTICLE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-sm text-sm font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
+              >
+                <span>
+                  {locale === "es"
+                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
+                    : "Read about SimpleCity in the Los Altos Town Crier"}
+                </span>
+                <ArrowRight
+                  aria-hidden
+                  className="h-4 w-4 shrink-0 text-[#9fc4f4] transition-transform group-hover:translate-x-0.5"
+                />
+              </a>
+            ) : null}
+            <p className="text-sm font-black uppercase text-[#9fc4f4]">
+              {introLabel}
+            </p>
+            <h1 className="mt-4 text-balance text-[36px] font-black leading-[1.02] text-[#fffaf0] sm:text-[52px] lg:text-[56px]">
+              {locale === "es"
+                ? "Mira qué está decidiendo tu gobierno local."
+                : "See what your local government is deciding."}
+            </h1>
+            <p className="mt-4 max-w-2xl text-balance text-base font-medium leading-7 text-[#d9e2ec] sm:mt-5 sm:text-xl sm:leading-8">
+              {locale === "es"
+                ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
+                : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
+            </p>
+            <Suspense
+              fallback={<div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />}
+            >
+              <HeroStatus data={data} locale={locale} />
+            </Suspense>
+          </div>
+
+          <div className="space-y-5 lg:justify-self-stretch">
+            {!hasSearch && glanceStats.length > 0 ? (
+              <div className="py-1 lg:-translate-y-4">
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+                  {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
+                </p>
+                <div
+                  className={`grid divide-x divide-white/15 ${
+                    glanceStats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"
+                  }`}
+                >
+                  {glanceStats.map((item) => (
+                    <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
+                        <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
+                      </span>
+                      <p className="min-w-0 leading-tight">
+                        <span className="block text-lg font-black text-white sm:text-xl">{item.value}</span>
+                        <span className="block text-[11px] font-semibold text-[#d9e2ec] sm:text-xs">
+                          {item.label}
+                        </span>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <div>
+              <p className="mb-4 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+                {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
+              </p>
+              <SearchAndFilters
+                action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
+                search={search}
+                locale={locale}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <Suspense fallback={<HomepageContentLoading locale={locale} />}>
+        <HomepageDataContent
+          data={data}
+          hasSearch={hasSearch}
+          jurisdictionLabel={jurisdictionLabel}
+          locale={locale}
+          search={search}
+        />
+      </Suspense>
       <section className="section-shell pb-16 pt-8">
         <div className="mb-5 max-w-2xl">
           <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>
