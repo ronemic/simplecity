@@ -8,7 +8,6 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import {
   getDecisionCardPage,
-  getPublicStats,
   getPublishedCardCount,
   getPublishedCardPreview,
   getUpcomingDecisionSnapshot
@@ -44,10 +43,10 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
-// Manually maintained from analytics -- not derived from the database like the
-// other "at a glance" stats. Last checked 2026-08-19; update the date when you
-// revise the figure so it is obvious when it has gone stale.
+// Manually maintained from analytics. Last checked 2026-08-19; update the date
+// when you revise the figure so it is obvious when it has gone stale.
 const APPROX_USER_COUNT = "500+";
+const APPROX_AGENDA_ITEMS_ANALYZED = "6800+";
 
 // Rounds down to a round hundred and adds "+" once there is a hundred to show;
 // below that the exact count is honest and "0+" is never rendered. Returns null
@@ -212,19 +211,10 @@ async function HeroStatus({
   return <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>;
 }
 
-/**
- * The agenda-item total is read from the databases rather than maintained by
- * hand, so it cannot drift as the pipeline publishes more cards. That read is a
- * count across every jurisdiction, so it streams in its own boundary instead of
- * holding up the hero; getPublicStats caches it for six hours and the pipeline's
- * cache tag refreshes it as soon as new content lands.
- */
-async function GlanceStats({ locale }: { locale: Locale }) {
-  const publicStats = await getPublicStats();
-
+function GlanceStats({ locale }: { locale: Locale }) {
   // A stat with no value is one whose read failed or whose count is zero; drop it
-  // rather than advertise it. Jurisdiction coverage is local configuration and
-  // APPROX_USER_COUNT is maintained by hand, so both are always present.
+  // rather than advertise it. Jurisdiction coverage plus the maintained user and
+  // agenda-item counts are always present.
   const glanceStats = [
     {
       icon: Users,
@@ -238,14 +228,7 @@ async function GlanceStats({ locale }: { locale: Locale }) {
     },
     {
       icon: FileText,
-      // agendaItemsAnalyzed counts only published cards joined to a meeting, so
-      // cards published without one are missing from it; publishedCards covers
-      // them. Take whichever read saw more, treating a failed (null) read as no
-      // contribution rather than as a zero.
-      value: statValue(
-        Math.max(publicStats.agendaItemsAnalyzed ?? 0, publicStats.publishedCards ?? 0),
-        locale
-      ),
+      value: APPROX_AGENDA_ITEMS_ANALYZED,
       label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
     }
   ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
