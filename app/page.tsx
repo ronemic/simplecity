@@ -9,7 +9,6 @@ import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/const
 import {
   getActiveAnnouncements,
   getDecisionCardPage,
-  getPublicStats,
   getPublishedCardCount,
   getPublishedCardPreview,
   getUpcomingDecisionSnapshot
@@ -17,6 +16,7 @@ import {
 import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
+  getJurisdictions,
   getJurisdictionLabel,
   isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
@@ -44,10 +44,10 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
-// Manually maintained from analytics -- not derived from the database like the
-// other "at a glance" stats. Last checked 2026-08-19; update the date when you
-// revise the figure so it is obvious when it has gone stale.
+// Manually maintained display totals. Last checked 2026-08-19; update the date
+// when revising either figure so it is obvious when they have gone stale.
 const APPROX_USER_COUNT = "500+";
+const APPROX_AGENDA_ITEM_COUNT = "6,800+";
 
 // Rounds down to a round hundred and adds "+" once there is a hundred to show;
 // below that the exact count is honest and "0+" is never rendered. Returns null
@@ -172,12 +172,10 @@ export default async function Home({
         cards: previewCards,
         totalCount: Math.max(publishedCardCount, previewCards.length)
       }));
-  const [cardResult, announcements, upcomingSnapshot, publicStats, publishedAgendaItemCount] = await Promise.all([
+  const [cardResult, announcements, upcomingSnapshot] = await Promise.all([
     cardResultPromise,
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG),
-    getUpcomingDecisionSnapshot(jurisdiction),
-    getPublicStats(),
-    getPublishedCardCount(ALL_JURISDICTIONS_SLUG)
+    getUpcomingDecisionSnapshot(jurisdiction)
   ]);
   const cards = cardResult.cards;
   const availableCardCount = cardResult.totalCount;
@@ -244,9 +242,8 @@ export default async function Home({
       ? "Ordenado para mostrar primero decisiones próximas, luego elementos recientes de alto impacto como presupuestos, vivienda, seguridad, transporte, servicios, audiencias públicas, contratos y tarifas antes que elementos ceremoniales o de proceso interno."
       : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
 
-  // A stat with no value is one whose read failed or whose count is zero;
-  // drop it rather than advertise it. APPROX_USER_COUNT is not read from the
-  // database and so is always present.
+  // Jurisdiction coverage comes from local configuration; the other display
+  // totals are maintained above and do not block rendering on database counts.
   const glanceStats = [
     {
       icon: Users,
@@ -255,16 +252,12 @@ export default async function Home({
     },
     {
       icon: Landmark,
-      value: statValue(publicStats.jurisdictionsSupported, locale),
+      value: statValue(getJurisdictions().length, locale),
       label: locale === "es" ? "jurisdicciones" : "jurisdictions"
     },
     {
       icon: FileText,
-      // publicStats counts only published cards joined to a meeting, so cards
-      // published without one are missing from it; the all-jurisdiction
-      // published count covers them. Take whichever read saw more, treating a
-      // failed (null) stats read as no contribution rather than as a zero.
-      value: statValue(Math.max(publicStats.agendaItemsAnalyzed ?? 0, publishedAgendaItemCount), locale),
+      value: APPROX_AGENDA_ITEM_COUNT,
       label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
     }
   ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
