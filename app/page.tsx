@@ -152,11 +152,12 @@ export default async function Home({
         cards: previewCards,
         totalCount: Math.max(publishedCardCount, previewCards.length)
       }));
-  const [cardResult, announcements, upcomingSnapshot, publicStats] = await Promise.all([
+  const [cardResult, announcements, upcomingSnapshot, publicStats, publishedAgendaItemCount] = await Promise.all([
     cardResultPromise,
     getActiveAnnouncements(ALL_JURISDICTIONS_SLUG),
     getUpcomingDecisionSnapshot(jurisdiction),
-    getPublicStats()
+    getPublicStats(),
+    getPublishedCardCount(ALL_JURISDICTIONS_SLUG)
   ]);
   const cards = cardResult.cards;
   const availableCardCount = cardResult.totalCount;
@@ -289,7 +290,7 @@ export default async function Home({
                     {
                       icon: FileText,
                       value: `${new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US").format(
-                        Math.floor(publicStats.agendaItemsAnalyzed / 100) * 100
+                        Math.floor(Math.max(publicStats.agendaItemsAnalyzed, publishedAgendaItemCount) / 100) * 100
                       )}+`,
                       label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
                     }
