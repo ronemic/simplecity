@@ -8,6 +8,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import {
   getDecisionCardPage,
+  getPublicStats,
   getPublishedCardCount,
   getPublishedCardPreview,
   getUpcomingDecisionSnapshot
@@ -43,10 +44,10 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
-// Manually maintained display totals. Last checked 2026-08-19; update the date
-// when revising either figure so it is obvious when they have gone stale.
+// Manually maintained from analytics -- not derived from the database like the
+// other "at a glance" stats. Last checked 2026-08-19; update the date when you
+// revise the figure so it is obvious when it has gone stale.
 const APPROX_USER_COUNT = "500+";
-const APPROX_AGENDA_ITEM_COUNT = "6,800+";
 
 // Rounds down to a round hundred and adds "+" once there is a hundred to show;
 // below that the exact count is honest and "0+" is never rendered. Returns null
@@ -209,6 +210,100 @@ async function HeroStatus({
         : `${pluralize(cardResult.totalCount, "published decision", "published decisions")} available`;
 
   return <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>;
+}
+
+/**
+ * The agenda-item total is read from the databases rather than maintained by
+ * hand, so it cannot drift as the pipeline publishes more cards. That read is a
+ * count across every jurisdiction, so it streams in its own boundary instead of
+ * holding up the hero; getPublicStats caches it for six hours and the pipeline's
+ * cache tag refreshes it as soon as new content lands.
+ */
+async function GlanceStats({ locale }: { locale: Locale }) {
+  const publicStats = await getPublicStats();
+
+  // A stat with no value is one whose read failed or whose count is zero; drop it
+  // rather than advertise it. Jurisdiction coverage is local configuration and
+  // APPROX_USER_COUNT is maintained by hand, so both are always present.
+  const glanceStats = [
+    {
+      icon: Users,
+      value: APPROX_USER_COUNT,
+      label: locale === "es" ? "usuarios" : "users"
+    },
+    {
+      icon: Landmark,
+      value: statValue(getJurisdictions().length, locale),
+      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
+    },
+    {
+      icon: FileText,
+      // agendaItemsAnalyzed counts only published cards joined to a meeting, so
+      // cards published without one are missing from it; publishedCards covers
+      // them. Take whichever read saw more, treating a failed (null) read as no
+      // contribution rather than as a zero.
+      value: statValue(
+        Math.max(publicStats.agendaItemsAnalyzed ?? 0, publicStats.publishedCards ?? 0),
+        locale
+      ),
+      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
+    }
+  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
+
+  if (glanceStats.length === 0) return null;
+
+  return (
+    <div className="py-1 lg:-translate-y-4">
+      <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+        {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
+      </p>
+      <div
+        className={`grid divide-x divide-white/15 ${
+          glanceStats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"
+        }`}
+      >
+        {glanceStats.map((item) => (
+          <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
+              <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
+            </span>
+            <p className="min-w-0 leading-tight">
+              <span className="block text-lg font-black text-white sm:text-xl">{item.value}</span>
+              <span className="block text-[11px] font-semibold text-[#d9e2ec] sm:text-xs">
+                {item.label}
+              </span>
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Holds the strip's height while the counts resolve, so the hero does not jump. */
+function GlanceStatsLoading({ locale }: { locale: Locale }) {
+  return (
+    <div
+      className="py-1 lg:-translate-y-4"
+      aria-busy="true"
+      aria-label={locale === "es" ? "Cargando estadísticas" : "Loading statistics"}
+    >
+      <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+        {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
+      </p>
+      <div className="grid grid-cols-2 divide-x divide-white/15 sm:grid-cols-3">
+        {[0, 1, 2].map((item) => (
+          <div key={item} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
+            <span className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[#182c45] sm:h-10 sm:w-10" />
+            <p className="min-w-0 flex-1 leading-tight">
+              <span className="block h-6 w-14 animate-pulse rounded bg-white/15 sm:h-7" />
+              <span className="mt-1 block h-3 w-16 animate-pulse rounded bg-white/10" />
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function HomepageContentLoading({ locale }: { locale: Locale }) {
@@ -420,26 +515,6 @@ export default async function Home({
         ? `Reuniones públicas de ${jurisdictionLabel}`
         : `${jurisdictionLabel} public meetings`;
 
-  // Jurisdiction coverage comes from local configuration; the other display
-  // totals are maintained above and do not block rendering on database counts.
-  const glanceStats = [
-    {
-      icon: Users,
-      value: APPROX_USER_COUNT,
-      label: locale === "es" ? "usuarios" : "users"
-    },
-    {
-      icon: Landmark,
-      value: statValue(getJurisdictions().length, locale),
-      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
-    },
-    {
-      icon: FileText,
-      value: APPROX_AGENDA_ITEM_COUNT,
-      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
-    }
-  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
-
   return (
     <div className="overflow-hidden">
       <section className="civic-hero">
@@ -488,31 +563,10 @@ export default async function Home({
           </div>
 
           <div className="space-y-5 lg:justify-self-stretch">
-            {!hasSearch && glanceStats.length > 0 ? (
-              <div className="py-1 lg:-translate-y-4">
-                <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-                  {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
-                </p>
-                <div
-                  className={`grid divide-x divide-white/15 ${
-                    glanceStats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"
-                  }`}
-                >
-                  {glanceStats.map((item) => (
-                    <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
-                        <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
-                      </span>
-                      <p className="min-w-0 leading-tight">
-                        <span className="block text-lg font-black text-white sm:text-xl">{item.value}</span>
-                        <span className="block text-[11px] font-semibold text-[#d9e2ec] sm:text-xs">
-                          {item.label}
-                        </span>
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {!hasSearch ? (
+              <Suspense fallback={<GlanceStatsLoading locale={locale} />}>
+                <GlanceStats locale={locale} />
+              </Suspense>
             ) : null}
 
             <div>
