@@ -1,47 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowRight, CalendarDays, FileText, Landmark, Users } from "lucide-react";
+import { ArrowRight, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
-import { Suspense, cache } from "react";
-import { HomepageDataLoader } from "@/components/HomepageDataLoader";
-import { SearchAndFilters } from "@/components/SearchAndFilters";
-import { SummaryCard } from "@/components/SummaryCard";
-import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { Suspense } from "react";
 import {
-  getDecisionCardPage,
-  getPublishedCardCount,
-  getPublishedCardPreview,
-  getUpcomingDecisionSnapshot
-} from "@/lib/db/queries";
+  HomepageDataContent,
+  HomepageDataProvider,
+  HomepageHeroStatus
+} from "@/components/HomepageData";
+import { SearchAndFilters } from "@/components/SearchAndFilters";
+import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictions,
   getJurisdictionLabel,
   isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug,
-  type JurisdictionSelection
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
-import {
-  compareCardsByPublicInterest,
-  isPublicInterestCard,
-  publicAgendaTitle,
-  selectDiverseCards
-} from "@/lib/utils/civicPriority";
-import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
-import {
-  formatDisplayDate,
-  isMeetingInProgress,
-  isUpcomingMeetingDate,
-  meetingClockTime,
-  meetingDateParts
-} from "@/lib/utils/date";
-import type { SummaryCardRow } from "@/lib/types";
 import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
-import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
-import { HOMEPAGE_DATA_PARAM } from "@/lib/homepageData";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
@@ -92,132 +71,6 @@ export async function generateMetadata({
     openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
     twitter: { card: "summary", title, description }
   };
-}
-
-function matchesSearch(card: SummaryCardRow, search: string) {
-  if (!search) return true;
-  const haystack = [
-    card.agenda_item,
-    ...normalizeSummaryPoints(card.what_is_happening),
-    card.why_it_matters,
-    card.meetings?.title,
-    ...(card.category_tags || [])
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  return haystack.includes(search.toLowerCase());
-}
-
-type MeetingPreviewCard = SummaryCardRow & {
-  meetings: NonNullable<SummaryCardRow["meetings"]>;
-};
-
-function getMeetingPreviewCards(cards: SummaryCardRow[]) {
-  const seen = new Set<string>();
-  const meetings: MeetingPreviewCard[] = [];
-
-  for (const card of cards) {
-    const meeting = card.meetings;
-    if (!meeting) continue;
-    if (/^cancel{1,2}ed$/i.test(String(meeting.status || "").trim())) continue;
-    if (!isUpcomingMeetingDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text))
-      continue;
-
-    const key = meeting.id || `${meeting.title}-${meeting.date_text || meeting.meeting_datetime || ""}`;
-    if (seen.has(key)) continue;
-
-    seen.add(key);
-    meetings.push(card as MeetingPreviewCard);
-  }
-
-  return meetings
-    .sort((a, b) => {
-      const aParts = meetingDateParts(a.meetings.date_text, a.meetings.meeting_datetime);
-      const bParts = meetingDateParts(b.meetings.date_text, b.meetings.meeting_datetime);
-      return (aParts?.iso || "").localeCompare(bParts?.iso || "");
-    })
-    .slice(0, 5);
-}
-
-function pluralize(count: number, singular: string, plural: string) {
-  return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
-}
-
-function loadHomepageData({
-  jurisdiction,
-  locale,
-  search
-}: {
-  jurisdiction: JurisdictionSelection;
-  locale: Locale;
-  search: string;
-}) {
-  const cardResultPromise = search
-    ? getDecisionCardPage({ jurisdiction, locale, search })
-    : Promise.all([
-        getPublishedCardPreview(jurisdiction, locale),
-        getPublishedCardCount(jurisdiction)
-      ]).then(([previewCards, publishedCardCount]) => ({
-        cards: previewCards,
-        totalCount: Math.max(publishedCardCount, previewCards.length)
-      }));
-
-  return {
-    cardResultPromise,
-    upcomingSnapshotPromise: getUpcomingDecisionSnapshot(jurisdiction)
-  };
-}
-
-// React cache compares argument identity, so keep these primitive keys positional.
-const getHomepageData = cache(
-  (jurisdiction: JurisdictionSelection, locale: Locale, search: string) =>
-    loadHomepageData({ jurisdiction, locale, search })
-);
-
-async function HeroStatus({
-  jurisdiction,
-  locale,
-  search
-}: {
-  jurisdiction: JurisdictionSelection;
-  locale: Locale;
-  search: string;
-}) {
-  const data = getHomepageData(jurisdiction, locale, search);
-  const [cardResult, upcomingSnapshot] = await Promise.all([
-    data.cardResultPromise,
-    data.upcomingSnapshotPromise
-  ]);
-  const { openForCommentCount, nextMeetingIso } = upcomingSnapshot;
-  const nextMeetingParts = meetingDateParts(null, nextMeetingIso, locale);
-  const nextMeetingUnderway = isMeetingInProgress(null, nextMeetingIso);
-  const nextMeetingTime = meetingClockTime(nextMeetingIso, locale);
-  const summaryItems = [
-    openForCommentCount > 0
-      ? locale === "es"
-        ? pluralize(openForCommentCount, "decisión está abierta a comentarios", "decisiones están abiertas a comentarios")
-        : pluralize(openForCommentCount, "decision is open for comment", "decisions are open for comment")
-      : null,
-    nextMeetingParts
-      ? nextMeetingUnderway
-        ? locale === "es"
-          ? "Reunión en curso ahora"
-          : "Meeting in session now"
-        : `${locale === "es" ? "Próxima reunión " : "Next meeting "}${nextMeetingParts.month} ${nextMeetingParts.day}${
-            nextMeetingTime ? `, ${nextMeetingTime}` : ""
-          }`
-      : null
-  ].filter(Boolean);
-  const summarySentence =
-    summaryItems.length > 0
-      ? summaryItems.join(" · ")
-      : locale === "es"
-        ? `${pluralize(cardResult.totalCount, "decisión publicada", "decisiones publicadas")} disponibles`
-        : `${pluralize(cardResult.totalCount, "published decision", "published decisions")} available`;
-
-  return <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>;
 }
 
 function GlanceStats({ locale }: { locale: Locale }) {
@@ -298,187 +151,6 @@ function GlanceStatsLoading({ locale }: { locale: Locale }) {
   );
 }
 
-function HomepageContentLoading({ locale }: { locale: Locale }) {
-  return (
-    <section
-      className="section-shell scroll-mt-24 pb-6 pt-6 sm:pb-8 sm:pt-8"
-      aria-busy="true"
-      aria-label={locale === "es" ? "Cargando decisiones" : "Loading decisions"}
-    >
-      <div className="mb-5 border-b border-black/10 pb-5">
-        <div className="h-3 w-32 animate-pulse rounded bg-black/10" />
-        <div className="mt-3 h-9 max-w-xl animate-pulse rounded bg-black/10" />
-        <div className="mt-3 h-5 max-w-2xl animate-pulse rounded bg-black/[0.07]" />
-      </div>
-      <div className="grid gap-3">
-        {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="quiet-card h-28 animate-pulse bg-black/[0.035]" />
-        ))}
-      </div>
-      <p className="sr-only">{locale === "es" ? "Cargando las decisiones más recientes…" : "Loading the latest decisions…"}</p>
-    </section>
-  );
-}
-
-async function HomepageDataContent({
-  hasSearch,
-  jurisdiction,
-  jurisdictionLabel,
-  locale,
-  search
-}: {
-  hasSearch: boolean;
-  jurisdiction: JurisdictionSelection;
-  jurisdictionLabel: string;
-  locale: Locale;
-  search: string;
-}) {
-  const data = getHomepageData(jurisdiction, locale, search);
-  const cardResult = await data.cardResultPromise;
-  const cards = cardResult.cards;
-  const availableCardCount = cardResult.totalCount;
-  const filteredCards = hasSearch ? cards : cards.filter((card) => matchesSearch(card, search));
-  const prioritizedCards = [...filteredCards].sort(compareCardsByPublicInterest);
-  const publicInterestCards = prioritizedCards.filter(isPublicInterestCard);
-  const decisionCards = selectDiverseCards(
-    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards,
-    4
-  );
-  const visibleCards = hasSearch ? prioritizedCards : decisionCards;
-  const meetingPreviewCards = getMeetingPreviewCards(
-    publicInterestCards.length > 0 ? publicInterestCards : prioritizedCards
-  );
-  const decisionSectionTitle = hasSearch
-    ? locale === "es"
-      ? `Resultados para "${search}"`
-      : `Results for "${search}"`
-    : locale === "es"
-      ? "Decisiones que pueden afectar la vida diaria"
-      : "Decisions that may affect daily life";
-  const decisionSectionDescription = hasSearch
-    ? locale === "es"
-      ? "Decisiones coincidentes de la jurisdicción seleccionada, con elementos más recientes y de mayor impacto primero."
-      : "Matching decisions from the currently selected jurisdiction, with newer, higher-impact items ranked first."
-    : locale === "es"
-      ? "Ordenado para mostrar primero decisiones próximas, luego elementos recientes de alto impacto como presupuestos, vivienda, seguridad, transporte, servicios, audiencias públicas, contratos y tarifas antes que elementos ceremoniales o de proceso interno."
-      : "Ranked to surface upcoming decisions first, then recent high-impact items like budgets, housing, safety, transportation, services, public hearings, contracts, and fees ahead of ceremonial or internal process items.";
-
-  return (
-    <>
-      <section id="decisions" className="section-shell scroll-mt-24 pb-6 pt-6 sm:pb-8 sm:pt-8">
-        <div id="search-results" className="scroll-mt-24">
-          <div className="mb-5 flex flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
-            <div className="max-w-2xl">
-              <p className="label-eyebrow text-civic">
-                {hasSearch ? t(locale, "searchResults") : t(locale, "topPublicDecisions")}
-              </p>
-              <h2 className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
-                {decisionSectionTitle}
-              </h2>
-              <p className="mt-2 text-base leading-7 text-black/[0.68]">{decisionSectionDescription}</p>
-            </div>
-            {hasSearch ? (
-              <p className="count-badge">
-                {filteredCards.length === 1
-                  ? locale === "es"
-                    ? "1 decisión coincidente"
-                    : "1 matching decision"
-                  : locale === "es"
-                    ? `${filteredCards.length} decisiones coincidentes`
-                    : `${filteredCards.length} matching decisions`}
-              </p>
-            ) : null}
-          </div>
-        </div>
-        <div className="grid gap-3">
-          {visibleCards.map((card) => (
-            <SummaryCard key={card.id} card={card} locale={locale} expandOnOutcome={false} />
-          ))}
-          {filteredCards.length === 0 ? (
-            <div className="quiet-card p-8 text-center">
-              <h3 className="text-lg font-semibold text-ink">
-                {hasSearch ? t(locale, "noMatchingDecisions") : t(locale, "noCardsYet")}
-              </h3>
-              <p className="mt-2 text-sm leading-6 text-black/70">
-                {hasSearch
-                  ? t(locale, "trySearching")
-                  : locale === "es"
-                    ? `Cuando se ejecuten el recopilador y el resumidor, aparecerán aquí tarjetas oficiales de agenda de ${jurisdictionLabel}.`
-                    : `Once the scraper and summarizer run, official ${jurisdictionLabel} agenda cards will appear here.`}
-              </p>
-            </div>
-          ) : null}
-        </div>
-        {!hasSearch && availableCardCount > 4 ? (
-          <Link href="/decisions" className="action-link mt-4 font-black underline-offset-4 hover:underline">
-            {t(locale, "viewAllDecisions")}
-            <ArrowRight aria-hidden className="h-4 w-4" />
-          </Link>
-        ) : null}
-      </section>
-
-      {meetingPreviewCards.length > 0 ? (
-        <section className="section-shell pb-8 pt-2">
-          <div className="grid gap-5 border-y border-black/10 py-7 lg:grid-cols-[0.72fr_1fr] lg:items-start">
-            <div>
-              <p className="label-eyebrow text-civic">{t(locale, "upcomingMeetings")}</p>
-              <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">
-                {locale === "es" ? "Reuniones relacionadas con las decisiones principales" : "Meetings tied to the top decisions"}
-              </h2>
-              <p className="mt-3 max-w-md text-base leading-7 text-black/[0.68]">
-                {locale === "es"
-                  ? "Próximas reuniones conectadas con las tarjetas de mayor impacto que se muestran primero."
-                  : "Upcoming meetings connected to the higher-impact cards shown first."}
-              </p>
-              <Link href="/meetings" className="action-link mt-4 font-black underline-offset-4 hover:underline">
-                {t(locale, "viewAllMeetings")}
-                <ArrowRight aria-hidden className="h-4 w-4" />
-              </Link>
-            </div>
-
-            <div className="divide-y divide-black/10 overflow-hidden rounded-lg border border-black/10 bg-white">
-              {meetingPreviewCards.map((card) => {
-                const meeting = card.meetings;
-
-                return (
-                  <article
-                    key={meeting.id}
-                    className="grid gap-3 p-4 sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-center"
-                  >
-                    <div className="flex items-center gap-2 text-sm font-black text-[#12365f]">
-                      <CalendarDays aria-hidden className="h-4 w-4" />
-                      <span>{formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <h3 className="line-clamp-2 text-base font-black leading-snug text-ink">
-                        {displayMeetingTitle(
-                          meeting,
-                          locale === "es" ? "Reunión no indicada" : "Meeting not listed",
-                          locale
-                        )}
-                      </h3>
-                      <p className="mt-1 text-sm font-semibold text-black/[0.58]">
-                        {displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)} ·{" "}
-                        {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
-                      </p>
-                      <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">
-                        {t(locale, "connectedDecision")}: {publicAgendaTitle(card)}
-                      </p>
-                    </div>
-                    <Link href={`/meetings/${meeting.id}`} className="action-secondary-sm">
-                      {t(locale, "meetingDetails")}
-                    </Link>
-                  </article>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      ) : null}
-    </>
-  );
-}
-
 export default async function Home({
   searchParams
 }: {
@@ -486,7 +158,6 @@ export default async function Home({
     q?: string;
     jurisdiction?: string;
     lang?: string;
-    [HOMEPAGE_DATA_PARAM]?: string;
   }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([
@@ -503,7 +174,6 @@ export default async function Home({
     ? SCHOOL_CATEGORIES
     : CATEGORIES;
   const hasSearch = search.length > 0;
-  const shouldLoadHomepageData = params[HOMEPAGE_DATA_PARAM] === "1";
   const introLabel =
     jurisdiction === "all"
       ? locale === "es"
@@ -514,7 +184,8 @@ export default async function Home({
         : `${jurisdictionLabel} public meetings`;
 
   return (
-    <div className="overflow-hidden">
+    <HomepageDataProvider jurisdiction={jurisdiction} locale={locale} search={search}>
+      <div className="overflow-hidden">
       <section className="civic-hero">
         <div
           className={`section-shell relative z-10 grid gap-7 ${
@@ -553,15 +224,7 @@ export default async function Home({
                 ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
                 : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
-            {shouldLoadHomepageData ? (
-              <Suspense
-                fallback={<div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />}
-              >
-                <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} />
-              </Suspense>
-            ) : (
-              <div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />
-            )}
+            <HomepageHeroStatus locale={locale} />
           </div>
 
           <div className="space-y-5 lg:justify-self-stretch">
@@ -585,25 +248,12 @@ export default async function Home({
         </div>
       </section>
 
-      {shouldLoadHomepageData ? (
-        <>
-          <Suspense fallback={<HomepageContentLoading locale={locale} />}>
-            <HomepageDataContent
-              hasSearch={hasSearch}
-              jurisdiction={jurisdiction}
-              jurisdictionLabel={jurisdictionLabel}
-              locale={locale}
-              search={search}
-            />
-          </Suspense>
-          <HomepageDataLoader loaded />
-        </>
-      ) : (
-        <>
-          <HomepageContentLoading locale={locale} />
-          <HomepageDataLoader />
-        </>
-      )}
+      <HomepageDataContent
+        hasSearch={hasSearch}
+        jurisdictionLabel={jurisdictionLabel}
+        locale={locale}
+        search={search}
+      />
       <section className="section-shell pb-16 pt-8">
         <div className="mb-5 max-w-2xl">
           <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>
@@ -634,6 +284,7 @@ export default async function Home({
         </div>
       </section>
 
-    </div>
+      </div>
+    </HomepageDataProvider>
   );
 }

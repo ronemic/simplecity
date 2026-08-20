@@ -1,6 +1,7 @@
-const CACHE_VERSION = "simplecity-v1";
+const CACHE_VERSION = "simplecity-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const PAGE_CACHE = `${CACHE_VERSION}-pages`;
+const HOMEPAGE_DATA_CACHE = `${CACHE_VERSION}-homepage-data`;
 const OFFLINE_URL = "/offline";
 
 const STATIC_ASSETS = [
@@ -25,6 +26,10 @@ function isCacheableAssetRequest(request, url) {
     request.destination === "script" ||
     request.destination === "style"
   );
+}
+
+function isHomepageDataRequest(request, url) {
+  return url.pathname.startsWith("/homepage-data/") && url.pathname.endsWith("/data.json");
 }
 
 function canCache(response) {
@@ -80,6 +85,30 @@ async function networkFirstPage(event) {
   }
 }
 
+async function staleWhileRevalidateHomepageData(event) {
+  const cache = await caches.open(HOMEPAGE_DATA_CACHE);
+  const cachedResponse = await cache.match(event.request);
+
+  if (cachedResponse) {
+    event.waitUntil(
+      fetch(event.request)
+        .then((response) =>
+          canCache(response) ? cache.put(event.request, response) : undefined
+        )
+        .catch(() => undefined)
+    );
+    return cachedResponse;
+  }
+
+  const networkResponse = await fetch(event.request);
+
+  if (canCache(networkResponse)) {
+    event.waitUntil(cache.put(event.request, networkResponse.clone()).catch(() => undefined));
+  }
+
+  return networkResponse;
+}
+
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
@@ -98,7 +127,12 @@ self.addEventListener("activate", (event) => {
           Promise.all(
             cacheNames
               .filter((cacheName) => cacheName.startsWith("simplecity-"))
-              .filter((cacheName) => cacheName !== STATIC_CACHE && cacheName !== PAGE_CACHE)
+              .filter(
+                (cacheName) =>
+                  cacheName !== STATIC_CACHE &&
+                  cacheName !== PAGE_CACHE &&
+                  cacheName !== HOMEPAGE_DATA_CACHE
+              )
               .map((cacheName) => caches.delete(cacheName))
           )
         ),
@@ -119,6 +153,11 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirstPage(event));
+    return;
+  }
+
+  if (isHomepageDataRequest(request, url)) {
+    event.respondWith(staleWhileRevalidateHomepageData(event));
     return;
   }
 
