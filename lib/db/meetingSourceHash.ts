@@ -113,6 +113,36 @@ function stableAgendaItemShape(meeting: LlmReadyMeeting) {
     );
 }
 
+/**
+ * The same components `meetingSourceHash` hashes, reported one by one.
+ *
+ * A stored summarized hash only tells us that something in the official source
+ * moved, not what. Portals that stamp a generation date into a PDF, or that
+ * return a slightly different byte count per request, otherwise re-summarize
+ * every meeting every night and quietly exhaust the run's LLM budget. Logging
+ * these fingerprints makes that visible by comparing two runs of the same
+ * meeting.
+ */
+export function meetingSourceHashComponents(meeting: LlmReadyMeeting) {
+  const shortHash = (value: unknown) =>
+    crypto.createHash("sha256").update(JSON.stringify(value)).digest("hex").slice(0, 10);
+
+  return {
+    metadata: shortHash({
+      title: meeting.title,
+      meetingType: meeting.meetingType,
+      dateText: meeting.dateText,
+      timeText: meeting.timeText,
+      location: meeting.location,
+      sourceType: meeting.sourceType,
+      sourceUrl: meeting.sourceUrl
+    }),
+    llmInput: shortHash(meeting.llmInputText),
+    documents: shortHash(stableDocumentShape(meeting)),
+    items: shortHash(stableAgendaItemShape(meeting))
+  };
+}
+
 export function meetingSourceHash(meeting: LlmReadyMeeting) {
   const source = {
     summarizerVersion: SIMPLECITY_SUMMARIZER_VERSION,

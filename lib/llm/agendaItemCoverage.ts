@@ -280,7 +280,7 @@ export async function completeAgendaItemCoverage(
   const generationFailedItemIds = new Set<string>();
 
   const recordRetry = async (items: AgendaItem[]) => {
-    if (!options.generate || items.length === 0) return;
+    if (!options.generate || items.length === 0) return false;
     for (const item of items) {
       if (!retriedItemIds.includes(item.externalId)) retriedItemIds.push(item.externalId);
     }
@@ -291,6 +291,7 @@ export async function completeAgendaItemCoverage(
         for (const item of items) validationFailedItemIds.add(item.externalId);
       }
       summary = appendSummary(summary, retry.summary);
+      return true;
     } catch (error) {
       for (const item of items) generationFailedItemIds.add(item.externalId);
       retryErrors.push(
@@ -298,6 +299,7 @@ export async function completeAgendaItemCoverage(
           error instanceof Error ? error.message : "Unknown item-summary error"
         }`
       );
+      return false;
     }
   };
 
@@ -312,12 +314,18 @@ export async function completeAgendaItemCoverage(
     // Recover all missing items as one logical request. generateSummaryForMeeting
     // will split this meeting into bounded source-size batches when necessary. This
     // avoids launching one paid request per missing card after a partial response.
-    await recordRetry(uncovered);
+    const recovered = await recordRetry(uncovered);
 
     // A provider can return valid JSON while omitting a few items. Give only those
     // residual items one bounded, small-batch pass instead of repeating the entire
     // meeting or immediately publishing placeholders.
-    const remaining = uncoveredAgendaItems(meeting, summary);
+    //
+    // The recovery request above already runs through the batching summarizer, so
+    // it only throws when every one of its batches failed — a rate limit, an
+    // exhausted budget, or the pipeline deadline. Small-batch retries against the
+    // same generator would fail the same way, so skip them and publish the
+    // official-source fallback instead of spending more requests.
+    const remaining = recovered ? uncoveredAgendaItems(meeting, summary) : [];
     const recoveryBatches = Array.from(
       { length: Math.min(4, Math.ceil(remaining.length / 3)) },
       (_, index) => remaining.slice(index * 3, index * 3 + 3)

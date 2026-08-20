@@ -34,8 +34,14 @@ export function isTransientOfficialDocumentError(error: unknown) {
   );
 }
 
-async function downloadOfficialDocumentWithRetries(
-  context: BrowserContext,
+/**
+ * A single transient network or 5xx response on one official document is enough
+ * to turn a healthy scrape into an "ingestion incomplete" coverage failure, so
+ * every official download retries transient errors before giving up. Permanent
+ * responses (404, unusable payloads) still fail on the first attempt.
+ */
+export async function downloadOfficialDocumentWithRetries(
+  context: Parameters<typeof streamDownloadToTemp>[0],
   url: string,
   targetPath: string,
   options: DownloadDocumentsOptions,
@@ -462,11 +468,13 @@ export async function downloadCompiledDocuments(
         const requestHeaders = {
           "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper"
         };
-        const streamed = await streamDownloadToTemp(
+        const streamed = await downloadOfficialDocumentWithRetries(
           context,
           downloadUrl,
           filePath,
-          streamingOptions(options, budget, requestHeaders)
+          options,
+          streamingOptions(options, budget, requestHeaders),
+          log
         );
         try {
           if (streamed.prefix.subarray(0, 5).toString() !== "%PDF-") {

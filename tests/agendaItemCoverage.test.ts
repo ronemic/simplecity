@@ -116,6 +116,57 @@ test("retries only uncovered items and publishes an official-source fallback whe
   assert.equal(completed.summary.translations?.es?.cards.length, 2);
 });
 
+test("stops after a recovery request that could not reach the provider", async () => {
+  const source = meeting([
+    item("3A", "Sidewalk repair contract"),
+    item("3B", "Park restroom renovation"),
+    item("3C", "Fee schedule update"),
+    item("3D", "Transit shelter agreement")
+  ]);
+  let attempts = 0;
+
+  const completed = await completeAgendaItemCoverage(
+    source,
+    { summary: emptySummary(), raw: { first: true } },
+    {
+      generate: async () => {
+        attempts += 1;
+        throw new Error("429 rate-limited");
+      }
+    }
+  );
+
+  // Recovery already runs through the batching summarizer, so a throw means every
+  // batch failed. Small-batch retries would spend more requests on the same
+  // failure instead of publishing the official-source fallback.
+  assert.equal(attempts, 1);
+  assert.deepEqual(completed.fallbackItemIds, ["3A", "3B", "3C", "3D"]);
+  assert.equal(completed.fallbackReasons["3A"], "generation_failed");
+  assert.equal(completed.retryErrors.length, 1);
+});
+
+test("still retries residual items the provider omitted from a usable response", async () => {
+  const source = meeting([
+    item("4A", "Sidewalk repair contract"),
+    item("4B", "Park restroom renovation")
+  ]);
+  const retried: string[][] = [];
+
+  const completed = await completeAgendaItemCoverage(
+    source,
+    { summary: emptySummary(), raw: { first: true } },
+    {
+      generate: async (retryMeeting) => {
+        retried.push((retryMeeting.items || []).map((value) => value.externalId));
+        return { summary: emptySummary(), raw: { retry: true } };
+      }
+    }
+  );
+
+  assert.deepEqual(retried, [["4A", "4B"], ["4A", "4B"]]);
+  assert.deepEqual(completed.fallbackItemIds, ["4A", "4B"]);
+});
+
 test("labels fallback items whose generated cards failed validation", async () => {
   const source = meeting([item("7B", "Library roof replacement contract")]);
   const rejectedRaw = {

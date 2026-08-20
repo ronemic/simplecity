@@ -258,6 +258,41 @@ test("does not split legal chapter numbers out of numbered agenda-item titles", 
   assert.match(items[1].title ?? "", /Chapter 17\.78/);
 });
 
+test("does not turn a number inside prose into an agenda item", () => {
+  const items = extractAgendaItemsFromText(
+    meeting,
+    `1. CALL TO ORDER AND ROLL CALL
+2. CONSENT CALENDAR
+2.1 Award of contract for the Elm Street pavement rehabilitation project
+Recommendation: Adopt a resolution awarding the construction contract.
+Background: The corridor was last resurfaced in 2004 and has a pavement condition index of 42. Staff released an invitation for bids and received four responsive bids.
+2.2 Second reading of an ordinance amending Chapter 17.78 of the Municipal Code
+Recommendation: Adopt the ordinance amending accessory dwelling unit setbacks.
+3. PUBLIC HEARINGS
+3.1 Proposed water rate adjustment for fiscal years 2027 and 2028
+Recommendation: Conduct a public hearing and adopt a resolution setting water rates.
+4. ADJOURNMENT
+`
+  );
+
+  // The out-of-sequence "42." belongs to item 2.1's background text. Accepting it
+  // as item 42 also advanced the running section number, which discarded every
+  // genuine item that followed it.
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["2.1", "2.2", "3.1"]);
+  assert.match(items[0].rowText, /pavement condition index of 42/);
+  assert.match(items[1].title ?? "", /^Second reading of an ordinance/);
+  assert.match(items[2].title ?? "", /^Proposed water rate adjustment/);
+});
+
+test("keeps whole-number agenda items that skip a few unreadable numbers", () => {
+  const items = extractAgendaItemsFromText(
+    meeting,
+    "1. CALL TO ORDER 2. PUBLIC COMMENT Item 3: Library contract Recommendation: Award the library contract. 6 Transportation update Recommendation: Receive the update."
+  );
+
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["3", "6"]);
+});
+
 test("keeps numbered items whose official title starts with a lettered action", () => {
   const items = extractAgendaItemsFromText(
     meeting,

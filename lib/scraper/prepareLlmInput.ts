@@ -298,7 +298,6 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
   const agendaPdf = findDoc(meeting, "Agenda");
   const accessibleAgenda = findDoc(meeting, "Accessible Agenda");
   const packetPdf = findDoc(meeting, "Packet") || findDoc(meeting, "Agenda Packet");
-  const publicCommentsPdf = findDoc(meeting, "Public Comments");
   const cancellationPdf = findDoc(meeting, "Notice of Cancellation");
   const specialEventNotice = findDoc(meeting, "Special Event Notice");
   const earlyStaffReports = findDocs(meeting, "Early Staff Report Release");
@@ -524,18 +523,6 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     );
   }
 
-  let publicCommentsSummaryInput: string | null = null;
-
-  if (publicCommentsPdf?.localPath) {
-    const commentsText = await extractPdfTextForDocument(publicCommentsPdf);
-
-    if (commentsText?.text && commentsText.text.length > 200) {
-      publicCommentsSummaryInput = truncateForLLM(commentsText.text);
-    } else {
-      extractionNotes.push("Public comments PDF had little or no extractable text.");
-    }
-  }
-
   if (isMenloParkMeeting && !meeting.timeText) {
     enrichMenloParkMeetingTimesFromAgendaText([meeting]);
     for (const note of meeting.extractionNotes || []) {
@@ -608,7 +595,12 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     // prepared input empty also protects non-pipeline callers from sending a stale
     // agenda or packet to an LLM after a meeting is cancelled.
     llmInputText: effectiveCancelled ? "" : truncateForLLM(selectedText),
-    publicCommentsInputText: publicCommentsSummaryInput
+    // Submitted public comments are deliberately excluded from every prompt
+    // path (source hash, item context, summary validation, and the user
+    // prompt), so extracting them added no card context. They were only ever
+    // republished verbatim on the meeting page; the comment packet itself stays
+    // linked as an official source document.
+    publicCommentsInputText: null
   };
 }
 

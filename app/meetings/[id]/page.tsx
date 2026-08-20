@@ -383,13 +383,6 @@ export default async function MeetingDetailPage({
           </section>
 
           <section className="quiet-card p-5 sm:p-6">
-            <h2 className="text-xl font-bold text-ink">{t(locale, "publicCommentInformation")}</h2>
-            <p className="mt-2 text-sm leading-6 text-black/75">
-              {meeting.public_comments_input_text || t(locale, "notListedInSource")}
-            </p>
-          </section>
-
-          <section className="quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">{t(locale, "sourceNote")}</h2>
             <p className="mt-2 text-sm leading-6 text-black/75">
               {locale === "es"

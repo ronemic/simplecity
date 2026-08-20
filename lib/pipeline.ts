@@ -25,6 +25,7 @@ import {
   setMeetingSummarizedSourceHash,
   upsertMeetings
 } from "@/lib/db/upsertMeetings";
+import { meetingSourceHashComponents } from "@/lib/db/meetingSourceHash";
 import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
@@ -199,6 +200,40 @@ function isDownloadedScannedPdf(document: PrimeGovMeeting["documents"][number]) 
   );
 }
 
+/**
+ * Portals routinely list an agenda link before the agenda itself is posted, and
+ * answer 404/410 until it appears. That is the portal's publication schedule,
+ * not a broken ingestion request, so it must not fail the results-coverage gate
+ * for a meeting that has not happened yet. Every other status — including 403,
+ * which usually means a real block — stays a hard error.
+ */
+function isUnpublishedAgendaDocument(document: PrimeGovMeeting["documents"][number]) {
+  return /\bHTTP\s+(?:404|410)\b/i.test(String(document.downloadError || ""));
+}
+
+function isUpcomingMeeting(meeting: PrimeGovMeeting) {
+  return (
+    meeting.status === "Upcoming" ||
+    meeting.section === "Upcoming Meetings" ||
+    meeting.section === "Current And Upcoming Meetings"
+  );
+}
+
+function unpublishedUpcomingAgendaDocuments(meeting: PrimeGovMeeting) {
+  if (meeting.hasHtmlAgenda || !isUpcomingMeeting(meeting)) return [];
+  const agendaDocuments = meeting.documents.filter(
+    (document) =>
+      AGENDA_DOCUMENT_TYPES.has(document.type) &&
+      // Match the coverage gate, which already treats a 0-byte placeholder as
+      // an unpublished document rather than a failed request.
+      !/empty unpublished placeholder/i.test(String(document.downloadError || ""))
+  );
+  return agendaDocuments.length > 0 &&
+    agendaDocuments.every(isUnpublishedAgendaDocument)
+    ? agendaDocuments
+    : [];
+}
+
 export function agendaIngestionWarnings(meetings: PrimeGovMeeting[]) {
   const warnings: string[] = [];
   for (const meeting of meetings) {
@@ -210,6 +245,13 @@ export function agendaIngestionWarnings(meetings: PrimeGovMeeting[]) {
     if (scanned.length > 0) {
       warnings.push(
         `Agenda OCR warning for ${meeting.title}: ${scanned.length} downloaded agenda document(s) are image-only; official links remain available.`
+      );
+    }
+
+    const unpublished = unpublishedUpcomingAgendaDocuments(meeting);
+    if (unpublished.length > 0) {
+      warnings.push(
+        `Agenda not yet published for ${meeting.title}: ${unpublished.length} agenda document(s) returned HTTP 404/410 for an upcoming meeting; official links remain available.`
       );
     }
   }
@@ -256,6 +298,9 @@ export function agendaIngestionErrors(meetings: PrimeGovMeeting[]) {
     // source, not a broken ingestion request. Keep it visible as an OCR warning
     // without failing the entire jurisdiction's results-coverage gate.
     if (agendaDocuments.some(isDownloadedScannedPdf)) continue;
+
+    // Same for an upcoming meeting whose agenda has not been posted yet.
+    if (unpublishedUpcomingAgendaDocuments(meeting).length > 0) continue;
 
     const documentCount = Math.max(agendaDocuments.length, 1);
     errors.push(
@@ -896,6 +941,21 @@ async function runSimpleCityPipelineInternal(
               // work during an extended Monday lookback.
               if (item.id) reconciledOutcomeMeetingIds.add(item.id);
               return null;
+            }
+
+            if (
+              item.sourceHash &&
+              item.summarizedSourceHash &&
+              item.summarizedSourceHash !== item.sourceHash
+            ) {
+              const components = meetingSourceHashComponents(item.meeting);
+              log(
+                `Re-summarizing ${item.meeting.title}; the official source hash changed ` +
+                `(stored ${item.summarizedSourceHash.slice(0, 10)}, current ${item.sourceHash.slice(0, 10)}). ` +
+                `Component fingerprints: metadata ${components.metadata}, llmInput ${components.llmInput}, ` +
+                `documents ${components.documents}, items ${components.items}. ` +
+                "Compare these across runs to identify a component that churns without a real source change."
+              );
             }
 
             if (!item.meeting.llmInputText) {

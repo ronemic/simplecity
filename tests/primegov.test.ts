@@ -792,6 +792,62 @@ test("retries transient official-document transport failures before marking inge
   }
 });
 
+test("retries transient PrimeGov compiled-document failures", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-primegov-retry-"));
+  const documentUrl = "https://city.primegov.com/Public/CompiledDocument/42";
+  const meeting = primeGovMeeting([
+    { type: "Agenda", label: "Agenda", url: documentUrl }
+  ]);
+  let attempts = 0;
+
+  try {
+    const result = await downloadCompiledDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      retryDelayMs: 0,
+      fetchImpl: (async () => {
+        attempts += 1;
+        if (attempts < 3) throw new TypeError("fetch failed");
+        return fetchResponse("%PDF-1.7\nOfficial agenda content");
+      }) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 1, failed: 0 });
+    assert.equal(attempts, 3);
+    assert.equal(meeting.documents[0].downloadError, null);
+    assert.ok(meeting.documents[0].localPath?.endsWith(".pdf"));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("does not retry a permanently missing PrimeGov compiled document", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-primegov-missing-"));
+  const documentUrl = "https://city.primegov.com/Public/CompiledDocument/43";
+  const meeting = primeGovMeeting([
+    { type: "Agenda", label: "Agenda", url: documentUrl }
+  ]);
+  let attempts = 0;
+
+  try {
+    const result = await downloadCompiledDocuments(downloadTestContext(), [meeting], {
+      outputDir,
+      minFreeBytes: 0,
+      retryDelayMs: 0,
+      fetchImpl: (async () => {
+        attempts += 1;
+        return new Response("missing", { status: 404 });
+      }) as typeof fetch
+    });
+
+    assert.deepEqual(result, { downloaded: 0, failed: 1 });
+    assert.equal(attempts, 1);
+    assert.match(String(meeting.documents[0].downloadError), /HTTP 404/);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("allows a source to use additional delayed retries and browser-like headers", async () => {
   const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-source-retries-"));
   const documentUrl = "https://city.example/agenda.pdf";

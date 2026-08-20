@@ -10,9 +10,9 @@ import { parseMeetingDate } from "@/lib/utils/date";
 import { withEffectiveSourceMeetingStatus } from "@/lib/utils/meetingStatus";
 import { filterMeetingsToWindow, getMeetingWindow } from "@/lib/utils/meetingWindow";
 import { mergeDiscoveredAgendaItemAttachments } from "@/lib/scraper/itemAttachments";
+import { downloadOfficialDocumentWithRetries } from "@/lib/scraper/downloadDocuments";
 import {
   createStreamDownloadBudget,
-  streamDownloadToTemp,
   STREAM_DOWNLOAD_MAX_FILE_BYTES
 } from "@/lib/scraper/streamDownload";
 
@@ -593,11 +593,18 @@ async function downloadLegistarDocuments(
           Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
         };
         const targetPath = path.join(docsDir, filename);
-        const streamed = await streamDownloadToTemp(context, doc.url, targetPath, {
-          headers,
-          budget,
-          shouldStop: options.shouldStop
-        });
+        const streamed = await downloadOfficialDocumentWithRetries(
+          context,
+          doc.url,
+          targetPath,
+          { shouldStop: options.shouldStop },
+          {
+            headers,
+            budget,
+            shouldStop: options.shouldStop
+          },
+          log
+        );
         try {
           if (streamed.prefix.subarray(0, 5).toString() === "%PDF-") {
             const filePath = path.join(docsDir, `${filename}.pdf`);
@@ -1561,14 +1568,21 @@ async function downloadLegistarApiDocuments(
     const filename = buildLegistarDocumentFilename(meeting, doc.type, doc.url);
     try {
       const targetPath = path.join(docsDir, filename);
-      const streamed = await streamDownloadToTemp(null, doc.url, targetPath, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
-          Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
+      const streamed = await downloadOfficialDocumentWithRetries(
+        null,
+        doc.url,
+        targetPath,
+        { shouldStop: options.shouldStop },
+        {
+          headers: {
+            "User-Agent": "Mozilla/5.0 SimpleCity civic agenda scraper",
+            Referer: meeting.meetingDetailsUrl || meeting.sourceUrl || doc.url
+          },
+          budget,
+          shouldStop: options.shouldStop
         },
-        budget,
-        shouldStop: options.shouldStop
-      });
+        log
+      );
       try {
         if (streamed.prefix.subarray(0, 5).toString() !== "%PDF-") {
           doc.localPath = null;

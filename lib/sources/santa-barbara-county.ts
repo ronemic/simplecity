@@ -10,6 +10,7 @@ import type {
   ScrapePortalResult
 } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
+import { downloadOfficialDocumentWithRetries } from "@/lib/scraper/downloadDocuments";
 import {
   createStreamDownloadBudget,
   streamDownloadToTemp
@@ -395,12 +396,19 @@ export async function downloadSantaBarbaraPlanningCommissionDocuments(
         const metadata = parseBoxFileDownloadMetadata(await fetchBoxHtml(document.url), fileId);
         const downloadUrl = new URL(metadata.downloadUrl);
         downloadUrl.searchParams.set("shared_link", SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL);
-        transfer = await streamDownloadToTemp(null, downloadUrl.toString(), filePath, {
-          headers: { Authorization: `Bearer ${metadata.token}` },
-          validateUrl: isAllowedBoxDownloadUrl,
-          shouldStop,
-          budget: downloadBudget
-        });
+        transfer = await downloadOfficialDocumentWithRetries(
+          null,
+          downloadUrl.toString(),
+          filePath,
+          { shouldStop },
+          {
+            headers: { Authorization: `Bearer ${metadata.token}` },
+            validateUrl: isAllowedBoxDownloadUrl,
+            shouldStop,
+            budget: downloadBudget
+          },
+          log
+        );
         if (transfer.prefix.subarray(0, 5).toString() !== "%PDF-") {
           throw new Error("Box document response was not a PDF.");
         }

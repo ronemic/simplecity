@@ -20,6 +20,13 @@ export const MEETING_WIDE_CONTEXT_HEADING =
 export const STRUCTURED_AGENDA_ITEMS_HEADING =
   "Current meeting agenda items (use each block only for its named item):";
 export const MAX_MEETING_WIDE_CONTEXT_CHARS = 8000;
+/**
+ * How far ahead of the last accepted whole-number item a new whole number may
+ * jump and still be treated as a real agenda item. Sized to tolerate a few
+ * items whose titles the extractor could not read, without accepting arbitrary
+ * numbers that appear inside sentences.
+ */
+const MAX_WHOLE_NUMBER_ITEM_GAP = 5;
 
 export function extractMeetingWideParticipationContext(text: string) {
   const headingIndex = text.indexOf(MEETING_WIDE_CONTEXT_HEADING);
@@ -271,6 +278,19 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
         continue;
       }
       if (wholeNumber <= lastWholeNumber) continue;
+      // Agendas number their items in sequence, so a number far ahead of the
+      // last accepted one came from prose ("a pavement condition index of 42.
+      // Staff released...") rather than from a new item. Accepting it also
+      // pushed the running section number forward, which made the decimal rule
+      // above discard every genuine item that followed.
+      if (
+        lastWholeNumber > 0 &&
+        wholeNumber > lastWholeNumber + MAX_WHOLE_NUMBER_ITEM_GAP
+      ) {
+        const previous = acceptedMatches.at(-1);
+        if (previous) previous.rawBlock += ` ${agendaNumber} ${match[2]}`;
+        continue;
+      }
       lastWholeNumber = wholeNumber;
     }
     acceptedMatches.push({ match, rawBlock: match[2] });

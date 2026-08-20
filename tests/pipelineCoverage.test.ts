@@ -187,6 +187,67 @@ test("downloaded image-only agenda PDFs warn without failing results coverage", 
   ]);
 });
 
+test("an unposted agenda for an upcoming meeting warns without failing results coverage", () => {
+  const record = meeting(
+    [
+      {
+        type: "Agenda",
+        label: "Agenda",
+        url: "https://example.com/agenda.pdf",
+        downloadError: "HTTP 404"
+      }
+    ],
+    { status: "Upcoming" }
+  );
+
+  assert.deepEqual(agendaIngestionErrors([record]), []);
+  assert.deepEqual(agendaIngestionWarnings([record]), [
+    "Agenda not yet published for City Council: 1 agenda document(s) returned HTTP 404/410 for an upcoming meeting; official links remain available."
+  ]);
+});
+
+test("a missing agenda for a past meeting still fails results coverage", () => {
+  assert.deepEqual(
+    agendaIngestionErrors([
+      meeting(
+        [
+          {
+            type: "Agenda",
+            label: "Agenda",
+            url: "https://example.com/agenda.pdf",
+            downloadError: "HTTP 404"
+          }
+        ],
+        { status: "Past", section: "Past Meetings" }
+      )
+    ]),
+    [
+      "Agenda ingestion incomplete for City Council: 1 published agenda document(s) had no usable official text."
+    ]
+  );
+});
+
+test("a blocked agenda for an upcoming meeting still fails results coverage", () => {
+  assert.deepEqual(
+    agendaIngestionErrors([
+      meeting(
+        [
+          {
+            type: "Agenda",
+            label: "Agenda",
+            url: "https://example.com/agenda.pdf",
+            downloadError: "HTTP 403"
+          }
+        ],
+        { status: "Upcoming" }
+      )
+    ]),
+    [
+      "Agenda ingestion incomplete for City Council: 1 published agenda document(s) had no usable official text."
+    ]
+  );
+});
+
 test("agenda coverage accepts a usable alternate official agenda", () => {
   assert.deepEqual(
     agendaIngestionErrors([
