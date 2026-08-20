@@ -31,6 +31,10 @@ function canCache(response) {
   return response && response.ok && response.type === "basic";
 }
 
+function cachePageInBackground(event, cache, response) {
+  event.waitUntil(cache.put(event.request, response.clone()).catch(() => undefined));
+}
+
 async function cacheFirst(request) {
   const cachedResponse = await caches.match(request);
 
@@ -55,14 +59,14 @@ async function networkFirstPage(event) {
     const preloadResponse = await event.preloadResponse;
 
     if (canCache(preloadResponse)) {
-      await cache.put(event.request, preloadResponse.clone());
+      cachePageInBackground(event, cache, preloadResponse);
       return preloadResponse;
     }
 
     const networkResponse = await fetch(event.request);
 
     if (canCache(networkResponse)) {
-      await cache.put(event.request, networkResponse.clone());
+      cachePageInBackground(event, cache, networkResponse);
     }
 
     return networkResponse;
