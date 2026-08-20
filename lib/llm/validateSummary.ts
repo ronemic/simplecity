@@ -219,6 +219,10 @@ export type SummaryValidationOptions = {
     agendaItem: string
   ) => { title: string; agendaNumber: string | null } | null;
   meetingWideParticipationText?: string;
+  officialActionForCard?: (
+    sourceItemId: string | null,
+    agendaItem: string
+  ) => { action: string | null; result: string | null } | null;
   onIssue?: (issue: SummaryValidationIssue) => void;
 };
 
@@ -553,6 +557,38 @@ function capConfidence(
   return confidenceRank[value] <= confidenceRank[maxConfidence] ? value : maxConfidence;
 }
 
+/**
+ * Statuses that tell a reader the body has not acted yet. Read against an item
+ * whose official record already shows an action, they are simply wrong.
+ */
+const PENDING_CARD_STATUSES = new Set(["Upcoming vote", "Under discussion"]);
+const NOT_APPROVED_CARD_STATUSES = new Set([
+  "Upcoming vote",
+  "Under discussion",
+  "Routine approval",
+  "Passed"
+]);
+/**
+ * Matched against the short structured action/result fields only, never against
+ * attachment prose: an item may lawfully approve a withdrawal of funds, and a
+ * staff report may discuss a withdrawn application from another matter.
+ */
+const WITHDRAWN_ITEM_PATTERN = /^\s*(?:item\s+)?withdrawn\b|^\s*withdrawn from (?:the )?(?:agenda|calendar|consideration)\b/i;
+const RECORDED_RESULT_PATTERN =
+  /^\s*(?:motion\s+)?(?:pass(?:ed)?|fail(?:ed)?|adopted|approved|denied|rejected|defeated|continued|tabled|no action(?: taken)?)\b/i;
+
+function officialItemStatusSignal(official: { action: string | null; result: string | null }) {
+  const action = String(official.action || "").trim();
+  const result = String(official.result || "").trim();
+  if (WITHDRAWN_ITEM_PATTERN.test(action) || WITHDRAWN_ITEM_PATTERN.test(result)) {
+    return "withdrawn" as const;
+  }
+  if (RECORDED_RESULT_PATTERN.test(result) || /\bmotion passed\b/i.test(action)) {
+    return "decided" as const;
+  }
+  return null;
+}
+
 function cleanStatus(status: string) {
   const normalized = status.trim();
   if (normalized.toLowerCase() === "info only") return "Information only";
@@ -805,6 +841,14 @@ export function validationOptionsForMeeting(
               title: String(matchedItem.title || matchedItem.rowText || "").trim(),
               agendaNumber: matchedItem.agendaNumber?.trim() || null
             };
+          },
+          officialActionForCard: (sourceItemId) => {
+            const matchedItem = resolveItem(sourceItemId);
+            if (!matchedItem) return null;
+            return {
+              action: matchedItem.action || matchedItem.recommendedAction || null,
+              result: matchedItem.result || matchedItem.status || null
+            };
           }
         }
       : {}),
@@ -991,6 +1035,42 @@ export function validateSimpleCitySummary(
         options.onIssue?.({
           agendaItem: card.agendaItem,
           reason: `Upcoming meeting card cannot use historical outcome status: ${status}`,
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
+        });
+        return null;
+      }
+
+      // An official record that already shows the item withdrawn or decided
+      // contradicts a card still describing a pending action. The platform's
+      // own action/result fields are authoritative here.
+      const officialAction = options.officialActionForCard?.(sourceItemId, card.agendaItem);
+      const officialSignal = officialAction ? officialItemStatusSignal(officialAction) : null;
+
+      if (officialSignal === "withdrawn" && NOT_APPROVED_CARD_STATUSES.has(status)) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem,
+          reason:
+            `The official record shows this item was withdrawn, so status "${status}" and any ` +
+            "description of the body acting on it are wrong. Say the item was withdrawn and that no action was taken.",
+          cardIndex: index,
+          repairable: true,
+          outcome: "reject"
+        });
+        return null;
+      }
+
+      if (
+        officialSignal === "decided" &&
+        options.meetingStatus === "Past" &&
+        PENDING_CARD_STATUSES.has(status)
+      ) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem,
+          reason:
+            `The official record already shows a recorded result for this item, so status "${status}" ` +
+            "is wrong. Use the status matching what the body actually did.",
           cardIndex: index,
           repairable: true,
           outcome: "reject"

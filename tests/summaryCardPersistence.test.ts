@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   appendSummaryCardsForMeeting,
+  cardModelInputText,
   isAgendaUnavailablePlaceholderCard,
   obsoleteAuthoritativeSourceCardIds,
   SUMMARY_CARD_WRITE_BATCH_SIZE,
@@ -129,7 +130,7 @@ test("initial replacement persists only cards in a complete official item invent
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [], error: null }; } };
@@ -252,7 +253,7 @@ test("removes an obsolete agenda placeholder when real agenda cards are appended
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return {
               async limit() {
                 return { data: [], error: null };
@@ -379,7 +380,7 @@ test("adopts a legacy exact-key card when appending a stable source item id", as
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [legacyCard], error: null }; } };
@@ -469,7 +470,7 @@ test("updates changed content on a uniquely matched legacy card before marking t
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [legacyCard], error: null }; } };
@@ -546,7 +547,7 @@ test("does not treat a shared meeting source URL as legacy card identity", async
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [existing], error: null }; } };
@@ -624,7 +625,7 @@ test("does not overwrite a modern card when a distinct source id has the same pu
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [existing], error: null }; } };
@@ -700,7 +701,7 @@ function appendClientForExisting(
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: existingRows, error: null }; } };
@@ -895,7 +896,7 @@ test("writes distinct Spanish translations for source-identified cards sharing a
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [], error: null }; } };
@@ -969,7 +970,7 @@ test("adopts one collapsed legacy row without dropping a second distinct source 
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return { async limit() { return { data: [], error: null }; } };
           }
           return { async eq() { return { data: [existing], error: null }; } };
@@ -1055,7 +1056,7 @@ test("persists a large meeting in batches and marks it summarized after all writ
       assert.equal(table, "summary_cards");
       return {
         select(columns: string) {
-          if (columns === "source_item_id") {
+          if (columns === "source_item_id" || columns === "model_input_text") {
             return {
               async limit() {
                 return { data: [], error: null };
@@ -1122,4 +1123,80 @@ test("persists a large meeting in batches and marks it summarized after all writ
   assert.equal(meetingUpdates.length, 1);
   assert.equal(meetingUpdates[0].summarized_source_hash, "source-hash");
   assert.equal(typeof meetingUpdates[0].cards_generated_at, "string");
+});
+
+
+const provenanceItems = [
+  {
+    externalId: "item-7",
+    fileNumber: null,
+    agendaNumber: "7A",
+    itemType: "CONSENT CALENDAR",
+    title: "Amendment No. 2 with Thermal Mechanical Inc. for citywide HVAC repair",
+    action: "Authorize the Mayor to execute the amendment",
+    result: null,
+    sourceUrl: "https://example.gov/item7",
+    rowText: "Staff recommends a $50,000 amendment not to exceed $200,000 annually.",
+    recommendedAction: null
+  },
+  {
+    externalId: "item-8",
+    fileNumber: null,
+    agendaNumber: "8",
+    itemType: "CONSENT CALENDAR",
+    title: "Accept the quarterly investment report",
+    action: null,
+    result: null,
+    sourceUrl: "https://example.gov/item8",
+    rowText: "Quarterly investment report for the period ending June 30.",
+    recommendedAction: null
+  }
+] as unknown as Parameters<typeof cardModelInputText>[1];
+
+function provenanceCard(overrides: Partial<SimpleCityCard>) {
+  return {
+    sourceItemId: null,
+    agendaItem: "A card",
+    whatIsHappening: ["Something happens."],
+    whyItMatters: "It matters.",
+    whoItAffects: [],
+    categoryTags: [],
+    status: "Upcoming vote",
+    commentWindow: { opens: "", closes: "" },
+    howToAct: { attend: "", email: "", submitComment: "" },
+    source: "https://example.gov/item7",
+    confidence: "medium",
+    ...overrides
+  } as SimpleCityCard;
+}
+
+test("card provenance captures only the matched agenda item's context", () => {
+  const text = cardModelInputText(
+    provenanceCard({ sourceItemId: "item-7", agendaItem: "Approve $50,000 HVAC contract amendment" }),
+    provenanceItems,
+    true
+  );
+  assert.match(String(text), /Thermal Mechanical/);
+  assert.match(String(text), /not to exceed \$200,000/);
+  // A neighbouring item must not leak in, or cross-item contamination becomes invisible.
+  assert.ok(!String(text).includes("quarterly investment report"));
+});
+
+test("card provenance is omitted entirely when the column is absent", () => {
+  assert.equal(
+    cardModelInputText(provenanceCard({ sourceItemId: "item-7" }), provenanceItems, false),
+    undefined
+  );
+});
+
+test("card provenance is null when no agenda item matches", () => {
+  assert.equal(
+    cardModelInputText(
+      provenanceCard({ sourceItemId: "not-present", agendaItem: "An unrelated rezoning" }),
+      provenanceItems,
+      true
+    ),
+    null
+  );
+  assert.equal(cardModelInputText(provenanceCard({}), undefined, true), null);
 });

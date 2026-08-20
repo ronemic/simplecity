@@ -89,6 +89,9 @@ create table if not exists public.summary_cards (
   is_featured boolean default false,
   admin_notes text,
   raw_llm_json jsonb,
+  -- Verbatim agenda-item context given to the summary model, kept so a card can
+  -- be audited for invented content after the fact.
+  model_input_text text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

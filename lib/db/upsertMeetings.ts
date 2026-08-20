@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+  AgendaItem,
   LlmReadyMeeting,
   PrimeGovDocument,
   SimpleCityCard,
@@ -22,6 +23,10 @@ import { parseMeetingDate } from "@/lib/utils/date";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 import { hasPublishableCardContent } from "@/lib/utils/cardContent";
+import {
+  findAgendaItemForCard,
+  formatAgendaItemContexts
+} from "@/lib/scraper/agendaItemContext";
 import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 
 type UpsertedMeeting = {
@@ -60,6 +65,7 @@ type AgendaAvailabilityCard = {
 };
 
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
+const modelInputSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
 const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
 const MAX_STORED_RAW_AGENDA_ITEM_CHARACTERS = 4_000;
@@ -209,6 +215,34 @@ function isMissingSourceItemIdColumn(error: { message?: string } | null) {
   return Boolean(error && /source_item_id|PGRST204|column/i.test(error.message || ""));
 }
 
+/**
+ * Each region is a separate Supabase project, so a project may not have run the
+ * migration yet. Cards must keep saving without their input provenance rather
+ * than failing the whole run.
+ */
+function supportsModelInputText(supabase: SupabaseClient) {
+  const existing = modelInputSupport.get(supabase);
+  if (existing) return existing;
+
+  const check = Promise.resolve(
+    supabase.from("summary_cards").select("model_input_text").limit(1)
+  )
+    .then(({ error }) => {
+      if (!error) return true;
+      if (/model_input_text|PGRST204|column/i.test(error.message || "")) {
+        modelInputSupport.delete(supabase);
+        return false;
+      }
+      throw new Error(`Failed to inspect summary card provenance support: ${error.message}`);
+    })
+    .catch((error) => {
+      modelInputSupport.delete(supabase);
+      throw error;
+    });
+  modelInputSupport.set(supabase, check);
+  return check;
+}
+
 function supportsSourceItemId(supabase: SupabaseClient) {
   const existing = sourceItemIdSupport.get(supabase);
   if (existing) return existing;
@@ -328,6 +362,28 @@ function summaryCardFingerprintInput(card: SimpleCityCard) {
   };
 }
 
+const MAX_CARD_MODEL_INPUT_CHARS = 20_000;
+
+/**
+ * Rebuilds the exact block the summary model received for this card. Batches are
+ * formatted without a character budget, so formatting the matched item on its own
+ * reproduces that block byte for byte.
+ */
+export function cardModelInputText(
+  card: SimpleCityCard,
+  items: readonly AgendaItem[] | undefined,
+  supported: boolean
+) {
+  if (!supported) return undefined;
+  if (!items?.length) return null;
+  const matched =
+    (card.sourceItemId
+      ? items.find((item) => item.externalId === card.sourceItemId)
+      : null) || findAgendaItemForCard(card.agendaItem, items as AgendaItem[]);
+  if (!matched) return null;
+  return formatAgendaItemContexts([matched]).slice(0, MAX_CARD_MODEL_INPUT_CHARS) || null;
+}
+
 function cardInsertRow(
   meetingId: string,
   card: SimpleCityCard,
@@ -339,6 +395,7 @@ function cardInsertRow(
     isPublished: boolean;
     isFeatured: boolean;
     adminNotes: string | null;
+    modelInputText?: string | null;
   }
 ) {
   // A card whose body is entirely the "not listed in the source document"
@@ -377,6 +434,9 @@ function cardInsertRow(
     source_url: card.source,
     confidence: publishable ? card.confidence : "low",
     is_published: publishable ? options.isPublished : false,
+    ...(options.modelInputText === undefined
+      ? {}
+      : { model_input_text: options.modelInputText }),
     is_featured: options.isFeatured,
     admin_notes: options.adminNotes,
     raw_llm_json: rawLlmJson
@@ -926,9 +986,11 @@ export async function replaceSummaryCardsForMeeting(
     sourceHash?: string | null;
     jurisdiction?: JurisdictionConfig | null;
     authoritativeSourceItemIds?: readonly string[];
+    agendaItems?: readonly AgendaItem[];
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
+  const modelInputAvailable = await supportsModelInputText(supabase);
   const authoritativeSourceItemIds =
     sourceItemIdAvailable && options.authoritativeSourceItemIds?.length
       ? new Set(options.authoritativeSourceItemIds)
@@ -994,6 +1056,7 @@ export async function replaceSummaryCardsForMeeting(
     return cardInsertRow(meetingId, card, rawLlmJsonForBulkRow(rawLlmJson, rowIndex), {
       jurisdiction: options.jurisdiction,
       includeSourceItemId: sourceItemIdAvailable,
+      modelInputText: cardModelInputText(card, options.agendaItems, modelInputAvailable),
       isPublished:
         typeof preserved?.is_published === "boolean" ? preserved.is_published : true,
       isFeatured:
@@ -1032,9 +1095,11 @@ export async function appendSummaryCardsForMeeting(
     sourceHash?: string | null;
     jurisdiction?: JurisdictionConfig | null;
     authoritativeSourceItemIds?: readonly string[];
+    agendaItems?: readonly AgendaItem[];
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
+  const modelInputAvailable = await supportsModelInputText(supabase);
   const existingColumns: string = sourceItemIdAvailable
     ? "id,source_item_id,agenda_item,source_url,is_published,is_featured,admin_notes"
     : "id,agenda_item,source_url,is_published,is_featured,admin_notes";
@@ -1201,6 +1266,7 @@ export async function appendSummaryCardsForMeeting(
         includeSourceItemId: sourceItemIdAvailable,
         // Adopting a row must never strip the identity it already carries.
         sourceItemId: entry.card.sourceItemId || existing.source_item_id || null,
+        modelInputText: cardModelInputText(entry.card, options.agendaItems, modelInputAvailable),
         isPublished: existing.is_published ?? true,
         isFeatured: existing.is_featured ?? false,
         adminNotes: existing.admin_notes || null
@@ -1229,6 +1295,7 @@ export async function appendSummaryCardsForMeeting(
         {
           jurisdiction: options.jurisdiction,
           includeSourceItemId: sourceItemIdAvailable,
+          modelInputText: cardModelInputText(card, options.agendaItems, modelInputAvailable),
           isPublished: true,
           isFeatured: false,
           adminNotes: null
