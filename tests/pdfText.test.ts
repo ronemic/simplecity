@@ -76,3 +76,59 @@ test("classifies readable text without allocating global regex match arrays", ()
   assert.equal(isLikelyReadablePdfText("1234567890 !@#$%^&*() ".repeat(30)), false);
   assert.equal(isLikelyReadablePdfText("A B C D ".repeat(100)), false);
 });
+
+
+test("separates word-per-item PDFs without breaking kerned words", async () => {
+  // Real shape from Redwood City minutes: one item per word, no trailing spaces.
+  const words = ["Motion", "and", "second,", "Chu", "and", "Gee", "to", "approve", "item", "7A,"];
+  let cursor = 100;
+  const items = words.map((word) => {
+    const transform = [1, 0, 0, 1, cursor, 700];
+    const width = word.length * 5;
+    cursor += width + 4; // a real inter-word gap
+    return { str: word, transform, width, height: 10 };
+  });
+  // A kerning split inside "approved": no gap between the pieces.
+  items.push({ str: "approve", transform: [1, 0, 0, 1, cursor, 700], width: 35, height: 10 });
+  items.push({ str: "d", transform: [1, 0, 0, 1, cursor + 35, 700], width: 5, height: 10 });
+
+  const result = await extractPdfText("/tmp/redwood-city-minutes.pdf", async (_input, options) => {
+    const page = await options!.pagerender!({
+      getTextContent: async () => ({ items }),
+      getAnnotations: async () => []
+    });
+    return {
+      numpages: 1,
+      numrender: 1,
+      info: {},
+      metadata: null,
+      text: page,
+      version: "test"
+    };
+  });
+
+  const text = result?.text || "";
+  assert.match(text, /Motion and second, Chu and Gee to approve item 7A,/);
+  // The kerned split must not become two words.
+  assert.match(text, /approved/);
+  assert.ok(!/approve d/.test(text), text);
+});
+
+test("keeps existing spacing and line breaks untouched", async () => {
+  const result = await extractPdfText("/tmp/normal.pdf", async (_input, options) => {
+    const page = await options!.pagerender!({
+      getTextContent: async () => ({
+        items: [
+          { str: "The Council approved ", transform: [1, 0, 0, 1, 0, 700], width: 100, height: 10 },
+          { str: "the contract.", transform: [1, 0, 0, 1, 100, 700], width: 60, height: 10 },
+          { str: "Next line here.", transform: [1, 0, 0, 1, 0, 680], width: 70, height: 10 }
+        ]
+      }),
+      getAnnotations: async () => []
+    });
+    return { numpages: 1, numrender: 1, info: {}, metadata: null, text: page, version: "test" };
+  });
+
+  // No doubled space where the item already ended with one, and the y change still breaks the line.
+  assert.match(result?.text || "", /The Council approved the contract\.\nNext line here\./);
+});

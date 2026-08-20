@@ -56,6 +56,32 @@ export function isLikelyReadablePdfText(text = "") {
   return true;
 }
 
+/**
+ * Most PDFs carry their inter-word spacing inside each text item, but some emit
+ * one item per word with no trailing space. Joining those directly produced text
+ * like "Motionandsecond, ChuandGeetoapproveitem7A", which no word-boundary
+ * matching can read.
+ *
+ * A space is added only when the glyphs are measurably apart, so items split
+ * mid-word for kerning stay joined.
+ */
+function itemSeparator(item: {
+  previous: string;
+  current: string;
+  sameLine: boolean;
+  firstItem: boolean;
+  gap: number | null;
+  height?: number;
+}) {
+  if (item.firstItem) return "";
+  if (!item.sameLine) return "\n";
+  if (item.gap === null) return "";
+  if (/\s$/.test(item.previous) || /^\s/.test(item.current)) return "";
+  // Scaled to the glyph height so the test holds at any font size, with a floor
+  // for pages that report no height.
+  return item.gap > Math.max(0.5, (item.height || 10) * 0.2) ? " " : "";
+}
+
 export async function extractPdfText(
   localPath?: string | null,
   parsePdf: typeof pdfParse = pdfParse,
@@ -76,15 +102,28 @@ export async function extractPdfText(
           });
           const chunks: string[] = [];
           let lastY: number | undefined;
+          let lastEndX: number | undefined;
+          let previous = "";
 
           for (const item of textContent.items) {
             if (remainingCharacters <= 0) break;
+            const x = item.transform?.[4];
             const y = item.transform?.[5];
-            const separator = lastY === undefined || lastY === y ? "" : "\n";
-            const value = `${separator}${item.str}`.slice(0, remainingCharacters);
+            const value = `${itemSeparator({
+              previous,
+              current: item.str,
+              sameLine: lastY !== undefined && lastY === y,
+              firstItem: lastY === undefined,
+              gap: typeof x === "number" && typeof lastEndX === "number"
+                ? x - lastEndX
+                : null,
+              height: item.height
+            })}${item.str}`.slice(0, remainingCharacters);
             chunks.push(value);
             remainingCharacters -= value.length;
             lastY = y;
+            lastEndX = typeof x === "number" ? x + (item.width || 0) : undefined;
+            previous = item.str;
           }
 
           return chunks.join("");
