@@ -5,7 +5,7 @@ import test from "node:test";
 const homepage = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
 const homepageData = readFileSync(new URL("../components/HomepageData.tsx", import.meta.url), "utf8");
 const homepageDataRoute = readFileSync(
-  new URL("../app/homepage-data/[jurisdiction]/[locale]/data.json/route.ts", import.meta.url),
+  new URL("../app/homepage-data/[jurisdiction]/[locale]/data.js/route.ts", import.meta.url),
   "utf8"
 );
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
@@ -16,6 +16,7 @@ test("homepage document has no database dependency", () => {
   assert.match(homepage, /<HomepageDataProvider/);
   assert.match(homepage, /<HomepageDataContent/);
   assert.match(homepageData, /fetch\(url/);
+  assert.match(homepageData, /preload\(url/);
   assert.match(homepageData, /status: "loading"/);
 });
 

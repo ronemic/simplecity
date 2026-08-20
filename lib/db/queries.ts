@@ -109,6 +109,7 @@ const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decisio
 const HOME_CARD_PREVIEW_BUDGET = 520;
 const HOME_CARD_PREVIEW_MIN_PER_JURISDICTION = 40;
 const HOME_CARD_PREVIEW_MAX_PER_JURISDICTION = 200;
+const HOME_CARD_PREVIEW_FAST_SINGLE_JURISDICTION = 80;
 
 function homeCardPreviewLimit(clientCount: number) {
   if (clientCount <= 0) return HOME_CARD_PREVIEW_MIN_PER_JURISDICTION;
@@ -119,6 +120,19 @@ function homeCardPreviewLimit(clientCount: number) {
       Math.floor(HOME_CARD_PREVIEW_BUDGET / clientCount)
     )
   );
+}
+
+function homepageSelectionPreviewLimit(
+  selection: JurisdictionSelection,
+  jurisdictionCount: number
+) {
+  // Santa Barbara needs the deep pool because cancellation-heavy imports can
+  // otherwise crowd out real decisions. Other single-jurisdiction homepages do
+  // not need to transfer and rank 200 full cards to display four.
+  if (selection !== "all" && selection !== "santa-barbara-county") {
+    return HOME_CARD_PREVIEW_FAST_SINGLE_JURISDICTION;
+  }
+  return homeCardPreviewLimit(jurisdictionCount);
 }
 const TRANSLATION_LOOKUP_BATCH_SIZE = 100;
 // The triple count-query below measures ~3s per jurisdiction, so the old 4s
@@ -741,6 +755,25 @@ async function loadPublishedCardsForProject(
   return enrichPublicCards(project.supabase, rowGroups.flat(), locale);
 }
 
+/** Homepage previews do not render outcome panels, so skip that extra database
+ * round trip. Spanish still applies its card and meeting translations. */
+async function loadHomepagePreviewCardsForProject(
+  project: JurisdictionProject,
+  locale: Locale,
+  limit: number
+) {
+  const rowGroups = await Promise.all(
+    project.jurisdictions.map((jurisdiction) =>
+      loadPublishedCardRowsForJurisdiction(
+        { jurisdiction, supabase: project.supabase },
+        { limit }
+      )
+    )
+  );
+  const rows = rowGroups.flat();
+  return locale === "en" ? rows : applyCardTranslations(project.supabase, rows, locale);
+}
+
 async function loadPublishedCardsForSelection(
   selection: JurisdictionSelection,
   locale: Locale
@@ -766,9 +799,9 @@ const getCachedPublishedCardPreview = unstable_cache(
       (total, project) => total + project.jurisdictions.length,
       0
     );
-    const limit = homeCardPreviewLimit(jurisdictionCount);
+    const limit = homepageSelectionPreviewLimit(selection, jurisdictionCount);
     const results = await Promise.all(
-      projects.map((project) => loadPublishedCardsForProject(project, locale, { limit }))
+      projects.map((project) => loadHomepagePreviewCardsForProject(project, locale, limit))
     );
 
     return sortCards(results.flat());

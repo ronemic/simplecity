@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { preload } from "react-dom";
 import { SummaryCard } from "@/components/SummaryCard";
 import type { JurisdictionSelection } from "@/lib/config/jurisdictions";
 import type { Locale } from "@/lib/i18n";
@@ -35,8 +36,10 @@ const memoryCache = new Map<string, HomepagePayload>();
 const pendingRequests = new Map<string, Promise<HomepagePayload>>();
 
 function dataUrl(jurisdiction: JurisdictionSelection, locale: Locale, search: string) {
-  const path = `/homepage-data/${encodeURIComponent(jurisdiction)}/${locale}/data.json`;
-  const params = new URLSearchParams({ v: "2" });
+  // Cloudflare does not cache JSON URLs by default. The .js pathname makes this
+  // public JSON response cache-eligible; its Content-Type remains JSON.
+  const path = `/homepage-data/${encodeURIComponent(jurisdiction)}/${locale}/data.js`;
+  const params = new URLSearchParams({ v: "3" });
   if (search) params.set("q", search);
   return `${path}?${params.toString()}`;
 }
@@ -73,6 +76,7 @@ export function HomepageDataProvider({
   search: string;
 }) {
   const url = useMemo(() => dataUrl(jurisdiction, locale, search), [jurisdiction, locale, search]);
+  preload(url, { as: "fetch", crossOrigin: "anonymous", fetchPriority: "high" });
   const [result, setResult] = useState<{ url: string; state: HomepageDataState }>(() => {
     const cached = memoryCache.get(url);
     return {

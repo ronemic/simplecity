@@ -29,7 +29,7 @@ function isCacheableAssetRequest(request, url) {
 }
 
 function isHomepageDataRequest(request, url) {
-  return url.pathname.startsWith("/homepage-data/") && url.pathname.endsWith("/data.json");
+  return url.pathname.startsWith("/homepage-data/") && url.pathname.endsWith("/data.js");
 }
 
 function canCache(response) {
