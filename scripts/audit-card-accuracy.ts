@@ -7,6 +7,11 @@ import {
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 import {
+  findLlmInputBlockForCard,
+  parseLlmInputItemBlocks,
+  parseMeetingWideContext
+} from "@/lib/utils/llmInputItems";
+import {
   fetchLlmResponse,
   getLlmProvidersForInput,
   LLM_OPTIONAL_REQUEST_TIMEOUT_MS,
@@ -169,16 +174,20 @@ Rules:
 - "major" = a reader would be misled about what the body decided, or the outcome is on the wrong item. "minor" = wording or detail imprecision only.
 - Judge only against sourceText. Do not use outside knowledge.`;
 
-const CARD_JUDGE_SYSTEM = `You audit plain-language civic summary "cards" for factual accuracy against the official source document excerpt they were generated from.
+const CARD_JUDGE_SYSTEM = `You audit plain-language civic summary "cards" for factual accuracy.
 
-You receive: sourceText (verbatim official excerpt) and the published card: agendaItem, whatIsHappening (bullets), whyItMatters, status, whoItAffects.
+sourceText is the COMPLETE text that was given to the model that wrote this card for this specific agenda item. Nothing else was available to it. So any specific fact in the card that is absent from sourceText was invented, and you should say so plainly.
+
+You also receive meetingWideParticipationContext: the attendance and comment instructions the same model saw. Judge how-to-act and comment-window claims against it, not against sourceText.
+
+You receive: sourceText, meetingWideParticipationContext, and the published card: agendaItem, whatIsHappening (bullets), whyItMatters, status, whoItAffects.
 
 Return JSON only:
 {
   "itemPresent": "yes" | "no" | "unclear",
   "bulletVerdicts": ["supported" | "contradicted" | "unsupported", ...],
   "whyItMattersVerdict": "supported" | "reasonable_inference" | "contradicted" | "unsupported",
-  "statusVerdict": "supported" | "contradicted" | "unsupported",
+  "statusVerdict": "consistent" | "contradicted",
   "fabricatedSpecifics": ["any number, date, dollar amount, address, name or deadline in the card that is absent from or conflicts with the source"],
   "problems": ["short specific description of each inaccuracy"],
   "severity": "none" | "minor" | "major"
@@ -187,7 +196,10 @@ Return JSON only:
 Rules:
 - One bulletVerdict per whatIsHappening bullet, in order.
 - whyItMatters is interpretive: "reasonable_inference" if it follows from the source without adding facts; "unsupported" if it asserts facts the source lacks.
-- itemPresent: does the excerpt actually cover this agenda item? "no" means the card may be summarizing the wrong item.
+- itemPresent: does sourceText actually describe the same item as the card title? "no" means the card summarizes a different item.
+- status is a category the pipeline assigns from a fixed list, NOT a quote from the source. Mark it "contradicted" only if it states the opposite of the source (e.g. "Passed" when the source shows the item failed). Never report it as unsupported, and never list it under fabricatedSpecifics.
+- whoItAffects is an inferred audience label, not a source quote. Do not flag it as fabricated.
+- fabricatedSpecifics is only for concrete factual details in agendaItem, whatIsHappening, or whyItMatters: numbers, dates, dollar amounts, addresses, org or person names, deadlines.
 - "major" = a reader would be misled about what is being proposed or decided, or the card invents specifics. "minor" = imprecision only.
 - Judge only against sourceText. Do not use outside knowledge.`;
 
@@ -211,6 +223,7 @@ type OutcomeRow = {
 type CardRow = {
   id: string;
   meeting_id: string | null;
+  source_item_id: string | null;
   agenda_item: string | null;
   what_is_happening: string | string[] | null;
   what_is_happening_points: string[] | null;
@@ -277,7 +290,7 @@ async function main() {
   const allOutcomes: Array<OutcomeRow & { jurisdiction: string }> = [];
   const allCards: Array<CardRow & { jurisdiction: string }> = [];
   const meetingsById = new Map<string, MeetingRow>();
-  const documentsByMeeting = new Map<string, string[]>();
+  const modelInputByMeeting = new Map<string, string>();
   const perJurisdiction: Array<Record<string, unknown>> = [];
 
   for (const jurisdiction of jurisdictions) {
@@ -299,7 +312,7 @@ async function main() {
       (from, to) => supabase
         .from("summary_cards")
         .select(
-          "id,meeting_id,agenda_item,what_is_happening,what_is_happening_points,why_it_matters,who_it_affects,status,confidence,source_url,comment_window_opens,comment_window_closes,meetings!inner(status)"
+          "id,meeting_id,source_item_id,agenda_item,what_is_happening,what_is_happening_points,why_it_matters,who_it_affects,status,confidence,source_url,comment_window_opens,comment_window_closes,meetings!inner(status)"
         )
         .eq("jurisdiction_slug", jurisdiction.slug)
         .eq("is_published", true)
@@ -566,72 +579,89 @@ async function main() {
       }
     });
 
-    // Card judging needs the official text the card was built from.
+    // A card must be judged against the exact per-item text the summary model
+    // was given, which the pipeline persists as meetings.llm_input_text.
+    // Retrieving anything looser makes grounded details look invented.
     const cardSample = sample(
       allCards.filter((card) => card.meeting_id && cardBullets(card).length > 0),
       cardSampleSize,
       (card) => card.id
     );
-    const neededMeetings = new Map<string, string>();
+    const staleInputMeetings = new Set<string>();
+    const meetingsBySlug = new Map<string, Set<string>>();
     for (const card of cardSample) {
-      if (card.meeting_id) neededMeetings.set(card.meeting_id, card.jurisdiction);
+      if (!card.meeting_id) continue;
+      const known = meetingsBySlug.get(card.jurisdiction) || new Set<string>();
+      known.add(card.meeting_id);
+      meetingsBySlug.set(card.jurisdiction, known);
     }
-    const byJurisdiction = new Map<string, string[]>();
-    for (const [meetingId, slug] of neededMeetings) {
-      byJurisdiction.set(slug, [...(byJurisdiction.get(slug) || []), meetingId]);
-    }
-    for (const [slug, meetingIds] of byJurisdiction) {
+    for (const [slug, meetingIds] of meetingsBySlug) {
       const supabase = getServiceSupabaseClientForJurisdiction(slug);
-      for (let index = 0; index < meetingIds.length; index += 25) {
-        const batch = meetingIds.slice(index, index + 25);
+      const ids = Array.from(meetingIds);
+      for (let index = 0; index < ids.length; index += 50) {
         const { data, error } = await supabase
-          .from("documents")
-          .select("meeting_id,type,extracted_text")
-          .in("meeting_id", batch)
-          .in("type", ["HTML Agenda", "Agenda", "Accessible Agenda", "Minutes", "Accessible Minutes", "Agenda Packet", "Staff Report"]);
-        if (error) throw new Error(`${slug} document read failed: ${error.message}`);
-        for (const document of (data || []) as Array<{ meeting_id: string | null; extracted_text: string | null }>) {
-          if (!document.meeting_id || !document.extracted_text) continue;
-          documentsByMeeting.set(document.meeting_id, [
-            ...(documentsByMeeting.get(document.meeting_id) || []),
-            document.extracted_text
-          ]);
+          .from("meetings")
+          .select("id,llm_input_text,source_hash,summarized_source_hash")
+          .in("id", ids.slice(index, index + 50));
+        if (error) throw new Error(`${slug} model input read failed: ${error.message}`);
+        for (const meeting of (data || []) as Array<{
+          id: string;
+          llm_input_text: string | null;
+          source_hash: string | null;
+          summarized_source_hash: string | null;
+        }>) {
+          // Every scrape overwrites llm_input_text. Only when the meeting has not
+          // changed since its cards were written is the stored text the input the
+          // model actually saw; otherwise "absent from source" proves nothing.
+          const inSync =
+            Boolean(meeting.source_hash) &&
+            meeting.source_hash === meeting.summarized_source_hash;
+          if (!inSync) {
+            staleInputMeetings.add(meeting.id);
+            continue;
+          }
+          if (meeting.llm_input_text) modelInputByMeeting.set(meeting.id, meeting.llm_input_text);
         }
       }
     }
 
     const judgedCards = await pool(cardSample, JUDGE_CONCURRENCY, async (card) => {
-      const texts = documentsByMeeting.get(card.meeting_id || "") || [];
-      const title = words(card.agenda_item);
-      const anchors = title.split(" ").filter((token) => token.length > 5).slice(0, 6);
-      let window = "";
-      for (const text of texts) {
-        const haystack = words(text);
-        let bestIndex = -1;
-        for (const anchor of anchors) {
-          const found = haystack.indexOf(anchor);
-          if (found >= 0 && (bestIndex < 0 || found < bestIndex)) bestIndex = found;
-        }
-        if (bestIndex >= 0) {
-          const ratio = text.length / Math.max(1, haystack.length);
-          const start = Math.max(0, Math.floor(bestIndex * ratio) - 1_500);
-          window = text.slice(start, start + JUDGE_MAX_SOURCE_CHARS);
-          break;
-        }
-      }
-      if (!window) {
+      const modelInput = modelInputByMeeting.get(card.meeting_id || "");
+      const blocks = parseLlmInputItemBlocks(modelInput);
+      const block = findLlmInputBlockForCard(blocks, {
+        sourceItemId: card.source_item_id,
+        agendaItem: card.agenda_item
+      });
+      if (block && !block.isComplete) {
         return {
           jurisdiction: card.jurisdiction,
           cardId: card.id,
           agendaItem: card.agenda_item,
-          skipped: texts.length === 0
-            ? "no extracted source document text stored for this meeting"
-            : "card agenda item not locatable in stored source text"
+          skipped:
+            "stored item block was trimmed to fit the meeting-level budget, so it is not the text the model saw"
+        };
+      }
+      if (!block) {
+        // Reported, never silently dropped: an unscoped card is unaudited, and
+        // counting it as clean would overstate accuracy.
+        return {
+          jurisdiction: card.jurisdiction,
+          cardId: card.id,
+          agendaItem: card.agenda_item,
+          skipped: staleInputMeetings.has(card.meeting_id || "")
+            ? "meeting re-scraped since these cards were written, so its stored input is not what produced them"
+            : !modelInput
+            ? "no stored model input for this meeting"
+            : blocks.length === 0
+              ? "stored model input has no per-item blocks"
+              : "card could not be scoped to one item block"
         };
       }
       try {
         const verdict = await judge(CARD_JUDGE_SYSTEM, {
-          sourceText: window,
+          sourceText: block.text.slice(0, JUDGE_MAX_SOURCE_CHARS),
+          meetingWideParticipationContext:
+            parseMeetingWideContext(modelInput)?.slice(0, 2_500) || null,
           agendaItem: card.agenda_item,
           whatIsHappening: cardBullets(card),
           whyItMatters: card.why_it_matters,
@@ -683,7 +713,17 @@ async function main() {
       cards: {
         sampled: judgedCards.length,
         graded: cardVerdicts.length,
+        // Coverage is stated up front: a low audited share means the accuracy
+        // rates below describe only part of the published set.
+        auditedPercent: judgedCards.length
+          ? Math.round((cardVerdicts.length / judgedCards.length) * 1000) / 10
+          : 0,
         skipped: judgedCards.filter((entry) => "skipped" in entry).length,
+        skipReasons: judgedCards.reduce<Record<string, number>>((counts, entry) => {
+          const reason = (entry as { skipped?: string }).skipped;
+          if (reason) counts[reason] = (counts[reason] || 0) + 1;
+          return counts;
+        }, {}),
         errors: judgedCards.filter((entry) => "error" in entry).length,
         majorSeverity: count(cardVerdicts, "severity", "major"),
         minorSeverity: count(cardVerdicts, "severity", "minor"),
