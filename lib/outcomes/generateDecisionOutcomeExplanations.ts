@@ -98,7 +98,12 @@ function preservesCanonicalMeaning(
   explanation: DecisionOutcomeExplanation
 ) {
   const text = `${explanation.summary} ${explanation.nextStep || ""}`.toLowerCase();
-  const claimsFinalApproval = /\b(?:approved|adopted|enacted|finally passed|received final approval)\b/.test(text);
+  const claimsFinalApproval =
+    /\b(?:approved|adopted|enacted|finally passed|received final approval)\b/.test(text) ||
+    ((input.canonicalStatus === "withdrawn" ||
+      input.canonicalStatus === "rescinded" ||
+      input.canonicalStatus === "reconsidered") &&
+      /\b(?:passed|carried)\b/.test(text));
 
   if (input.canonicalStatus !== "approved" && claimsFinalApproval) return false;
   if (input.canonicalStatus === "recommended") {
@@ -123,6 +128,9 @@ function preservesCanonicalMeaning(
   if (input.canonicalStatus === "continued") return /\b(?:continued|postponed|deferred|returns?)\b/.test(text);
   if (input.canonicalStatus === "rejected") return /\b(?:rejected|denied|failed|defeated)\b/.test(text);
   if (input.canonicalStatus === "no_action") return /\bno action\b/.test(text);
+  if (input.canonicalStatus === "withdrawn") return /\bwithdr(?:aw|ew)/.test(text);
+  if (input.canonicalStatus === "rescinded") return /\brescind/.test(text);
+  if (input.canonicalStatus === "reconsidered") return /\breconsider/.test(text);
   if (input.canonicalStatus === "direction") return /\bdirect/.test(text);
   return true;
 }
