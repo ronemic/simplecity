@@ -9,6 +9,11 @@ import { resolveCardSourceItemId } from "@/lib/utils/cardSourceIdentity";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 import { extractMeetingWideParticipationContext } from "@/lib/scraper/agendaItemContext";
 import { parseMeetingDate } from "@/lib/utils/date";
+import {
+  ACTED_ON_CARD_STATUSES,
+  officialItemStatusSignal,
+  PENDING_CARD_STATUSES
+} from "@/lib/utils/officialItemStatus";
 
 const allowedCategories = new Set<string>(ALL_CATEGORIES);
 const allowedStatuses = new Set<string>(CARD_STATUSES);
@@ -557,38 +562,6 @@ function capConfidence(
   return confidenceRank[value] <= confidenceRank[maxConfidence] ? value : maxConfidence;
 }
 
-/**
- * Statuses that tell a reader the body has not acted yet. Read against an item
- * whose official record already shows an action, they are simply wrong.
- */
-const PENDING_CARD_STATUSES = new Set(["Upcoming vote", "Under discussion"]);
-const NOT_APPROVED_CARD_STATUSES = new Set([
-  "Upcoming vote",
-  "Under discussion",
-  "Routine approval",
-  "Passed"
-]);
-/**
- * Matched against the short structured action/result fields only, never against
- * attachment prose: an item may lawfully approve a withdrawal of funds, and a
- * staff report may discuss a withdrawn application from another matter.
- */
-const WITHDRAWN_ITEM_PATTERN = /^\s*(?:item\s+)?withdrawn\b|^\s*withdrawn from (?:the )?(?:agenda|calendar|consideration)\b/i;
-const RECORDED_RESULT_PATTERN =
-  /^\s*(?:motion\s+)?(?:pass(?:ed)?|fail(?:ed)?|adopted|approved|denied|rejected|defeated|continued|tabled|no action(?: taken)?)\b/i;
-
-function officialItemStatusSignal(official: { action: string | null; result: string | null }) {
-  const action = String(official.action || "").trim();
-  const result = String(official.result || "").trim();
-  if (WITHDRAWN_ITEM_PATTERN.test(action) || WITHDRAWN_ITEM_PATTERN.test(result)) {
-    return "withdrawn" as const;
-  }
-  if (RECORDED_RESULT_PATTERN.test(result) || /\bmotion passed\b/i.test(action)) {
-    return "decided" as const;
-  }
-  return null;
-}
-
 function cleanStatus(status: string) {
   const normalized = status.trim();
   if (normalized.toLowerCase() === "info only") return "Information only";
@@ -1048,7 +1021,7 @@ export function validateSimpleCitySummary(
       const officialAction = options.officialActionForCard?.(sourceItemId, card.agendaItem);
       const officialSignal = officialAction ? officialItemStatusSignal(officialAction) : null;
 
-      if (officialSignal === "withdrawn" && NOT_APPROVED_CARD_STATUSES.has(status)) {
+      if (officialSignal === "withdrawn" && ACTED_ON_CARD_STATUSES.has(status)) {
         options.onIssue?.({
           agendaItem: card.agendaItem,
           reason:
@@ -1062,7 +1035,8 @@ export function validateSimpleCitySummary(
       }
 
       if (
-        officialSignal === "decided" &&
+        officialSignal &&
+        officialSignal !== "withdrawn" &&
         options.meetingStatus === "Past" &&
         PENDING_CARD_STATUSES.has(status)
       ) {
