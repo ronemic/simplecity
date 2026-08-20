@@ -21,6 +21,7 @@ import { externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
+import { hasPublishableCardContent } from "@/lib/utils/cardContent";
 import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 
 type UpsertedMeeting = {
@@ -340,6 +341,11 @@ function cardInsertRow(
     adminNotes: string | null;
   }
 ) {
+  // A card whose body is entirely the "not listed in the source document"
+  // placeholder tells a reader nothing, so it is withheld regardless of any
+  // previously stored publish flag and never claims high confidence.
+  const publishable = hasPublishableCardContent(card);
+
   return sanitizeForDatabase({
     ...(options.jurisdiction
       ? {
@@ -369,8 +375,8 @@ function cardInsertRow(
     how_to_act_email: card.howToAct.email,
     how_to_act_submit_comment: card.howToAct.submitComment,
     source_url: card.source,
-    confidence: card.confidence,
-    is_published: options.isPublished,
+    confidence: publishable ? card.confidence : "low",
+    is_published: publishable ? options.isPublished : false,
     is_featured: options.isFeatured,
     admin_notes: options.adminNotes,
     raw_llm_json: rawLlmJson

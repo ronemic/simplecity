@@ -40,6 +40,23 @@ const NEGATED_APPROVAL_PATTERN = new RegExp(
   `${NEGATOR}${NEGATED_LINKING_VERB}\\s+(?:${APPROVAL_TERMS})\\b`,
   "i"
 );
+/**
+ * A platform "Pass" flag only reports that the recorded motion succeeded. When
+ * the action itself removed the item from consideration or undid an earlier
+ * vote, the item was not approved, so these patterns take precedence over the
+ * flag.
+ *
+ * All three are anchored to procedural phrasing on purpose: an item may lawfully
+ * approve a withdrawal of funds or adopt an ordinance rescinding a resolution,
+ * and those are ordinary approvals that must keep their normal classification.
+ */
+const WITHDRAWN_FROM_AGENDA_PATTERN =
+  /^(?:item\s+)?withdrawn\b|\bwithdraw(?:n|al)\b[^.]{0,40}?\b(?:from\s+(?:the\s+)?(?:agenda|calendar|consideration)|by\s+(?:staff|the\s+applicant|the\s+petitioner|the\s+sponsor))\b/i;
+const RESCINDED_VOTE_PATTERN =
+  /\brescind(?:ed|ing|s)?\b[^.]{0,40}?\b(?:previous|prior|earlier)\b|\b(?:previous|prior|earlier)\s+(?:vote|motion|action)\b[^.]{0,40}?\brescind/i;
+const RECONSIDERED_VOTE_PATTERN =
+  /\b(?:motion|moved|move)\b[^.]{0,40}?\breconsider/i;
+
 const RESULT_PARAGRAPH_FRAGMENT = "(?:(?!\\n\\n)[\\s\\S])";
 const RESULT_MARKER_PATTERN = new RegExp(
   `\\b(?:action|result|decision|motion)\\s*[:\\-]\\s*${RESULT_PARAGRAPH_FRAGMENT}{0,700}?(?:${OUTCOME_TERMS})${RESULT_PARAGRAPH_FRAGMENT}{0,350}`,
@@ -104,6 +121,9 @@ export type DecisionOutcomeCanonicalStatus =
   | "committee_action"
   | "direction"
   | "no_action"
+  | "withdrawn"
+  | "rescinded"
+  | "reconsidered"
   | "recorded";
 
 export type CanonicalDecisionOutcome = {
@@ -200,6 +220,26 @@ export function outcomeHeadline(kind: DecisionOutcomeKind, value: string) {
   return "Outcome recorded";
 }
 
+/**
+ * Scanned minutes frequently omit sentence punctuation, so a roll call runs
+ * straight into whatever follows it. Stopping at the next tally label or motion
+ * verb keeps the next motion's prose out of the recorded vote.
+ */
+const ROLL_CALL_SEGMENT_BOUNDARY =
+  /[.;]|\b(?:no(?:es)?|nay(?:s)?|absent|excused|abstain(?:ed|ing|tions?)?|recused|vacant|motion|moved|move|seconded?|enactment|resolution|ordinance|proclamation|session|closed|item|file|attachment)\b/i;
+
+function rollCallSegment(text: string, label: RegExp) {
+  const match = text.match(label);
+  if (!match || match.index === undefined) return null;
+  const rest = text.slice(match.index + match[0].length);
+  const boundary = rest.search(ROLL_CALL_SEGMENT_BOUNDARY);
+  const segment = cleanText(boundary >= 0 ? rest.slice(0, boundary) : rest)
+    // Minutes glue the tally onto the last name ("and Canepa5 - No: 0"), so a
+    // trailing separator is left behind once the boundary is applied.
+    .replace(/[\s,;:\-–—]+$/, "");
+  return segment ? segment.slice(0, 160) : null;
+}
+
 export function extractVoteDetail(value: string) {
   const text = compactOutcomeText(value);
   const numericVote = text.match(/\b(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?\b/);
@@ -207,13 +247,10 @@ export function extractVoteDetail(value: string) {
     return [numericVote[1], numericVote[2], numericVote[3]].filter(Boolean).join("–");
   }
 
-  const rollCall = text.match(
-    /\b(?:ayes?|yes)\s*:\s*([^.;]{1,160})(?:[.;]\s*(?:noes?|no)\s*:\s*([^.;]{0,160}))?/i
-  );
-  if (rollCall) {
-    const ayes = cleanText(rollCall[1]);
-    const noes = cleanText(rollCall[2] || "None");
-    return `Ayes: ${ayes}; Noes: ${noes}`.slice(0, 260);
+  const ayes = rollCallSegment(text, /\b(?:ayes?|yes)\s*:\s*/i);
+  if (ayes) {
+    const noes = rollCallSegment(text, /\b(?:noes?|nays?|no)\s*:\s*/i);
+    return `Ayes: ${ayes}; Noes: ${noes || "None"}`.slice(0, 260);
   }
 
   return /\bunanim(?:ous|ously|ity)\b/i.test(text) ? "Unanimous" : null;
@@ -253,6 +290,33 @@ export function interpretOfficialAction(
   const lowerResult = resultText.toLowerCase();
   const lowerSource = sourceText.toLowerCase();
   const failed = /\b(?:fail(?:ed)?|denied|rejected|defeated)\b/.test(lowerSource);
+
+  if (WITHDRAWN_FROM_AGENDA_PATTERN.test(sourceText)) {
+    return {
+      kind: "other",
+      canonicalStatus: "withdrawn",
+      headline: "Withdrawn from the agenda",
+      nextStep: "The item was withdrawn, so the body did not act on it."
+    };
+  }
+
+  if (RESCINDED_VOTE_PATTERN.test(sourceText)) {
+    return {
+      kind: "other",
+      canonicalStatus: "rescinded",
+      headline: "Previous vote rescinded",
+      nextStep: "The earlier vote was undone, so the item may return for another vote."
+    };
+  }
+
+  if (RECONSIDERED_VOTE_PATTERN.test(sourceText)) {
+    return {
+      kind: "other",
+      canonicalStatus: "reconsidered",
+      headline: "Previous vote reconsidered",
+      nextStep: "The body reopened its earlier vote on this item."
+    };
+  }
 
   if (isSantaBarbaraPlanningCommission(meeting)) {
     const advisoryKind = classifyDecisionOutcome(sourceText);
