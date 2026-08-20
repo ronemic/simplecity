@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
 import { Suspense, cache } from "react";
+import { HomepageDataLoader } from "@/components/HomepageDataLoader";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
@@ -40,6 +41,7 @@ import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { normalizeSummaryPoints } from "@/lib/utils/summaryPoints";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
+import { HOMEPAGE_DATA_PARAM } from "@/lib/homepageData";
 
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
@@ -480,7 +482,12 @@ async function HomepageDataContent({
 export default async function Home({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; jurisdiction?: string; lang?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    jurisdiction?: string;
+    lang?: string;
+    [HOMEPAGE_DATA_PARAM]?: string;
+  }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([
     searchParams,
@@ -496,6 +503,7 @@ export default async function Home({
     ? SCHOOL_CATEGORIES
     : CATEGORIES;
   const hasSearch = search.length > 0;
+  const shouldLoadHomepageData = params[HOMEPAGE_DATA_PARAM] === "1";
   const introLabel =
     jurisdiction === "all"
       ? locale === "es"
@@ -545,11 +553,15 @@ export default async function Home({
                 ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
                 : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
-            <Suspense
-              fallback={<div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />}
-            >
-              <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} />
-            </Suspense>
+            {shouldLoadHomepageData ? (
+              <Suspense
+                fallback={<div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />}
+              >
+                <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} />
+              </Suspense>
+            ) : (
+              <div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />
+            )}
           </div>
 
           <div className="space-y-5 lg:justify-self-stretch">
@@ -573,15 +585,25 @@ export default async function Home({
         </div>
       </section>
 
-      <Suspense fallback={<HomepageContentLoading locale={locale} />}>
-        <HomepageDataContent
-          hasSearch={hasSearch}
-          jurisdiction={jurisdiction}
-          jurisdictionLabel={jurisdictionLabel}
-          locale={locale}
-          search={search}
-        />
-      </Suspense>
+      {shouldLoadHomepageData ? (
+        <>
+          <Suspense fallback={<HomepageContentLoading locale={locale} />}>
+            <HomepageDataContent
+              hasSearch={hasSearch}
+              jurisdiction={jurisdiction}
+              jurisdictionLabel={jurisdictionLabel}
+              locale={locale}
+              search={search}
+            />
+          </Suspense>
+          <HomepageDataLoader loaded />
+        </>
+      ) : (
+        <>
+          <HomepageContentLoading locale={locale} />
+          <HomepageDataLoader />
+        </>
+      )}
       <section className="section-shell pb-16 pt-8">
         <div className="mb-5 max-w-2xl">
           <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>

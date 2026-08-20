@@ -31,8 +31,13 @@ function canCache(response) {
   return response && response.ok && response.type === "basic";
 }
 
-function cachePageInBackground(event, cache, response) {
-  event.waitUntil(cache.put(event.request, response.clone()).catch(() => undefined));
+function cachePageInBackground(event, response) {
+  event.waitUntil(
+    caches
+      .open(PAGE_CACHE)
+      .then((cache) => cache.put(event.request, response.clone()))
+      .catch(() => undefined)
+  );
 }
 
 async function cacheFirst(request) {
@@ -53,24 +58,23 @@ async function cacheFirst(request) {
 }
 
 async function networkFirstPage(event) {
-  const cache = await caches.open(PAGE_CACHE);
-
   try {
     const preloadResponse = await event.preloadResponse;
 
     if (canCache(preloadResponse)) {
-      cachePageInBackground(event, cache, preloadResponse);
+      cachePageInBackground(event, preloadResponse);
       return preloadResponse;
     }
 
     const networkResponse = await fetch(event.request);
 
     if (canCache(networkResponse)) {
-      cachePageInBackground(event, cache, networkResponse);
+      cachePageInBackground(event, networkResponse);
     }
 
     return networkResponse;
   } catch {
+    const cache = await caches.open(PAGE_CACHE);
     const cachedResponse = await cache.match(event.request);
     return cachedResponse || (await caches.match(OFFLINE_URL)) || Response.error();
   }

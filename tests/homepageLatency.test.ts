@@ -3,6 +3,10 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const homepage = readFileSync(new URL("../app/page.tsx", import.meta.url), "utf8");
+const homepageDataLoader = readFileSync(
+  new URL("../components/HomepageDataLoader.tsx", import.meta.url),
+  "utf8"
+);
 const serviceWorker = readFileSync(new URL("../public/sw.js", import.meta.url), "utf8");
 
 test("homepage database work starts inside suspended components", () => {
@@ -12,6 +16,10 @@ test("homepage database work starts inside suspended components", () => {
   assert.match(homepage, /const getHomepageData = cache\(/);
   assert.equal(homepage.indexOf("getHomepageData(", pageRenderStart), -1);
   assert.doesNotMatch(homepage, /const data = loadHomepageData/);
+  assert.match(homepage, /params\[HOMEPAGE_DATA_PARAM\] === "1"/);
+  assert.match(homepage, /<HomepageDataLoader \/>/);
+  assert.match(homepageDataLoader, /router\.replace\(/);
+  assert.match(homepageDataLoader, /window\.history\.replaceState\(/);
 });
 
 test("service worker does not buffer streamed pages while writing its cache", () => {
@@ -21,6 +29,7 @@ test("service worker does not buffer streamed pages while writing its cache", ()
 
   assert.ok(pageHandlerStart >= 0);
   assert.ok(pageHandlerEnd > pageHandlerStart);
-  assert.match(serviceWorker, /event\.waitUntil\(cache\.put\(/);
+  assert.match(serviceWorker, /event\.waitUntil\([\s\S]*\.open\(PAGE_CACHE\)/);
   assert.doesNotMatch(pageHandler, /await cache\.put\(/);
+  assert.doesNotMatch(pageHandler.split("try {")[0], /caches\.open\(PAGE_CACHE\)/);
 });
