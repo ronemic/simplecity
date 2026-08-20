@@ -12,6 +12,7 @@ import {
 } from "@/lib/scraper/agendaItemContext";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 import { categoryTagsForMeeting } from "@/lib/llm/topicPolicy";
+import { cardStatusForOfficialItem } from "@/lib/utils/officialItemStatus";
 
 type SummaryResult = { summary: SimpleCitySummary; raw: unknown };
 
@@ -100,6 +101,13 @@ export function agendaItemRetryMeeting(
 
 function fallbackStatus(meeting: LlmReadyMeeting, item: AgendaItem) {
   if (meeting.status === "Cancelled") return "Cancelled";
+  // This path does not run through card validation, so an item the official
+  // record already settled would otherwise be published as still pending.
+  const officialStatus = cardStatusForOfficialItem({
+    action: item.action || item.recommendedAction,
+    result: item.result || item.status
+  });
+  if (officialStatus) return officialStatus;
   const actionText = [item.title, item.action, item.recommendedAction, item.rowText]
     .filter(Boolean)
     .join(" ");

@@ -5,6 +5,7 @@ import {
   validationOptionsForMeeting,
   validateSimpleCitySummary
 } from "@/lib/llm/validateSummary";
+import { cardStatusForOfficialItem } from "@/lib/utils/officialItemStatus";
 
 function agendaItem(overrides: Partial<AgendaItem> & { externalId: string }): AgendaItem {
   return {
@@ -147,4 +148,24 @@ test("approving a withdrawal of funds is not treated as a withdrawn item", () =>
   );
 
   assert.equal(result.cards.length, 1);
+});
+
+
+test("the official-source fallback card cannot claim a pending status either", () => {
+  // The fallback path bypasses card validation, so it needs the same rule.
+  assert.equal(cardStatusForOfficialItem({ action: "withdrawn", result: "Pass" }), "Cancelled");
+  assert.equal(cardStatusForOfficialItem({ action: null, result: "Passed" }), "Passed");
+  assert.equal(cardStatusForOfficialItem({ action: null, result: "Continued to August 4" }), "Tabled");
+  assert.equal(cardStatusForOfficialItem({ action: null, result: "Failed" }), "Information only");
+  assert.equal(cardStatusForOfficialItem({ action: null, result: "No action taken" }), "Information only");
+  // Nothing decided yet leaves the pending statuses alone.
+  assert.equal(cardStatusForOfficialItem({ action: "Approve the contract", result: null }), null);
+  // And an item whose subject matter is a withdrawal is not a withdrawn item.
+  assert.equal(
+    cardStatusForOfficialItem({
+      action: "Approve the withdrawal of $2,000,000 from the Capital Reserve Fund",
+      result: null
+    }),
+    null
+  );
 });
