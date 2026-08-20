@@ -997,6 +997,7 @@ async function runSimpleCityPipelineInternal(
                     summary,
                     raw,
                     {
+                      agendaItems: item.meeting.items,
                       authoritativeSourceItemIds:
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
@@ -1009,6 +1010,7 @@ async function runSimpleCityPipelineInternal(
                     summary,
                     raw,
                     {
+                      agendaItems: item.meeting.items,
                       allowEmptyReplacement: true,
                       authoritativeSourceItemIds:
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,

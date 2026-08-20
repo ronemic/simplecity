@@ -1607,4 +1607,15 @@ set name = excluded.name,
     region_slug = excluded.region_slug,
     updated_at = now();
 
+
+-- -----------------------------------------------------------------------------
+-- Source: supabase/migrations/20260820000000_store_card_model_input.sql
+-- -----------------------------------------------------------------------------
+
+alter table public.summary_cards
+  add column if not exists model_input_text text;
+
+comment on column public.summary_cards.model_input_text is
+  'Verbatim agenda-item context supplied to the summary model for this card, for later accuracy auditing.';
+
 commit;
