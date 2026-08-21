@@ -27,6 +27,16 @@ test("the first-time jurisdiction defaults to San Mateo in data and navigation",
   assert.equal(toPublicJurisdictionSlug(defaultJurisdiction.slug), "san-mateo");
 });
 
+test("Foster City uses eSCRIBE while retaining its PrimeGov archive", () => {
+  const fosterCity = getJurisdictionBySlug("foster-city");
+
+  assert.equal(fosterCity?.platform, "escribe");
+  assert.equal(fosterCity?.sourceUrl, "https://pub-fostercity.escribemeetings.com/");
+  assert.equal(fosterCity?.escribeUrl, "https://pub-fostercity.escribemeetings.com/");
+  assert.equal(fosterCity?.escribeStartDate, "August 13, 2026");
+  assert.equal(fosterCity?.primegovUrl, "https://fostercity.primegov.com/public/portal");
+});
+
 test("rejects an anon key configured as a pipeline service-role credential", () => {
   const anonKey = testJwt("anon");
   assert.throws(

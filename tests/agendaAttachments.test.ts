@@ -341,6 +341,32 @@ test("falls back to the next ranked attachment when a staff report has no usable
   assert.doesNotMatch(result.text, /Linked document: Staff Report/);
 });
 
+test("never extracts submitted public-comment attachments into LLM context", async () => {
+  const publicComment: PrimeGovDocument = {
+    type: "Public Comment",
+    label: "Submitted public correspondence",
+    url: "https://city.example/submitted-comment.pdf",
+    extractedText: "PRIVATE_PUBLIC_COMMENT_BODY_SENTINEL ".repeat(20),
+    agendaItemNumber: "H1"
+  };
+  const supportingReport: PrimeGovDocument = {
+    type: "Staff Report",
+    label: "Staff Report",
+    url: "https://city.example/staff-report.pdf",
+    extractedText: "Official staff analysis supporting the agenda item. ".repeat(20),
+    agendaItemNumber: "H1"
+  };
+  const meeting = meetingWithAttachments([publicComment]);
+  meeting.documents.push(supportingReport);
+  meeting.items![0].attachments = [publicComment, supportingReport];
+
+  const result = await appendAgendaItemAttachmentContext(meeting, "Base agenda text.");
+
+  assert.equal(result.included, 1);
+  assert.match(result.text, /Official staff analysis/);
+  assert.doesNotMatch(result.text, /PRIVATE_PUBLIC_COMMENT_BODY_SENTINEL/);
+});
+
 test("malformed PDFs fail attachment discovery without producing page data", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-pdf-"));
   const file = path.join(directory, "invalid.pdf");

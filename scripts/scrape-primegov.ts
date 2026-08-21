@@ -47,8 +47,8 @@ function getLimit() {
 async function main() {
   const jurisdiction = getJurisdictionBySlug(getRequestedJurisdiction());
   if (!jurisdiction) throw new Error("Unknown jurisdiction.");
-  if (jurisdiction.platform !== "primegov") {
-    throw new Error(`${jurisdiction.name} is configured for ${jurisdiction.platform}, not PrimeGov.`);
+  if (!jurisdiction.primegovUrl) {
+    throw new Error(`${jurisdiction.name} does not have a PrimeGov archive configured.`);
   }
 
   const outputDir = getJurisdictionScrapedDir(jurisdiction.slug);
@@ -82,11 +82,11 @@ async function main() {
   for (const meeting of result.meetings) {
     meeting.jurisdictionName = jurisdiction.name;
     meeting.jurisdictionSlug = jurisdiction.slug;
-    meeting.platform = jurisdiction.platform;
+    meeting.platform = "primegov";
     for (const doc of meeting.documents) {
       doc.jurisdictionName = jurisdiction.name;
       doc.jurisdictionSlug = jurisdiction.slug;
-      doc.platform = jurisdiction.platform;
+      doc.platform = "primegov";
     }
   }
 

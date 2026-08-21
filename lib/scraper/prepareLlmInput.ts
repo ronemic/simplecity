@@ -154,6 +154,7 @@ function rankedItemAttachments(item: NonNullable<PrimeGovMeeting["items"]>[numbe
 
   return (item.attachments || [])
     .filter((doc) => {
+      if (doc.type === "Public Comment" || doc.type === "Public Comments") return false;
       const normalizedUrl = doc.url.trim().toLowerCase();
       if (!normalizedUrl || seenUrls.has(normalizedUrl)) return false;
       seenUrls.add(normalizedUrl);
@@ -536,7 +537,7 @@ export async function buildLlmReadyMeeting(meeting: PrimeGovMeeting): Promise<Ll
     : extractAgendaItemsFromText(meeting, selectedText);
   if (authoritativeSourceItemIds) {
     extractionNotes.push(
-      `Used ${authoritativeSourceItemIds.length} authoritative Legistar agenda item(s); PDF text was retained as evidence but not reparsed into additional items.`
+      `Used ${authoritativeSourceItemIds.length} authoritative source agenda item(s); PDF text was retained as evidence but not reparsed into additional items.`
     );
   }
   meeting.items = effectiveCancelled

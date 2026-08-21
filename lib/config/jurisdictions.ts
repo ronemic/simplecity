@@ -37,6 +37,7 @@ export type PublicJurisdictionSelection =
   | typeof ALL_JURISDICTIONS_SLUG;
 export type CivicPlatform =
   | "primegov"
+  | "escribe"
   | "iqm2"
   | "legistar"
   | "official-site"
@@ -59,6 +60,8 @@ export type JurisdictionConfig = {
   timezone: string;
   sourceUrl: string;
   primegovUrl?: string;
+  escribeUrl?: string;
+  escribeStartDate?: string;
   iqm2Url?: string;
   legistarUrl?: string;
   legistarClient?: string;
@@ -79,6 +82,8 @@ export type JurisdictionPublicOption = {
 };
 
 const DEFAULT_FOSTER_CITY_PRIMEGOV_URL = "https://fostercity.primegov.com/public/portal";
+export const DEFAULT_FOSTER_CITY_ESCRIBE_URL =
+  "https://pub-fostercity.escribemeetings.com/";
 const DEFAULT_SAN_MATEO_CITY_PRIMEGOV_URL = "https://sanmateo.primegov.com/public/portal";
 const DEFAULT_SAN_MATEO_COUNTY_LEGISTAR_URL =
   process.env.SAN_MATEO_COUNTY_LEGISTAR_URL ||
@@ -262,15 +267,19 @@ export function getJurisdictions(): JurisdictionConfig[] {
       officialName: "City of Foster City",
       slug: "foster-city",
       regionSlug: "north-san-mateo",
-      platform: "primegov",
+      platform: "escribe",
       timezone: "America/Los_Angeles",
       sourceUrl:
-        process.env.FOSTER_CITY_PRIMEGOV_URL ||
-        process.env.SCRAPER_BASE_URL ||
-        DEFAULT_FOSTER_CITY_PRIMEGOV_URL,
+        process.env.FOSTER_CITY_ESCRIBE_URL ||
+        DEFAULT_FOSTER_CITY_ESCRIBE_URL,
+      escribeUrl:
+        process.env.FOSTER_CITY_ESCRIBE_URL ||
+        DEFAULT_FOSTER_CITY_ESCRIBE_URL,
+      // The City's migration page assigns meetings after August 12 to eSCRIBE.
+      // Earlier records were copied into eSCRIBE but remain PrimeGov archive records.
+      escribeStartDate: "August 13, 2026",
       primegovUrl:
         process.env.FOSTER_CITY_PRIMEGOV_URL ||
-        process.env.SCRAPER_BASE_URL ||
         DEFAULT_FOSTER_CITY_PRIMEGOV_URL,
       supabaseUrl:
         northSanMateo?.url ||

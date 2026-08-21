@@ -59,6 +59,7 @@ import {
   scrapeMenloParkMeetings
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
+import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 import {
   formatLlmProcessRunSummary,
@@ -605,6 +606,17 @@ async function runSimpleCityPipelineInternal(
             shouldStop: deadlineExceeded,
             log
           })
+          : jurisdiction.platform === "escribe"
+            ? await scrapeEscribeMeetings({
+                ...options,
+                jurisdiction,
+                portalUrl: options.portalUrl || jurisdiction.escribeUrl || jurisdiction.sourceUrl,
+                documentOutputDir,
+                scrapeHtmlAgendas: options.scrapeHtmlAgendas ?? true,
+                downloadDocuments: options.downloadDocuments ?? true,
+                shouldStop: deadlineExceeded,
+                log
+              })
           : jurisdiction.platform === "legistar"
           ? jurisdiction.slug === "santa-barbara-county"
             ? await scrapeSantaBarbaraCountyMeetings({
