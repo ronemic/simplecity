@@ -70,8 +70,8 @@ export async function GET(
     },
     {
       headers: {
-        "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=86400`,
-        "CDN-Cache-Control": `public, s-maxage=${CACHE_SECONDS}, stale-while-revalidate=86400`
+        "Cache-Control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}`,
+        "CDN-Cache-Control": `public, s-maxage=${CACHE_SECONDS}`
       }
     }
   );

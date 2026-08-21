@@ -27,7 +27,7 @@ test("homepage data endpoint is publicly reusable and avoids an exact count", ()
   assert.match(homepageDataRoute, /selectDiverseCards\(preferredCards, 4\)/);
   assert.match(homepageDataRoute, /Cache-Control/);
   assert.match(homepageDataRoute, /s-maxage=\$\{CACHE_SECONDS\}/);
-  assert.match(homepageDataRoute, /stale-while-revalidate=86400/);
+  assert.doesNotMatch(homepageDataRoute, /stale-while-revalidate/);
 });
 
 test("service worker does not buffer streamed pages while writing its cache", () => {
@@ -40,6 +40,6 @@ test("service worker does not buffer streamed pages while writing its cache", ()
   assert.match(serviceWorker, /event\.waitUntil\([\s\S]*\.open\(PAGE_CACHE\)/);
   assert.doesNotMatch(pageHandler, /await cache\.put\(/);
   assert.doesNotMatch(pageHandler.split("try {")[0], /caches\.open\(PAGE_CACHE\)/);
-  assert.match(serviceWorker, /staleWhileRevalidateHomepageData/);
-  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/homepage-data\/"\)/);
+  assert.doesNotMatch(serviceWorker, /HOMEPAGE_DATA_CACHE/);
+  assert.doesNotMatch(serviceWorker, /staleWhileRevalidateHomepageData/);
 });
