@@ -587,6 +587,59 @@ test("writes unknown-length multi-chunk bodies exactly and commits without a par
   }
 });
 
+test("starts consuming a response before asynchronously synchronizing its cookies", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-backpressure-"));
+  const targetPath = path.join(outputDir, "agenda.pdf");
+  const events: string[] = [];
+  let bodyStarted = false;
+  const context = {
+    cookies: async () => [],
+    addCookies: async () => {
+      events.push("cookie");
+      assert.equal(bodyStarted, true, "response cookies must wait until the body is drained");
+    },
+    clearCookies: async () => undefined
+  } as unknown as BrowserContext;
+
+  try {
+    const streamed = await streamDownloadToTemp(
+      context,
+      "https://city.example/agenda.pdf",
+      targetPath,
+      {
+        minFreeBytes: 0,
+        statfsImpl: async () => {
+          events.push("statfs");
+          return { bavail: STREAM_DOWNLOAD_MAX_FILE_BYTES, bsize: 2 };
+        },
+        fetchImpl: (async () => {
+          events.push("fetch");
+          return new Response(new ReadableStream<Uint8Array>({
+            pull(controller) {
+              bodyStarted = true;
+              events.push("body");
+              controller.enqueue(Buffer.from("%PDF-backpressure-safe"));
+              controller.close();
+            }
+          }, { highWaterMark: 0 }), {
+            headers: { "set-cookie": "session=updated; Path=/; HttpOnly" }
+          });
+        }) as typeof fetch
+      }
+    );
+    try {
+      await streamed.commit(targetPath);
+    } finally {
+      await streamed.cleanup();
+    }
+
+    assert.deepEqual(events, ["statfs", "fetch", "body", "cookie"]);
+    assert.equal(await fs.readFile(targetPath, "utf8"), "%PDF-backpressure-safe");
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("stops before reading a body when disk reserve or invocation budget is exhausted", async () => {
   const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-stream-precheck-"));
   let bodyPulls = 0;

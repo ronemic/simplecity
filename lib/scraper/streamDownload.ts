@@ -329,6 +329,32 @@ export async function streamDownloadToTemp(
       throw new Error("Document download budget had an invalid used-byte count.");
     }
 
+    // Complete every asynchronous safety precheck before opening the response.
+    // Undici can pause an unread response body under backpressure; if the peer
+    // closes the socket while we await unrelated work, affected Node versions
+    // throw an uncatchable Parser.finish assertion instead of rejecting fetch.
+    const absoluteBudgetBytes = Math.min(
+      positiveLimit(budget.maxBytes, STREAM_DOWNLOAD_MAX_TOTAL_BYTES),
+      STREAM_DOWNLOAD_MAX_TOTAL_BYTES
+    );
+    const remainingBudget = Math.max(0, absoluteBudgetBytes - budget.usedBytes);
+    if (remainingBudget <= 0) {
+      throw new Error(
+        `Document download stopped at the ${absoluteBudgetBytes}-byte invocation safety limit.`
+      );
+    }
+    const available = await freeBytes(path.dirname(targetPath), statfsImpl);
+    if (available === null && minFreeBytes > 0) {
+      throw new Error("Document download could not verify the configured free-disk reserve.");
+    }
+    const writableFreeBytes = available === null
+      ? Number.POSITIVE_INFINITY
+      : Math.max(0, available - minFreeBytes);
+    const effectiveMaxBytes = Math.min(maxFileBytes, remainingBudget, writableFreeBytes);
+    if (effectiveMaxBytes <= 0) {
+      throw new Error("Document download stopped to preserve the configured disk reserve.");
+    }
+
     let requestUrl = assertDownloadUrl(url, options.validateUrl);
     const initialOrigin = new URL(requestUrl).origin;
     for (let redirectCount = 0; ; redirectCount += 1) {
@@ -360,11 +386,11 @@ export async function streamDownloadToTemp(
         clearTimeout(headerTimer);
       }
 
-      await applyResponseCookies(context, response.headers, requestUrl);
       if (![301, 302, 303, 307, 308].includes(response.status)) break;
 
       const location = response.headers.get("location");
       await cancelBody(response);
+      await applyResponseCookies(context, response.headers, requestUrl);
       if (!location) throw new Error(`HTTP ${response.status} redirect had no Location header.`);
       if (redirectCount >= maxRedirects) {
         throw new Error(`Document exceeded the ${maxRedirects}-redirect limit.`);
@@ -375,38 +401,18 @@ export async function streamDownloadToTemp(
 
     if (!response.ok) {
       await cancelBody(response);
+      await applyResponseCookies(context, response.headers, requestUrl);
       throw new Error(`HTTP ${response.status}`);
     }
-    if (!response.body) throw new Error("Document response had no body.");
-
-    const absoluteBudgetBytes = Math.min(
-      positiveLimit(budget.maxBytes, STREAM_DOWNLOAD_MAX_TOTAL_BYTES),
-      STREAM_DOWNLOAD_MAX_TOTAL_BYTES
-    );
-    const remainingBudget = Math.max(0, absoluteBudgetBytes - budget.usedBytes);
-    const available = await freeBytes(path.dirname(targetPath), statfsImpl);
-    if (remainingBudget <= 0) {
-      await cancelBody(response);
-      throw new Error(
-        `Document download stopped at the ${absoluteBudgetBytes}-byte invocation safety limit.`
-      );
-    }
-    if (available === null && minFreeBytes > 0) {
-      await cancelBody(response);
-      throw new Error("Document download could not verify the configured free-disk reserve.");
-    }
-    const writableFreeBytes = available === null
-      ? Number.POSITIVE_INFINITY
-      : Math.max(0, available - minFreeBytes);
-    const effectiveMaxBytes = Math.min(maxFileBytes, remainingBudget, writableFreeBytes);
-    if (effectiveMaxBytes <= 0) {
-      await cancelBody(response);
-      throw new Error("Document download stopped to preserve the configured disk reserve.");
+    if (!response.body) {
+      await applyResponseCookies(context, response.headers, requestUrl);
+      throw new Error("Document response had no body.");
     }
 
     const declaredBytes = contentLength(response.headers);
     if (declaredBytes !== null && declaredBytes > effectiveMaxBytes) {
       await cancelBody(response);
+      await applyResponseCookies(context, response.headers, requestUrl);
       throw new Error(
         `Document declared ${declaredBytes} bytes, above the ${effectiveMaxBytes}-byte absolute safety limit.`
       );
@@ -461,6 +467,9 @@ export async function streamDownloadToTemp(
       clearTimeout(idleTimer);
       idleTimer = null;
     }
+    // Preserve browser-session cookies only after the body is fully drained so
+    // cookie synchronization cannot leave Undici paused when the peer sends FIN.
+    await applyResponseCookies(context, response.headers, requestUrl);
     const finalUrl = response.url || requestUrl;
     const responseHeaders = response.headers;
 
