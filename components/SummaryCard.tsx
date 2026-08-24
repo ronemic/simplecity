@@ -408,7 +408,7 @@ export function SummaryCard({
               <HighlightedText text={topicLabel} query={highlight} />
             </span>
             {!officialSourceFallback && !hasCommentOption ? (
-              <span className="inline-flex items-center gap-1.5 text-black/[0.5]">
+              <span className="inline-flex items-center gap-1.5 text-black/[0.56]">
                 <MessageSquare aria-hidden className="h-4 w-4" />
                 {noCommentLabel}
               </span>
