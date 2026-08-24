@@ -8,6 +8,7 @@ import {
   formatResultsCoverageFailure,
   getPipelineLlmBudgetLimits,
   minutesIngestionErrors,
+  minutesIngestionWarnings,
   shouldReconcileMinutesWithoutGeneratingCards,
   shouldSkipUnchangedSummary
 } from "@/lib/pipeline";
@@ -141,6 +142,32 @@ test("minutes coverage reports download and extraction failures without double-c
   assert.deepEqual(errors, [
     "Minutes ingestion incomplete for City Council: 1 published minutes document(s) failed to download.",
     "Minutes ingestion incomplete for City Council: 1 published minutes document(s) had no usable extracted text."
+  ]);
+});
+
+test("downloaded image-only minutes PDFs warn without failing results coverage", () => {
+  const record = meeting([
+    {
+      type: "Minutes",
+      label: "Approved minutes",
+      url: "https://files.smartsites.parentsquare.com/9655/approved-minutes.pdf",
+      localPath: "/tmp/approved-minutes.pdf",
+      isScanned: true,
+      extractedText: ""
+    },
+    {
+      type: "Accessible Minutes",
+      label: "Approved minutes",
+      url: "https://files.smartsites.parentsquare.com/9655/approved-minutes.pdf",
+      localPath: "/tmp/approved-minutes.pdf",
+      isScanned: true,
+      extractedText: ""
+    }
+  ]);
+
+  assert.deepEqual(minutesIngestionErrors([record]), []);
+  assert.deepEqual(minutesIngestionWarnings([record]), [
+    "Minutes OCR warning for City Council: 1 downloaded minutes document(s) are image-only; official links remain available."
   ]);
 });
 

@@ -157,7 +157,8 @@ export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
     const unreadable = minutes.filter(
       (documents) =>
         documents.some((document) => !document.downloadError) &&
-        !documents.some((document) => hasUsableOfficialDocumentText(document))
+        !documents.some((document) => hasUsableOfficialDocumentText(document)) &&
+        !documents.some(isDownloadedScannedPdf)
     );
 
     const hasUsableMinutes = minutes.some((documents) =>
@@ -178,6 +179,28 @@ export function minutesIngestionErrors(meetings: PrimeGovMeeting[]) {
   }
 
   return errors;
+}
+
+export function minutesIngestionWarnings(meetings: PrimeGovMeeting[]) {
+  const warnings: string[] = [];
+
+  for (const meeting of meetings) {
+    const scannedUrls = new Set(
+      meeting.documents
+        .filter((document) =>
+          ["Minutes", "Accessible Minutes"].includes(document.type) &&
+          isDownloadedScannedPdf(document)
+        )
+        .map((document) => document.url)
+    );
+    if (scannedUrls.size > 0) {
+      warnings.push(
+        `Minutes OCR warning for ${meeting.title}: ${scannedUrls.size} downloaded minutes document(s) are image-only; official links remain available.`
+      );
+    }
+  }
+
+  return warnings;
 }
 
 const AGENDA_DOCUMENT_TYPES = new Set([
@@ -757,6 +780,9 @@ async function runSimpleCityPipelineInternal(
     for (const minutesError of minutesIngestionErrors(scrapeResult.meetings)) {
       errors.push(minutesError);
       log(minutesError);
+    }
+    for (const minutesWarning of minutesIngestionWarnings(scrapeResult.meetings)) {
+      log(minutesWarning);
     }
 
     log("Preparing LLM input.");
