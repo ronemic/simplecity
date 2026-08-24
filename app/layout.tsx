@@ -66,7 +66,11 @@ export default async function RootLayout({
           `}
         </Script>
         <Header />
-        <main>{children}</main>
+        {/* Holds a viewport's worth of height so the support callout and
+            footer below stay off-screen while a route's loading skeleton is
+            showing. Without it they paint high on the page and then jump
+            down when the streamed content arrives, which is layout shift. */}
+        <main className="min-h-[calc(100vh-3rem)]">{children}</main>
         <SupportCallout locale={locale} />
         <Footer locale={locale} />
         <ServiceWorkerRegistration />

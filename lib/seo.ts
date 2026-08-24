@@ -13,15 +13,17 @@ export function localizedSeoUrls(pathOrUrl: string | URL, locale: Locale) {
   const defaultUrl = new URL(pathOrUrl.toString(), getConfiguredAppUrl());
   defaultUrl.searchParams.delete("lang");
 
-  const englishUrl = new URL(defaultUrl);
-  englishUrl.searchParams.set("lang", "en");
   const spanishUrl = new URL(defaultUrl);
   spanishUrl.searchParams.set("lang", "es");
 
+  // English is the default language, so its canonical is the bare URL rather
+  // than ?lang=en. A canonical that points at a *different* URL listed in this
+  // page's own hreflang set is self-contradictory -- it tells crawlers to index
+  // a duplicate of the page they just fetched -- and Lighthouse flags it.
   return {
-    canonical: (locale === "es" ? spanishUrl : englishUrl).toString(),
+    canonical: (locale === "es" ? spanishUrl : defaultUrl).toString(),
     languages: {
-      "en-US": englishUrl.toString(),
+      "en-US": defaultUrl.toString(),
       "es-US": spanishUrl.toString(),
       "x-default": defaultUrl.toString()
     }
