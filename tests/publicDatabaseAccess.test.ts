@@ -56,6 +56,8 @@ test("public database grants revoke table-wide reads before allowing safe column
       "llm_input_text",
       "source_hash",
       "summarized_source_hash",
+      "summary_source_hash",
+      "summarized_summary_source_hash",
       "cards_generated_at",
       "extraction_notes",
       "raw"

@@ -281,6 +281,7 @@ async function requestTranslations(
     }, LLM_OPTIONAL_REQUEST_TIMEOUT_MS, {
       label: `${provider.label} ${input.locale} translation request`,
       provider: provider.name,
+      providerApiKey: provider.apiKey,
       log: options.log
     });
 

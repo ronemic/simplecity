@@ -812,7 +812,11 @@ async function runSimpleCityPipelineInternal(
     let detailedAgendaItems = 0;
     let fallbackAgendaItems = 0;
     const reconciledOutcomeMeetingIds = new Set<string>();
-    const reconcileOutcomesForItem = async (item: { id: string; meeting: LlmReadyMeeting }) => {
+    const reconcileOutcomesForItem = async (item: {
+      id: string;
+      meeting: LlmReadyMeeting;
+      sourceHash?: string | null;
+    }) => {
       if (
         deadlineExceeded() ||
         !canPersist ||
@@ -820,8 +824,11 @@ async function runSimpleCityPipelineInternal(
         !item.id ||
         reconciledOutcomeMeetingIds.has(item.id)
       ) {
-        return;
+        return "skipped" as const;
       }
+      // One attempt per meeting per run. Incomplete work remains eligible on a
+      // future run because its full source hash is not checkpointed below.
+      reconciledOutcomeMeetingIds.add(item.id);
       try {
         const reconciliation = await reconcileDecisionOutcomesForMeeting(
           supabase,
@@ -844,17 +851,21 @@ async function runSimpleCityPipelineInternal(
         resultCardsUnmatched += reconciliation.resultCardsUnmatched;
         duplicateCardsDetected += reconciliation.duplicateCardsDetected;
         duplicateCardsResolved += reconciliation.duplicateCardsResolved;
-        reconciledOutcomeMeetingIds.add(item.id);
         if (!reconciliation.complete && reconciliation.resultCardsFound > 0) {
           const coverageError =
             `Outcome coverage incomplete for ${item.meeting.title}: matched ${reconciliation.resultCardsMatched} of ${reconciliation.resultCardsFound} decision card(s) with official results; ${reconciliation.outcomesRejectedAmbiguous} ambiguous card assignment(s).`;
           errors.push(coverageError);
           log(coverageError);
         }
+        if (reconciliation.complete && item.sourceHash) {
+          await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
+        }
+        return reconciliation.complete ? "complete" as const : "incomplete" as const;
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unknown decision outcome error";
         errors.push(`${item.meeting.title}: ${message}`);
         log(`Decision outcome reconciliation failed for ${item.meeting.title}: ${message}`);
+        return "failed" as const;
       }
     };
 
@@ -875,8 +886,11 @@ async function runSimpleCityPipelineInternal(
               id: "",
               meeting,
               sourceHash: null,
+              summarySourceHash: null,
+              compatibleSummarySourceHashes: [],
               compatibleSourceHashes: [],
               summarizedSourceHash: null,
+              summarizedSummarySourceHash: null,
               existingCardCount: 0
             }));
         let consecutiveRateLimitFailures = 0;
@@ -888,6 +902,7 @@ async function runSimpleCityPipelineInternal(
           cancelled: 0,
           unchanged: 0,
           minutesOnly: 0,
+          outcomesOnly: 0,
           noInput: 0,
           failed: 0
         };
@@ -938,8 +953,28 @@ async function runSimpleCityPipelineInternal(
                   item.summarizedSourceHash !== item.sourceHash &&
                   item.compatibleSourceHashes.includes(item.summarizedSourceHash)
               ) {
-                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
+                await setMeetingSummarizedSourceHash(
+                  supabase,
+                  item.id,
+                  item.sourceHash,
+                  item.summarySourceHash
+                );
                 migratedLegacyHash = true;
+              } else if (
+                persistSummaries &&
+                  supabase &&
+                  item.id &&
+                  item.summarySourceHash &&
+                  item.summarizedSummarySourceHash !== item.summarySourceHash
+              ) {
+                // The full source was already completed, so a missing or newly
+                // versioned summary hash is metadata migration—not paid work.
+                await setMeetingSummarizedSourceHash(
+                  supabase,
+                  item.id,
+                  null,
+                  item.summarySourceHash
+                );
               }
               log(
                 item.existingCardCount > 0
@@ -952,6 +987,53 @@ async function runSimpleCityPipelineInternal(
               // safety pass cannot repeat historical explanation/translation
               // work during an extended Monday lookback.
               if (item.id) reconciledOutcomeMeetingIds.add(item.id);
+              return null;
+            }
+
+            if (!item.meeting.llmInputText) {
+              summaryProgress.noInput += 1;
+              log(`Skipping ${item.meeting.title}; no LLM input text.`);
+              if (persistSummaries) await reconcileOutcomesForItem(item);
+              return null;
+            }
+
+            if (
+              shouldAppendToExisting &&
+              supabase &&
+              shouldSkipUnchangedSummary(
+                item.summarySourceHash,
+                item.summarizedSummarySourceHash,
+                item.existingCardCount,
+                item.meeting.items?.length || 0,
+                item.compatibleSummarySourceHashes
+              )
+            ) {
+              if (
+                item.summarySourceHash &&
+                item.summarizedSummarySourceHash &&
+                item.summarizedSummarySourceHash !== item.summarySourceHash &&
+                item.compatibleSummarySourceHashes.includes(
+                  item.summarizedSummarySourceHash
+                )
+              ) {
+                await setMeetingSummarizedSourceHash(
+                  supabase,
+                  item.id,
+                  null,
+                  item.summarySourceHash
+                );
+              }
+              const minutesOnly = shouldReconcileMinutesWithoutGeneratingCards(
+                item.meeting,
+                item.existingCardCount
+              );
+              log(minutesOnly
+                ? `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; changed official minutes will update those cards without generating duplicates.`
+                : `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; the agenda-summary source is unchanged, so only official outcomes will be reconciled.`
+              );
+              if (minutesOnly) summaryProgress.minutesOnly += 1;
+              else summaryProgress.outcomesOnly += 1;
+              await reconcileOutcomesForItem(item);
               return null;
             }
 
@@ -968,32 +1050,6 @@ async function runSimpleCityPipelineInternal(
                 `documents ${components.documents}, items ${components.items}. ` +
                 "Compare these across runs to identify a component that churns without a real source change."
               );
-            }
-
-            if (!item.meeting.llmInputText) {
-              summaryProgress.noInput += 1;
-              log(`Skipping ${item.meeting.title}; no LLM input text.`);
-              if (persistSummaries) await reconcileOutcomesForItem(item);
-              return null;
-            }
-
-            if (
-              shouldAppendToExisting &&
-              supabase &&
-              shouldReconcileMinutesWithoutGeneratingCards(
-                item.meeting,
-                item.existingCardCount
-              )
-            ) {
-              if (item.sourceHash) {
-                await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
-              }
-              log(
-                `Kept ${item.existingCardCount} existing cards for ${item.meeting.title}; changed official minutes will update those cards without generating duplicates.`
-              );
-              summaryProgress.minutesOnly += 1;
-              await reconcileOutcomesForItem(item);
-              return null;
             }
 
             let initialSummary: Awaited<ReturnType<typeof generateSummaryForMeeting>> | null = null;
@@ -1055,12 +1111,9 @@ async function runSimpleCityPipelineInternal(
             }
 
             // Recovery has already been attempted for every uncovered item.
-            // Treat the official-source fallback as the completed result for
-            // this exact source version; otherwise unchanged fallback cards
-            // are regenerated every day (and especially across Monday's
-            // three-month window). A changed agenda/minutes hash still makes
-            // the meeting eligible again.
-            const completedSourceHash = item.sourceHash;
+            // Checkpoint the agenda-summary hash with the cards so unchanged
+            // fallback coverage is not regenerated. The full source hash is
+            // checkpointed separately only after outcome reconciliation.
             if (persistSummaries && supabase && item.id) {
               const inserted = shouldAppendToExisting
                 ? await appendSummaryCardsForMeeting(
@@ -1073,7 +1126,7 @@ async function runSimpleCityPipelineInternal(
                       authoritativeSourceItemIds:
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
-                      sourceHash: completedSourceHash
+                      summarySourceHash: item.summarySourceHash
                     }
                   )
                 : await replaceSummaryCardsForMeeting(
@@ -1087,7 +1140,7 @@ async function runSimpleCityPipelineInternal(
                       authoritativeSourceItemIds:
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
-                      sourceHash: completedSourceHash
+                      summarySourceHash: item.summarySourceHash
                     }
                   );
               if (shouldAppendToExisting) {
@@ -1147,6 +1200,7 @@ async function runSimpleCityPipelineInternal(
                 `${Math.max(0, summaryTargets.length - summaryProgress.completed)} remaining ` +
                 `(generated ${summaryProgress.generated}, cancelled ${summaryProgress.cancelled}, ` +
                 `unchanged ${summaryProgress.unchanged}, minutes-only ${summaryProgress.minutesOnly}, ` +
+                `outcomes-only ${summaryProgress.outcomesOnly}, ` +
                 `no-input ${summaryProgress.noInput}, failed ${summaryProgress.failed}). ` +
                 `OpenRouter budget: requests ${usage.requests}/${usage.requestLimit}; ` +
                 `estimated/actual tokens ${usage.tokens}/${usage.tokenLimit}.`

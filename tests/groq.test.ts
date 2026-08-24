@@ -10,6 +10,7 @@ import {
   configuredLlmRequestTimeoutMs,
   fetchLlmResponse,
   formatLlmProcessRunSummary,
+  getLlmProvidersForInput,
   getLlmProcessBudgetUsage,
   getLlmProcessRunSummary,
   LLM_REQUEST_TIMEOUT_MS,
@@ -311,6 +312,52 @@ test("logs completed LLM request duration and status", async (t) => {
   assert.ok(logs.some((message) =>
     /Test request completed in \d+ms \(HTTP 200\)/i.test(message)
   ));
+});
+
+test("does not retry a Groq key while its rate-limit cooldown is active", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const originalGroqKey = process.env.GROQ_API_KEY;
+  const originalGroqKey2 = process.env.GROQ_API_KEY_2;
+  const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+    if (originalGroqKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = originalGroqKey;
+    if (originalGroqKey2 === undefined) delete process.env.GROQ_API_KEY_2;
+    else process.env.GROQ_API_KEY_2 = originalGroqKey2;
+    if (originalOpenRouterKey === undefined) delete process.env.OPENROUTER_API_KEY;
+    else process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+    resetLlmProcessBudgetForTests();
+  });
+
+  process.env.GROQ_API_KEY = "cooldown-key-1";
+  process.env.GROQ_API_KEY_2 = "cooldown-key-2";
+  process.env.OPENROUTER_API_KEY = "openrouter-key";
+  resetLlmProcessBudgetForTests();
+  globalThis.fetch = (async () =>
+    new Response(
+      JSON.stringify({
+        error: { message: "Rate limit reached. Please try again in 42m39.6s." }
+      }),
+      { status: 429 }
+    )) as typeof fetch;
+
+  await fetchLlmResponse(
+    "https://api.groq.com/openai/v1/chat/completions",
+    { method: "POST", body: "{}" },
+    100,
+    {
+      label: "Rate-limited Groq request",
+      provider: "Groq",
+      providerApiKey: "cooldown-key-1"
+    }
+  );
+
+  const providers = getLlmProvidersForInput("short prompt", 1000);
+  assert.deepEqual(
+    providers.map((provider) => provider.apiKey),
+    ["cooldown-key-2", "openrouter-key"]
+  );
 });
 
 test("never runs more than two LLM requests at once", async (t) => {

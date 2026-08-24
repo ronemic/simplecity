@@ -403,6 +403,15 @@ alter table public.meetings
 create index if not exists meetings_source_hash_idx on public.meetings(source_hash);
 create index if not exists meetings_summarized_source_hash_idx on public.meetings(summarized_source_hash);
 
+alter table public.meetings
+  add column if not exists summary_source_hash text,
+  add column if not exists summarized_summary_source_hash text;
+
+create index if not exists meetings_summary_source_hash_idx
+  on public.meetings(summary_source_hash);
+create index if not exists meetings_summarized_summary_source_hash_idx
+  on public.meetings(summarized_summary_source_hash);
+
 -- -----------------------------------------------------------------------------
 -- Source: supabase/migrations/20260610000000_add_jurisdiction_support.sql
 -- -----------------------------------------------------------------------------

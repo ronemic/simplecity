@@ -67,6 +67,49 @@ test("unchanged meetings bypass Monday minutes and outcome LLM work", () => {
   );
 });
 
+test("unchanged agenda-summary sources reconcile before any new summary request", () => {
+  const workerStart = pipeline.indexOf("const summarizeTarget = async");
+  const minutesCheck = pipeline.indexOf(
+    "shouldReconcileMinutesWithoutGeneratingCards(",
+    workerStart
+  );
+  const summaryHashCheck = pipeline.indexOf(
+    "item.summarizedSummarySourceHash,",
+    workerStart
+  );
+  const summaryRequest = pipeline.indexOf(
+    'generateWithinPipelineBudget(item.meeting, "meeting")',
+    workerStart
+  );
+  assert.ok(summaryHashCheck >= 0);
+  assert.ok(minutesCheck > summaryHashCheck);
+  assert.ok(summaryRequest > summaryHashCheck);
+  assert.match(
+    pipeline,
+    /reconciliation\.complete && item\.sourceHash[\s\S]*setMeetingSummarizedSourceHash/
+  );
+});
+
+test("a new summary hash version migrates already-completed sources without paid work", () => {
+  const workerStart = pipeline.indexOf("const summarizeTarget = async");
+  const unchangedSource = pipeline.indexOf("shouldSkipUnchangedSummary(", workerStart);
+  const summaryHashMigration = pipeline.indexOf(
+    "item.summarizedSummarySourceHash !== item.summarySourceHash",
+    unchangedSource
+  );
+  const summaryRequest = pipeline.indexOf(
+    'generateWithinPipelineBudget(item.meeting, "meeting")',
+    workerStart
+  );
+  assert.ok(unchangedSource >= 0);
+  assert.ok(summaryHashMigration > unchangedSource);
+  assert.ok(summaryRequest > summaryHashMigration);
+  assert.match(
+    pipeline.slice(unchangedSource, summaryRequest),
+    /setMeetingSummarizedSourceHash\([\s\S]*item\.summarySourceHash/
+  );
+});
+
 test("paid budget exhaustion stops the summary queue instead of fanning out blocked attempts", () => {
   assert.match(pipeline, /isLlmProcessBudgetExceededError/);
   assert.match(pipeline, /outcome === "budget-exhausted"/);
@@ -74,7 +117,7 @@ test("paid budget exhaustion stops the summary queue instead of fanning out bloc
 });
 
 test("official-source fallbacks complete the current source version", () => {
-  assert.match(pipeline, /const completedSourceHash = item\.sourceHash/);
+  assert.match(pipeline, /summarySourceHash: item\.summarySourceHash/);
 });
 
 test("every scraper workflow exposes all five Groq keys for hybrid routing", () => {

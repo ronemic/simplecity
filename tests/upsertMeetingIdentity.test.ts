@@ -278,18 +278,38 @@ test("ships a single oversized document row rather than dropping it", () => {
 
 type CapturedWrite = { table: string; payload: unknown; options?: unknown };
 
-function fakeSupabaseClient(writes: CapturedWrite[]) {
+function fakeSupabaseClient(writes: CapturedWrite[], summaryHashesSupported = true) {
   function chainFor(table: string) {
     let outcome: Record<string, unknown> = { data: [], error: null, count: 0 };
     const chain = {
-      select: () => chain,
+      select: (columns?: string) => {
+        if (
+          table === "meetings" &&
+          columns?.includes("summary_source_hash") &&
+          !summaryHashesSupported
+        ) {
+          outcome = {
+            data: null,
+            error: { message: "Could not find the summary_source_hash column", code: "PGRST204" }
+          };
+        }
+        return chain;
+      },
+      limit: () => chain,
       eq: () => chain,
       in: () => chain,
       single: async () => outcome,
       upsert: (payload: unknown, options?: unknown) => {
         writes.push({ table, payload, options });
         if (table === "meetings") {
-          outcome = { data: { id: "meeting-1", summarized_source_hash: null }, error: null };
+          outcome = {
+            data: {
+              id: "meeting-1",
+              summarized_source_hash: null,
+              summarized_summary_source_hash: null
+            },
+            error: null
+          };
         }
         return chain;
       },
@@ -358,4 +378,17 @@ test("collapses duplicate document URLs before the batched upsert reaches Postgr
   assert.equal(merged?.type, "Accessible Minutes");
   // The later duplicate carries no text of its own; the earlier row's text survives.
   assert.equal(merged?.extracted_text, "Approved 5-0.");
+});
+
+test("keeps meeting upserts compatible until summary hash columns are migrated", async () => {
+  const writes: CapturedWrite[] = [];
+  await upsertMeetings(
+    fakeSupabaseClient(writes, false),
+    [meetingWithDocuments([])]
+  );
+
+  const meetingWrite = writes.find((write) => write.table === "meetings");
+  const payload = meetingWrite?.payload as Record<string, unknown>;
+  assert.equal("summary_source_hash" in payload, false);
+  assert.equal("summarized_summary_source_hash" in payload, false);
 });

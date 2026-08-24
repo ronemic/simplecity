@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   compatibleLegacyMeetingSourceHashes,
   legacyMeetingSourceHashV1,
+  meetingSummarySourceHash,
   meetingSourceHash,
   SIMPLECITY_SUMMARIZER_VERSION
 } from "@/lib/db/meetingSourceHash";
@@ -117,4 +118,31 @@ test("routine upcoming-to-past status transitions do not regenerate unchanged su
       compatibleLegacyMeetingSourceHashes(past).includes(hash)
     )
   );
+});
+
+test("summary source hash ignores results and minutes but detects agenda changes", () => {
+  const original = meeting();
+  const publishedResult = meeting();
+  publishedResult.status = "Past";
+  publishedResult.items![0].action = "Approved";
+  publishedResult.items![0].result = "Passed 5-0";
+  publishedResult.items![0].rowText =
+    "The contract covers park maintenance. Official result: Passed 5-0.";
+  publishedResult.documents.push({
+    type: "Minutes",
+    label: "Minutes",
+    url: "https://city.example/minutes.pdf",
+    extractedText: "The council approved the contract 5-0."
+  });
+
+  assert.equal(meetingSummarySourceHash(original), meetingSummarySourceHash(publishedResult));
+  assert.notEqual(meetingSourceHash(original), meetingSourceHash(publishedResult));
+
+  const changedTitle = structuredClone(publishedResult);
+  changedTitle.items![0].title = "Revised park and trail maintenance contract";
+  assert.notEqual(meetingSummarySourceHash(original), meetingSummarySourceHash(changedTitle));
+
+  const changedAgenda = structuredClone(publishedResult);
+  changedAgenda.documents[0].extractedText = "Official revised agenda content";
+  assert.notEqual(meetingSummarySourceHash(original), meetingSummarySourceHash(changedAgenda));
 });

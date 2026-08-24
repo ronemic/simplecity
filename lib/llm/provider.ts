@@ -251,6 +251,7 @@ export function formatLlmProcessRunSummary() {
 }
 
 export function resetLlmProcessBudgetForTests(limits?: LlmProcessBudgetLimits) {
+  groqCooldownUntilByApiKey.clear();
   const resetState = createLlmProcessBudgetState(limits);
   const currentState = llmProcessBudgetStorage.getStore();
   if (currentState) {
@@ -330,9 +331,51 @@ function releaseLlmRequestSlot() {
 type LlmRequestTelemetry = {
   label: string;
   provider?: LlmProvider["name"];
+  providerApiKey?: string;
   group?: string;
   log?: (message: string) => void;
 };
+
+const groqCooldownUntilByApiKey = new Map<string, number>();
+const DEFAULT_GROQ_RATE_LIMIT_COOLDOWN_MS = 60_000;
+const MAX_GROQ_RATE_LIMIT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+function groqRateLimitCooldownMs(response: Response, text: string) {
+  const retryAfter = response.headers.get("retry-after")?.trim();
+  if (retryAfter) {
+    const seconds = Number(retryAfter);
+    if (Number.isFinite(seconds) && seconds > 0) {
+      return Math.min(MAX_GROQ_RATE_LIMIT_COOLDOWN_MS, Math.ceil(seconds * 1000));
+    }
+    const date = Date.parse(retryAfter);
+    if (Number.isFinite(date) && date > Date.now()) {
+      return Math.min(MAX_GROQ_RATE_LIMIT_COOLDOWN_MS, date - Date.now());
+    }
+  }
+
+  const duration = text.match(
+    /try again in\s+(?:(\d+(?:\.\d+)?)h)?\s*(?:(\d+(?:\.\d+)?)m)?\s*(?:(\d+(?:\.\d+)?)s)?/i
+  );
+  if (duration) {
+    const milliseconds =
+      Number(duration[1] || 0) * 60 * 60 * 1000 +
+      Number(duration[2] || 0) * 60 * 1000 +
+      Number(duration[3] || 0) * 1000;
+    if (milliseconds > 0) {
+      return Math.min(MAX_GROQ_RATE_LIMIT_COOLDOWN_MS, Math.ceil(milliseconds));
+    }
+  }
+
+  return DEFAULT_GROQ_RATE_LIMIT_COOLDOWN_MS;
+}
+
+function coolDownGroqApiKey(apiKey: string, response: Response, text: string) {
+  const cooldownUntil = Date.now() + groqRateLimitCooldownMs(response, text);
+  groqCooldownUntilByApiKey.set(
+    apiKey,
+    Math.max(groqCooldownUntilByApiKey.get(apiKey) || 0, cooldownUntil)
+  );
+}
 
 function formatRequestDuration(elapsedMs: number) {
   return elapsedMs < 1000
@@ -431,6 +474,13 @@ export async function fetchLlmResponse(
       }, timeoutMs);
     });
     const result = await Promise.race([request, deadline]);
+    if (
+      providerName === "Groq" &&
+      result.response.status === 429 &&
+      telemetry?.providerApiKey
+    ) {
+      coolDownGroqApiKey(telemetry.providerApiKey, result.response, result.text);
+    }
     if (result.response.ok) budgetState.requestStats.successful += 1;
     else budgetState.requestStats.failed += 1;
     const actualTokens = consumesBudget
@@ -505,13 +555,16 @@ export function getConfiguredGroqProviders(): LlmProvider[] {
     process.env.GROQ_API_KEY_5
   ].filter((key, index, keys): key is string => Boolean(key) && keys.indexOf(key) === index);
 
-  return apiKeys.map((apiKey, index) => ({
-    name: "Groq",
-    label: apiKeys.length > 1 ? `Groq key ${index + 1}` : "Groq",
-    apiKey,
-    baseUrl: "https://api.groq.com/openai/v1/chat/completions",
-    model: process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL
-  }));
+  const now = Date.now();
+  return apiKeys
+    .map((apiKey, index) => ({
+      name: "Groq" as const,
+      label: apiKeys.length > 1 ? `Groq key ${index + 1}` : "Groq",
+      apiKey,
+      baseUrl: "https://api.groq.com/openai/v1/chat/completions",
+      model: process.env.GROQ_MODEL?.trim() || DEFAULT_GROQ_MODEL
+    }))
+    .filter((provider) => (groqCooldownUntilByApiKey.get(provider.apiKey) || 0) <= now);
 }
 
 function getRotatedGroqProviders() {

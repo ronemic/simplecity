@@ -5,6 +5,7 @@ import {
   appendSummaryCardsForMeeting,
   cardModelInputText,
   isAgendaUnavailablePlaceholderCard,
+  markMeetingSummarized,
   obsoleteAuthoritativeSourceCardIds,
   SUMMARY_CARD_WRITE_BATCH_SIZE,
   rawLlmJsonForBulkRow,
@@ -79,6 +80,46 @@ function summary(cardCount: number): SimpleCitySummary {
     cards: Array.from({ length: cardCount }, (_, index) => card(index))
   };
 }
+
+test("card persistence can checkpoint the agenda hash without completing the full source", async () => {
+  const updates: Array<Record<string, unknown>> = [];
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "meetings");
+      return {
+        select(columns: string) {
+          assert.equal(columns, "summary_source_hash,summarized_summary_source_hash");
+          return {
+            async limit() {
+              return { data: [], error: null };
+            }
+          };
+        },
+        update(payload: Record<string, unknown>) {
+          updates.push(payload);
+          return {
+            async eq(column: string, value: string) {
+              assert.equal(column, "id");
+              assert.equal(value, "meeting-1");
+              return { error: null };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  await markMeetingSummarized(
+    supabase as never,
+    "meeting-1",
+    null,
+    "agenda-hash"
+  );
+
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].summarized_summary_source_hash, "agenda-hash");
+  assert.equal("summarized_source_hash" in updates[0], false);
+});
 
 test("splits large summary-card writes into bounded batches", () => {
   const rows = Array.from({ length: 82 }, (_, index) => index);

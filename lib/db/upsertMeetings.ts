@@ -11,7 +11,9 @@ import {
   type JurisdictionConfig
 } from "@/lib/config/jurisdictions";
 import {
+  compatibleMeetingSummarySourceHashes,
   compatibleLegacyMeetingSourceHashes,
+  meetingSummarySourceHash,
   meetingSourceHash
 } from "@/lib/db/meetingSourceHash";
 import {
@@ -34,8 +36,11 @@ type UpsertedMeeting = {
   id: string;
   meeting: LlmReadyMeeting;
   sourceHash: string;
+  summarySourceHash: string | null;
+  compatibleSummarySourceHashes: string[];
   compatibleSourceHashes: string[];
   summarizedSourceHash: string | null;
+  summarizedSummarySourceHash: string | null;
   existingCardCount: number;
 };
 
@@ -66,6 +71,7 @@ type AgendaAvailabilityCard = {
 
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const modelInputSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
+const meetingSummaryHashSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
 const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
 const MAX_STORED_RAW_AGENDA_ITEM_CHARACTERS = 4_000;
@@ -263,6 +269,35 @@ function supportsSourceItemId(supabase: SupabaseClient) {
       throw error;
     });
   sourceItemIdSupport.set(supabase, check);
+  return check;
+}
+
+/** Keep regional pipelines running while the additive hash migration rolls out. */
+function supportsMeetingSummarySourceHashes(supabase: SupabaseClient) {
+  const existing = meetingSummaryHashSupport.get(supabase);
+  if (existing) return existing;
+
+  const check = Promise.resolve(
+    supabase
+      .from("meetings")
+      .select("summary_source_hash,summarized_summary_source_hash")
+      .limit(1)
+  )
+    .then(({ error }) => {
+      if (!error) return true;
+      if (/summary_source_hash|summarized_summary_source_hash|PGRST204|column/i.test(
+        error.message || ""
+      )) {
+        meetingSummaryHashSupport.delete(supabase);
+        return false;
+      }
+      throw new Error(`Failed to inspect meeting summary hash support: ${error.message}`);
+    })
+    .catch((error) => {
+      meetingSummaryHashSupport.delete(supabase);
+      throw error;
+    });
+  meetingSummaryHashSupport.set(supabase, check);
   return check;
 }
 
@@ -777,13 +812,17 @@ async function writeSpanishCardTranslations(
 export async function markMeetingSummarized(
   supabase: SupabaseClient,
   meetingId: string,
-  sourceHash?: string | null
+  sourceHash?: string | null,
+  summarySourceHash?: string | null
 ) {
   const update: Record<string, string> = {
     cards_generated_at: new Date().toISOString()
   };
 
   if (sourceHash) update.summarized_source_hash = sourceHash;
+  if (summarySourceHash && await supportsMeetingSummarySourceHashes(supabase)) {
+    update.summarized_summary_source_hash = summarySourceHash;
+  }
 
   const { error } = await supabase.from("meetings").update(update).eq("id", meetingId);
   if (error) throw new Error(`Failed to mark meeting summarized: ${error.message}`);
@@ -792,11 +831,19 @@ export async function markMeetingSummarized(
 export async function setMeetingSummarizedSourceHash(
   supabase: SupabaseClient,
   meetingId: string,
-  sourceHash: string
+  sourceHash?: string | null,
+  summarySourceHash?: string | null
 ) {
+  const update: Record<string, string> = {};
+  if (sourceHash) update.summarized_source_hash = sourceHash;
+  if (summarySourceHash && await supportsMeetingSummarySourceHashes(supabase)) {
+    update.summarized_summary_source_hash = summarySourceHash;
+  }
+  if (Object.keys(update).length === 0) return;
+
   const { error } = await supabase
     .from("meetings")
-    .update({ summarized_source_hash: sourceHash })
+    .update(update)
     .eq("id", meetingId);
 
   if (error) throw new Error(`Failed to backfill summarized source hash: ${error.message}`);
@@ -809,6 +856,7 @@ export async function upsertMeetings(
   jurisdiction?: JurisdictionConfig
 ) {
   const upserted: UpsertedMeeting[] = [];
+  const summaryHashesAvailable = await supportsMeetingSummarySourceHashes(supabase);
   const existingExternalIds = await loadExistingExternalIdsByMeetingDetailsUrl(
     supabase,
     meetings,
@@ -826,6 +874,12 @@ export async function upsertMeetings(
       safeMeeting.externalId ||
       externalMeetingId(meetingDateTimeText(meeting), meeting.title, identitySourceUrl);
     const sourceHash = meetingSourceHash(safeMeeting);
+    const summarySourceHash = summaryHashesAvailable
+      ? meetingSummarySourceHash(safeMeeting)
+      : null;
+    const compatibleSummarySourceHashes = summaryHashesAvailable
+      ? compatibleMeetingSummarySourceHashes(safeMeeting)
+      : [];
     const compatibleSourceHashes = compatibleLegacyMeetingSourceHashes(safeMeeting);
     const jurisdictionColumns = jurisdiction
       ? {
@@ -840,6 +894,7 @@ export async function upsertMeetings(
     const { data, error } = await retryTransientSupabaseWrite<{
       id: string;
       summarized_source_hash: string | null;
+      summarized_summary_source_hash: string | null;
     }>(
       () => supabase
         .from("meetings")
@@ -862,13 +917,18 @@ export async function upsertMeetings(
             llm_input_text: safeMeeting.llmInputText,
             public_comments_input_text: safeMeeting.publicCommentsInputText,
             source_hash: sourceHash,
+            ...(summarySourceHash ? { summary_source_hash: summarySourceHash } : {}),
             extraction_notes: safeMeeting.extractionNotes,
             raw: compactRaw,
             scraped_at: scrapedAt || new Date().toISOString()
           },
           { onConflict: regionalDatabase ? "jurisdiction_slug,external_id" : "external_id" }
         )
-        .select("id,summarized_source_hash")
+        .select(
+          summaryHashesAvailable
+            ? "id,summarized_source_hash,summarized_summary_source_hash"
+            : "id,summarized_source_hash"
+        )
         .single(),
       {
         onRetry: (retryError, nextAttempt, delayMs) => {
@@ -967,8 +1027,11 @@ export async function upsertMeetings(
       id: data.id,
       meeting: safeMeeting,
       sourceHash,
+      summarySourceHash,
+      compatibleSummarySourceHashes,
       compatibleSourceHashes,
       summarizedSourceHash: data.summarized_source_hash || null,
+      summarizedSummarySourceHash: data.summarized_summary_source_hash || null,
       existingCardCount
     });
   }
@@ -984,6 +1047,7 @@ export async function replaceSummaryCardsForMeeting(
   options: {
     allowEmptyReplacement?: boolean;
     sourceHash?: string | null;
+    summarySourceHash?: string | null;
     jurisdiction?: JurisdictionConfig | null;
     authoritativeSourceItemIds?: readonly string[];
     agendaItems?: readonly AgendaItem[];
@@ -1036,7 +1100,12 @@ export async function replaceSummaryCardsForMeeting(
     if (deleteError) throw new Error(`Failed to delete old cards: ${deleteError.message}`);
 
     await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
-    await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+    await markMeetingSummarized(
+      supabase,
+      meetingId,
+      options.sourceHash,
+      options.summarySourceHash
+    );
 
     return [];
   }
@@ -1081,7 +1150,12 @@ export async function replaceSummaryCardsForMeeting(
     rawLlmJson
   );
 
-  await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+  await markMeetingSummarized(
+    supabase,
+    meetingId,
+    options.sourceHash,
+    options.summarySourceHash
+  );
 
   return data;
 }
@@ -1093,6 +1167,7 @@ export async function appendSummaryCardsForMeeting(
   rawLlmJson: unknown,
   options: {
     sourceHash?: string | null;
+    summarySourceHash?: string | null;
     jurisdiction?: JurisdictionConfig | null;
     authoritativeSourceItemIds?: readonly string[];
     agendaItems?: readonly AgendaItem[];
@@ -1232,7 +1307,12 @@ export async function appendSummaryCardsForMeeting(
 
   if (cardsToPersist.length === 0) {
     await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
-    await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+    await markMeetingSummarized(
+      supabase,
+      meetingId,
+      options.sourceHash,
+      options.summarySourceHash
+    );
     return [];
   }
 
@@ -1321,7 +1401,12 @@ export async function appendSummaryCardsForMeeting(
     rawLlmJson
   );
 
-  await markMeetingSummarized(supabase, meetingId, options.sourceHash);
+  await markMeetingSummarized(
+    supabase,
+    meetingId,
+    options.sourceHash,
+    options.summarySourceHash
+  );
 
   return persistedCards;
 }

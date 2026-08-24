@@ -423,6 +423,7 @@ ${sourceContext}`;
   }, configuredLlmRequestTimeoutMs(LLM_OPTIONAL_REQUEST_TIMEOUT_MS), {
     label: `${provider.label} targeted repair for ${meeting.title}`,
     provider: provider.name,
+    providerApiKey: provider.apiKey,
     group: options.requestGroup || meeting.id,
     log: options.log
   });
@@ -539,6 +540,7 @@ async function requestSummary(
   }, configuredLlmRequestTimeoutMs(LLM_REQUEST_TIMEOUT_MS), {
     label: `${provider.label} summary for ${meeting.title}`,
     provider: provider.name,
+    providerApiKey: provider.apiKey,
     group: options.requestGroup || meeting.id,
     log: options.log
   });
@@ -651,6 +653,7 @@ async function requestTopicValidation(
   }, configuredLlmRequestTimeoutMs(LLM_OPTIONAL_REQUEST_TIMEOUT_MS), {
     label: `${provider.label} topic validation for ${candidates.length} card(s)`,
     provider: provider.name,
+    providerApiKey: provider.apiKey,
     group: options.requestGroup,
     log: options.log
   });

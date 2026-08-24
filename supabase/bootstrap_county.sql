@@ -34,6 +34,8 @@ create table if not exists public.meetings (
   public_comments_input_text text,
   source_hash text,
   summarized_source_hash text,
+  summary_source_hash text,
+  summarized_summary_source_hash text,
   cards_generated_at timestamptz,
   extraction_notes jsonb default '[]'::jsonb,
   raw jsonb,
@@ -161,6 +163,8 @@ create index if not exists meetings_meeting_datetime_idx on public.meetings(meet
 create index if not exists meetings_status_idx on public.meetings(status);
 create index if not exists meetings_source_hash_idx on public.meetings(source_hash);
 create index if not exists meetings_summarized_source_hash_idx on public.meetings(summarized_source_hash);
+create index if not exists meetings_summary_source_hash_idx on public.meetings(summary_source_hash);
+create index if not exists meetings_summarized_summary_source_hash_idx on public.meetings(summarized_summary_source_hash);
 create index if not exists meetings_jurisdiction_slug_idx on public.meetings(jurisdiction_slug);
 create index if not exists meetings_platform_idx on public.meetings(platform);
 create index if not exists meetings_status_datetime_idx

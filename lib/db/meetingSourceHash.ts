@@ -1,11 +1,27 @@
 import crypto from "node:crypto";
-import type { LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
+import type { DocumentType, LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
 import { MEETING_WIDE_CONTEXT_HEADING } from "@/lib/scraper/agendaItemContext";
 
 export const SIMPLECITY_SUMMARIZER_VERSION =
   "item-scoped-no-public-comments-v3-status-independent";
 const PREVIOUS_SUMMARIZER_VERSION = "item-scoped-no-public-comments-v2";
 const PUBLIC_COMMENT_DOCUMENT_TYPES = new Set(["Public Comment", "Public Comments"]);
+const SUMMARY_SOURCE_HASH_VERSION = "agenda-source-v1";
+const SUMMARY_DOCUMENT_TYPES = new Set<DocumentType>([
+  "HTML Agenda",
+  "Agenda",
+  "Accessible Agenda",
+  "Agenda Packet",
+  "Packet",
+  "Attachment",
+  "Staff Report",
+  "Resolution",
+  "Ordinance",
+  "Contract",
+  "Exhibit",
+  "Document",
+  "Other"
+]);
 
 function contentHash(value?: string | null) {
   return value
@@ -30,6 +46,81 @@ function stableDocuments(documents: PrimeGovDocument[]) {
 
 function stableDocumentShape(meeting: LlmReadyMeeting) {
   return stableDocuments(meeting.documents);
+}
+
+function stableSummaryDocuments(documents: PrimeGovDocument[]) {
+  return documents
+    .filter((document) =>
+      SUMMARY_DOCUMENT_TYPES.has(document.type) || Boolean(document.isAgendaItemAttachment)
+    )
+    .map((document) => ({
+      type: document.type,
+      label: document.label,
+      url: document.url,
+      isScanned: Boolean(document.isScanned),
+      extractedTextHash: contentHash(document.extractedText)
+    }))
+    .sort((left, right) =>
+      `${left.url}\n${left.type}\n${left.label}`.localeCompare(
+        `${right.url}\n${right.type}\n${right.label}`
+      )
+    );
+}
+
+function stableSummaryAgendaItemShape(meeting: LlmReadyMeeting) {
+  return (meeting.items || [])
+    .map((item) => ({
+      externalId: item.externalId,
+      fileNumber: item.fileNumber,
+      agendaNumber: item.agendaNumber,
+      itemType: item.itemType,
+      title: item.title,
+      meetingBody: item.meetingBody || null,
+      onAgenda: item.onAgenda || null,
+      recommendedAction: item.recommendedAction || null,
+      sourceUrl: item.sourceUrl,
+      legislationTextHash: contentHash(item.legislationText),
+      attachments: stableSummaryDocuments(item.attachments || [])
+    }))
+    .sort((left, right) =>
+      `${left.externalId}\n${left.agendaNumber || ""}\n${left.title || ""}`.localeCompare(
+        `${right.externalId}\n${right.agendaNumber || ""}\n${right.title || ""}`
+      )
+    );
+}
+
+/**
+ * Hash only the official inputs that can change an agenda summary. Minutes,
+ * votes, and other post-meeting result fields are deliberately excluded so
+ * they can update outcomes without rewriting already-published agenda cards.
+ * This version is independent of the general summarizer version: changing the
+ * broader source hash must not fan out new summary requests.
+ */
+export function meetingSummarySourceHash(meeting: LlmReadyMeeting) {
+  const source = {
+    version: SUMMARY_SOURCE_HASH_VERSION,
+    title: meeting.title,
+    meetingType: meeting.meetingType,
+    dateText: meeting.dateText,
+    timeText: meeting.timeText,
+    location: meeting.location,
+    sourceType: meeting.sourceType,
+    sourceUrl: meeting.sourceUrl,
+    documents: stableSummaryDocuments(meeting.documents),
+    items: stableSummaryAgendaItemShape(meeting)
+  };
+
+  return crypto.createHash("sha256").update(JSON.stringify(source)).digest("hex");
+}
+
+/**
+ * When SUMMARY_SOURCE_HASH_VERSION changes, keep the immediately previous
+ * algorithm here until every stored hash has migrated. The pipeline accepts a
+ * compatible hash and upgrades it without dispatching an LLM request.
+ */
+export function compatibleMeetingSummarySourceHashes(meeting: LlmReadyMeeting) {
+  void meeting;
+  return [] as string[];
 }
 
 /**
