@@ -162,11 +162,13 @@ export function normalizeSubscriptionJurisdictions(values: string[]) {
   return [...seen];
 }
 
-function subscriptionLabels(jurisdictions: JurisdictionSlug[]) {
-  return jurisdictions.map((jurisdiction) => getJurisdictionDisplayLabel(jurisdiction));
+function subscriptionLabels(jurisdictions: JurisdictionSlug[], locale: "en" | "es" = "en") {
+  return jurisdictions.map((jurisdiction) =>
+    getJurisdictionDisplayLabel(jurisdiction, locale)
+  );
 }
 
-function buildConfirmationEmail({
+export function buildConfirmationEmail({
   email,
   jurisdictions,
   token,
@@ -180,7 +182,11 @@ function buildConfirmationEmail({
   const link = confirmationUrl(token, baseUrl);
   const labels = subscriptionLabels(jurisdictions);
   const labelText = labels.length === 1 ? labels[0] : labels.join(", ");
-  const subject = "Confirm your SimpleCity email updates";
+  const spanishLabels = subscriptionLabels(jurisdictions, "es");
+  const spanishLabelText =
+    spanishLabels.length === 1 ? spanishLabels[0] : spanishLabels.join(", ");
+  const subject =
+    "Confirm your SimpleCity email updates / Confirma tus actualizaciones por email de SimpleCity";
   const html = `<!doctype html>
 <html>
   <body style="margin:0;padding:0;background:#f7f3eb;color:#111827;font-family:Arial,Helvetica,sans-serif;">
@@ -201,6 +207,19 @@ function buildConfirmationEmail({
                 <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
                   If you did not request this, you can ignore this email.
                 </p>
+                <div style="margin-top:30px;padding-top:24px;border-top:3px solid #0f5e7c;">
+                  <h2 style="margin:0 0 8px;font-size:22px;line-height:1.25;color:#111827;">En español</h2>
+                  <h3 style="margin:0 0 10px;font-size:19px;line-height:1.25;color:#111827;">Confirma tus actualizaciones por email</h3>
+                  <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
+                    Confirma que ${escapeHtml(email)} debe comenzar a recibir o actualizar los resúmenes semanales de SimpleCity para ${escapeHtml(spanishLabelText)}.
+                  </p>
+                  <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
+                    Confirmar actualizaciones por email
+                  </a>
+                  <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
+                    Si no solicitaste esto, puedes ignorar este email.
+                  </p>
+                </div>
               </td>
             </tr>
           </table>
@@ -216,7 +235,17 @@ function buildConfirmationEmail({
     "",
     link,
     "",
-    "If you did not request this, you can ignore this email."
+    "If you did not request this, you can ignore this email.",
+    "",
+    "En español",
+    "",
+    "Confirma tus actualizaciones por email de SimpleCity",
+    "",
+    `Confirma que ${email} debe comenzar a recibir o actualizar los resúmenes semanales de SimpleCity para ${spanishLabelText}.`,
+    "",
+    link,
+    "",
+    "Si no solicitaste esto, puedes ignorar este email."
   ].join("\n");
 
   return { subject, html, text };

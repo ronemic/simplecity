@@ -4,6 +4,7 @@ import { getPublicAppUrlForRequest } from "@/lib/email/config";
 import { buildNewPostsDigestEmail, labelForEmailSelections } from "@/lib/email/newPosts";
 import { sendEmail } from "@/lib/email/resend";
 import {
+  buildConfirmationEmail,
   confirmEmailSubscription,
   createOrRefreshSubscription,
   EmailSubscriptionInputError,
@@ -608,6 +609,32 @@ test("builds stable email token hashes and unsubscribe URLs", () => {
   assert.equal(
     unsubscribeUrl("token-123", "https://simplecity.example/"),
     "https://simplecity.example/api/email/unsubscribe?token=token-123"
+  );
+});
+
+test("builds a bilingual subscription confirmation email", () => {
+  const email = buildConfirmationEmail({
+    email: "resident+alerts@example.com",
+    jurisdictions: ["santa-clara-county"],
+    token: "token-123",
+    baseUrl: "https://simplecity.example"
+  });
+
+  assert.match(email.subject, /Confirm your SimpleCity email updates/);
+  assert.match(email.subject, /Confirma tus actualizaciones por email de SimpleCity/);
+  assert.match(email.html, /En español/);
+  assert.match(email.html, /Condado de Santa Clara/);
+  assert.match(email.html, /Confirmar actualizaciones por email/);
+  assert.match(email.text, /resúmenes semanales de SimpleCity para Condado de Santa Clara/);
+  assert.ok(email.html.indexOf("Confirm your email updates") < email.html.indexOf("En español"));
+  assert.ok(
+    email.text.indexOf("Confirm your SimpleCity email updates") <
+      email.text.indexOf("En español")
+  );
+  assert.equal(
+    email.html.match(/https:\/\/simplecity\.example\/api\/email\/confirm\?token=token-123/g)
+      ?.length,
+    2
   );
 });
 
