@@ -10,6 +10,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { type Locale, t } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
 import { type CategoryName } from "@/lib/constants";
+import { cn } from "@/lib/utils/cn";
 import type { DecisionResultFilter as ResultFilter } from "@/lib/utils/decisionResultFilter";
 import {
   SantaBarbaraInterestHub,
@@ -175,33 +176,33 @@ export function DecisionBrowser({
               </div>
               <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 sm:w-auto sm:gap-x-4">
                 <div
-                  className="inline-flex rounded-lg border border-black/10 bg-black/[0.025] p-0.5"
+                  className="segmented-control w-full sm:w-auto"
                   aria-label={locale === "es" ? "Vista de decisiones" : "Decision view"}
                 >
                   <button
                     type="button"
-                    aria-pressed={decisionView === "list"}
+                    aria-current={decisionView === "list" ? "page" : undefined}
                     onClick={() => changeDecisionView("list")}
-                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-black transition sm:min-h-9 sm:text-sm ${
-                      decisionView === "list"
-                        ? "bg-white text-civic shadow-sm"
-                        : "text-black/55 hover:text-ink"
-                    }`}
+                    className={cn(
+                      "segmented-button",
+                      "flex-1 justify-center sm:flex-none",
+                      decisionView === "list" && "segmented-button-selected"
+                    )}
                   >
-                    <List aria-hidden className="h-3.5 w-3.5" />
+                    <List aria-hidden className="h-4 w-4" />
                     {locale === "es" ? "Lista" : "List"}
                   </button>
                   <button
                     type="button"
-                    aria-pressed={decisionView === "map"}
+                    aria-current={decisionView === "map" ? "page" : undefined}
                     onClick={() => changeDecisionView("map")}
-                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-black transition sm:min-h-9 sm:text-sm ${
-                      decisionView === "map"
-                        ? "bg-white text-civic shadow-sm"
-                        : "text-black/55 hover:text-ink"
-                    }`}
+                    className={cn(
+                      "segmented-button",
+                      "flex-1 justify-center sm:flex-none",
+                      decisionView === "map" && "segmented-button-selected"
+                    )}
                   >
-                    <MapIcon aria-hidden className="h-3.5 w-3.5" />
+                    <MapIcon aria-hidden className="h-4 w-4" />
                     {locale === "es" ? "Mapa" : "Map"}
                   </button>
                 </div>
