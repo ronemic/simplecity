@@ -228,10 +228,11 @@ export function meetingClockTime(iso?: string | null, locale: "en" | "es" = "en"
 export function formatDisplayDate(
   dateText?: string | null,
   iso?: string | null,
-  timeText?: string | null
+  timeText?: string | null,
+  locale: "en" | "es" = "en"
 ) {
   const value = iso || dateText;
-  if (!value) return "Date not listed";
+  if (!value) return locale === "es" ? "Fecha no indicada" : "Date not listed";
 
   const parsed = parseDisplayDate(value);
   if (!parsed) return dateText || value;
@@ -248,16 +249,20 @@ export function formatDisplayDate(
     options.minute = "2-digit";
   }
 
-  return new Intl.DateTimeFormat("en-US", options).format(parsed);
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", options).format(parsed);
 }
 
-export function formatCompactDisplayDate(dateText?: string | null, iso?: string | null) {
+export function formatCompactDisplayDate(
+  dateText?: string | null,
+  iso?: string | null,
+  locale: "en" | "es" = "en"
+) {
   const value = iso || dateText;
-  if (!value) return "Date not listed";
+  if (!value) return locale === "es" ? "Fecha no indicada" : "Date not listed";
 
   const parsed = parseDisplayDate(value);
   if (parsed) {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
       timeZone: CIVIC_TIME_ZONE,
       month: "short",
       day: "numeric"
@@ -393,13 +398,13 @@ export function meetingDateParts(
   };
 }
 
-export function formatPacificTimestamp(value?: string | null) {
+export function formatPacificTimestamp(value?: string | null, locale: "en" | "es" = "en") {
   if (!value) return null;
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
 
-  return `${new Intl.DateTimeFormat("en-US", {
+  return `${new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
     timeZone: CIVIC_TIME_ZONE,
     month: "short",
     day: "numeric",

@@ -68,8 +68,11 @@ function writeMeetingViewPreference(view: MeetingView) {
   document.cookie = `${MEETING_VIEW_PREFERENCE_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
 }
 
-function jurisdictionLabel(meeting: MeetingRow) {
-  return getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name);
+function jurisdictionLabel(meeting: MeetingRow, locale: Locale = "en") {
+  return getJurisdictionDisplayLabel(
+    meeting.jurisdiction_slug || meeting.jurisdiction_name,
+    locale
+  );
 }
 
 function meetingStart(meeting: MeetingRow) {
@@ -278,7 +281,7 @@ function MeetingLine({
 }) {
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
   const meetingType = displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale);
-  const meetingJurisdiction = jurisdictionLabel(meeting);
+  const meetingJurisdiction = jurisdictionLabel(meeting, locale);
   const advisory = isSantaBarbaraPlanningMeeting(meeting);
   const searchMatch = meetingSearchMatch(meeting, highlight || "", locale);
   const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight || "", locale);
@@ -899,7 +902,7 @@ export function MeetingList({
                     <span className="inline-flex items-center gap-1.5">
                       <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
                       <HighlightedText
-                        text={formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+                        text={formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text, locale)}
                         query={highlight}
                       />
                     </span>

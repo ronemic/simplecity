@@ -145,14 +145,15 @@ export async function generateMetadata({
 
   const jurisdictionSlug = toPublicJurisdictionSlug(jurisdiction);
   const jurisdictionLabel = getJurisdictionDisplayLabel(
-    meeting.jurisdiction_slug || meeting.jurisdiction_name
+    meeting.jurisdiction_slug || meeting.jurisdiction_name,
+    locale
   );
   const meetingTitle = displayMeetingTitle(
     meeting,
     locale === "es" ? "Reunión pública" : "Public meeting",
     locale
   );
-  const date = formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text);
+  const date = formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text, locale);
   const title = `${meetingTitle} - ${jurisdictionLabel} | SimpleCity`;
   const description =
     locale === "es"
@@ -209,7 +210,8 @@ export default async function MeetingDetailPage({
   ]);
   const videoDocuments = rawVideoDocuments.length > 0 ? [...documents, ...rawVideoDocuments] : documents;
   const jurisdictionLabel = getJurisdictionDisplayLabel(
-    meeting.jurisdiction_slug || meeting.jurisdiction_name
+    meeting.jurisdiction_slug || meeting.jurisdiction_name,
+    locale
   );
   const isAdvisoryPlanningMeeting = isSantaBarbaraPlanningMeeting(meeting);
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
@@ -291,7 +293,7 @@ export default async function MeetingDetailPage({
               {jurisdictionLabel}
             </span>
             <span className="text-sm font-semibold text-black/70">
-              {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}
+              {formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text, locale)}
             </span>
           </div>
           <h1 className="page-title mt-3">{displayMeetingTitle(meeting, meetingTitleFallback, locale)}</h1>

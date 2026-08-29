@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
+  getJurisdictionDisplayLabel,
   getPublicJurisdictionOptions
 } from "@/lib/config/jurisdictions";
 import {
@@ -59,7 +60,7 @@ function announceLocalePreference(value: Locale) {
 }
 
 function jurisdictionLabel(jurisdiction: (typeof jurisdictions)[number], locale: Locale) {
-  return jurisdiction.slug === "all" ? t(locale, "all") : jurisdiction.label;
+  return getJurisdictionDisplayLabel(jurisdiction.slug, locale);
 }
 
 function isActiveNavItem(pathname: string, href: string) {

@@ -201,8 +201,29 @@ export function toPublicJurisdictionSlug(
   return slug;
 }
 
-export function getJurisdictionDisplayLabel(slug: string | null | undefined) {
-  if (slug === ALL_JURISDICTIONS_SLUG || slug === "all") return "All";
+/**
+ * Spanish labels for the jurisdictions whose names carry a translatable common
+ * noun. City names are proper nouns and stay as they are in both locales.
+ */
+const SPANISH_JURISDICTION_LABELS: Record<string, string> = {
+  [ALL_JURISDICTIONS_SLUG]: "Todos",
+  "san-mateo-county": "Condado de San Mateo",
+  "santa-clara-county": "Condado de Santa Clara",
+  "santa-barbara-county": "Condado de Santa Bárbara",
+  "los-altos-school-district": "Distrito Escolar de Los Altos"
+};
+
+export function getJurisdictionDisplayLabel(
+  slug: string | null | undefined,
+  locale: "en" | "es" = "en"
+) {
+  if (slug === ALL_JURISDICTIONS_SLUG || slug === "all") {
+    return locale === "es" ? SPANISH_JURISDICTION_LABELS[ALL_JURISDICTIONS_SLUG] : "All";
+  }
+  if (locale === "es") {
+    const spanish = SPANISH_JURISDICTION_LABELS[toInternalJurisdictionSlug(slug) || ""];
+    if (spanish) return spanish;
+  }
   const internalSlug = toInternalJurisdictionSlug(slug);
   if (internalSlug === "san-mateo-city") return "San Mateo";
   if (internalSlug === "san-mateo-county") return "San Mateo County";
@@ -613,8 +634,17 @@ export function normalizeJurisdictionSelection(
   }
 }
 
-export function getJurisdictionLabel(slug: JurisdictionSelection) {
-  if (slug === ALL_JURISDICTIONS_SLUG) return "All";
+export function getJurisdictionLabel(
+  slug: JurisdictionSelection,
+  locale: "en" | "es" = "en"
+) {
+  if (slug === ALL_JURISDICTIONS_SLUG) {
+    return locale === "es" ? SPANISH_JURISDICTION_LABELS[ALL_JURISDICTIONS_SLUG] : "All";
+  }
+  if (locale === "es") {
+    const spanish = SPANISH_JURISDICTION_LABELS[slug];
+    if (spanish) return spanish;
+  }
   return getJurisdictionBySlug(slug)?.name || "Foster City";
 }
 

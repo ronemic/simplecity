@@ -12,6 +12,7 @@ import {
   ALL_JURISDICTIONS_SLUG,
   JURISDICTION_PREFERENCE_COOKIE,
   getPublicJurisdictionOptions,
+  getJurisdictionDisplayLabel,
   getJurisdictionLabel,
   normalizeJurisdictionSelection,
   toInternalJurisdictionSlug,
@@ -39,7 +40,7 @@ export async function generateMetadata({
   const jurisdiction = params.jurisdiction
     ? normalizeJurisdictionSelection(params.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
-  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
   const title =
     locale === "es"
@@ -185,7 +186,9 @@ function DecisionResultsCoverage({
         <dl className="flex flex-wrap gap-x-3 gap-y-1">
         {jurisdictions.map((option) => (
           <div key={option.slug} className="flex min-w-0 items-baseline gap-1.5">
-            <dt className="shrink-0 font-bold text-black/55">{option.name}</dt>
+            <dt className="shrink-0 font-bold text-black/55">
+              {getJurisdictionDisplayLabel(option.slug, locale)}
+            </dt>
             <dd className="min-w-0 font-black text-civic">
               {freshnessLabel(freshness, option.slug, locale, advisory)}
             </dd>
@@ -227,7 +230,7 @@ export default async function DecisionsPage({
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
-  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const isAllJurisdictions = jurisdiction === ALL_JURISDICTIONS_SLUG;
   const isSchoolDistrict = jurisdiction === "los-altos-school-district";
   const isSantaBarbara = jurisdiction === "santa-barbara-county";

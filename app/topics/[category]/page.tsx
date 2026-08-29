@@ -40,7 +40,7 @@ export async function generateMetadata({
     ? normalizeJurisdictionSelection(query.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
   const jurisdictionPrefix =
-    jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local" : getJurisdictionLabel(jurisdiction);
+    jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local" : getJurisdictionLabel(jurisdiction, locale);
   const definition = CATEGORY_DEFINITIONS[category];
   const title =
     locale === "es"

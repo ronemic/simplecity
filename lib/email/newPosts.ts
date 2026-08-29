@@ -103,9 +103,10 @@ function cardUrl(card: SummaryCardRow, appUrl: string, locale: Locale) {
   return url.toString();
 }
 
-function cardJurisdictionLabel(card: SummaryCardRow) {
+function cardJurisdictionLabel(card: SummaryCardRow, locale: Locale = "en") {
   return getJurisdictionDisplayLabel(
-    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name
+    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name,
+    locale
   );
 }
 
@@ -140,14 +141,15 @@ function titleForCard(card: SummaryCardRow, locale: Locale) {
 function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale = "en") {
   const meeting = card.meetings;
   const title = titleForCard(card, locale);
-  const jurisdiction = cardJurisdictionLabel(card);
+  const jurisdiction = cardJurisdictionLabel(card, locale);
   const meetingType = meeting
     ? displayMeetingType(meeting, COPY[locale].meetingTypeFallback, locale)
     : COPY[locale].meetingTypeFallback;
   const meetingDate = formatDisplayDate(
     meeting?.date_text,
     meeting?.meeting_datetime,
-    meeting?.time_text
+    meeting?.time_text,
+    locale
   );
   const summary = compactSummary(card.what_is_happening, COPY[locale].summaryFallback);
   const url = cardUrl(card, appUrl, locale);

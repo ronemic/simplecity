@@ -137,12 +137,12 @@ export function createEmailToken() {
   return randomBytes(TOKEN_BYTES).toString("base64url");
 }
 
-export function publicEmailJurisdictionOptions() {
+export function publicEmailJurisdictionOptions(locale: "en" | "es" = "en") {
   return getPublicJurisdictionOptions()
     .filter((jurisdiction) => jurisdiction.slug !== "all")
     .map((jurisdiction) => ({
       value: requireValidJurisdictionSlug(jurisdiction.slug) as JurisdictionSlug,
-      label: jurisdiction.name,
+      label: getJurisdictionDisplayLabel(jurisdiction.slug, locale),
       parentCountyValue: jurisdiction.parentCountySlug
         ? (requireValidJurisdictionSlug(jurisdiction.parentCountySlug) as JurisdictionSlug)
         : undefined,

@@ -169,7 +169,7 @@ export default async function Home({
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
-  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const topicCategories = isSchoolDistrictJurisdiction(jurisdiction)
     ? SCHOOL_CATEGORIES
     : CATEGORIES;

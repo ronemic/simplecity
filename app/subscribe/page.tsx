@@ -94,7 +94,7 @@ export default async function SubscribePage({
       <div className="mt-7">
         <SubscribeForm
           initialJurisdiction={initialJurisdiction}
-          jurisdictions={publicEmailJurisdictionOptions()}
+          jurisdictions={publicEmailJurisdictionOptions(locale)}
           locale={locale}
         />
       </div>

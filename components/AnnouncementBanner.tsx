@@ -9,9 +9,9 @@ const icons = {
   event: CalendarClock
 };
 
-function jurisdictionLabel(slug?: string | null) {
-  if (!slug) return "All";
-  return getJurisdictionDisplayLabel(slug);
+function jurisdictionLabel(slug: string | null | undefined, locale: Locale) {
+  if (!slug) return getJurisdictionDisplayLabel("all", locale);
+  return getJurisdictionDisplayLabel(slug, locale);
 }
 
 export function AnnouncementBanner({
@@ -39,7 +39,7 @@ export function AnnouncementBanner({
               </span>
               <div className="min-w-0">
                 <p className="label-eyebrow text-black/[0.65]">
-                  {t(locale, "adminAnnouncement")} · {jurisdictionLabel(announcement.jurisdiction_slug)}
+                  {t(locale, "adminAnnouncement")} · {jurisdictionLabel(announcement.jurisdiction_slug, locale)}
                 </p>
                 <h2 className="mt-1 text-xl font-black leading-snug text-ink">{announcement.title}</h2>
                 <p className="mt-2 text-sm leading-6 text-black/75">{announcement.body}</p>

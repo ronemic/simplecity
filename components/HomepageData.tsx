@@ -5,7 +5,10 @@ import { ArrowRight, CalendarDays } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { preload } from "react-dom";
 import { SummaryCard } from "@/components/SummaryCard";
-import type { JurisdictionSelection } from "@/lib/config/jurisdictions";
+import {
+  getJurisdictionDisplayLabel,
+  type JurisdictionSelection
+} from "@/lib/config/jurisdictions";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
@@ -225,10 +228,10 @@ export function HomepageDataContent({
                 const meeting = card.meetings;
                 return (
                   <article key={meeting.id} className="grid gap-3 p-4 sm:grid-cols-[11rem_minmax(0,1fr)_auto] sm:items-center">
-                    <div className="flex items-center gap-2 text-sm font-black text-[#12365f]"><CalendarDays aria-hidden className="h-4 w-4" /><span>{formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)}</span></div>
+                    <div className="flex items-center gap-2 text-sm font-black text-[#12365f]"><CalendarDays aria-hidden className="h-4 w-4" /><span>{formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text, locale)}</span></div>
                     <div className="min-w-0">
                       <h3 className="line-clamp-2 text-base font-black leading-snug text-ink">{displayMeetingTitle(meeting, locale === "es" ? "Reunión no indicada" : "Meeting not listed", locale)}</h3>
-                      <p className="mt-1 text-sm font-semibold text-black/[0.58]">{displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)} · {meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}</p>
+                      <p className="mt-1 text-sm font-semibold text-black/[0.58]">{displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale)} · {meeting.jurisdiction_slug || card.jurisdiction_slug ? getJurisdictionDisplayLabel(meeting.jurisdiction_slug || card.jurisdiction_slug, locale) : meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}</p>
                       <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">{t(locale, "connectedDecision")}: {publicAgendaTitle(card)}</p>
                     </div>
                     <Link href={`/meetings/${meeting.id}`} className="action-secondary-sm">{t(locale, "meetingDetails")}</Link>

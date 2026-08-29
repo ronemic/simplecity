@@ -39,7 +39,7 @@ export async function generateMetadata({
   const jurisdiction = params.jurisdiction
     ? normalizeJurisdictionSelection(params.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
-  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const label = jurisdiction === ALL_JURISDICTIONS_SLUG ? "Local government" : jurisdictionLabel;
   const title =
     locale === "es"
@@ -95,7 +95,7 @@ export default async function MeetingsPage({
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
-  const jurisdictionLabel = getJurisdictionLabel(jurisdiction);
+  const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const isSantaBarbara = jurisdiction === "santa-barbara-county";
   const santaBarbaraBody = normalizeSantaBarbaraBodyView(params.body);
   const search = params.q || "";

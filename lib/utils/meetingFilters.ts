@@ -27,7 +27,12 @@ export function meetingSearchFields(
     },
     {
       field: "date",
-      text: formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)
+      text: formatDisplayDate(
+        meeting.date_text,
+        meeting.meeting_datetime,
+        meeting.time_text,
+        locale
+      )
     },
     {
       field: "type",
@@ -35,7 +40,10 @@ export function meetingSearchFields(
     },
     {
       field: "jurisdiction",
-      text: getJurisdictionDisplayLabel(meeting.jurisdiction_slug || meeting.jurisdiction_name)
+      text: getJurisdictionDisplayLabel(
+        meeting.jurisdiction_slug || meeting.jurisdiction_name,
+        locale
+      )
     }
   ];
 

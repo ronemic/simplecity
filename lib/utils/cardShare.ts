@@ -52,9 +52,10 @@ export function cardPreviewText(
     .find(Boolean) || defaultPreview;
 }
 
-export function cardJurisdictionLabel(card: SummaryCardRow) {
+export function cardJurisdictionLabel(card: SummaryCardRow, locale: Locale = "en") {
   return getJurisdictionDisplayLabel(
-    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name
+    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name,
+    locale
   );
 }
 
@@ -70,11 +71,12 @@ export function cardGroupLabel(card: SummaryCardRow, locale: Locale = "en") {
   );
 }
 
-export function cardMeetingDate(card: SummaryCardRow) {
+export function cardMeetingDate(card: SummaryCardRow, locale: Locale = "en") {
   return formatDisplayDate(
     card.meetings?.date_text,
     card.meetings?.meeting_datetime,
-    card.meetings?.time_text
+    card.meetings?.time_text,
+    locale
   );
 }
 

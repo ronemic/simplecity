@@ -209,7 +209,7 @@ export function commentSummary(
 
   if (commentDeadline) {
     return {
-      label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value)}`,
+      label: `${t(locale, "commentDeadline")} ${formatCompactDisplayDate(commentDeadline.value, undefined, locale)}`,
       className: "border-[#e7ba6a] bg-[#fff7e8] text-[#7a4808]",
       icon: Clock
     };
@@ -224,9 +224,10 @@ export function commentSummary(
   return null;
 }
 
-function jurisdictionLabel(card: SummaryCardRow) {
+function jurisdictionLabel(card: SummaryCardRow, locale: Locale) {
   return getJurisdictionDisplayLabel(
-    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name
+    card.jurisdiction_slug || card.meetings?.jurisdiction_slug || card.jurisdiction_name,
+    locale
   );
 }
 
@@ -283,8 +284,8 @@ export function SummaryCard({
   const fallbackInfo = officialSourceFallbackInfo(card, locale);
   const officialSourceFallback = Boolean(fallbackInfo);
   const titlePreview = cardPreviewText(card, locale, highlight);
-  const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text);
-  const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime);
+  const meetingDate = formatDisplayDate(meeting?.date_text, meeting?.meeting_datetime, meeting?.time_text, locale);
+  const compactMeetingDate = formatCompactDisplayDate(meeting?.date_text, meeting?.meeting_datetime, locale);
   const affectedResidents = compactList(card.who_it_affects, locale);
   const affectedTags = (card.who_it_affects || []).filter(Boolean).slice(0, 4);
   const categoryTags = (card.category_tags || []).filter(Boolean).slice(0, 3);
@@ -305,11 +306,11 @@ export function SummaryCard({
     ? null
     : commentSummary(commentDeadline, hasCommentOption, locale, isUpcoming);
   const summaryConfidence = officialSourceFallback ? null : confidenceLabel(card, locale);
-  const createdTimestamp = formatPacificTimestamp(card.created_at);
-  const updatedTimestamp = formatPacificTimestamp(card.updated_at);
+  const createdTimestamp = formatPacificTimestamp(card.created_at, locale);
+  const updatedTimestamp = formatPacificTimestamp(card.updated_at, locale);
   const CommentIcon = comment?.icon;
   const StatusIcon = status.icon;
-  const cardJurisdictionLabel = jurisdictionLabel(card);
+  const cardJurisdictionLabel = jurisdictionLabel(card, locale);
   const meetingPageHref = meetingHref(card);
   const primaryButtonClass = "action-primary-sm font-black";
   const noCommentLabel = t(locale, "noCommentOptionListed");
