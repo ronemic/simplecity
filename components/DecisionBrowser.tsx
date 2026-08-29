@@ -79,7 +79,6 @@ export function DecisionBrowser({
     if (initialSearch !== submittedSearch.current) {
       submittedSearch.current = initialSearch;
       setSearch(initialSearch);
-      if (initialSearch) setShowSearch(true);
     }
   }, [initialSearch]);
 
