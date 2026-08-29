@@ -42,8 +42,12 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
   useEffect(() => {
     if (!apiKey) return;
     const controller = new AbortController();
+    const params = new URLSearchParams(query);
+    // Pin the locale to the URL. The map response is localized, and the shared
+    // cache in front of the route keys on the URL alone.
+    params.set("lang", locale);
 
-    fetch(`/api/decisions/map?${query}`, { signal: controller.signal })
+    fetch(`/api/decisions/map?${params.toString()}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("Map data request failed");
         return response.json() as Promise<{ points?: DecisionMapPoint[] }>;
@@ -59,7 +63,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
       });
 
     return () => controller.abort();
-  }, [apiKey, query]);
+  }, [apiKey, locale, query]);
 
   if (!apiKey) {
     return (

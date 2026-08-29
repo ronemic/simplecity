@@ -214,6 +214,81 @@ test("initial replacement persists only cards in a complete official item invent
   assert.equal(persisted.length, 1);
 });
 
+test("groups identical decision-location writes into one update", async () => {
+  const locationUpdates: Array<{ values: Record<string, unknown>; ids: string[] }> = [];
+  const supabase = {
+    from(table: string) {
+      if (table === "meetings") {
+        return { update() { return { async eq() { return { error: null }; } }; } };
+      }
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          if (
+            columns === "source_item_id" ||
+            columns === "model_input_text" ||
+            columns === "location_status,location_latitude,location_longitude"
+          ) {
+            return { async limit() { return { data: [], error: null }; } };
+          }
+          return { async eq() { return { data: [], error: null }; } };
+        },
+        delete() {
+          return { async eq() { return { error: null }; } };
+        },
+        update(values: Record<string, unknown>) {
+          return {
+            async in(_column: string, ids: string[]) {
+              locationUpdates.push({ values, ids });
+              return { error: null };
+            }
+          };
+        },
+        insert(rows: Array<Record<string, unknown>>) {
+          return {
+            async select() {
+              return {
+                data: rows.map((row, index) => ({
+                  id: `persisted-${index}`,
+                  source_item_id: row.source_item_id,
+                  agenda_item: row.agenda_item,
+                  source_url: row.source_url
+                })),
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const persisted = await replaceSummaryCardsForMeeting(
+    supabase as never,
+    "meeting-locations",
+    summary(3),
+    { response: "summary" },
+    {
+      sourceHash: "location-source-hash",
+      jurisdiction: {
+        name: "Mountain View",
+        slug: "mountain-view",
+        officialName: "City of Mountain View",
+        regionSlug: "santa-clara",
+        platform: "legistar",
+        timezone: "America/Los_Angeles",
+        sourceUrl: "https://example.test"
+      } as never
+    }
+  );
+
+  assert.equal(persisted.length, 3);
+  // Three cards, one shared `no_candidate` value, one round trip.
+  assert.equal(locationUpdates.length, 1);
+  assert.equal(locationUpdates[0].values.location_status, "no_candidate");
+  assert.deepEqual(locationUpdates[0].ids, ["persisted-0", "persisted-1", "persisted-2"]);
+});
+
 test("stores one raw model payload for a bulk card write", () => {
   const raw = { simplecityItemBatches: [{ response: "large payload" }] };
   assert.equal(rawLlmJsonForBulkRow(raw, 0), raw);

@@ -336,6 +336,20 @@ function storedLocationFromRow(row: Record<string, unknown>): StoredDecisionLoca
   };
 }
 
+/** Groups identical location writes; `location_updated_at` is intentionally excluded. */
+function storedLocationValueKey(location: StoredDecisionLocation) {
+  return JSON.stringify([
+    location.location_label,
+    location.location_latitude,
+    location.location_longitude,
+    location.location_precision,
+    location.location_confidence,
+    location.location_method,
+    location.location_status,
+    location.location_source_text
+  ]);
+}
+
 async function populateDecisionLocations(
   supabase: SupabaseClient,
   insertedCards: InsertedCardIdentity[],
@@ -349,6 +363,12 @@ async function populateDecisionLocations(
     return;
   }
 
+  // Most cards on a meeting resolve to the same stored value -- usually the
+  // `no_candidate` blank, since only a minority of agenda items name an
+  // address -- so the writes are grouped by value and sent as a few `in (...)`
+  // updates instead of one round trip per card.
+  const writesByValue = new Map<string, { location: StoredDecisionLocation; ids: string[] }>();
+
   for (const inserted of insertedCards) {
     const source = sourceCards.find(({ card }) =>
       inserted.source_item_id && card.sourceItemId
@@ -361,22 +381,36 @@ async function populateDecisionLocations(
     const preserved =
       preservedByExactKey?.get(exactCardKey(source.card.agendaItem, source.card.source)) ||
       preservedByAgendaKey?.get(normalizeCardKey(source.card.agendaItem));
-    const sourceText = cardModelInputText(source.card, agendaItems, true);
+    // Re-reading the agenda item costs a full context format, so it only runs
+    // when there is no preserved location to carry forward.
     const location =
       preserved?.location ||
-      (await locateDecisionFromSource(sourceText, jurisdiction, {
-        apiKey:
-          process.env.MAPTILER_GEOCODING_API_KEY ||
-          process.env.NEXT_PUBLIC_MAPTILER_API_KEY
-      }));
+      (await locateDecisionFromSource(
+        cardModelInputText(source.card, agendaItems, true),
+        jurisdiction,
+        {
+          apiKey:
+            process.env.MAPTILER_GEOCODING_API_KEY ||
+            process.env.NEXT_PUBLIC_MAPTILER_API_KEY
+        }
+      ));
     if (!location) continue;
 
-    const { error } = await supabase
-      .from("summary_cards")
-      .update(location)
-      .eq("id", inserted.id);
-    if (error) {
-      throw new Error(`Failed to store decision location: ${error.message}`);
+    const key = storedLocationValueKey(location);
+    const pending = writesByValue.get(key);
+    if (pending) pending.ids.push(inserted.id);
+    else writesByValue.set(key, { location, ids: [inserted.id] });
+  }
+
+  for (const { location, ids } of writesByValue.values()) {
+    for (const batch of summaryCardWriteBatches(ids)) {
+      const { error } = await supabase
+        .from("summary_cards")
+        .update(location)
+        .in("id", batch);
+      if (error) {
+        throw new Error(`Failed to store decision location: ${error.message}`);
+      }
     }
   }
 }
