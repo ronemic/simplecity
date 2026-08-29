@@ -381,6 +381,7 @@ export default async function DecisionsPage({
           ) : undefined
         }
         showSantaBarbaraInterestPilot={jurisdiction === "santa-barbara-county"}
+        mapJurisdiction={jurisdiction}
       />
     </div>
   );

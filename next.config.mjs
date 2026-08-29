@@ -15,7 +15,8 @@ export function buildContentSecurityPolicy(environment = process.env.NODE_ENV) {
     "https://www.googletagmanager.com",
     "https://*.google-analytics.com",
     "https://*.analytics.google.com",
-    "https://*.supabase.co"
+    "https://*.supabase.co",
+    "https://api.maptiler.com"
   ];
 
   return [
@@ -26,11 +27,11 @@ export function buildContentSecurityPolicy(environment = process.env.NODE_ENV) {
     "form-action 'self'",
     `script-src ${scriptSources.join(" ")}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com",
+    "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com https://api.maptiler.com",
     "font-src 'self'",
     `connect-src ${connectSources.join(" ")}`,
     "frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://*.swagit.com https://*.granicus.com https://*.legistar.com https://*.iqm2.com",
-    "worker-src 'self'",
+    "worker-src 'self' blob:",
     "manifest-src 'self'",
     ...(development ? [] : ["upgrade-insecure-requests"])
   ].join("; ");

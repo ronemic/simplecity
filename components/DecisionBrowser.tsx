@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Search, SlidersHorizontal } from "lucide-react";
+import { List, Loader2, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DecisionFilters } from "@/components/DecisionFilters";
@@ -15,6 +15,7 @@ import {
   SantaBarbaraInterestHub,
   type SantaBarbaraDecisionView
 } from "@/components/SantaBarbaraInterestHub";
+import { DecisionMapPanel } from "@/components/DecisionMapPanel";
 
 function resultSummary(locale: Locale, start: number, end: number, total: number) {
   if (total === 0) return locale === "es" ? "0 decisiones" : "0 decisions";
@@ -40,7 +41,8 @@ export function DecisionBrowser({
   resultsCoverage,
   resultsCoverageInline,
   showTopicFilters = true,
-  showSantaBarbaraInterestPilot = false
+  showSantaBarbaraInterestPilot = false,
+  mapJurisdiction
 }: {
   cards: SummaryCardRow[];
   initialSearch: string;
@@ -58,6 +60,7 @@ export function DecisionBrowser({
   resultsCoverageInline?: ReactNode;
   showTopicFilters?: boolean;
   showSantaBarbaraInterestPilot?: boolean;
+  mapJurisdiction: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -69,9 +72,15 @@ export function DecisionBrowser({
   const [showSearch, setShowSearch] = useState(Boolean(initialSearch));
   const [showFilters, setShowFilters] = useState(Boolean(selectedCategory || selectedResult));
   const [isPending, startTransition] = useTransition();
+  const decisionView = searchParams.get("view") === "map" ? "map" : "list";
   const resultStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const resultEnd = totalCount === 0 ? 0 : resultStart + cards.length - 1;
   const highlight = initialSearch.trim();
+  const mapParams = new URLSearchParams(searchParams.toString());
+  mapParams.set("jurisdiction", mapJurisdiction);
+  mapParams.delete("page");
+  mapParams.delete("view");
+  const mapQuery = mapParams.toString();
 
   useEffect(() => {
     // The URL changed from outside this input (back/forward, a filter link):
@@ -116,6 +125,18 @@ export function DecisionBrowser({
     });
   }
 
+  function changeDecisionView(view: "list" | "map") {
+    const params = new URLSearchParams(searchParams.toString());
+    if (view === "map") params.set("view", "map");
+    else params.delete("view");
+    params.delete("page");
+    const nextUrl = `${pathname}${params.size > 0 ? `?${params.toString()}` : ""}`;
+
+    startTransition(() => {
+      router.replace(nextUrl, { scroll: false });
+    });
+  }
+
   return (
     <>
       {showSantaBarbaraInterestPilot && santaBarbaraView === "interests" ? (
@@ -153,6 +174,37 @@ export function DecisionBrowser({
                 </div>
               </div>
               <div className="flex w-full flex-wrap items-center gap-x-5 gap-y-2 sm:w-auto sm:gap-x-4">
+                <div
+                  className="inline-flex rounded-lg border border-black/10 bg-black/[0.025] p-0.5"
+                  aria-label={locale === "es" ? "Vista de decisiones" : "Decision view"}
+                >
+                  <button
+                    type="button"
+                    aria-pressed={decisionView === "list"}
+                    onClick={() => changeDecisionView("list")}
+                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-black transition sm:min-h-9 sm:text-sm ${
+                      decisionView === "list"
+                        ? "bg-white text-civic shadow-sm"
+                        : "text-black/55 hover:text-ink"
+                    }`}
+                  >
+                    <List aria-hidden className="h-3.5 w-3.5" />
+                    {locale === "es" ? "Lista" : "List"}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={decisionView === "map"}
+                    onClick={() => changeDecisionView("map")}
+                    className={`inline-flex min-h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-black transition sm:min-h-9 sm:text-sm ${
+                      decisionView === "map"
+                        ? "bg-white text-civic shadow-sm"
+                        : "text-black/55 hover:text-ink"
+                    }`}
+                  >
+                    <MapIcon aria-hidden className="h-3.5 w-3.5" />
+                    {locale === "es" ? "Mapa" : "Map"}
+                  </button>
+                </div>
                 <button
                   type="button"
                   aria-expanded={showSearch}
@@ -209,25 +261,29 @@ export function DecisionBrowser({
             ) : null}
           </div>
 
-          <div className="grid gap-3" aria-live="polite">
-            {cards.map((card) => (
-              <SummaryCard key={card.id} card={card} highlight={highlight} locale={locale} />
-            ))}
-            {cards.length === 0 ? (
-              <div className="quiet-card p-8 text-center">
-                <h3 className="text-lg font-semibold text-ink">
-                  {initialSearch || selectedCategory || selectedResult
-                    ? t(locale, "noMatchingDecisions")
-                    : t(locale, "noDecisionsYet")}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-black/70">
-                  {initialSearch || selectedCategory || selectedResult ? t(locale, "tryChangingFilters") : emptyDescription}
-                </p>
-              </div>
-            ) : null}
-          </div>
+          {decisionView === "map" ? (
+            <DecisionMapPanel key={mapQuery} query={mapQuery} locale={locale} />
+          ) : (
+            <div className="grid gap-3" aria-live="polite">
+              {cards.map((card) => (
+                <SummaryCard key={card.id} card={card} highlight={highlight} locale={locale} />
+              ))}
+              {cards.length === 0 ? (
+                <div className="quiet-card p-8 text-center">
+                  <h3 className="text-lg font-semibold text-ink">
+                    {initialSearch || selectedCategory || selectedResult
+                      ? t(locale, "noMatchingDecisions")
+                      : t(locale, "noDecisionsYet")}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-black/70">
+                    {initialSearch || selectedCategory || selectedResult ? t(locale, "tryChangingFilters") : emptyDescription}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          )}
 
-          {pageCount > 1 ? (
+          {decisionView === "list" && pageCount > 1 ? (
             <nav
               aria-label={locale === "es" ? "Paginación de decisiones" : "Decision pagination"}
               className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-5"

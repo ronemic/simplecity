@@ -33,6 +33,7 @@ import type {
   AnnouncementRow,
   DecisionOutcome,
   DecisionOutcomeTranslationRow,
+  DecisionMapPoint,
   DocumentRow,
   MeetingRow,
   MeetingTranslationRow,
@@ -59,11 +60,21 @@ import {
   isPublicInterestCard,
   selectDiverseCards
 } from "@/lib/utils/civicPriority";
-import type { DecisionResultFilter } from "@/lib/utils/decisionResultFilter";
+import {
+  matchesDecisionResultFilter,
+  type DecisionResultFilter
+} from "@/lib/utils/decisionResultFilter";
+import {
+  cardJurisdictionLabel,
+  cardMeetingDate,
+  cardSharePath,
+  cardShareTitle
+} from "@/lib/utils/cardShare";
 import {
   matchesSantaBarbaraBody,
   type SantaBarbaraBodyView
 } from "@/lib/utils/santaBarbaraBody";
+import { decisionMapCutoff, type DecisionMapTimeframe } from "@/lib/maps/timeframe";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,updated_at";
@@ -101,6 +112,17 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
 ].join(",");
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
+const PUBLIC_DECISION_MAP_SELECT = [
+  PUBLIC_SUMMARY_CARD_COLUMNS,
+  "decision_sort_at",
+  "location_label",
+  "location_latitude",
+  "location_longitude",
+  "location_precision",
+  "location_confidence",
+  "location_status",
+  `meetings(${PUBLIC_CARD_MEETING_COLUMNS})`
+].join(",");
 /**
  * The homepage ranks a pool of candidates down to four cards, so the pool has to
  * be wide enough to contain the good ones. At a flat 80 per jurisdiction, Santa
@@ -203,6 +225,12 @@ function isMissingDecisionSortColumn(error: unknown) {
   if (!error) return false;
   const message = error instanceof Error ? error.message : JSON.stringify(error);
   return message.includes("decision_sort_at") && /PGRST(204|205)|column/i.test(message);
+}
+
+function isMissingDecisionLocationColumn(error: unknown) {
+  if (!error) return false;
+  const message = error instanceof Error ? error.message : JSON.stringify(error);
+  return /location_(?:status|latitude|longitude)/.test(message) && /PGRST(204|205)|column/i.test(message);
 }
 
 function normalizeSearch(value?: string | null) {
@@ -1469,6 +1497,105 @@ const getCachedDecisionCardPage = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
+const getCachedDecisionMapPoints = unstable_cache(
+  async (
+    selection: JurisdictionSelection,
+    locale: Locale,
+    search: string,
+    category: CategoryName | "",
+    result: DecisionResultFilter | "",
+    timeframe: DecisionMapTimeframe,
+    body: SantaBarbaraBodyView | ""
+  ): Promise<DecisionMapPoint[]> => {
+    const clients = getSafePublicClients(selection);
+    const normalizedSearch = normalizeSearch(search);
+    const pattern = toIlikePattern(normalizedSearch);
+    const cutoff = decisionMapCutoff(timeframe);
+
+    const results = await Promise.all(
+      clients.map(async ({ jurisdiction, supabase }) => {
+        const meetingIds = pattern
+          ? await getMatchingMeetingIdsForSearch(
+              supabase,
+              jurisdiction.slug,
+              jurisdiction.name,
+              pattern
+            )
+          : [];
+        const bodyMeetingIds =
+          jurisdiction.slug === "santa-barbara-county" && body
+            ? await getSantaBarbaraMeetingIdsForBody(supabase, body)
+            : null;
+        if (bodyMeetingIds && bodyMeetingIds.length === 0) return [] as SummaryCardRow[];
+
+        let query = supabase
+          .from("summary_cards")
+          .select(PUBLIC_DECISION_MAP_SELECT)
+          .eq("jurisdiction_slug", jurisdiction.slug)
+          .eq("is_published", true)
+          .eq("location_status", "verified")
+          .not("location_latitude", "is", null)
+          .not("location_longitude", "is", null);
+
+        if (category) query = query.contains("category_tags", [category]);
+        if (bodyMeetingIds) query = query.in("meeting_id", bodyMeetingIds);
+        if (pattern) query = query.or(decisionCardSearchFilters(pattern, meetingIds));
+        if (cutoff) query = query.gte("decision_sort_at", cutoff);
+
+        const { data, error } = await query
+          .order("decision_sort_at", { ascending: false, nullsFirst: false })
+          .limit(500);
+        if (error) {
+          if (!isMissingDecisionLocationColumn(error)) {
+            logQueryError(`Failed to load ${jurisdiction.name} decision map`, error);
+          }
+          return [] as SummaryCardRow[];
+        }
+
+        const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
+          withCardJurisdictionFallback(row, jurisdiction)
+        );
+        return enrichPublicCards(supabase, rows, locale);
+      })
+    );
+
+    return sortCards(results.flat())
+      .filter((card) => matchesDecisionResultFilter(card, result || undefined))
+      .flatMap((card): DecisionMapPoint[] => {
+        const latitude = card.location_latitude;
+        const longitude = card.location_longitude;
+        const precision = card.location_precision;
+        if (
+          typeof latitude !== "number" ||
+          typeof longitude !== "number" ||
+          !precision ||
+          !card.location_label
+        ) {
+          return [];
+        }
+        const outcome = card.outcome?.kind ||
+          (card.status === "Upcoming vote" && card.meetings?.status === "Past" ? "awaiting" : null);
+        return [{
+          id: card.id,
+          title: cardShareTitle(card),
+          jurisdiction: cardJurisdictionLabel(card, locale),
+          latitude,
+          longitude,
+          locationLabel: card.location_label,
+          locationPrecision: precision,
+          locationConfidence: card.location_confidence ?? 0,
+          category: card.category_tags?.[0] || null,
+          result: outcome,
+          meetingDate: cardMeetingDate(card, locale) || null,
+          href: cardSharePath(card.id)
+        }];
+      })
+      .slice(0, 750);
+  },
+  ["decision-map-points-v2"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
 const getCachedMeetings = unstable_cache(
   async (
     selection: JurisdictionSelection,
@@ -1937,6 +2064,34 @@ export async function getDecisionCardPage({
     body || "",
     normalizeDecisionPage(page),
     normalizeDecisionPageSize(pageSize)
+  );
+}
+
+export async function getDecisionMapPoints({
+  jurisdiction = getDefaultJurisdiction().slug,
+  locale = "en",
+  search = "",
+  category,
+  result,
+  timeframe = "12m",
+  body
+}: {
+  jurisdiction?: JurisdictionSelection;
+  locale?: Locale;
+  search?: string;
+  category?: CategoryName;
+  result?: DecisionResultFilter;
+  timeframe?: DecisionMapTimeframe;
+  body?: SantaBarbaraBodyView;
+}) {
+  return getCachedDecisionMapPoints(
+    jurisdiction,
+    locale,
+    normalizeSearch(search),
+    category || "",
+    result || "",
+    timeframe,
+    body || ""
   );
 }
 

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import "./globals.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { SupportCallout } from "@/components/SupportCallout";

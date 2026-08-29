@@ -81,6 +81,15 @@ create table if not exists public.summary_cards (
   is_published boolean default true,
   is_featured boolean default false,
   admin_notes text,
+  location_label text,
+  location_latitude double precision,
+  location_longitude double precision,
+  location_precision text,
+  location_confidence double precision,
+  location_method text,
+  location_status text,
+  location_source_text text,
+  location_updated_at timestamptz,
   raw_llm_json jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
@@ -1180,6 +1189,42 @@ on public.summary_cards(
 );
 
 -- -----------------------------------------------------------------------------
+-- Source: supabase/migrations/20260829000000_add_decision_locations.sql
+-- -----------------------------------------------------------------------------
+
+alter table public.summary_cards
+  drop constraint if exists summary_cards_location_precision_check,
+  add constraint summary_cards_location_precision_check
+    check (location_precision is null or location_precision in ('street_address', 'intersection', 'place')),
+  drop constraint if exists summary_cards_location_confidence_check,
+  add constraint summary_cards_location_confidence_check
+    check (location_confidence is null or (location_confidence >= 0 and location_confidence <= 1)),
+  drop constraint if exists summary_cards_location_method_check,
+  add constraint summary_cards_location_method_check
+    check (location_method is null or location_method in ('geocoded', 'manual')),
+  drop constraint if exists summary_cards_location_status_check,
+  add constraint summary_cards_location_status_check
+    check (location_status is null or location_status in ('verified', 'no_candidate', 'geocode_failed')),
+  drop constraint if exists summary_cards_verified_location_check,
+  add constraint summary_cards_verified_location_check
+    check (
+      location_status is distinct from 'verified'
+      or (
+        location_label is not null
+        and location_latitude between -90 and 90
+        and location_longitude between -180 and 180
+        and location_precision is not null
+        and location_confidence is not null
+        and location_method is not null
+        and location_source_text is not null
+      )
+    );
+
+create index if not exists summary_cards_public_location_idx
+on public.summary_cards(jurisdiction_slug, decision_sort_at desc)
+where is_published = true and location_status = 'verified';
+
+-- -----------------------------------------------------------------------------
 -- Source: supabase/migrations/20260717000000_add_security_rate_limits.sql
 -- -----------------------------------------------------------------------------
 
@@ -1423,6 +1468,14 @@ grant select (
   is_published,
   is_featured,
   decision_sort_at,
+  location_label,
+  location_latitude,
+  location_longitude,
+  location_precision,
+  location_confidence,
+  location_method,
+  location_status,
+  location_updated_at,
   created_at,
   updated_at
 )

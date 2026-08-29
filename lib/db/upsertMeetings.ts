@@ -30,6 +30,10 @@ import {
   formatAgendaItemContexts
 } from "@/lib/scraper/agendaItemContext";
 import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
+import {
+  locateDecisionFromSource,
+  type StoredDecisionLocation
+} from "@/lib/maps/decisionLocation";
 
 type UpsertedMeeting = {
   externalId: string;
@@ -48,6 +52,7 @@ type PreservedCardAdminState = {
   is_published: boolean | null;
   is_featured: boolean | null;
   admin_notes: string | null;
+  location?: StoredDecisionLocation | null;
 };
 
 type InsertedCardIdentity = {
@@ -72,6 +77,7 @@ type AgendaAvailabilityCard = {
 const sourceItemIdSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const modelInputSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const meetingSummaryHashSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
+const decisionLocationSupport = new WeakMap<SupabaseClient, Promise<boolean>>();
 const MAX_STORED_MINUTES_CHARACTERS = 2_000_000;
 const MAX_STORED_DOCUMENT_CHARACTERS = 500_000;
 const MAX_STORED_RAW_AGENDA_ITEM_CHARACTERS = 4_000;
@@ -270,6 +276,109 @@ function supportsSourceItemId(supabase: SupabaseClient) {
     });
   sourceItemIdSupport.set(supabase, check);
   return check;
+}
+
+function supportsDecisionLocations(supabase: SupabaseClient) {
+  const existing = decisionLocationSupport.get(supabase);
+  if (existing) return existing;
+
+  const inspection = supabase
+    .from("summary_cards")
+    .select("location_status,location_latitude,location_longitude");
+  const limitedInspection = "limit" in inspection && typeof inspection.limit === "function"
+    ? inspection.limit(1)
+    : Promise.resolve({ error: { message: "location columns unavailable" } });
+  const check = Promise.resolve(limitedInspection)
+    .then(({ error }) => {
+      if (!error) return true;
+      if (/location_status|location_latitude|location_longitude|PGRST204|column/i.test(
+        error.message || ""
+      )) {
+        decisionLocationSupport.delete(supabase);
+        return false;
+      }
+      throw new Error(`Failed to inspect decision location support: ${error.message}`);
+    })
+    .catch((error) => {
+      decisionLocationSupport.delete(supabase);
+      throw error;
+    });
+  decisionLocationSupport.set(supabase, check);
+  return check;
+}
+
+const DECISION_LOCATION_COLUMNS = [
+  "location_label",
+  "location_latitude",
+  "location_longitude",
+  "location_precision",
+  "location_confidence",
+  "location_method",
+  "location_status",
+  "location_source_text",
+  "location_updated_at"
+].join(",");
+
+function storedLocationFromRow(row: Record<string, unknown>): StoredDecisionLocation | null {
+  if (row.location_status !== "verified") return null;
+  return {
+    location_label: typeof row.location_label === "string" ? row.location_label : null,
+    location_latitude: typeof row.location_latitude === "number" ? row.location_latitude : null,
+    location_longitude: typeof row.location_longitude === "number" ? row.location_longitude : null,
+    location_precision: row.location_precision as StoredDecisionLocation["location_precision"],
+    location_confidence: typeof row.location_confidence === "number" ? row.location_confidence : null,
+    location_method: row.location_method as StoredDecisionLocation["location_method"],
+    location_status: "verified",
+    location_source_text:
+      typeof row.location_source_text === "string" ? row.location_source_text : null,
+    location_updated_at:
+      typeof row.location_updated_at === "string" ? row.location_updated_at : new Date().toISOString()
+  };
+}
+
+async function populateDecisionLocations(
+  supabase: SupabaseClient,
+  insertedCards: InsertedCardIdentity[],
+  sourceCards: CardWithSummaryIndex[],
+  jurisdiction: JurisdictionConfig | null | undefined,
+  agendaItems: readonly AgendaItem[] | undefined,
+  preservedByExactKey?: ReadonlyMap<string, PreservedCardAdminState>,
+  preservedByAgendaKey?: ReadonlyMap<string, PreservedCardAdminState>
+) {
+  if (!jurisdiction || insertedCards.length === 0 || !(await supportsDecisionLocations(supabase))) {
+    return;
+  }
+
+  for (const inserted of insertedCards) {
+    const source = sourceCards.find(({ card }) =>
+      inserted.source_item_id && card.sourceItemId
+        ? inserted.source_item_id === card.sourceItemId
+        : exactCardKey(inserted.agenda_item, inserted.source_url) ===
+          exactCardKey(card.agendaItem, card.source)
+    );
+    if (!source) continue;
+
+    const preserved =
+      preservedByExactKey?.get(exactCardKey(source.card.agendaItem, source.card.source)) ||
+      preservedByAgendaKey?.get(normalizeCardKey(source.card.agendaItem));
+    const sourceText = cardModelInputText(source.card, agendaItems, true);
+    const location =
+      preserved?.location ||
+      (await locateDecisionFromSource(sourceText, jurisdiction, {
+        apiKey:
+          process.env.MAPTILER_GEOCODING_API_KEY ||
+          process.env.NEXT_PUBLIC_MAPTILER_API_KEY
+      }));
+    if (!location) continue;
+
+    const { error } = await supabase
+      .from("summary_cards")
+      .update(location)
+      .eq("id", inserted.id);
+    if (error) {
+      throw new Error(`Failed to store decision location: ${error.message}`);
+    }
+  }
 }
 
 /** Keep regional pipelines running while the additive hash migration rolls out. */
@@ -1055,6 +1164,7 @@ export async function replaceSummaryCardsForMeeting(
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
   const modelInputAvailable = await supportsModelInputText(supabase);
+  const decisionLocationsAvailable = await supportsDecisionLocations(supabase);
   const authoritativeSourceItemIds =
     sourceItemIdAvailable && options.authoritativeSourceItemIds?.length
       ? new Set(options.authoritativeSourceItemIds)
@@ -1066,9 +1176,12 @@ export async function replaceSummaryCardsForMeeting(
         !authoritativeSourceItemIds ||
         Boolean(card.sourceItemId && authoritativeSourceItemIds.has(card.sourceItemId))
     );
+  const existingColumns = decisionLocationsAvailable
+    ? `agenda_item,source_url,is_published,is_featured,admin_notes,${DECISION_LOCATION_COLUMNS}`
+    : "agenda_item,source_url,is_published,is_featured,admin_notes";
   const { data: existingCards, error: existingError } = await supabase
     .from("summary_cards")
-    .select("agenda_item,source_url,is_published,is_featured,admin_notes")
+    .select(existingColumns)
     .eq("meeting_id", meetingId);
 
   if (existingError) throw new Error(`Failed to read old cards: ${existingError.message}`);
@@ -1076,11 +1189,22 @@ export async function replaceSummaryCardsForMeeting(
   const preservedByExactKey = new Map<string, PreservedCardAdminState>();
   const preservedByAgendaKey = new Map<string, PreservedCardAdminState>();
 
-  for (const card of existingCards || []) {
+  const existingCardRows = (existingCards || []) as unknown as Array<{
+    agenda_item: string | null;
+    source_url: string | null;
+    is_published: boolean | null;
+    is_featured: boolean | null;
+    admin_notes: string | null;
+  } & Record<string, unknown>>;
+
+  for (const card of existingCardRows) {
     const state = {
       is_published: card.is_published,
       is_featured: card.is_featured,
-      admin_notes: card.admin_notes
+      admin_notes: card.admin_notes,
+      location: decisionLocationsAvailable
+        ? storedLocationFromRow(card)
+        : null
     };
 
     preservedByExactKey.set(exactCardKey(card.agenda_item, card.source_url), state);
@@ -1139,6 +1263,16 @@ export async function replaceSummaryCardsForMeeting(
     rows,
     sourceItemIdAvailable,
     "insert"
+  );
+
+  await populateDecisionLocations(
+    supabase,
+    data,
+    cardsToInsert,
+    options.jurisdiction,
+    options.agendaItems,
+    preservedByExactKey,
+    preservedByAgendaKey
   );
 
   await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
@@ -1387,6 +1521,13 @@ export async function appendSummaryCardsForMeeting(
       rows,
       sourceItemIdAvailable,
       "append"
+    );
+    await populateDecisionLocations(
+      supabase,
+      insertedCards,
+      cardsToInsert,
+      options.jurisdiction,
+      options.agendaItems
     );
   }
 

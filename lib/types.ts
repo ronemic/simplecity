@@ -224,11 +224,39 @@ export type SummaryCardRow = {
   is_published: boolean | null;
   is_featured: boolean | null;
   admin_notes: string | null;
+  location_label?: string | null;
+  location_latitude?: number | null;
+  location_longitude?: number | null;
+  location_precision?: DecisionLocationPrecision | null;
+  location_confidence?: number | null;
+  location_method?: DecisionLocationMethod | null;
+  location_status?: DecisionLocationStatus | null;
+  location_source_text?: string | null;
+  location_updated_at?: string | null;
   decision_sort_at?: string | null;
   created_at: string | null;
   updated_at: string | null;
   meetings?: MeetingRow | null;
   outcome?: DecisionOutcome | null;
+};
+
+export type DecisionLocationPrecision = "street_address" | "intersection" | "place";
+export type DecisionLocationMethod = "geocoded" | "manual";
+export type DecisionLocationStatus = "verified" | "no_candidate" | "geocode_failed";
+
+export type DecisionMapPoint = {
+  id: string;
+  title: string;
+  jurisdiction: string;
+  latitude: number;
+  longitude: number;
+  locationLabel: string;
+  locationPrecision: DecisionLocationPrecision;
+  locationConfidence: number;
+  category: string | null;
+  result: DecisionOutcomeKind | "awaiting" | null;
+  meetingDate: string | null;
+  href: string;
 };
 
 export type DecisionOutcomeKind =
