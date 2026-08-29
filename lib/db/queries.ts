@@ -39,12 +39,12 @@ import type {
   SummaryCardRow,
   SummaryCardTranslationRow
 } from "@/lib/types";
-import type { Locale } from "@/lib/i18n";
+import { LOCALES, type Locale } from "@/lib/i18n";
 import {
   applyDecisionOutcomeTranslation,
 } from "@/lib/i18n/decisionOutcome";
 import { hasCommentOptionInfo } from "@/lib/utils/commentDeadline";
-import { isUpcomingMeetingDate } from "@/lib/utils/date";
+import { isUpcomingMeetingDate, meetingDateParts } from "@/lib/utils/date";
 import {
   decisionCardSearchFilters,
   decisionMeetingSearchFilters,
@@ -54,6 +54,11 @@ import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
 import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
+import {
+  compareCardsByPublicInterest,
+  isPublicInterestCard,
+  selectDiverseCards
+} from "@/lib/utils/civicPriority";
 import type { DecisionResultFilter } from "@/lib/utils/decisionResultFilter";
 import {
   matchesSantaBarbaraBody,
@@ -756,10 +761,10 @@ async function loadPublishedCardsForProject(
 }
 
 /** Homepage previews do not render outcome panels, so skip that extra database
- * round trip. Spanish still applies its card and meeting translations. */
-async function loadHomepagePreviewCardsForProject(
+ * round trip. These rows are untranslated on purpose -- ranking runs on the
+ * English text and only the selected cards are translated afterwards. */
+async function loadHomepagePreviewRowsForProject(
   project: JurisdictionProject,
-  locale: Locale,
   limit: number
 ) {
   const rowGroups = await Promise.all(
@@ -770,8 +775,76 @@ async function loadHomepagePreviewCardsForProject(
       )
     )
   );
-  const rows = rowGroups.flat();
-  return locale === "en" ? rows : applyCardTranslations(project.supabase, rows, locale);
+  return rowGroups.flat();
+}
+
+/**
+ * Translates an already-chosen handful of cards.
+ *
+ * Each card has to go back to the database it came from, so they are regrouped
+ * by project -- keyed off each row's own jurisdiction rather than the candidate
+ * pool, so this needs nothing but the cards themselves and can therefore run
+ * against a cached selection. Cards whose project cannot be resolved keep their
+ * English text rather than being dropped.
+ */
+async function translateSelectedCards(
+  selection: JurisdictionSelection,
+  cards: SummaryCardRow[],
+  locale: Locale
+) {
+  if (locale === "en" || cards.length === 0) return cards;
+
+  const projectBySlug = new Map<string, JurisdictionProject>();
+  for (const project of getSafePublicProjects(selection)) {
+    for (const jurisdiction of project.jurisdictions) {
+      projectBySlug.set(jurisdiction.slug, project);
+    }
+  }
+
+  const groups = new Map<JurisdictionProject, SummaryCardRow[]>();
+  for (const card of cards) {
+    const project = projectBySlug.get(card.jurisdiction_slug || "");
+    if (!project) continue;
+    const existing = groups.get(project);
+    if (existing) existing.push(card);
+    else groups.set(project, [card]);
+  }
+
+  const translated = new Map<string, SummaryCardRow>();
+  await Promise.all(
+    [...groups].map(async ([project, rows]) => {
+      for (const row of await applyCardTranslations(project.supabase, rows, locale)) {
+        translated.set(row.id, row);
+      }
+    })
+  );
+
+  return cards.map((card) => translated.get(card.id) || card);
+}
+
+/**
+ * The soonest upcoming meetings represented in the ranked pool, one card each.
+ */
+function selectUpcomingMeetingCards(cards: SummaryCardRow[], limit: number) {
+  const seen = new Set<string>();
+  return cards
+    .filter((card) => {
+      const meeting = card.meetings;
+      if (!meeting || /^cancel{1,2}ed$/i.test(String(meeting.status || "").trim())) return false;
+      if (!isUpcomingMeetingDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text)) {
+        return false;
+      }
+      const key = meeting.id || `${meeting.title}-${meeting.date_text || meeting.meeting_datetime || ""}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => {
+      const leftParts = meetingDateParts(left.meetings?.date_text, left.meetings?.meeting_datetime);
+      const rightParts = meetingDateParts(right.meetings?.date_text, right.meetings?.meeting_datetime);
+      return (leftParts?.iso || "").localeCompare(rightParts?.iso || "");
+    })
+    .slice(0, limit);
 }
 
 async function loadPublishedCardsForSelection(
@@ -788,10 +861,43 @@ async function loadPublishedCardsForSelection(
   return sortCards(results.flat());
 }
 
-const getCachedPublishedCardPreview = unstable_cache(
-  async (selection: JurisdictionSelection, locale: Locale) => {
+export const HOMEPAGE_DECISION_CARD_COUNT = 4;
+const HOMEPAGE_MEETING_CARD_COUNT = 5;
+
+export type HomepageCardSelection = {
+  cards: SummaryCardRow[];
+  meetingCards: SummaryCardRow[];
+  totalCount: number;
+};
+
+type LocalizedHomepageSelection = Record<Locale, HomepageCardSelection>;
+
+function emptyLocalizedSelection(): LocalizedHomepageSelection {
+  return LOCALES.reduce((selection, locale) => {
+    selection[locale] = { cards: [], meetingCards: [], totalCount: 0 };
+    return selection;
+  }, {} as LocalizedHomepageSelection);
+}
+
+/**
+ * The nine-or-so cards the homepage actually renders, ranked and ready.
+ *
+ * What is cached here is the *answer*, not the candidate pool. Caching the pool
+ * looked equivalent but was not: every request still deserialized ~1MB of cards
+ * and re-ran the ranking sort, which is ~275ms for a 520-card pool on a fast
+ * machine and several seconds on a small shared instance. That cost sat outside
+ * the cache, so it was paid on every hit and no amount of cache warming helped.
+ * Ranking inside the cache makes a hit a lookup of ~20KB and nothing else.
+ *
+ * Ranking also happens before translation, on the English rows. The scoring
+ * patterns are English, so ranking translated text scored Spanish cards near
+ * zero and gave the two locales different homepages; now both locales pick the
+ * same decisions and only the survivors are translated.
+ */
+const getCachedHomepageSelection = unstable_cache(
+  async (selection: JurisdictionSelection): Promise<LocalizedHomepageSelection> => {
     const projects = getSafePublicProjects(selection);
-    if (projects.length === 0) return [] as SummaryCardRow[];
+    if (projects.length === 0) return emptyLocalizedSelection();
 
     // The pool is budgeted per jurisdiction, not per database, so the divisor
     // stays the jurisdiction count however those jurisdictions are grouped.
@@ -800,13 +906,51 @@ const getCachedPublishedCardPreview = unstable_cache(
       0
     );
     const limit = homepageSelectionPreviewLimit(selection, jurisdictionCount);
-    const results = await Promise.all(
-      projects.map((project) => loadHomepagePreviewCardsForProject(project, locale, limit))
+    const [rowGroups, publishedCount] = await Promise.all([
+      Promise.all(projects.map((project) => loadHomepagePreviewRowsForProject(project, limit))),
+      countPublishedCards(selection)
+    ]);
+
+    const pool = rowGroups.flat();
+    const prioritized = sortCards(pool).sort(compareCardsByPublicInterest);
+    const publicInterestCards = prioritized.filter(isPublicInterestCard);
+    const preferred = publicInterestCards.length > 0 ? publicInterestCards : prioritized;
+
+    const cards = selectDiverseCards(preferred, HOMEPAGE_DECISION_CARD_COUNT);
+    const meetingCards = selectUpcomingMeetingCards(preferred, HOMEPAGE_MEETING_CARD_COUNT);
+    // The pool is capped by `limit`, so its length is a query limit rather than
+    // a count -- reporting it told every reader there were exactly 80 (or 200,
+    // or 520) published decisions. A failed count returns 0, in which case the
+    // pool size is at least an honest lower bound.
+    const totalCount = publishedCount || pool.length;
+
+    // Ranking runs on English text, so every locale gets the same cards and
+    // only the wording differs. Building them all here keeps the expensive
+    // fan-out to one cache entry: switching language then costs nothing beyond
+    // the render, rather than repeating the whole query to reach an identical
+    // selection. Nesting a second unstable_cache to do this per locale does not
+    // work -- an inner cached call inside a cache scope always recomputes.
+    const localized = await Promise.all(
+      LOCALES.map(async (entryLocale): Promise<[Locale, HomepageCardSelection]> => {
+        if (entryLocale === "en") {
+          return [entryLocale, { cards, meetingCards, totalCount }];
+        }
+
+        const [localizedCards, localizedMeetingCards] = await Promise.all([
+          translateSelectedCards(selection, cards, entryLocale),
+          translateSelectedCards(selection, meetingCards, entryLocale)
+        ]);
+
+        return [
+          entryLocale,
+          { cards: localizedCards, meetingCards: localizedMeetingCards, totalCount }
+        ];
+      })
     );
 
-    return sortCards(results.flat());
+    return Object.fromEntries(localized) as LocalizedHomepageSelection;
   },
-  ["published-summary-card-preview"],
+  ["homepage-selection-v2"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -927,36 +1071,37 @@ const getCachedUpcomingDecisionSnapshot = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
-const getCachedPublishedCardCount = unstable_cache(
-  async (selection: JurisdictionSelection) => {
-    const projects = getSafePublicProjects(selection);
-    if (projects.length === 0) return 0;
+async function countPublishedCards(selection: JurisdictionSelection) {
+  const projects = getSafePublicProjects(selection);
+  if (projects.length === 0) return 0;
 
-    const results = await Promise.all(
-      projects.map(async (project) => {
-        const { count, error } = await project.supabase
-          .from("summary_cards")
-          .select("id", { count: "exact", head: true })
-          .in("jurisdiction_slug", projectSlugs(project))
-          .eq("is_published", true);
+  const results = await Promise.all(
+    projects.map(async (project) => {
+      const { count, error } = await project.supabase
+        .from("summary_cards")
+        .select("id", { count: "exact", head: true })
+        .in("jurisdiction_slug", projectSlugs(project))
+        .eq("is_published", true);
 
-        if (error) {
-          logQueryError(
-            `Failed to count ${projectLabel(project)} published summary cards`,
-            error
-          );
-          return 0;
-        }
+      if (error) {
+        logQueryError(
+          `Failed to count ${projectLabel(project)} published summary cards`,
+          error
+        );
+        return 0;
+      }
 
-        return count || 0;
-      })
-    );
+      return count || 0;
+    })
+  );
 
-    return results.reduce((sum, count) => sum + count, 0);
-  },
-  ["published-summary-card-count"],
-  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
-);
+  return results.reduce((sum, count) => sum + count, 0);
+}
+
+const getCachedPublishedCardCount = unstable_cache(countPublishedCards, ["published-summary-card-count"], {
+  revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS,
+  tags: [PUBLIC_CONTENT_CACHE_TAG]
+});
 
 const getCachedDecisionResultFreshness = unstable_cache(
   async (
@@ -1652,11 +1797,42 @@ export async function getPublishedCards(
   return loadPublishedCardsForSelection(selection, locale);
 }
 
-export async function getPublishedCardPreview(
+export async function getHomepageCardSelection(
   selection: JurisdictionSelection = getDefaultJurisdiction().slug,
   locale: Locale = "en"
 ) {
-  return getCachedPublishedCardPreview(selection, locale);
+  const localized = await getCachedHomepageSelection(selection);
+  return localized[locale] || localized.en;
+}
+
+/**
+ * Everything the homepage renders, for either the default view or a search.
+ *
+ * Search results come from the already-cached decision page query and are
+ * ranked inline: a page of results is small enough that ranking it costs
+ * nothing, and caching per search term would fill the cache with one-off keys.
+ */
+export async function getHomepageContent({
+  jurisdiction = getDefaultJurisdiction().slug,
+  locale = "en",
+  search = ""
+}: {
+  jurisdiction?: JurisdictionSelection;
+  locale?: Locale;
+  search?: string;
+}): Promise<HomepageCardSelection> {
+  if (!search) return getHomepageCardSelection(jurisdiction, locale);
+
+  const { cards, totalCount } = await getDecisionCardPage({ jurisdiction, locale, search });
+  const prioritized = [...cards].sort(compareCardsByPublicInterest);
+  const publicInterestCards = prioritized.filter(isPublicInterestCard);
+  const preferred = publicInterestCards.length > 0 ? publicInterestCards : prioritized;
+
+  return {
+    cards: prioritized,
+    meetingCards: selectUpcomingMeetingCards(preferred, HOMEPAGE_MEETING_CARD_COUNT),
+    totalCount
+  };
 }
 
 export async function getPublishedCardCount(

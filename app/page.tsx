@@ -2,21 +2,25 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
-import { Suspense } from "react";
+import { cache, Suspense } from "react";
 import {
+  HomepageContentLoading,
+  HomepageContentUnavailable,
   HomepageDataContent,
-  HomepageDataProvider,
-  HomepageHeroStatus
+  HomepageHeroStatus,
+  HomepageHeroStatusLoading
 } from "@/components/HomepageData";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { getHomepageContent, type HomepageCardSelection } from "@/lib/db/queries";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictions,
   getJurisdictionLabel,
   isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  toPublicJurisdictionSlug,
+  type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -151,6 +155,71 @@ function GlanceStatsLoading({ locale }: { locale: Locale }) {
   );
 }
 
+/**
+ * Deduped per request so the hero status line and the decisions section can sit
+ * in separate Suspense boundaries -- streaming independently -- while sharing a
+ * single read. `cache` keys on argument identity, so the arguments stay
+ * primitives rather than the options object the query itself takes.
+ */
+const homepageContent = cache(
+  (jurisdiction: JurisdictionSelection, locale: Locale, search: string) =>
+    getHomepageContent({ jurisdiction, locale, search })
+);
+
+async function HeroStatus({
+  jurisdiction,
+  locale,
+  search
+}: {
+  jurisdiction: JurisdictionSelection;
+  locale: Locale;
+  search: string;
+}) {
+  let totalCount: number | null = null;
+  try {
+    ({ totalCount } = await homepageContent(jurisdiction, locale, search));
+  } catch {
+    // A missing count is not worth a visible failure in the hero, and the
+    // decisions section below already reports the error and logs it once.
+  }
+
+  if (totalCount === null) return null;
+  return <HomepageHeroStatus locale={locale} totalCount={totalCount} />;
+}
+
+async function HomepageDecisions({
+  hasSearch,
+  jurisdiction,
+  jurisdictionLabel,
+  locale,
+  search
+}: {
+  hasSearch: boolean;
+  jurisdiction: JurisdictionSelection;
+  jurisdictionLabel: string;
+  locale: Locale;
+  search: string;
+}) {
+  let content: HomepageCardSelection | null = null;
+  try {
+    content = await homepageContent(jurisdiction, locale, search);
+  } catch (error) {
+    console.error("Failed to load homepage decisions", error);
+  }
+
+  if (!content) return <HomepageContentUnavailable locale={locale} />;
+
+  return (
+    <HomepageDataContent
+      content={content}
+      hasSearch={hasSearch}
+      jurisdictionLabel={jurisdictionLabel}
+      locale={locale}
+      search={search}
+    />
+  );
+}
+
 export default async function Home({
   searchParams
 }: {
@@ -184,8 +253,7 @@ export default async function Home({
         : `${jurisdictionLabel} public meetings`;
 
   return (
-    <HomepageDataProvider jurisdiction={jurisdiction} locale={locale} search={search}>
-      <div className="overflow-hidden">
+    <div className="overflow-hidden">
       <section className="civic-hero">
         <div
           className={`section-shell relative z-10 grid gap-7 ${
@@ -224,7 +292,9 @@ export default async function Home({
                 ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
                 : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
-            <HomepageHeroStatus locale={locale} />
+            <Suspense fallback={<HomepageHeroStatusLoading />}>
+              <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} />
+            </Suspense>
           </div>
 
           <div className="space-y-5 lg:justify-self-stretch">
@@ -248,12 +318,15 @@ export default async function Home({
         </div>
       </section>
 
-      <HomepageDataContent
-        hasSearch={hasSearch}
-        jurisdictionLabel={jurisdictionLabel}
-        locale={locale}
-        search={search}
-      />
+      <Suspense fallback={<HomepageContentLoading locale={locale} />}>
+        <HomepageDecisions
+          hasSearch={hasSearch}
+          jurisdiction={jurisdiction}
+          jurisdictionLabel={jurisdictionLabel}
+          locale={locale}
+          search={search}
+        />
+      </Suspense>
       <section className="section-shell pb-16 pt-8">
         <div className="mb-5 max-w-2xl">
           <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>
@@ -283,8 +356,6 @@ export default async function Home({
           })}
         </div>
       </section>
-
-      </div>
-    </HomepageDataProvider>
+    </div>
   );
 }
