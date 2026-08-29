@@ -2,7 +2,7 @@
 
 import { Loader2, Search, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DecisionFilters } from "@/components/DecisionFilters";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { PaginationJumpForm } from "@/components/PaginationJumpForm";
@@ -63,6 +63,7 @@ export function DecisionBrowser({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(initialSearch);
+  const submittedSearch = useRef(initialSearch);
   const [pendingPage, setPendingPage] = useState<number | null>(null);
   const [santaBarbaraView, setSantaBarbaraView] = useState<SantaBarbaraDecisionView>("all");
   const [showSearch, setShowSearch] = useState(Boolean(initialSearch));
@@ -71,6 +72,16 @@ export function DecisionBrowser({
   const resultStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const resultEnd = totalCount === 0 ? 0 : resultStart + cards.length - 1;
   const highlight = initialSearch.trim();
+
+  useEffect(() => {
+    // The URL changed from outside this input (back/forward, a filter link):
+    // adopt it instead of pushing the stale local value back.
+    if (initialSearch !== submittedSearch.current) {
+      submittedSearch.current = initialSearch;
+      setSearch(initialSearch);
+      if (initialSearch) setShowSearch(true);
+    }
+  }, [initialSearch]);
 
   useEffect(() => {
     const query = search.trim();
@@ -83,6 +94,7 @@ export function DecisionBrowser({
       params.delete("page");
       const nextUrl = `${pathname}${params.size > 0 ? `?${params.toString()}` : ""}`;
 
+      submittedSearch.current = query;
       startTransition(() => {
         router.replace(nextUrl, { scroll: false });
       });

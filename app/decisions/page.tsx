@@ -333,7 +333,7 @@ export default async function DecisionsPage({
       ) : null}
 
       <DecisionBrowser
-        key={`${jurisdiction}-${isSantaBarbara ? santaBarbaraBody : "all-bodies"}-${selectedCategory || "all"}-${selectedResult || "all"}-${search}`}
+        key={`${jurisdiction}-${isSantaBarbara ? santaBarbaraBody : "all-bodies"}-${selectedCategory || "all"}-${selectedResult || "all"}`}
         cards={result.cards}
         initialSearch={search}
         currentPage={result.page}
