@@ -30,7 +30,7 @@ const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 // Manually maintained from analytics. Last checked 2026-08-21; update the date
 // when you revise the figure so it is obvious when it has gone stale.
-const APPROX_USER_COUNT = "500+";
+const APPROX_USER_COUNT = "600+";
 // Rounded down from the aggregate published-card count. Last checked 2026-08-29.
 const APPROX_AGENDA_ITEMS_ANALYZED = "8000+";
 
