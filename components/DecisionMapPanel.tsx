@@ -7,6 +7,18 @@ import { useEffect, useState } from "react";
 import type { DecisionMapPoint } from "@/lib/types";
 import { normalizeDecisionMapTimeframe, type DecisionMapTimeframe } from "@/lib/maps/timeframe";
 
+const pointCache = new Map<string, DecisionMapPoint[]>();
+const MAX_CACHED_POINT_QUERIES = 30;
+
+function cachePoints(key: string, points: DecisionMapPoint[]) {
+  pointCache.delete(key);
+  pointCache.set(key, points);
+  if (pointCache.size > MAX_CACHED_POINT_QUERIES) {
+    const oldestKey = pointCache.keys().next().value;
+    if (oldestKey) pointCache.delete(oldestKey);
+  }
+}
+
 const DecisionMapCanvas = dynamic(
   () => import("@/components/DecisionMapCanvas").then((module) => module.DecisionMapCanvas),
   {
@@ -24,10 +36,18 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
   const router = useRouter();
   const searchParams = useSearchParams();
   const [points, setPoints] = useState<DecisionMapPoint[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [mapStarted, setMapStarted] = useState(false);
+  const [settledRequestUrl, setSettledRequestUrl] = useState<string | null>(null);
+  const [failedRequestUrl, setFailedRequestUrl] = useState<string | null>(null);
   const apiKey = process.env.NEXT_PUBLIC_MAPTILER_API_KEY || "";
   const timeframe = normalizeDecisionMapTimeframe(searchParams.get("mapRange"));
+  const requestParams = new URLSearchParams(query);
+  requestParams.set("lang", locale);
+  const requestUrl = `/api/decisions/map?${requestParams.toString()}`;
+  const error = failedRequestUrl === requestUrl;
+  const loading = !hasLoaded && !error;
+  const refreshing = hasLoaded && settledRequestUrl !== requestUrl;
 
   function changeTimeframe(nextTimeframe: DecisionMapTimeframe) {
     const params = new URLSearchParams(searchParams.toString());
@@ -42,28 +62,34 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
   useEffect(() => {
     if (!apiKey) return;
     const controller = new AbortController();
-    const params = new URLSearchParams(query);
-    // Pin the locale to the URL. The map response is localized, and the shared
-    // cache in front of the route keys on the URL alone.
-    params.set("lang", locale);
+    const cached = pointCache.get(requestUrl);
+    const request = cached
+      ? Promise.resolve(cached)
+      : fetch(requestUrl, { signal: controller.signal }).then(async (response) => {
+          if (!response.ok) throw new Error("Map data request failed");
+          const body = await response.json() as { points?: DecisionMapPoint[] };
+          return body.points || [];
+        });
 
-    fetch(`/api/decisions/map?${params.toString()}`, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Map data request failed");
-        return response.json() as Promise<{ points?: DecisionMapPoint[] }>;
+    request
+      .then((nextPoints) => {
+        if (controller.signal.aborted) return;
+        cachePoints(requestUrl, nextPoints);
+        setPoints(nextPoints);
+        setHasLoaded(true);
+        if (nextPoints.length > 0) setMapStarted(true);
+        setFailedRequestUrl(null);
+        setSettledRequestUrl(requestUrl);
       })
-      .then((body) => setPoints(body.points || []))
       .catch((fetchError: unknown) => {
         if (!(fetchError instanceof DOMException && fetchError.name === "AbortError")) {
-          setError(true);
+          setFailedRequestUrl(requestUrl);
+          setSettledRequestUrl(requestUrl);
         }
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => controller.abort();
-  }, [apiKey, locale, query]);
+  }, [apiKey, requestUrl]);
 
   if (!apiKey) {
     return (
@@ -76,7 +102,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
     );
   }
 
-  if (loading) {
+  if (loading && !hasLoaded) {
     return (
       <div className="quiet-card flex min-h-[28rem] items-center justify-center" aria-live="polite">
         <Loader2 aria-hidden className="h-6 w-6 animate-spin text-civic" />
@@ -85,7 +111,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
     );
   }
 
-  if (error) {
+  if (error && !hasLoaded) {
     return (
       <div className="quiet-card p-8 text-center text-sm font-semibold text-black/65">
         {locale === "es" ? "No se pudo cargar el mapa." : "The map could not be loaded."}
@@ -93,7 +119,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
     );
   }
 
-  if (points.length === 0) {
+  if (!mapStarted && points.length === 0) {
     return (
       <div className="quiet-card p-8 text-center">
         <MapPin aria-hidden className="mx-auto h-7 w-7 text-black/35" />
@@ -110,7 +136,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
   }
 
   return (
-    <section aria-labelledby="decision-map-heading">
+    <section aria-labelledby="decision-map-heading" aria-busy={refreshing}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h3 id="decision-map-heading" className="text-sm font-black text-ink">
           {locale === "es" ? "Decisiones con ubicación verificada" : "Decisions with verified locations"}
@@ -129,10 +155,26 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
             </select>
           </label>
           <p className="text-xs font-semibold text-black/50">
-            {locale === "es" ? `${points.length} decisiones` : `${points.length} decisions`}
+            {refreshing ? (
+              <Loader2 aria-hidden className="inline h-3.5 w-3.5 animate-spin" />
+            ) : locale === "es" ? `${points.length} decisiones` : `${points.length} decisions`}
           </p>
         </div>
       </div>
+      {points.length === 0 ? (
+        <p className="mb-3 rounded-lg bg-black/[0.035] px-3 py-2 text-sm font-semibold text-black/60">
+          {locale === "es"
+            ? "No hay ubicaciones verificadas para estos filtros."
+            : "No verified locations match these filters."}
+        </p>
+      ) : null}
+      {error ? (
+        <p className="mb-3 rounded-lg bg-clay/10 px-3 py-2 text-sm font-semibold text-clay">
+          {locale === "es"
+            ? "No se pudieron actualizar los puntos del mapa; se conservan los resultados anteriores."
+            : "The map points could not be refreshed; the previous results remain visible."}
+        </p>
+      ) : null}
       <DecisionMapCanvas points={points} apiKey={apiKey} locale={locale} />
       <p className="mt-2 text-xs leading-5 text-black/50">
         {locale === "es"

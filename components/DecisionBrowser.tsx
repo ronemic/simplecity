@@ -263,7 +263,7 @@ export function DecisionBrowser({
           </div>
 
           {decisionView === "map" ? (
-            <DecisionMapPanel key={mapQuery} query={mapQuery} locale={locale} />
+            <DecisionMapPanel query={mapQuery} locale={locale} />
           ) : (
             <div className="grid gap-3" aria-live="polite">
               {cards.map((card) => (

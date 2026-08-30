@@ -41,11 +41,16 @@ export function DecisionMapCanvas({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const groups = useMemo(() => groupMapPoints(points), [points]);
+  const initialGroups = useRef(groups);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
   const [selected, setSelected] = useState<DecisionMapGroup | null>(null);
   const [mapError, setMapError] = useState(false);
 
   useEffect(() => {
-    if (!container.current || groups.length === 0) return;
+    if (!container.current || initialGroups.current.length === 0) return;
+
+    const firstGroup = initialGroups.current[0];
 
     const map = new maplibregl.Map({
       container: container.current,
@@ -63,12 +68,36 @@ export function DecisionMapCanvas({
         },
         layers: [{ id: "maptiler-streets", type: "raster", source: "maptiler-streets" }]
       },
-      center: [groups[0].longitude, groups[0].latitude],
+      center: [firstGroup.longitude, firstGroup.latitude],
       zoom: 10,
       cooperativeGestures: true
     });
+    mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("error", () => setMapError(true));
+
+    map.on("load", () => {
+      const bounds = new maplibregl.LngLatBounds();
+      for (const group of initialGroups.current) {
+        bounds.extend([group.longitude, group.latitude]);
+      }
+      if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 52, maxZoom: 15, duration: 0 });
+      }
+    });
+
+    return () => {
+      markersRef.current = [];
+      mapRef.current = null;
+      map.remove();
+    };
+  }, [apiKey]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    for (const marker of markersRef.current) marker.remove();
 
     const markers = groups.map((group) => {
       const count = group.points.length;
@@ -110,19 +139,19 @@ export function DecisionMapCanvas({
       return marker;
     });
 
-    map.on("load", () => {
-      const bounds = new maplibregl.LngLatBounds();
-      for (const group of groups) bounds.extend([group.longitude, group.latitude]);
-      if (!bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: 52, maxZoom: 15, duration: 0 });
-      }
+    markersRef.current = markers;
+    setSelected((current) => {
+      if (!current) return null;
+      return groups.find(
+        (group) =>
+          group.latitude === current.latitude && group.longitude === current.longitude
+      ) || null;
     });
 
     return () => {
       for (const marker of markers) marker.remove();
-      map.remove();
     };
-  }, [apiKey, groups]);
+  }, [groups, locale]);
 
   return (
     <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
