@@ -115,7 +115,7 @@ function GlanceStats({ locale }: { locale: Locale }) {
         {glanceStats.map((item) => (
           <div
             key={item.label}
-            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-center sm:gap-2 sm:px-4"
+            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-start sm:gap-2 sm:px-4"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
               <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
@@ -148,7 +148,7 @@ function GlanceStatsLoading({ locale }: { locale: Locale }) {
         {[0, 1, 2].map((item) => (
           <div
             key={item}
-            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-center sm:gap-2 sm:px-4"
+            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-start sm:gap-2 sm:px-4"
           >
             <span className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-[#182c45] sm:h-10 sm:w-10" />
             <p className="min-w-0 flex-1 leading-tight">
