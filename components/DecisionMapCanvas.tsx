@@ -1,18 +1,96 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { DecisionMapPoint } from "@/lib/types";
 
+// Bundled chunks resolve MapLibre's own worker URL to a path that does not
+// exist, which leaves vector tiles and clustering blank. The worker is copied
+// into public/ by scripts/copy-maplibre-worker.mjs.
+maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+
+const SOURCE_ID = "decision-points";
+const CLUSTER_HALO_LAYER = "decision-cluster-halo";
+const CLUSTER_LAYER = "decision-clusters";
+const CLUSTER_COUNT_LAYER = "decision-cluster-count";
+const POINT_LAYER = "decision-point";
+const FIT_PADDING = 56;
+const FIT_MAX_ZOOM = 14;
+
+// Locations share one colour. Outcomes at a single address are usually a mix
+// (10 awaiting + 1 approved + 1 other, say), and collapsing that into one
+// swatch claimed more than the data supports.
+const POINT_COLOR = "#d3533d";
+const PIN_IMAGE = "decision-pin";
+const PIN_SELECTED_IMAGE = "decision-pin-selected";
+// Logical pin geometry. The tip sits on the bottom edge so `icon-anchor:
+// "bottom"` lands it exactly on the coordinate, and the head centre is
+// PIN_HEIGHT - PIN_HEAD_Y above that — which is where the count has to sit.
+const PIN_WIDTH = 26;
+const PIN_HEIGHT = 34;
+const PIN_HEAD_Y = 13;
+const PIN_HEAD_RADIUS = 11;
+const PIN_COUNT_SIZE = 11;
+const PIN_COUNT_OFFSET = -(PIN_HEIGHT - PIN_HEAD_Y) / PIN_COUNT_SIZE;
+
+// Drawn rather than loaded: an ImageData is synchronous, so the symbol layer
+// can be added in the same tick and never renders against a missing image.
+function drawPin(stroke: string, strokeWidth: number, ratio = 2) {
+  const canvas = document.createElement("canvas");
+  canvas.width = PIN_WIDTH * ratio;
+  canvas.height = PIN_HEIGHT * ratio;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.scale(ratio, ratio);
+
+  const tipY = PIN_HEIGHT - strokeWidth / 2;
+  // Where the sides meet the head tangentially, measured from straight down.
+  const spread = Math.acos(PIN_HEAD_RADIUS / (tipY - PIN_HEAD_Y));
+  context.beginPath();
+  context.arc(
+    PIN_WIDTH / 2,
+    PIN_HEAD_Y,
+    PIN_HEAD_RADIUS,
+    Math.PI / 2 - spread,
+    Math.PI / 2 + spread,
+    true
+  );
+  context.lineTo(PIN_WIDTH / 2, tipY);
+  context.closePath();
+
+  context.fillStyle = POINT_COLOR;
+  context.fill();
+  context.lineWidth = strokeWidth;
+  context.strokeStyle = stroke;
+  context.lineJoin = "round";
+  context.stroke();
+
+  return context.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function addPinImages(map: maplibregl.Map) {
+  const pins: Array<[string, string, number]> = [
+    [PIN_IMAGE, "#ffffff", 2],
+    [PIN_SELECTED_IMAGE, "#171717", 2.5]
+  ];
+  for (const [id, stroke, width] of pins) {
+    if (map.hasImage(id)) continue;
+    const image = drawPin(stroke, width);
+    if (image) map.addImage(id, image, { pixelRatio: 2 });
+  }
+}
+
 type DecisionMapGroup = {
+  key: string;
   latitude: number;
   longitude: number;
   locationLabel: string;
   points: DecisionMapPoint[];
 };
 
-function groupMapPoints(points: DecisionMapPoint[]) {
+function groupMapPoints(points: DecisionMapPoint[]): DecisionMapGroup[] {
   const groups = new Map<string, DecisionMapGroup>();
   for (const point of points) {
     const key = `${point.latitude.toFixed(5)}:${point.longitude.toFixed(5)}`;
@@ -20,6 +98,7 @@ function groupMapPoints(points: DecisionMapPoint[]) {
     if (group) group.points.push(point);
     else {
       groups.set(key, {
+        key,
         latitude: point.latitude,
         longitude: point.longitude,
         locationLabel: point.locationLabel,
@@ -28,6 +107,28 @@ function groupMapPoints(points: DecisionMapPoint[]) {
     }
   }
   return [...groups.values()];
+}
+
+function toFeatureCollection(
+  groups: DecisionMapGroup[]
+): GeoJSON.FeatureCollection<GeoJSON.Point> {
+  return {
+    type: "FeatureCollection",
+    features: groups.map((group) => ({
+      type: "Feature",
+      geometry: { type: "Point", coordinates: [group.longitude, group.latitude] },
+      properties: {
+        groupKey: group.key,
+        count: group.points.length
+      }
+    }))
+  };
+}
+
+function boundsFor(groups: DecisionMapGroup[]) {
+  const bounds = new maplibregl.LngLatBounds();
+  for (const group of groups) bounds.extend([group.longitude, group.latitude]);
+  return bounds.isEmpty() ? null : bounds;
 }
 
 export function DecisionMapCanvas({
@@ -43,38 +144,63 @@ export function DecisionMapCanvas({
   const groups = useMemo(() => groupMapPoints(points), [points]);
   const initialGroups = useRef(groups);
   const mapRef = useRef<maplibregl.Map | null>(null);
-  const markersRef = useRef<maplibregl.Marker[]>([]);
-  const [selected, setSelected] = useState<DecisionMapGroup | null>(null);
+  const cardRef = useRef<HTMLElement>(null);
+  // Once the reader has driven the camera themselves, a filter change must not
+  // yank them back to the full extent.
+  const movedRef = useRef(false);
+  const styleLoadedRef = useRef(false);
+  const [hasMoved, setHasMoved] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [mapError, setMapError] = useState(false);
+
+  const selected = useMemo(
+    () => groups.find((group) => group.key === selectedKey) || null,
+    [groups, selectedKey]
+  );
+
+  const markMoved = useCallback(() => {
+    movedRef.current = true;
+    setHasMoved(true);
+  }, []);
+
+  const resetView = useCallback(() => {
+    const map = mapRef.current;
+    const bounds = boundsFor(groups);
+    if (!map || !bounds) return;
+    movedRef.current = false;
+    setHasMoved(false);
+    map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration: 500 });
+  }, [groups]);
+
+  const focusGroup = useCallback((group: DecisionMapGroup) => {
+    setSelectedKey(group.key);
+    const map = mapRef.current;
+    if (!map) return;
+    markMoved();
+    map.easeTo({
+      center: [group.longitude, group.latitude],
+      zoom: Math.max(map.getZoom(), 15),
+      duration: 500
+    });
+  }, [markMoved]);
 
   useEffect(() => {
     if (!container.current || initialGroups.current.length === 0) return;
 
-    const mapContainer = container.current;
-    const firstGroup = initialGroups.current[0];
-
+    let removed = false;
     const map = new maplibregl.Map({
-      container: mapContainer,
-      style: {
-        version: 8,
-        sources: {
-          "maptiler-streets": {
-            type: "raster",
-            tiles: [
-              `https://api.maptiler.com/maps/streets-v4/256/{z}/{x}/{y}.png?key=${encodeURIComponent(apiKey)}`
-            ],
-            tileSize: 256,
-            attribution: "© MapTiler © OpenStreetMap contributors"
-          }
-        },
-        layers: [{ id: "maptiler-streets", type: "raster", source: "maptiler-streets" }]
-      },
-      center: [firstGroup.longitude, firstGroup.latitude],
-      zoom: 10,
+      container: container.current,
+      // A muted data-visualisation basemap keeps the markers legible against
+      // it; the vector style also stays sharp on high-density screens.
+      style: `https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(apiKey)}`,
+      bounds: boundsFor(initialGroups.current) || undefined,
+      fitBoundsOptions: { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM },
       attributionControl: false,
       cooperativeGestures: true
     });
     mapRef.current = map;
+
     map.addControl(
       new maplibregl.AttributionControl({
         compact: true,
@@ -82,132 +208,304 @@ export function DecisionMapCanvas({
       }),
       "bottom-right"
     );
-    const attribution = mapContainer.querySelector<HTMLDetailsElement>(
+    const attribution = container.current.querySelector<HTMLDetailsElement>(
       ".maplibregl-ctrl-attrib"
     );
     attribution?.classList.remove("maplibregl-compact-show");
     attribution?.removeAttribute("open");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
-    map.on("error", () => setMapError(true));
+    // Only a style that never loads leaves the reader with nothing to look at.
+    // Individual tile, glyph and sprite failures are transient and recoverable,
+    // and a vector style makes far more of those requests than a raster one.
+    map.on("error", () => {
+      if (!styleLoadedRef.current) setMapError(true);
+    });
+    map.on("dragstart", markMoved);
+    map.on("zoomstart", (event) => {
+      if (event.originalEvent) markMoved();
+    });
 
     map.on("load", () => {
-      const bounds = new maplibregl.LngLatBounds();
-      for (const group of initialGroups.current) {
-        bounds.extend([group.longitude, group.latitude]);
+      styleLoadedRef.current = true;
+      map.addSource(SOURCE_ID, {
+        type: "geojson",
+        data: toFeatureCollection(initialGroups.current),
+        cluster: true,
+        clusterRadius: 46,
+        clusterMaxZoom: 14,
+        // Cluster badges count decisions, not addresses, so they reconcile with
+        // the decision total shown above the map.
+        clusterProperties: { decisions: ["+", ["get", "count"]] }
+      });
+
+      addPinImages(map);
+
+      map.addLayer({
+        id: POINT_LAYER,
+        type: "symbol",
+        source: SOURCE_ID,
+        filter: ["!", ["has", "point_count"]],
+        layout: {
+          "icon-image": PIN_IMAGE,
+          "icon-anchor": "bottom",
+          "icon-allow-overlap": true,
+          "icon-ignore-placement": true,
+          // Only a location holding more than one decision needs a number.
+          "text-field": [
+            "case",
+            [">", ["get", "count"], 1],
+            ["to-string", ["get", "count"]],
+            ""
+          ],
+          "text-font": ["Noto Sans Bold"],
+          "text-size": PIN_COUNT_SIZE,
+          "text-offset": [0, PIN_COUNT_OFFSET],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true
+        },
+        paint: { "text-color": "#ffffff" }
+      });
+
+      // Clusters and multi-decision locations both carry a number, so the halo
+      // backs up the colour difference in saying which one you are looking at.
+      map.addLayer({
+        id: CLUSTER_HALO_LAYER,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#12365f",
+          "circle-opacity": 0.16,
+          "circle-radius": ["step", ["get", "decisions"], 22, 5, 27, 15, 33, 40, 40]
+        }
+      });
+
+      map.addLayer({
+        id: CLUSTER_LAYER,
+        type: "circle",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        paint: {
+          "circle-color": "#12365f",
+          "circle-radius": ["step", ["get", "decisions"], 15, 5, 19, 15, 24, 40, 30],
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+
+      map.addLayer({
+        id: CLUSTER_COUNT_LAYER,
+        type: "symbol",
+        source: SOURCE_ID,
+        filter: ["has", "point_count"],
+        layout: {
+          "text-field": ["to-string", ["get", "decisions"]],
+          "text-font": ["Noto Sans Bold"],
+          "text-size": ["step", ["get", "decisions"], 11, 15, 12, 40, 13],
+          "text-allow-overlap": true,
+          "text-ignore-placement": true
+        },
+        paint: { "text-color": "#ffffff" }
+      });
+
+      map.on("click", CLUSTER_LAYER, (event) => {
+        const feature = event.features?.[0];
+        if (!feature) return;
+        const clusterId = feature.properties?.cluster_id;
+        if (typeof clusterId !== "number") return;
+        const source = map.getSource(SOURCE_ID);
+        if (!(source instanceof maplibregl.GeoJSONSource)) return;
+        const center = (feature.geometry as GeoJSON.Point).coordinates as [number, number];
+        markMoved();
+        source
+          .getClusterExpansionZoom(clusterId)
+          .then((zoom) => {
+            if (removed) return;
+            map.easeTo({ center, zoom, duration: 500 });
+          })
+          .catch(() => {
+            if (!removed) map.easeTo({ center, zoom: map.getZoom() + 2, duration: 500 });
+          });
+      });
+
+      map.on("click", POINT_LAYER, (event) => {
+        const groupKey = event.features?.[0]?.properties?.groupKey;
+        if (typeof groupKey === "string") setSelectedKey(groupKey);
+      });
+
+      map.on("click", (event) => {
+        const hits = map.queryRenderedFeatures(event.point, {
+          layers: [CLUSTER_LAYER, POINT_LAYER]
+        });
+        if (hits.length === 0) setSelectedKey(null);
+      });
+
+      for (const layer of [CLUSTER_LAYER, POINT_LAYER]) {
+        map.on("mouseenter", layer, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", layer, () => {
+          map.getCanvas().style.cursor = "";
+        });
       }
-      if (!bounds.isEmpty()) {
-        map.fitBounds(bounds, { padding: 52, maxZoom: 15, duration: 0 });
-      }
+
+      if (!removed) setReady(true);
     });
 
     return () => {
-      markersRef.current = [];
+      removed = true;
       mapRef.current = null;
+      styleLoadedRef.current = false;
+      setReady(false);
       map.remove();
     };
-  }, [apiKey]);
+  }, [apiKey, markMoved]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !ready) return;
+    const source = map.getSource(SOURCE_ID);
+    if (!(source instanceof maplibregl.GeoJSONSource)) return;
+    source.setData(toFeatureCollection(groups));
+    const bounds = boundsFor(groups);
+    if (!bounds) return;
+    // Panning is respected while the reader can still see results. Once a
+    // filter change moves every result off screen, staying put would just show
+    // empty streets next to a "95 decisions" count, so refit regardless.
+    const viewport = map.getBounds();
+    const anyVisible = groups.some((group) =>
+      viewport.contains([group.longitude, group.latitude])
+    );
+    if (movedRef.current && anyVisible) return;
+    map.fitBounds(bounds, { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM, duration: 400 });
+    movedRef.current = false;
+    setHasMoved(false);
+  }, [groups, ready]);
 
-    for (const marker of markersRef.current) marker.remove();
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !map.getLayer(POINT_LAYER)) return;
+    map.setLayoutProperty(POINT_LAYER, "icon-image", selectedKey
+      ? ["case", ["==", ["get", "groupKey"], selectedKey], PIN_SELECTED_IMAGE, PIN_IMAGE]
+      : PIN_IMAGE);
+  }, [ready, selectedKey]);
 
-    const markers = groups.map((group) => {
-      const count = group.points.length;
-      const markerOptions: maplibregl.MarkerOptions = count === 1
-        ? { color: "#d3533d", scale: 0.8 }
-        : { element: document.createElement("button") };
-      const marker = new maplibregl.Marker(markerOptions)
-        .setLngLat([group.longitude, group.latitude])
-        .addTo(map);
-      const element = marker.getElement();
-      if (count > 1) {
-        element.textContent = String(count);
-        element.style.width = "2.25rem";
-        element.style.height = "2.25rem";
-        element.style.borderRadius = "9999px";
-        element.style.border = "2px solid white";
-        element.style.background = "#1746a2";
-        element.style.color = "white";
-        element.style.fontWeight = "800";
-        element.style.boxShadow = "0 2px 6px rgb(0 0 0 / 0.25)";
-        element.style.cursor = "pointer";
-      }
-      element.setAttribute("role", "button");
-      element.setAttribute("tabindex", "0");
-      element.setAttribute(
-        "aria-label",
-        count === 1
-          ? group.points[0].title
-          : `${count} decisions at ${group.locationLabel}`
-      );
-      const selectPoint = () => setSelected(group);
-      element.addEventListener("click", selectPoint);
-      element.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          selectPoint();
-        }
-      });
-      return marker;
-    });
+  // Keyed on the selection itself, not the resolved group, so a background
+  // data refresh does not pull focus back to an already-open card.
+  useEffect(() => {
+    if (!selectedKey) return;
+    cardRef.current?.focus({ preventScroll: true });
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setSelectedKey(null);
+    }
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [selectedKey]);
 
-    markersRef.current = markers;
-    setSelected((current) => {
-      if (!current) return null;
-      return groups.find(
-        (group) =>
-          group.latitude === current.latitude && group.longitude === current.longitude
-      ) || null;
-    });
-
-    return () => {
-      for (const marker of markers) marker.remove();
-    };
-  }, [groups, locale]);
+  const keyboardGroups = useMemo(
+    () => [...groups].sort((a, b) => b.points.length - a.points.length),
+    [groups]
+  );
 
   return (
     <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
-      <div ref={container} className="h-[28rem] w-full sm:h-[34rem]" aria-label={locale === "es" ? "Mapa de decisiones" : "Map of decisions"} />
+      <div className="relative">
+        <div
+          ref={container}
+          className="h-[28rem] w-full sm:h-[34rem]"
+          aria-hidden
+        />
+        {hasMoved ? (
+          <button
+            type="button"
+            onClick={resetView}
+            className="absolute left-3 top-3 rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+          >
+            {locale === "es" ? "Restablecer vista" : "Reset view"}
+          </button>
+        ) : null}
+        {selected ? (
+          <article
+            ref={cardRef}
+            tabIndex={-1}
+            aria-live="polite"
+            className="border-t border-black/10 p-4 focus:outline-none sm:absolute sm:bottom-3 sm:left-3 sm:max-h-[calc(100%-1.5rem)] sm:w-80 sm:overflow-y-auto sm:rounded-xl sm:border sm:border-black/10 sm:bg-white/95 sm:shadow-lg sm:backdrop-blur"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm text-black/65">{selected.locationLabel}</p>
+              <button
+                type="button"
+                onClick={() => setSelectedKey(null)}
+                aria-label={locale === "es" ? "Cerrar detalles" : "Close details"}
+                className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-black/45 transition hover:bg-black/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+              >
+                <X aria-hidden className="h-4 w-4" />
+              </button>
+            </div>
+            {selected.points.length === 1 ? (
+              <>
+                <p className="mt-2 text-xs font-black uppercase tracking-wide text-civic">
+                  {selected.points[0].jurisdiction}
+                  {selected.points[0].category ? ` · ${selected.points[0].category}` : ""}
+                </p>
+                <h4 className="mt-1 text-base font-black text-ink">{selected.points[0].title}</h4>
+                <Link href={selected.points[0].href} className="action-link mt-2 inline-flex !px-0">
+                  {locale === "es" ? "Ver decisión" : "View decision"}
+                </Link>
+              </>
+            ) : (
+              <>
+                <h4 className="mt-2 text-base font-black text-ink">
+                  {locale === "es"
+                    ? `${selected.points.length} decisiones en esta ubicación`
+                    : `${selected.points.length} decisions at this location`}
+                </h4>
+                <ul className="mt-2 divide-y divide-black/10">
+                  {selected.points.map((point) => (
+                    <li key={point.id} className="py-2">
+                      <Link href={point.href} className="font-bold text-civic hover:underline">
+                        {point.title}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </article>
+        ) : null}
+      </div>
+      {/* The map draws to a canvas, so the same locations are exposed here as
+          ordinary buttons. Collapsed, so it costs keyboard users one tab stop
+          rather than one per location, and revealed on focus so a sighted
+          keyboard user can see where focus has landed. */}
+      <details className="sr-only focus-within:not-sr-only focus-within:block focus-within:max-h-64 focus-within:overflow-y-auto focus-within:border-t focus-within:border-black/10 focus-within:p-4 focus-within:text-sm">
+        <summary className="cursor-pointer font-bold text-ink">
+          {locale === "es"
+            ? `Ubicaciones en el mapa (${keyboardGroups.length})`
+            : `Locations on the map (${keyboardGroups.length})`}
+        </summary>
+        <ul className="mt-2 divide-y divide-black/10">
+          {keyboardGroups.map((group) => (
+            <li key={group.key}>
+              <button
+                type="button"
+                onClick={() => focusGroup(group)}
+                className="w-full py-2 text-left font-semibold text-civic hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+              >
+                {group.points.length === 1
+                  ? `${group.points[0].title} — ${group.locationLabel}`
+                  : locale === "es"
+                    ? `${group.points.length} decisiones en ${group.locationLabel}`
+                    : `${group.points.length} decisions at ${group.locationLabel}`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </details>
       {mapError ? (
         <p className="border-t border-black/10 px-4 py-3 text-sm font-semibold text-clay">
           {locale === "es" ? "Algunas partes del mapa no pudieron cargarse." : "Some map content could not be loaded."}
         </p>
-      ) : null}
-      {selected ? (
-        <article className="border-t border-black/10 p-4" aria-live="polite">
-          <p className="text-sm text-black/65">{selected.locationLabel}</p>
-          {selected.points.length === 1 ? (
-            <>
-              <p className="mt-2 text-xs font-black uppercase tracking-wide text-civic">
-                {selected.points[0].jurisdiction}
-                {selected.points[0].category ? ` · ${selected.points[0].category}` : ""}
-              </p>
-              <h4 className="mt-1 text-base font-black text-ink">{selected.points[0].title}</h4>
-              <Link href={selected.points[0].href} className="action-link mt-2 inline-flex !px-0">
-                {locale === "es" ? "Ver decisión" : "View decision"}
-              </Link>
-            </>
-          ) : (
-            <>
-              <h4 className="mt-2 text-base font-black text-ink">
-                {locale === "es"
-                  ? `${selected.points.length} decisiones en esta ubicación`
-                  : `${selected.points.length} decisions at this location`}
-              </h4>
-              <ul className="mt-2 divide-y divide-black/10">
-                {selected.points.map((point) => (
-                  <li key={point.id} className="py-2">
-                    <Link href={point.href} className="font-bold text-civic hover:underline">
-                      {point.title}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </article>
       ) : null}
     </div>
   );

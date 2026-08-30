@@ -7,6 +7,12 @@ import { useEffect, useState } from "react";
 import type { DecisionMapPoint } from "@/lib/types";
 import { normalizeDecisionMapTimeframe, type DecisionMapTimeframe } from "@/lib/maps/timeframe";
 
+const TIMEFRAME_OPTIONS: Array<{ value: DecisionMapTimeframe; en: string; es: string }> = [
+  { value: "3m", en: "3 mo", es: "3 m" },
+  { value: "12m", en: "12 mo", es: "12 m" },
+  { value: "all", en: "All", es: "Todo" }
+];
+
 const pointCache = new Map<string, DecisionMapPoint[]>();
 const MAX_CACHED_POINT_QUERIES = 30;
 
@@ -19,15 +25,33 @@ function cachePoints(key: string, points: DecisionMapPoint[]) {
   }
 }
 
+// Every placeholder matches the rendered map's height so the panel never
+// resizes as the map loads in.
+const MAP_HEIGHT = "h-[28rem] sm:h-[34rem]";
+
+function MapSkeleton({ label }: { label: string }) {
+  return (
+    <div
+      className={`relative overflow-hidden rounded-xl border border-black/10 bg-black/[0.03] ${MAP_HEIGHT}`}
+      aria-live="polite"
+    >
+      <div
+        aria-hidden
+        className="absolute inset-0 animate-pulse bg-[linear-gradient(rgba(23,23,23,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(23,23,23,0.05)_1px,transparent_1px)] bg-[size:56px_56px]"
+      />
+      <div className="absolute inset-0 flex items-center justify-center">
+        <Loader2 aria-hidden className="h-6 w-6 animate-spin text-civic" />
+        <span className="sr-only">{label}</span>
+      </div>
+    </div>
+  );
+}
+
 const DecisionMapCanvas = dynamic(
   () => import("@/components/DecisionMapCanvas").then((module) => module.DecisionMapCanvas),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex min-h-[28rem] items-center justify-center rounded-xl bg-black/[0.03]">
-        <Loader2 aria-hidden className="h-6 w-6 animate-spin text-civic" />
-      </div>
-    )
+    loading: () => <MapSkeleton label="Loading map" />
   }
 );
 
@@ -112,17 +136,12 @@ export function DecisionMapPanel({
   }
 
   if (loading && !hasLoaded) {
-    return (
-      <div className="quiet-card flex min-h-[28rem] items-center justify-center" aria-live="polite">
-        <Loader2 aria-hidden className="h-6 w-6 animate-spin text-civic" />
-        <span className="sr-only">{locale === "es" ? "Cargando mapa" : "Loading map"}</span>
-      </div>
-    );
+    return <MapSkeleton label={locale === "es" ? "Cargando mapa" : "Loading map"} />;
   }
 
   if (error && !hasLoaded) {
     return (
-      <div className="quiet-card p-8 text-center text-sm font-semibold text-black/65">
+      <div className={`quiet-card flex items-center justify-center p-8 text-center text-sm font-semibold text-black/65 ${MAP_HEIGHT}`}>
         {locale === "es" ? "No se pudo cargar el mapa." : "The map could not be loaded."}
       </div>
     );
@@ -151,18 +170,28 @@ export function DecisionMapPanel({
           {locale === "es" ? "Decisiones con ubicación verificada" : "Decisions with verified locations"}
         </h3>
         <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs font-bold text-black/60">
-            <span>{locale === "es" ? "Período" : "Timeframe"}</span>
-            <select
-              value={timeframe}
-              onChange={(event) => changeTimeframe(event.target.value as DecisionMapTimeframe)}
-              className="min-h-9 rounded-lg border border-black/15 bg-white px-2 text-xs font-bold text-ink"
-            >
-              <option value="3m">{locale === "es" ? "3 meses" : "3 months"}</option>
-              <option value="12m">{locale === "es" ? "12 meses" : "12 months"}</option>
-              <option value="all">{locale === "es" ? "Todo el historial" : "All history"}</option>
-            </select>
-          </label>
+          <div
+            role="group"
+            aria-label={locale === "es" ? "Período" : "Timeframe"}
+            className="segmented-control"
+          >
+            {TIMEFRAME_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                aria-pressed={timeframe === option.value}
+                onClick={() => changeTimeframe(option.value)}
+                className={[
+                  "segmented-button !min-h-8 !px-2.5 !py-1.5 !text-xs",
+                  timeframe === option.value && "segmented-button-selected"
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                {locale === "es" ? option.es : option.en}
+              </button>
+            ))}
+          </div>
           <p className="text-xs font-semibold text-black/50">
             {refreshing ? (
               <Loader2 aria-hidden className="inline h-3.5 w-3.5 animate-spin" />

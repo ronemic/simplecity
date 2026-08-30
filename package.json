@@ -7,9 +7,11 @@
     "node": "22.x"
   },
   "scripts": {
+    "maplibre:worker": "node scripts/copy-maplibre-worker.mjs",
+    "predev": "npm run maplibre:worker",
     "dev": "PLAYWRIGHT_BROWSERS_PATH=0 next dev --disable-source-maps",
     "playwright:install": "PLAYWRIGHT_BROWSERS_PATH=0 playwright install chromium",
-    "prebuild": "npm run playwright:install",
+    "prebuild": "npm run playwright:install && npm run maplibre:worker",
     "build": "next build",
     "start": "PLAYWRIGHT_BROWSERS_PATH=0 next start",
     "lint": "eslint . --max-warnings=0",

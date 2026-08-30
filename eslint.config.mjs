@@ -11,6 +11,7 @@ const eslintConfig = [
       "dist/**",
       "node_modules/**",
       "out/**",
+      "public/maplibre/**",
       "playwright-report/**",
       "scraped-primegov/**",
       "supabase/functions/**",
