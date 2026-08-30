@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { Maximize2, Minimize2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as maplibregl from "maplibre-gl";
+import { DecisionPreviewModal } from "@/components/DecisionPreviewModal";
 import type { DecisionMapPoint } from "@/lib/types";
 
 // Bundled chunks resolve MapLibre's own worker URL to a path that does not
@@ -158,6 +158,7 @@ export function DecisionMapCanvas({
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [mapError, setMapError] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [previewPoint, setPreviewPoint] = useState<DecisionMapPoint | null>(null);
 
   const selected = useMemo(
     () => groups.find((group) => group.key === selectedKey) || null,
@@ -402,9 +403,10 @@ export function DecisionMapCanvas({
     cardRef.current?.focus({ preventScroll: true });
   }, [selectedKey]);
 
-  // Escape peels one layer at a time: the open card first, then fullscreen.
+  // The modal owns Escape while it is open. Otherwise Escape peels one map
+  // layer at a time: the location card first, then fullscreen.
   useEffect(() => {
-    if (!selectedKey && !isFullscreen) return;
+    if (previewPoint || (!selectedKey && !isFullscreen)) return;
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
       if (selectedKey) setSelectedKey(null);
@@ -412,7 +414,7 @@ export function DecisionMapCanvas({
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [isFullscreen, selectedKey]);
+  }, [isFullscreen, previewPoint, selectedKey]);
 
   // The expanded map covers the page, so the canvas has to be remeasured and
   // the page behind it must not scroll away underneath.
@@ -527,9 +529,13 @@ export function DecisionMapCanvas({
                   {selected.points[0].category ? ` · ${selected.points[0].category}` : ""}
                 </p>
                 <h4 className="mt-1 text-base font-black text-ink">{selected.points[0].title}</h4>
-                <Link href={selected.points[0].href} className="action-link mt-2 inline-flex !px-0">
+                <button
+                  type="button"
+                  onClick={() => setPreviewPoint(selected.points[0])}
+                  className="action-link mt-2 inline-flex !px-0"
+                >
                   {locale === "es" ? "Ver decisión" : "View decision"}
-                </Link>
+                </button>
               </>
             ) : (
               <>
@@ -541,9 +547,13 @@ export function DecisionMapCanvas({
                 <ul className="mt-2 divide-y divide-black/10">
                   {selected.points.map((point) => (
                     <li key={point.id} className="py-2">
-                      <Link href={point.href} className="font-bold text-civic hover:underline">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewPoint(point)}
+                        className="text-left font-bold text-civic hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+                      >
                         {point.title}
-                      </Link>
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -584,6 +594,14 @@ export function DecisionMapCanvas({
         <p className="border-t border-black/10 px-4 py-3 text-sm font-semibold text-clay">
           {locale === "es" ? "Algunas partes del mapa no pudieron cargarse." : "Some map content could not be loaded."}
         </p>
+      ) : null}
+      {previewPoint ? (
+        <DecisionPreviewModal
+          key={`${previewPoint.id}:${locale}`}
+          point={previewPoint}
+          locale={locale}
+          onClose={() => setPreviewPoint(null)}
+        />
       ) : null}
     </div>
   );
