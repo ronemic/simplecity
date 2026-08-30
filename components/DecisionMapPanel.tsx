@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { Loader2, MapPin } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { DecisionMapPoint } from "@/lib/types";
 import { normalizeDecisionMapTimeframe, type DecisionMapTimeframe } from "@/lib/maps/timeframe";
 
@@ -58,11 +58,17 @@ const DecisionMapCanvas = dynamic(
 export function DecisionMapPanel({
   query,
   locale,
-  onPointCountChange
+  onPointCountChange,
+  controlToggles,
+  controlPanels
 }: {
   query: string;
   locale: "en" | "es";
   onPointCountChange?: (count: number) => void;
+  // The page's own search and filter controls. Expanded, the map covers the
+  // page they normally sit on, so they come along.
+  controlToggles?: ReactNode;
+  controlPanels?: ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -163,6 +169,31 @@ export function DecisionMapPanel({
     );
   }
 
+  const timeframeControl = (
+    <div
+      role="group"
+      aria-label={locale === "es" ? "Período" : "Timeframe"}
+      className="segmented-control"
+    >
+      {TIMEFRAME_OPTIONS.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={timeframe === option.value}
+          onClick={() => changeTimeframe(option.value)}
+          className={[
+            "segmented-button !min-h-8 !px-2.5 !py-1.5 !text-xs",
+            timeframe === option.value && "segmented-button-selected"
+          ]
+            .filter(Boolean)
+            .join(" ")}
+        >
+          {locale === "es" ? option.es : option.en}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <section aria-labelledby="decision-map-heading" aria-busy={refreshing}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
@@ -170,28 +201,7 @@ export function DecisionMapPanel({
           {locale === "es" ? "Decisiones con ubicación verificada" : "Decisions with verified locations"}
         </h3>
         <div className="flex items-center gap-3">
-          <div
-            role="group"
-            aria-label={locale === "es" ? "Período" : "Timeframe"}
-            className="segmented-control"
-          >
-            {TIMEFRAME_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={timeframe === option.value}
-                onClick={() => changeTimeframe(option.value)}
-                className={[
-                  "segmented-button !min-h-8 !px-2.5 !py-1.5 !text-xs",
-                  timeframe === option.value && "segmented-button-selected"
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                {locale === "es" ? option.es : option.en}
-              </button>
-            ))}
-          </div>
+          {timeframeControl}
           <p className="text-xs font-semibold text-black/50">
             {refreshing ? (
               <Loader2 aria-hidden className="inline h-3.5 w-3.5 animate-spin" />
@@ -213,7 +223,25 @@ export function DecisionMapPanel({
             : "The map points could not be refreshed; the previous results remain visible."}
         </p>
       ) : null}
-      <DecisionMapCanvas points={points} apiKey={apiKey} locale={locale} />
+      <DecisionMapCanvas
+        points={points}
+        apiKey={apiKey}
+        locale={locale}
+        fullscreenControls={
+          <>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {timeframeControl}
+              {controlToggles}
+              <p className="ml-auto text-xs font-semibold text-black/50">
+                {refreshing ? (
+                  <Loader2 aria-hidden className="inline h-3.5 w-3.5 animate-spin" />
+                ) : locale === "es" ? `${points.length} decisiones` : `${points.length} decisions`}
+              </p>
+            </div>
+            {controlPanels}
+          </>
+        }
+      />
       <p className="mt-2 text-xs leading-5 text-black/50">
         {locale === "es"
           ? "El mapa solo incluye decisiones vinculadas a una dirección explícita en una fuente oficial."

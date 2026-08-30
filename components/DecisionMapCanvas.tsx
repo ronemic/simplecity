@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Maximize2, Minimize2, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as maplibregl from "maplibre-gl";
 import type { DecisionMapPoint } from "@/lib/types";
 
@@ -134,11 +134,15 @@ function boundsFor(groups: DecisionMapGroup[]) {
 export function DecisionMapCanvas({
   points,
   apiKey,
-  locale
+  locale,
+  fullscreenControls
 }: {
   points: DecisionMapPoint[];
   apiKey: string;
   locale: "en" | "es";
+  // Search, topic and timeframe controls. Expanded, the map hides the page they
+  // normally live on, so they travel into the overlay with it.
+  fullscreenControls?: ReactNode;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const groups = useMemo(() => groupMapPoints(points), [points]);
@@ -153,6 +157,7 @@ export function DecisionMapCanvas({
   const [ready, setReady] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [mapError, setMapError] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const selected = useMemo(
     () => groups.find((group) => group.key === selectedKey) || null,
@@ -395,12 +400,57 @@ export function DecisionMapCanvas({
   useEffect(() => {
     if (!selectedKey) return;
     cardRef.current?.focus({ preventScroll: true });
+  }, [selectedKey]);
+
+  // Escape peels one layer at a time: the open card first, then fullscreen.
+  useEffect(() => {
+    if (!selectedKey && !isFullscreen) return;
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setSelectedKey(null);
+      if (event.key !== "Escape") return;
+      if (selectedKey) setSelectedKey(null);
+      else setIsFullscreen(false);
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [selectedKey]);
+  }, [isFullscreen, selectedKey]);
+
+  // The expanded map covers the page, so the canvas has to be remeasured and
+  // the page behind it must not scroll away underneath.
+  // Held in a ref so resizing runs on the fullscreen toggle alone, not on every
+  // filter change that produces a new resetView.
+  const resetViewRef = useRef(resetView);
+  useEffect(() => {
+    resetViewRef.current = resetView;
+  }, [resetView]);
+
+  useEffect(() => {
+    mapRef.current?.resize();
+    // A much taller viewport makes the old camera a poor fit, so a reader who
+    // has not taken the camera over gets the full extent refitted for them.
+    if (!movedRef.current) resetViewRef.current();
+    if (!isFullscreen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.body.classList.add("has-fullscreen-overlay");
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.classList.remove("has-fullscreen-overlay");
+    };
+  }, [isFullscreen]);
+
+  // Opening or closing the search and filter panels hands height to the map.
+  useEffect(() => {
+    mapRef.current?.resize();
+  }, [fullscreenControls]);
+
+  // Requiring a modifier to zoom protects the page scroll; filling the screen
+  // there is no page scroll left to protect.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    if (isFullscreen) map.cooperativeGestures.disable();
+    else map.cooperativeGestures.enable();
+  }, [isFullscreen, ready]);
 
   const keyboardGroups = useMemo(
     () => [...groups].sort((a, b) => b.points.length - a.points.length),
@@ -408,22 +458,50 @@ export function DecisionMapCanvas({
   );
 
   return (
-    <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm">
-      <div className="relative">
+    <div
+      className={
+        isFullscreen
+          ? "fixed inset-0 z-[60] flex flex-col bg-white"
+          : "overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm"
+      }
+    >
+      {isFullscreen && fullscreenControls ? (
+        <div className="max-h-[45vh] shrink-0 overflow-y-auto border-b border-black/10 bg-white px-4 py-2">
+          {fullscreenControls}
+        </div>
+      ) : null}
+      <div className={isFullscreen ? "relative min-h-0 flex-1" : "relative"}>
         <div
           ref={container}
-          className="h-[28rem] w-full sm:h-[34rem]"
+          className={isFullscreen ? "h-full w-full" : "h-[28rem] w-full sm:h-[34rem]"}
           aria-hidden
         />
-        {hasMoved ? (
+        <div className="absolute left-3 top-3 flex items-center gap-2">
           <button
             type="button"
-            onClick={resetView}
-            className="absolute left-3 top-3 rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+            onClick={() => setIsFullscreen((current) => !current)}
+            aria-pressed={isFullscreen}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
           >
-            {locale === "es" ? "Restablecer vista" : "Reset view"}
+            {isFullscreen ? (
+              <Minimize2 aria-hidden className="h-3.5 w-3.5" />
+            ) : (
+              <Maximize2 aria-hidden className="h-3.5 w-3.5" />
+            )}
+            {isFullscreen
+              ? locale === "es" ? "Salir de pantalla completa" : "Exit full screen"
+              : locale === "es" ? "Pantalla completa" : "Full screen"}
           </button>
-        ) : null}
+          {hasMoved ? (
+            <button
+              type="button"
+              onClick={resetView}
+              className="rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+            >
+              {locale === "es" ? "Restablecer vista" : "Reset view"}
+            </button>
+          ) : null}
+        </div>
         {selected ? (
           <article
             ref={cardRef}

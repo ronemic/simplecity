@@ -146,6 +146,58 @@ export function DecisionBrowser({
     });
   }
 
+  // Shared with the expanded map, which covers the page these normally sit on.
+  // Same markup in both places, so the controls behave identically.
+  const searchToggle = (
+    <button
+      type="button"
+      aria-expanded={showSearch}
+      onClick={() => setShowSearch((value) => !value)}
+      className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
+    >
+      <Search aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      {locale === "es" ? "Buscar" : "Search"}
+    </button>
+  );
+
+  const filterToggle = (
+    <button
+      type="button"
+      aria-expanded={showFilters}
+      onClick={() => setShowFilters((value) => !value)}
+      className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
+    >
+      <SlidersHorizontal aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      {locale === "es" ? "Filtros" : "Filters"}
+      {selectedCategory || selectedResult ? (
+        <span className="tabular-nums text-black/45">
+          {[selectedCategory, selectedResult].filter(Boolean).length}
+        </span>
+      ) : null}
+    </button>
+  );
+
+  const searchPanel = showSearch ? (
+    <div className="max-w-3xl border-b border-black/10 py-3" aria-busy={isPending}>
+      <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
+    </div>
+  ) : null;
+
+  const filterPanel = showFilters ? (
+    <div className="border-b border-black/10 py-3">
+      {resultFilter ? <div className="max-w-xs">{resultFilter}</div> : null}
+      {showTopicFilters ? (
+        <div className={resultFilter ? "mt-3" : ""}>
+          <DecisionFilters
+            selectedCategory={selectedCategory}
+            categories={topicCategories}
+            locale={locale}
+          />
+        </div>
+      ) : null}
+    </div>
+  ) : null;
+
   return (
     <>
       {showSantaBarbaraInterestPilot && santaBarbaraView === "interests" ? (
@@ -230,29 +282,8 @@ export function DecisionBrowser({
                     </span>
                   </button>
                 </div>
-                <button
-                  type="button"
-                  aria-expanded={showSearch}
-                  onClick={() => setShowSearch((value) => !value)}
-                  className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
-                >
-                  <Search aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  {locale === "es" ? "Buscar" : "Search"}
-                </button>
-                <button
-                  type="button"
-                  aria-expanded={showFilters}
-                  onClick={() => setShowFilters((value) => !value)}
-                  className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
-                >
-                  <SlidersHorizontal aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  {locale === "es" ? "Filtros" : "Filters"}
-                  {selectedCategory || selectedResult ? (
-                    <span className="tabular-nums text-black/45">
-                      {[selectedCategory, selectedResult].filter(Boolean).length}
-                    </span>
-                  ) : null}
-                </button>
+                {searchToggle}
+                {filterToggle}
                 {showSantaBarbaraInterestPilot ? (
                   <SantaBarbaraInterestHub
                     activeView="all"
@@ -264,26 +295,8 @@ export function DecisionBrowser({
               </div>
             </div>
 
-            {showSearch ? (
-              <div className="max-w-3xl border-b border-black/10 py-3" aria-busy={isPending}>
-                <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
-              </div>
-            ) : null}
-
-            {showFilters ? (
-              <div className="border-b border-black/10 py-3">
-                {resultFilter ? <div className="max-w-xs">{resultFilter}</div> : null}
-                {showTopicFilters ? (
-                  <div className={resultFilter ? "mt-3" : ""}>
-                    <DecisionFilters
-                      selectedCategory={selectedCategory}
-                      categories={topicCategories}
-                      locale={locale}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
+            {searchPanel}
+            {filterPanel}
           </div>
 
           {decisionView === "map" ? (
@@ -291,6 +304,18 @@ export function DecisionBrowser({
               query={mapQuery}
               locale={locale}
               onPointCountChange={updateMapPointCount}
+              controlToggles={
+                <>
+                  {searchToggle}
+                  {filterToggle}
+                </>
+              }
+              controlPanels={
+                <>
+                  {searchPanel}
+                  {filterPanel}
+                </>
+              }
             />
           ) : (
             <div className="grid gap-3" aria-live="polite">

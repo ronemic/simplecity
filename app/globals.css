@@ -38,6 +38,12 @@ main {
   z-index: 0;
 }
 
+/* main's stacking context would otherwise trap the expanded map below the
+   sticky header, which is z-50. Set by DecisionMapCanvas while expanded. */
+body.has-fullscreen-overlay main {
+  z-index: 60;
+}
+
 a {
   color: inherit;
   text-underline-offset: 0.18em;
