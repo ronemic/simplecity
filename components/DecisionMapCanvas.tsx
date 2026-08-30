@@ -507,7 +507,7 @@ export function DecisionMapCanvas({
             ref={cardRef}
             tabIndex={-1}
             aria-live="polite"
-            className="border-t border-black/10 p-4 focus:outline-none sm:absolute sm:bottom-3 sm:left-3 sm:max-h-[calc(100%-1.5rem)] sm:w-80 sm:overflow-y-auto sm:rounded-xl sm:border sm:border-black/10 sm:bg-white/95 sm:shadow-lg sm:backdrop-blur"
+            className="absolute bottom-12 left-3 right-3 z-10 max-h-[calc(100%-7rem)] overflow-y-auto rounded-xl border border-black/10 bg-white/95 p-3 shadow-lg backdrop-blur focus:outline-none sm:bottom-3 sm:right-auto sm:max-h-[calc(100%-5rem)] sm:w-80 sm:p-4"
           >
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm text-black/65">{selected.locationLabel}</p>
