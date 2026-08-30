@@ -50,10 +50,11 @@ export function DecisionMapCanvas({
   useEffect(() => {
     if (!container.current || initialGroups.current.length === 0) return;
 
+    const mapContainer = container.current;
     const firstGroup = initialGroups.current[0];
 
     const map = new maplibregl.Map({
-      container: container.current,
+      container: mapContainer,
       style: {
         version: 8,
         sources: {
@@ -70,9 +71,22 @@ export function DecisionMapCanvas({
       },
       center: [firstGroup.longitude, firstGroup.latitude],
       zoom: 10,
+      attributionControl: false,
       cooperativeGestures: true
     });
     mapRef.current = map;
+    map.addControl(
+      new maplibregl.AttributionControl({
+        compact: true,
+        customAttribution: '<a href="https://maplibre.org/" target="_blank">MapLibre</a>'
+      }),
+      "bottom-right"
+    );
+    const attribution = mapContainer.querySelector<HTMLDetailsElement>(
+      ".maplibregl-ctrl-attrib"
+    );
+    attribution?.classList.remove("maplibregl-compact-show");
+    attribution?.removeAttribute("open");
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     map.on("error", () => setMapError(true));
 
