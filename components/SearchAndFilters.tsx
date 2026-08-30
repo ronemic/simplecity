@@ -1,4 +1,4 @@
-import { CalendarDays, Search } from "lucide-react";
+import { CalendarDays, Map as MapIcon, Search } from "lucide-react";
 import Link from "next/link";
 import { type Locale, t } from "@/lib/i18n";
 
@@ -77,6 +77,16 @@ export function SearchAndFilters({
         >
           <CalendarDays aria-hidden className="h-4 w-4" />
           {t(locale, "viewMeetingCalendar")}
+        </Link>
+        <Link
+          href="/decisions?view=map"
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[#b9d7ff] transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
+        >
+          <MapIcon aria-hidden className="h-4 w-4" />
+          {locale === "es" ? "Explorar mapa" : "Explore map"}
+          <span className="inline-flex rounded-full bg-[#dcecff]/15 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-wide text-[#dcecff]">
+            {locale === "es" ? "Nuevo" : "New"}
+          </span>
         </Link>
       </div>
     </div>

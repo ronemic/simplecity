@@ -107,18 +107,21 @@ function GlanceStats({ locale }: { locale: Locale }) {
         {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
       </p>
       <div
-        className={`grid divide-x divide-white/15 ${
-          glanceStats.length === 3 ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"
+        className={`grid ${
+          glanceStats.length === 3 ? "grid-cols-3" : "grid-cols-2"
         }`}
       >
         {glanceStats.map((item) => (
-          <div key={item.label} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
+          <div
+            key={item.label}
+            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-center sm:gap-2 sm:px-4"
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
               <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
             </span>
             <p className="min-w-0 leading-tight">
-              <span className="block text-lg font-black text-white sm:text-xl">{item.value}</span>
-              <span className="block text-[11px] font-semibold text-[#d9e2ec] sm:text-xs">
+              <span className="block text-base font-black text-white sm:text-xl">{item.value}</span>
+              <span className="block text-[10px] font-semibold text-[#d9e2ec] sm:text-xs">
                 {item.label}
               </span>
             </p>
@@ -140,12 +143,15 @@ function GlanceStatsLoading({ locale }: { locale: Locale }) {
       <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
         {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
       </p>
-      <div className="grid grid-cols-2 divide-x divide-white/15 sm:grid-cols-3">
+      <div className="grid grid-cols-3">
         {[0, 1, 2].map((item) => (
-          <div key={item} className="flex min-w-0 items-center gap-2 px-3 first:pl-0 last:pr-0 sm:px-4">
-            <span className="h-9 w-9 shrink-0 animate-pulse rounded-full bg-[#182c45] sm:h-10 sm:w-10" />
+          <div
+            key={item}
+            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-center sm:gap-2 sm:px-4"
+          >
+            <span className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-[#182c45] sm:h-10 sm:w-10" />
             <p className="min-w-0 flex-1 leading-tight">
-              <span className="block h-6 w-14 animate-pulse rounded bg-white/15 sm:h-7" />
+              <span className="block h-5 w-12 max-w-full animate-pulse rounded bg-white/15 sm:h-7 sm:w-14" />
               <span className="mt-1 block h-3 w-16 animate-pulse rounded bg-white/10" />
             </p>
           </div>

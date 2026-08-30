@@ -218,6 +218,16 @@ export function DecisionBrowser({
                   >
                     <MapIcon aria-hidden className="h-4 w-4" />
                     {locale === "es" ? "Mapa" : "Map"}
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-wide",
+                        decisionView === "map"
+                          ? "bg-white/20 text-white"
+                          : "bg-clay/10 text-clay"
+                      )}
+                    >
+                      {locale === "es" ? "Nuevo" : "New"}
+                    </span>
                   </button>
                 </div>
                 <button
