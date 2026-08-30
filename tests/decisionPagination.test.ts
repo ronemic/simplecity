@@ -80,6 +80,8 @@ test("decisions use bounded server pagination with a database sort key", () => {
   assert.doesNotMatch(browser, /matchesDecisionFilters|\.slice\(/);
   assert.match(browser, /Updating results/);
   assert.match(browser, /Actualizando resultados/);
+  assert.match(browser, /mapped decisions/);
+  assert.match(browser, /decisiones en el mapa/);
   assert.match(page, /<DecisionBrowser\s+key=\{jurisdiction\}/);
   assert.doesNotMatch(page, /key=\{`[^`]*selectedCategory/);
   assert.match(queries, /\.order\("decision_sort_at"/);

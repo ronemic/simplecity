@@ -31,7 +31,15 @@ const DecisionMapCanvas = dynamic(
   }
 );
 
-export function DecisionMapPanel({ query, locale }: { query: string; locale: "en" | "es" }) {
+export function DecisionMapPanel({
+  query,
+  locale,
+  onPointCountChange
+}: {
+  query: string;
+  locale: "en" | "es";
+  onPointCountChange?: (count: number) => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -78,6 +86,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
         setPoints(nextPoints);
         setHasLoaded(true);
         if (nextPoints.length > 0) setMapStarted(true);
+        onPointCountChange?.(nextPoints.length);
         setFailedRequestUrl(null);
         setSettledRequestUrl(requestUrl);
       })
@@ -89,7 +98,7 @@ export function DecisionMapPanel({ query, locale }: { query: string; locale: "en
       });
 
     return () => controller.abort();
-  }, [apiKey, requestUrl]);
+  }, [apiKey, onPointCountChange, requestUrl]);
 
   if (!apiKey) {
     return (

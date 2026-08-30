@@ -2,7 +2,7 @@
 
 import { List, Loader2, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DecisionFilters } from "@/components/DecisionFilters";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";
 import { PaginationJumpForm } from "@/components/PaginationJumpForm";
@@ -72,6 +72,7 @@ export function DecisionBrowser({
   const [santaBarbaraView, setSantaBarbaraView] = useState<SantaBarbaraDecisionView>("all");
   const [showSearch, setShowSearch] = useState(Boolean(initialSearch));
   const [showFilters, setShowFilters] = useState(Boolean(selectedCategory || selectedResult));
+  const [mapPointCount, setMapPointCount] = useState<{ key: string; count: number } | null>(null);
   const [isPending, startTransition] = useTransition();
   const decisionView = searchParams.get("view") === "map" ? "map" : "list";
   const resultStart = totalCount === 0 ? 0 : (currentPage - 1) * pageSize + 1;
@@ -82,6 +83,13 @@ export function DecisionBrowser({
   mapParams.delete("page");
   mapParams.delete("view");
   const mapQuery = mapParams.toString();
+  const mapPointCountKey = `${locale}:${mapQuery}`;
+  const visibleMapPointCount = mapPointCount?.key === mapPointCountKey
+    ? mapPointCount.count
+    : null;
+  const updateMapPointCount = useCallback((count: number) => {
+    setMapPointCount({ key: mapPointCountKey, count });
+  }, [mapPointCountKey]);
 
   useEffect(() => {
     // The URL changed from outside this input (back/forward, a filter link):
@@ -159,11 +167,17 @@ export function DecisionBrowser({
                 </h2>
                 <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold text-black/50">
                   <p aria-live="polite" className="inline-flex items-center gap-2">
-                    {isPending ? (
+                    {isPending || (decisionView === "map" && visibleMapPointCount === null) ? (
                       <>
                         <Loader2 aria-hidden className="h-3.5 w-3.5 animate-spin" />
-                        {locale === "es" ? "Actualizando resultados" : "Updating results"}
+                        {decisionView === "map"
+                          ? locale === "es" ? "Actualizando el mapa" : "Updating map"
+                          : locale === "es" ? "Actualizando resultados" : "Updating results"}
                       </>
+                    ) : decisionView === "map" ? (
+                      locale === "es"
+                        ? `${visibleMapPointCount} decisiones en el mapa`
+                        : `${visibleMapPointCount} mapped decisions`
                     ) : resultSummary(locale, resultStart, resultEnd, totalCount)}
                   </p>
                   {resultsCoverageInline ? (
@@ -263,7 +277,11 @@ export function DecisionBrowser({
           </div>
 
           {decisionView === "map" ? (
-            <DecisionMapPanel query={mapQuery} locale={locale} />
+            <DecisionMapPanel
+              query={mapQuery}
+              locale={locale}
+              onPointCountChange={updateMapPointCount}
+            />
           ) : (
             <div className="grid gap-3" aria-live="polite">
               {cards.map((card) => (
