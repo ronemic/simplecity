@@ -13,16 +13,30 @@ const TIMEFRAME_OPTIONS: Array<{ value: DecisionMapTimeframe; en: string; es: st
   { value: "all", en: "All", es: "Todo" }
 ];
 
-const pointCache = new Map<string, DecisionMapPoint[]>();
+type CachedPoints = {
+  points: DecisionMapPoint[];
+  cachedAt: number;
+};
+
+const pointCache = new Map<string, CachedPoints>();
 const MAX_CACHED_POINT_QUERIES = 30;
+const POINT_CACHE_TTL_MS = 5 * 60_000;
 
 function cachePoints(key: string, points: DecisionMapPoint[]) {
   pointCache.delete(key);
-  pointCache.set(key, points);
+  pointCache.set(key, { points, cachedAt: Date.now() });
   if (pointCache.size > MAX_CACHED_POINT_QUERIES) {
     const oldestKey = pointCache.keys().next().value;
     if (oldestKey) pointCache.delete(oldestKey);
   }
+}
+
+function freshCachedPoints(key: string) {
+  const cached = pointCache.get(key);
+  if (!cached) return null;
+  if (Date.now() - cached.cachedAt <= POINT_CACHE_TTL_MS) return cached.points;
+  pointCache.delete(key);
+  return null;
 }
 
 // Every placeholder matches the rendered map's height so the panel never
@@ -100,10 +114,10 @@ export function DecisionMapPanel({
   useEffect(() => {
     if (!apiKey) return;
     const controller = new AbortController();
-    const cached = pointCache.get(requestUrl);
+    const cached = freshCachedPoints(requestUrl);
     const request = cached
       ? Promise.resolve(cached)
-      : fetch(requestUrl, { signal: controller.signal }).then(async (response) => {
+      : fetch(requestUrl, { signal: controller.signal, cache: "no-cache" }).then(async (response) => {
           if (!response.ok) throw new Error("Map data request failed");
           const body = await response.json() as { points?: DecisionMapPoint[] };
           return body.points || [];

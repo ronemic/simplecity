@@ -1592,7 +1592,7 @@ const getCachedDecisionMapPoints = unstable_cache(
       })
       .slice(0, 750);
   },
-  ["decision-map-points-v2"],
+  ["decision-map-points-v3"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
