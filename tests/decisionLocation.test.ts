@@ -110,3 +110,61 @@ test("keeps a project location when the body merely mentions a non-site word", (
 
   assert.equal(candidate?.address, "613 Portsmouth Lane");
 });
+
+test("drops the agenda item number that runs into the address", () => {
+  assert.equal(
+    extractStreetAddressCandidate("Item context: CONSENT CALENDAR. 15 445 S. B Street (Bespoke) mixed-use.")?.address,
+    "445 S. B Street"
+  );
+  // A dotted sub-number sits between the item number and the address.
+  assert.equal(
+    extractStreetAddressCandidate("Item context: 2 4.2. 27440 Elena Road variance study session.")?.address,
+    "27440 Elena Road"
+  );
+});
+
+test("never trims past intervening words, where letterhead and table rows live", () => {
+  // Staff-report footer: "Page 1 of 4" followed by the city's own letterhead.
+  assert.equal(
+    extractStreetAddressCandidate("Item context: Page 1 of 4 City of Redwood City 1017 Middlefield Road")?.address,
+    "4 City of Redwood City 1017 Middlefield Road"
+  );
+  // One row of an assessment-appeal table, which names an unrelated property.
+  assert.equal(
+    extractStreetAddressCandidate("Item context: STRYKER (TENANT) N 24 Y 24.2346 2610 ORCHARD PARKWAY")?.address,
+    "24 Y 24.2346 2610 ORCHARD PARKWAY"
+  );
+});
+
+test("leaves a street with no house number rather than claiming address precision", () => {
+  assert.equal(
+    extractStreetAddressCandidate("Item context: CONSENT CALENDAR. 13 19th Avenue multimodal project.")?.address,
+    "13 19th Avenue"
+  );
+});
+
+test("keeps an address range intact and geocodes it by its low number", async () => {
+  const candidate = extractStreetAddressCandidate(
+    "Item context: Landmark designation for the storefronts at 2035-2047 Fillmore Street."
+  );
+  assert.equal(candidate?.address, "2035-2047 Fillmore Street");
+
+  let requested = "";
+  const result = await geocodeDecisionAddress(candidate!, jurisdiction, {
+    apiKey: "test-key",
+    fetchImpl: async (input) => {
+      requested = decodeURIComponent(String(input));
+      return new Response(JSON.stringify({
+        features: [{
+          center: [-122.08, 37.39],
+          place_name: "2035 Fillmore Street, Mountain View, California",
+          relevance: 1
+        }]
+      }));
+    }
+  });
+
+  assert.match(requested, /2035 Fillmore Street, Mountain View/);
+  assert.doesNotMatch(requested, /2035-2047/);
+  assert.equal(result?.location_status, "verified");
+});
