@@ -22,7 +22,10 @@ const FIT_MAX_ZOOM = 14;
 // Locations share one colour. Outcomes at a single address are usually a mix
 // (10 awaiting + 1 approved + 1 other, say), and collapsing that into one
 // swatch claimed more than the data supports.
-const POINT_COLOR = "#d3533d";
+// Familiar consumer-map colors: warm red for exact places and clear blue for
+// groups, against MapTiler's brighter street-map basemap.
+const POINT_COLOR = "#ea4335";
+const CLUSTER_COLOR = "#1a73e8";
 const PIN_IMAGE = "decision-pin";
 const PIN_SELECTED_IMAGE = "decision-pin-selected";
 // Logical pin geometry. The tip sits on the bottom edge so `icon-anchor:
@@ -197,9 +200,9 @@ export function DecisionMapCanvas({
     let removed = false;
     const map = new maplibregl.Map({
       container: container.current,
-      // A muted data-visualisation basemap keeps the markers legible against
-      // it; the vector style also stays sharp on high-density screens.
-      style: `https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(apiKey)}`,
+      // A conventional street-map treatment feels familiar to readers while
+      // retaining MapLibre and the existing MapTiler account.
+      style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${encodeURIComponent(apiKey)}`,
       bounds: boundsFor(initialGroups.current) || undefined,
       fitBoundsOptions: { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM },
       attributionControl: false,
@@ -280,7 +283,7 @@ export function DecisionMapCanvas({
         source: SOURCE_ID,
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": "#12365f",
+          "circle-color": CLUSTER_COLOR,
           "circle-opacity": 0.16,
           "circle-radius": ["step", ["get", "decisions"], 22, 5, 27, 15, 33, 40, 40]
         }
@@ -292,7 +295,7 @@ export function DecisionMapCanvas({
         source: SOURCE_ID,
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": "#12365f",
+          "circle-color": CLUSTER_COLOR,
           "circle-radius": ["step", ["get", "decisions"], 15, 5, 19, 15, 24, 40, 30],
           "circle-stroke-width": 2.5,
           "circle-stroke-color": "#ffffff"
