@@ -7,6 +7,7 @@ import {
   associatePdfLinksWithAgendaItems,
   extractAgendaPdfPages,
   MENLO_PARK_ATTACHMENT_MAX_ITEMS,
+  menloParkAgendaItemExternalId,
   normalizeMenloParkAttachmentUrl,
   selectAgendaItemAttachments,
   selectAllAgendaItemAttachments,
@@ -29,6 +30,21 @@ function text(str: string, x: number, y: number) {
 function link(url: string, y: number) {
   return { url, rect: [300, y - 5, 420, y + 5], subtype: "Link" };
 }
+
+test("preserves agenda numbers in item IDs for long Menlo Park meeting IDs", () => {
+  const meeting = {
+    externalId:
+      "menlo-park-official-site-city-council-july-14-2026-agenda-20260714-city-council-special-and-regular-agenda-pdf",
+    title: "City Council - July 14, 2026"
+  };
+
+  const k1 = menloParkAgendaItemExternalId(meeting, "K1");
+  const k2 = menloParkAgendaItemExternalId(meeting, "K2");
+
+  assert.equal(k1, `${meeting.externalId}-item-k1`);
+  assert.equal(k2, `${meeting.externalId}-item-k2`);
+  assert.notEqual(k1, k2);
+});
 
 test("associates official PDF annotations with same-page Menlo Park agenda items", () => {
   const page: AgendaPdfPage = {
