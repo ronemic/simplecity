@@ -198,7 +198,7 @@ export function SubscribeForm({
           {jurisdictionGroups.map((group) => (
             <div
               aria-labelledby={`${group.id}-label`}
-              className="rounded-xl bg-black/[0.025] p-3.5"
+              className="rounded-lg bg-black/[0.025] p-3.5"
               key={group.id}
               role="group"
             >

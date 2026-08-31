@@ -26,7 +26,7 @@ export function SearchAndFilters({
   return (
     <div className="w-full max-w-[740px]">
       <form
-        className="flex w-full rounded-[10px] border border-white/20 bg-white/10 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur"
+        className="flex w-full rounded-lg border border-white/20 bg-white/10 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur"
         action={action}
         role="search"
       >

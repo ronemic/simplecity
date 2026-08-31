@@ -126,11 +126,11 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
         <input type="hidden" name="id" value={card.id} />
         <div className="grid gap-3 md:grid-cols-2">
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-black/70">Agenda item</span>
+            <span className="label-eyebrow">Agenda item</span>
             <input name="agenda_item" defaultValue={card.agenda_item || ""} className="input-control" />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-black/70">What is happening</span>
+            <span className="label-eyebrow">What is happening</span>
             <textarea
               name="what_is_happening"
               defaultValue={normalizeSummaryPoints(card.what_is_happening).join("\n")}
@@ -140,7 +140,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             <span className="block text-xs text-black/50">Enter one bullet point per line, up to three.</span>
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-black/70">Why it matters</span>
+            <span className="label-eyebrow">Why it matters</span>
             <textarea
               name="why_it_matters"
               defaultValue={card.why_it_matters || ""}
@@ -149,11 +149,11 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Status</span>
+            <span className="label-eyebrow">Status</span>
             <input name="status" defaultValue={card.status || ""} className="input-control" />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Who it affects</span>
+            <span className="label-eyebrow">Who it affects</span>
             <input
               name="who_it_affects"
               defaultValue={(card.who_it_affects || []).join(", ")}
@@ -161,11 +161,11 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Source URL</span>
+            <span className="label-eyebrow">Source URL</span>
             <input name="source_url" defaultValue={card.source_url || ""} className="input-control" />
           </label>
           <fieldset className="md:col-span-2">
-            <legend className="text-xs font-bold uppercase text-black/70">Topics</legend>
+            <legend className="label-eyebrow">Topics</legend>
             <div className="mt-2 flex flex-wrap gap-2 rounded-lg border border-black/10 bg-black/[0.02] p-2">
               {availableCategories.map((category) => (
                 <label
@@ -184,7 +184,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             </div>
           </fieldset>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Comment opens</span>
+            <span className="label-eyebrow">Comment opens</span>
             <input
               name="comment_window_opens"
               defaultValue={card.comment_window_opens || ""}
@@ -192,7 +192,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Comment closes</span>
+            <span className="label-eyebrow">Comment closes</span>
             <input
               name="comment_window_closes"
               defaultValue={card.comment_window_closes || ""}
@@ -200,7 +200,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Attend</span>
+            <span className="label-eyebrow">Attend</span>
             <textarea
               name="how_to_act_attend"
               defaultValue={card.how_to_act_attend || ""}
@@ -209,7 +209,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1">
-            <span className="text-xs font-bold uppercase text-black/70">Email</span>
+            <span className="label-eyebrow">Email</span>
             <textarea
               name="how_to_act_email"
               defaultValue={card.how_to_act_email || ""}
@@ -218,7 +218,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             />
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-black/70">Submit comment</span>
+            <span className="label-eyebrow">Submit comment</span>
             <textarea
               name="how_to_act_submit_comment"
               defaultValue={card.how_to_act_submit_comment || ""}
@@ -235,7 +235,7 @@ export function AdminCardEditor({ card }: { card: SummaryCardRow }) {
             Featured
           </label>
           <label className="block space-y-1 md:col-span-2">
-            <span className="text-xs font-bold uppercase text-black/70">Admin notes</span>
+            <span className="label-eyebrow">Admin notes</span>
             <textarea
               name="admin_notes"
               defaultValue={card.admin_notes || ""}

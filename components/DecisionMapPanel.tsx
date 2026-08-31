@@ -46,7 +46,7 @@ const MAP_HEIGHT = "h-[28rem] sm:h-[34rem]";
 function MapSkeleton({ label }: { label: string }) {
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border border-black/10 bg-black/[0.03] ${MAP_HEIGHT}`}
+      className={`relative overflow-hidden rounded-lg border border-black/10 bg-black/[0.03] ${MAP_HEIGHT}`}
       aria-live="polite"
     >
       <div

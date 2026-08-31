@@ -76,7 +76,7 @@ export function ListboxSelect({
         />
       </button>
       {isOpen ? (
-        <div className="menu-popover border-black/20 shadow-soft">
+        <div className="menu-popover">
           <div role="listbox" aria-label={label} className="max-h-64 overflow-auto">
             {options.map((option) => {
               const isSelected = option.value === selectedValue;

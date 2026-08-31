@@ -133,7 +133,7 @@ export function DecisionPreviewModal({
               type="button"
               onClick={onClose}
               aria-label={locale === "es" ? "Cerrar vista previa" : "Close preview"}
-              className="rounded-lg p-2 text-black/55 transition hover:bg-black/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+              className="icon-button"
             >
               <X aria-hidden className="h-5 w-5" />
             </button>

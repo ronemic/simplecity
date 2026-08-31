@@ -38,7 +38,7 @@ export function PaginationJumpForm({
         <span>{locale === "es" ? "Página" : "Page"}</span>
         <input
           aria-label={locale === "es" ? "Número de página" : "Page number"}
-          className="h-9 w-16 rounded-lg border border-black/15 bg-white px-2 text-center text-sm font-black text-ink shadow-sm focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/15"
+          className="h-9 w-16 rounded-lg border border-black/15 bg-white px-2 text-center text-sm font-black text-ink shadow-sm focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/20"
           inputMode="numeric"
           max={pageCount}
           min={1}

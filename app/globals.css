@@ -249,6 +249,14 @@ p {
   @apply inline-flex min-h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border border-black/10 bg-white px-3 py-2 text-sm font-semibold text-black/35 shadow-sm;
 }
 
+.icon-button {
+  @apply inline-flex shrink-0 items-center justify-center rounded-md p-2 text-black/55 transition hover:bg-black/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.map-control {
+  @apply inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
 .icon-tile {
   @apply flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#eef3f6] text-[#12365f] shadow-[inset_0_0_0_1px_rgba(36,87,166,0.06)];
 }
@@ -315,6 +323,10 @@ p {
 
 .select-trigger-compact {
   @apply flex min-h-9 w-full items-center justify-between gap-2 rounded-md border border-black/15 bg-[#f8fafb] px-2.5 py-1.5 text-left text-sm font-bold text-ink shadow-sm transition hover:border-civic/30 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
+
+.floating-surface {
+  @apply rounded-lg border border-black/10 shadow-[0_18px_46px_rgba(12,24,40,0.14)];
 }
 
 .menu-popover {

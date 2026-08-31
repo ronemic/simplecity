@@ -464,7 +464,7 @@ export function DecisionMapCanvas({
       className={
         isFullscreen
           ? "fixed inset-0 z-[60] flex flex-col bg-white"
-          : "overflow-hidden rounded-xl border border-black/10 bg-white shadow-sm"
+          : "overflow-hidden rounded-lg border border-black/10 bg-white shadow-sm"
       }
     >
       {isFullscreen && fullscreenControls ? (
@@ -483,7 +483,7 @@ export function DecisionMapCanvas({
             type="button"
             onClick={() => setIsFullscreen((current) => !current)}
             aria-pressed={isFullscreen}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+            className="map-control"
           >
             {isFullscreen ? (
               <Minimize2 aria-hidden className="h-3.5 w-3.5" />
@@ -498,7 +498,7 @@ export function DecisionMapCanvas({
             <button
               type="button"
               onClick={resetView}
-              className="rounded-lg border border-black/10 bg-white/95 px-3 py-2 text-xs font-black text-ink shadow-sm backdrop-blur transition hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+              className="map-control"
             >
               {locale === "es" ? "Restablecer vista" : "Reset view"}
             </button>
@@ -509,7 +509,7 @@ export function DecisionMapCanvas({
             ref={cardRef}
             tabIndex={-1}
             aria-live="polite"
-            className="absolute bottom-12 left-3 right-3 z-10 max-h-[calc(100%-7rem)] overflow-y-auto rounded-xl border border-black/10 bg-white/95 p-3 shadow-lg backdrop-blur focus:outline-none sm:bottom-3 sm:right-auto sm:max-h-[calc(100%-5rem)] sm:w-80 sm:p-4"
+            className="floating-surface absolute bottom-12 left-3 right-3 z-10 max-h-[calc(100%-7rem)] overflow-y-auto bg-white/95 p-3 backdrop-blur focus:outline-none sm:bottom-3 sm:right-auto sm:max-h-[calc(100%-5rem)] sm:w-80 sm:p-4"
           >
             <div className="flex items-start justify-between gap-2">
               <p className="text-sm text-black/65">{selected.locationLabel}</p>
@@ -517,7 +517,7 @@ export function DecisionMapCanvas({
                 type="button"
                 onClick={() => setSelectedKey(null)}
                 aria-label={locale === "es" ? "Cerrar detalles" : "Close details"}
-                className="-mr-1 -mt-1 shrink-0 rounded-md p-1 text-black/45 transition hover:bg-black/[0.06] hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+                className="icon-button -mr-1 -mt-1"
               >
                 <X aria-hidden className="h-4 w-4" />
               </button>
@@ -550,7 +550,7 @@ export function DecisionMapCanvas({
                       <button
                         type="button"
                         onClick={() => setPreviewPoint(point)}
-                        className="text-left font-bold text-civic hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+                        className="rounded-md text-left font-bold text-civic hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                       >
                         {point.title}
                       </button>
@@ -578,7 +578,7 @@ export function DecisionMapCanvas({
               <button
                 type="button"
                 onClick={() => focusGroup(group)}
-                className="w-full py-2 text-left font-semibold text-civic hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+                className="w-full rounded-md py-2 text-left font-semibold text-civic hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic focus-visible:ring-offset-2 focus-visible:ring-offset-white"
               >
                 {group.points.length === 1
                   ? `${group.points[0].title} — ${group.locationLabel}`

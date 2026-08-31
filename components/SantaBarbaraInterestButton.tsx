@@ -180,7 +180,7 @@ export function SantaBarbaraInterestButton({
             // used to open rightward from a button that already sits at the
             // card's right edge, so it ran off the card and the viewport.
             <div className="absolute right-0 top-full z-40 mt-2 w-[14.5rem] sm:w-72" id={disclosureId}>
-              <p className="rounded-lg border border-black/10 bg-white p-3 text-left text-xs font-semibold leading-5 text-black/65 shadow-xl">
+              <p className="floating-surface bg-white p-3 text-left text-xs font-semibold leading-5 text-black/65">
                 {disclosure}{" "}
                 <Link
                   className="font-bold text-civic underline underline-offset-2"
