@@ -199,7 +199,7 @@ export function DecisionMapCanvas({
       container: container.current,
       // A muted data-visualisation basemap keeps the markers legible against
       // it; the vector style also stays sharp on high-density screens.
-      style: `https://api.maptiler.com/maps/dataviz/style.json?key=${encodeURIComponent(apiKey)}`,
+      style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${encodeURIComponent(apiKey)}`,
       bounds: boundsFor(initialGroups.current) || undefined,
       fitBoundsOptions: { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM },
       attributionControl: false,
