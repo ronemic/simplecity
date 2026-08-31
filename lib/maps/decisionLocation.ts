@@ -12,6 +12,16 @@ const STREET_ADDRESS_PATTERN = new RegExp(
   "gi"
 );
 
+/**
+ * Item types whose body routinely names addresses that the decision is not
+ * about: payment registers list a vendor address per line, minutes recap every
+ * site the body discussed, and adjournment or salary boilerplate carries the
+ * city-hall letterhead. Picking any one of those addresses tells a reader the
+ * city acted on that property, so these items get no pin at all.
+ */
+const NON_SITE_ITEM_PATTERN =
+  /\b(?:warrants?\s+of\s+demands?|registers?\s+of\s+demands?|check\s+register|warrant\s+register|accounts?\s+payable|cash\s+disbursements?|disbursements?\s+report|list\s+of\s+(?:claims|demands|warrants)|claims?\s+register|payroll\s+register|salary\s+schedule|meeting\s+minutes|minutes\s+(?:of|for|from)\b|adjournment)\b/i;
+
 type Bounds = readonly [west: number, south: number, east: number, north: number];
 
 const REGION_BOUNDS: Record<string, Bounds> = {
@@ -58,10 +68,25 @@ function evidenceExcerpt(text: string, start: number, length: number) {
   return compact(text.slice(from, to));
 }
 
+/**
+ * The official agenda title when the formatted item context is available, and
+ * otherwise the whole text -- which older cards store as the bare title. Body
+ * prose is deliberately excluded so an incidental "minutes" or "warrant" inside
+ * a real project report cannot suppress its location.
+ */
+function itemTitle(text: string) {
+  return text.match(/^Official title:\s*(.+)$/m)?.[1] ?? text;
+}
+
+function isNonSiteItem(text: string) {
+  return NON_SITE_ITEM_PATTERN.test(itemTitle(text));
+}
+
 export function extractStreetAddressCandidate(
   sourceText: string | null | undefined
 ): DecisionLocationCandidate | null {
   const text = String(sourceText || "");
+  if (isNonSiteItem(text)) return null;
   STREET_ADDRESS_PATTERN.lastIndex = 0;
 
   for (const match of text.matchAll(STREET_ADDRESS_PATTERN)) {
@@ -100,6 +125,10 @@ function withinBounds(longitude: number, latitude: number, bounds: Bounds) {
 
 function finiteCoordinate(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+export function clearedDecisionLocation() {
+  return emptyLocation("no_candidate");
 }
 
 function emptyLocation(status: Exclude<DecisionLocationStatus, "verified">): StoredDecisionLocation {

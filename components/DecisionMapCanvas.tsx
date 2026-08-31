@@ -4,6 +4,7 @@ import { Maximize2, Minimize2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as maplibregl from "maplibre-gl";
 import { DecisionPreviewModal } from "@/components/DecisionPreviewModal";
+import { lockBodyScroll } from "@/lib/utils/scrollLock";
 import type { DecisionMapPoint } from "@/lib/types";
 
 // Bundled chunks resolve MapLibre's own worker URL to a path that does not
@@ -146,7 +147,7 @@ export function DecisionMapCanvas({
 }) {
   const container = useRef<HTMLDivElement>(null);
   const groups = useMemo(() => groupMapPoints(points), [points]);
-  const initialGroups = useRef(groups);
+  const groupsRef = useRef(groups);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const cardRef = useRef<HTMLElement>(null);
   // Once the reader has driven the camera themselves, a filter change must not
@@ -191,8 +192,19 @@ export function DecisionMapCanvas({
     });
   }, [markMoved]);
 
+  // Kept current for the map-creation effect below, which reads the groups it
+  // should open on without taking them as a dependency -- it must not re-run
+  // and rebuild the map every time the points change.
   useEffect(() => {
-    if (!container.current || initialGroups.current.length === 0) return;
+    groupsRef.current = groups;
+  }, [groups]);
+
+  // Built as soon as there is a container. Gating on having points instead left
+  // no way back: the effect does not re-run when points arrive, so a canvas
+  // that first rendered empty stayed permanently blank. An empty map opens
+  // without bounds and the effect below fits it the moment points land.
+  useEffect(() => {
+    if (!container.current) return;
 
     let removed = false;
     const map = new maplibregl.Map({
@@ -200,7 +212,7 @@ export function DecisionMapCanvas({
       // A muted data-visualisation basemap keeps the markers legible against
       // it; the vector style also stays sharp on high-density screens.
       style: `https://api.maptiler.com/maps/streets-v4/style.json?key=${encodeURIComponent(apiKey)}`,
-      bounds: boundsFor(initialGroups.current) || undefined,
+      bounds: boundsFor(groupsRef.current) || undefined,
       fitBoundsOptions: { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM },
       attributionControl: false,
       cooperativeGestures: true
@@ -235,7 +247,7 @@ export function DecisionMapCanvas({
       styleLoadedRef.current = true;
       map.addSource(SOURCE_ID, {
         type: "geojson",
-        data: toFeatureCollection(initialGroups.current),
+        data: toFeatureCollection(groupsRef.current),
         cluster: true,
         clusterRadius: 46,
         clusterMaxZoom: 14,
@@ -431,11 +443,10 @@ export function DecisionMapCanvas({
     // has not taken the camera over gets the full extent refitted for them.
     if (!movedRef.current) resetViewRef.current();
     if (!isFullscreen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     document.body.classList.add("has-fullscreen-overlay");
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       document.body.classList.remove("has-fullscreen-overlay");
     };
   }, [isFullscreen]);
@@ -473,10 +484,15 @@ export function DecisionMapCanvas({
         </div>
       ) : null}
       <div className={isFullscreen ? "relative min-h-0 flex-1" : "relative"}>
+        {/* Deliberately not `aria-hidden`. MapLibre fills this with a
+            focusable canvas it labels itself, plus zoom and attribution
+            controls that are ordinary labelled buttons and links; hiding the
+            subtree left all of them focusable inside `aria-hidden`, which
+            reads as focus disappearing into nowhere. What the canvas paints
+            instead of exposes -- the locations -- is listed as buttons below. */}
         <div
           ref={container}
           className={isFullscreen ? "h-full w-full" : "h-[28rem] w-full sm:h-[34rem]"}
-          aria-hidden
         />
         <div className="absolute left-3 top-3 flex items-center gap-2">
           <button

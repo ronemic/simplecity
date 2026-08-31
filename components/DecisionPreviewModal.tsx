@@ -5,6 +5,7 @@ import { ExternalLink, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { SummaryCard } from "@/components/SummaryCard";
+import { lockBodyScroll } from "@/lib/utils/scrollLock";
 import type { DecisionMapPoint, SummaryCardRow } from "@/lib/types";
 
 type CachedCard = {
@@ -13,7 +14,20 @@ type CachedCard = {
 };
 
 const CARD_CACHE_TTL_MS = 5 * 60 * 1000;
+// Entries are otherwise only dropped when the same key is read back after
+// expiring, so a long session that previews many decisions never releases any
+// of them. Full cards are far larger than map points, hence the smaller bound.
+const MAX_CACHED_CARDS = 20;
 const cardCache = new Map<string, CachedCard>();
+
+function cacheCard(cacheKey: string, card: SummaryCardRow) {
+  cardCache.delete(cacheKey);
+  cardCache.set(cacheKey, { card, expiresAt: Date.now() + CARD_CACHE_TTL_MS });
+  if (cardCache.size > MAX_CACHED_CARDS) {
+    const oldestKey = cardCache.keys().next().value;
+    if (oldestKey) cardCache.delete(oldestKey);
+  }
+}
 
 function cachedCard(cardId: string, locale: "en" | "es") {
   const cacheKey = `${cardId}:${locale}`;
@@ -40,11 +54,10 @@ export function DecisionPreviewModal({
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
     const previousFocus = document.activeElement instanceof HTMLElement
       ? document.activeElement
       : null;
-    document.body.style.overflow = "hidden";
+    const releaseScroll = lockBodyScroll();
     closeButtonRef.current?.focus();
 
     function closeOnEscape(event: KeyboardEvent) {
@@ -52,7 +65,7 @@ export function DecisionPreviewModal({
     }
     window.addEventListener("keydown", closeOnEscape);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      releaseScroll();
       window.removeEventListener("keydown", closeOnEscape);
       previousFocus?.focus({ preventScroll: true });
     };
@@ -70,10 +83,7 @@ export function DecisionPreviewModal({
         return response.json() as Promise<{ card: SummaryCardRow }>;
       })
       .then(({ card: nextCard }) => {
-        cardCache.set(cacheKey, {
-          card: nextCard,
-          expiresAt: Date.now() + CARD_CACHE_TTL_MS
-        });
+        cacheCard(cacheKey, nextCard);
         setCard(nextCard);
       })
       .catch((reason: unknown) => {

@@ -4,11 +4,16 @@ import {
   getServiceSupabaseClientsForSelection,
   requireValidJurisdictionSlug
 } from "@/lib/config/jurisdictions";
-import { locateDecisionFromSource } from "@/lib/maps/decisionLocation";
+import {
+  clearedDecisionLocation,
+  extractStreetAddressCandidate,
+  locateDecisionFromSource
+} from "@/lib/maps/decisionLocation";
 
 const args = process.argv.slice(2);
 const execute = args.includes("--execute");
 const retry = args.includes("--retry");
+const recheck = args.includes("--recheck");
 const jurisdictionArg = args.find((arg) => arg.startsWith("--jurisdiction="))?.split("=")[1];
 const limitArg = Number.parseInt(
   args.find((arg) => arg.startsWith("--limit="))?.split("=")[1] || "500",
@@ -17,7 +22,10 @@ const limitArg = Number.parseInt(
 const limit = Number.isFinite(limitArg) ? Math.max(1, Math.min(limitArg, 5000)) : 500;
 const apiKey = process.env.MAPTILER_GEOCODING_API_KEY;
 
-if (!apiKey) throw new Error("Set MAPTILER_GEOCODING_API_KEY before backfilling locations.");
+// A recheck never geocodes, so it runs without a geocoding key.
+if (!apiKey && !recheck) {
+  throw new Error("Set MAPTILER_GEOCODING_API_KEY before backfilling locations.");
+}
 
 const jurisdictions = jurisdictionArg
   ? [getJurisdictions().find((entry) => entry.slug === requireValidJurisdictionSlug(jurisdictionArg))]
@@ -27,18 +35,24 @@ const jurisdictions = jurisdictionArg
 let candidates = 0;
 let verified = 0;
 let unresolved = 0;
+let cleared = 0;
 
 for (const jurisdiction of jurisdictions) {
   const [{ supabase }] = getServiceSupabaseClientsForSelection(jurisdiction.slug);
   let query = supabase
     .from("summary_cards")
-    .select("id,model_input_text,agenda_item,location_status")
+    .select("id,model_input_text,agenda_item,location_status,location_label")
     .eq("jurisdiction_slug", jurisdiction.slug)
     .eq("is_published", true);
 
-  query = retry
-    ? query.or("location_status.is.null,location_status.neq.verified")
-    : query.is("location_status", null);
+  // A recheck revisits pins that are already stored as verified, so extractor
+  // changes that disqualify an address can retire the pin it produced. Manually
+  // placed locations are never machine-derived and stay untouched.
+  query = recheck
+    ? query.eq("location_status", "verified").eq("location_method", "geocoded")
+    : retry
+      ? query.or("location_status.is.null,location_status.neq.verified")
+      : query.is("location_status", null);
 
   const { data, error } = await query
     .order("decision_sort_at", { ascending: false, nullsFirst: false })
@@ -54,6 +68,26 @@ for (const jurisdiction of jurisdictions) {
     // still use the agenda-item title, which is the narrowest source-grounded
     // field available without trusting generated explanatory copy.
     const sourceText = card.model_input_text || card.agenda_item;
+
+    // Rechecks only ever retire a pin, so they re-run the extractor alone and
+    // leave every still-valid address at the coordinates it already has --
+    // no geocoding calls, and no chance of moving a correct pin.
+    if (recheck) {
+      if (extractStreetAddressCandidate(sourceText)) continue;
+      cleared += 1;
+      console.log(`  clearing ${card.agenda_item || card.id} -> ${card.location_label}`);
+      if (execute) {
+        const { error: clearError } = await supabase
+          .from("summary_cards")
+          .update(clearedDecisionLocation())
+          .eq("id", card.id);
+        if (clearError) {
+          throw new Error(`Failed to clear card ${card.id}: ${clearError.message}`);
+        }
+      }
+      continue;
+    }
+
     const location = await locateDecisionFromSource(sourceText, jurisdiction, { apiKey });
     if (!location) continue;
     if (location.location_status === "verified") verified += 1;
@@ -76,7 +110,11 @@ for (const jurisdiction of jurisdictions) {
 }
 
 console.log(
-  `Decision locations: ${candidates} checked, ${verified} verified, ${unresolved} unresolved${
-    execute ? "" : ". Re-run with --execute to save results"
-  }.${retry ? " Previously unresolved cards were retried." : " Use --retry to revisit unresolved cards."}`
+  recheck
+    ? `Decision locations: ${candidates} verified pin(s) rechecked, ${cleared} no longer qualify${
+        execute ? " and were cleared" : ". Re-run with --execute to save results"
+      }.`
+    : `Decision locations: ${candidates} checked, ${verified} verified, ${unresolved} unresolved${
+        execute ? "" : ". Re-run with --execute to save results"
+      }.${retry ? " Previously unresolved cards were retried." : " Use --retry to revisit unresolved cards."}`
 );

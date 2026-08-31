@@ -71,3 +71,42 @@ test("rejects a geocoder result outside the jurisdiction region", async () => {
 
   assert.equal(result?.location_status, "geocode_failed");
 });
+
+test("skips payment registers whose vendor lines name unrelated addresses", () => {
+  const candidate = extractStreetAddressCandidate(
+    [
+      "Official title: City/District Warrant of Demands were Processed and Issued on July 30, 2026",
+      "Item context: 158356 BAY SOLUTIONS JUNK REMOVAL:633 COMET DR $900.00 158357 BAYSIDE BUILDING MATERIALS"
+    ].join("\n")
+  );
+
+  assert.equal(candidate, null);
+});
+
+test("skips minutes and adjournment items that carry city-hall boilerplate", () => {
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Official title: JUNE 18, 2026 REGULAR MEETING MINUTES\nItem context: Council discussed 613 Portsmouth Lane."
+    ),
+    null
+  );
+  assert.equal(
+    extractStreetAddressCandidate("Official title: ADJOURNMENT\nItem context: 610 Foster City Boulevard."),
+    null
+  );
+});
+
+test("suppresses non-site items backfilled from a bare agenda title", () => {
+  assert.equal(extractStreetAddressCandidate("Cash Disbursement Report for June 2026"), null);
+});
+
+test("keeps a project location when the body merely mentions a non-site word", () => {
+  const candidate = extractStreetAddressCandidate(
+    [
+      "Official title: Vote on use permit for 613 Portsmouth Lane addition",
+      "Item context: The prior meeting minutes recorded neighbor comments about 613 Portsmouth Lane."
+    ].join("\n")
+  );
+
+  assert.equal(candidate?.address, "613 Portsmouth Lane");
+});

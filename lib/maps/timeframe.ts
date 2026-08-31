@@ -14,6 +14,12 @@ export function decisionMapCutoff(
 ): string | null {
   if (timeframe === "all") return null;
   const cutoff = new Date(now);
+  const dayOfMonth = cutoff.getUTCDate();
   cutoff.setUTCMonth(cutoff.getUTCMonth() - (timeframe === "3m" ? 3 : 12));
+  // Subtracting months from the 29th to the 31st can land past the end of the
+  // target month, and JS then rolls the overflow into the following one --
+  // silently shortening the window. Day 0 backs up to the intended month's
+  // last day, so the cutoff never moves later than the reader asked for.
+  if (cutoff.getUTCDate() !== dayOfMonth) cutoff.setUTCDate(0);
   return cutoff.toISOString();
 }

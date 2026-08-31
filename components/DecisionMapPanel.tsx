@@ -126,7 +126,10 @@ export function DecisionMapPanel({
     request
       .then((nextPoints) => {
         if (controller.signal.aborted) return;
-        cachePoints(requestUrl, nextPoints);
+        // Only a fresh response resets the entry's age. Re-caching a hit kept
+        // pushing its timestamp forward, so a filter the reader kept returning
+        // to would never revalidate and could serve stale points all session.
+        if (!cached) cachePoints(requestUrl, nextPoints);
         setPoints(nextPoints);
         setHasLoaded(true);
         if (nextPoints.length > 0) setMapStarted(true);

@@ -89,6 +89,7 @@
     "outcomes:backfill": "node --import tsx/esm scripts/backfill-decision-outcomes.ts",
     "outcomes:audit": "node --import tsx/esm scripts/audit-decision-outcomes.ts",
     "locations:backfill": "node --import tsx/esm scripts/backfill-decision-locations.ts",
+    "locations:recheck": "node --import tsx/esm scripts/backfill-decision-locations.ts --recheck",
     "minutes:audit": "node --import tsx/esm scripts/audit-minutes-coverage.ts",
     "cards:audit": "node --import tsx/esm scripts/audit-card-accuracy.ts",
     "reconcile:meetings": "node --import tsx/esm scripts/reconcile-meetings.ts",
