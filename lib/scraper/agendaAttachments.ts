@@ -298,8 +298,12 @@ function agendaDocumentCandidates(meeting: PrimeGovMeeting) {
   );
 }
 
-function itemExternalId(meeting: PrimeGovMeeting, agendaNumber: string) {
-  return slugify(`${meeting.externalId || meeting.title}-${agendaNumber}`);
+export function menloParkAgendaItemExternalId(
+  meeting: Pick<PrimeGovMeeting, "externalId" | "title">,
+  agendaNumber: string
+) {
+  const meetingId = meeting.externalId || slugify(meeting.title);
+  return `${meetingId}-item-${slugify(agendaNumber)}`;
 }
 
 export async function discoverMenloParkAgendaAttachments(
@@ -371,7 +375,7 @@ export async function discoverMenloParkAgendaAttachments(
       }
 
       newItems.push({
-        externalId: itemExternalId(meeting, item.agendaNumber),
+        externalId: menloParkAgendaItemExternalId(meeting, item.agendaNumber),
         fileNumber: null,
         agendaNumber: item.agendaNumber,
         itemType: null,
