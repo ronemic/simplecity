@@ -137,6 +137,10 @@ const HOME_CARD_PREVIEW_BUDGET = 520;
 const HOME_CARD_PREVIEW_MIN_PER_JURISDICTION = 40;
 const HOME_CARD_PREVIEW_MAX_PER_JURISDICTION = 200;
 const HOME_CARD_PREVIEW_FAST_SINGLE_JURISDICTION = 80;
+// A safety bound on the upcoming slice rather than a tuned budget: no
+// jurisdiction is near it today (the busiest has ~120 future-dated cards), and
+// trimming upcoming decisions is what this split exists to avoid.
+const HOME_CARD_UPCOMING_MAX_PER_JURISDICTION = 250;
 
 function homeCardPreviewLimit(clientCount: number) {
   if (clientCount <= 0) return HOME_CARD_PREVIEW_MIN_PER_JURISDICTION;
@@ -722,7 +726,7 @@ async function loadPublishedCardRowsForJurisdiction(
     jurisdiction: JurisdictionConfig;
     supabase: SupabaseClient;
   },
-  options: { limit?: number } = {}
+  options: { limit?: number; splitUpcoming?: boolean } = {}
 ) {
   // Ordered by decision date, not row-creation date.
   //
@@ -749,6 +753,68 @@ async function loadPublishedCardRowsForJurisdiction(
     query = query.order("created_at", { ascending: false });
 
     return options.limit ? query.limit(options.limit) : query;
+  }
+
+  // A single descending slice fills from the *furthest-out* meeting backwards,
+  // which is the opposite of what a capped pool wants: Los Altos Hills has more
+  // future-dated cards than the cap, so a Planning Commission meeting two days
+  // later crowded out most of an Emergency Preparedness agenda happening first,
+  // and the homepage picked that meeting's leftovers.
+  //
+  // Upcoming decisions are read as their own slice instead, and the cap applies
+  // only to the past backfill. Capping the upcoming slice as well just moves the
+  // truncation: soonest-first, San Francisco's 74-item Board of Supervisors
+  // agenda fills a 40-row pool by itself and the next two days of committee
+  // meetings vanish. There are only a few hundred future-dated cards across
+  // every jurisdiction, so taking them whole costs little and is exactly the
+  // data both homepage sections rank.
+  function buildSplitQuery(upcoming: boolean, cutoff: string, limit: number) {
+    let query = supabase
+      .from("summary_cards")
+      .select(PUBLIC_SUMMARY_CARD_SELECT)
+      .eq("jurisdiction_slug", jurisdiction.slug)
+      .eq("is_published", true);
+
+    query = upcoming
+      ? query.gte("decision_sort_at", cutoff)
+      : // Nulls are kept on the past side. `decision_sort_at` is maintained by a
+        // trigger, but a row written before it existed should still be a
+        // candidate rather than disappearing from both slices.
+        query.or(`decision_sort_at.lt.${cutoff},decision_sort_at.is.null`);
+
+    return query
+      .order("is_featured", { ascending: false })
+      .order("decision_sort_at", { ascending: upcoming, nullsFirst: false })
+      .order("created_at", { ascending: false })
+      .limit(limit);
+  }
+
+  const limit = options.limit;
+
+  if (options.splitUpcoming && limit) {
+    const cutoff = new Date().toISOString();
+    const [upcomingResult, pastResult] = await Promise.all([
+      buildSplitQuery(true, cutoff, HOME_CARD_UPCOMING_MAX_PER_JURISDICTION),
+      buildSplitQuery(false, cutoff, limit)
+    ]);
+
+    const splitError = upcomingResult.error || pastResult.error;
+    if (!splitError) {
+      const upcomingRows = (upcomingResult.data || []) as unknown as SummaryCardRow[];
+      const pastRows = (pastResult.data || []) as unknown as SummaryCardRow[];
+      return [...upcomingRows, ...pastRows].map((row) =>
+        withCardJurisdictionFallback(row, jurisdiction)
+      );
+    }
+
+    // Older deployments may not have the column yet; the single-query path below
+    // has its own fallback for that. Any other failure is logged there too.
+    if (!isMissingDecisionSortColumn(splitError)) {
+      logQueryError(
+        `Failed to load ${jurisdiction.name} upcoming and past summary cards`,
+        splitError
+      );
+    }
   }
 
   let { data, error } = await buildQuery(true);
@@ -799,7 +865,7 @@ async function loadHomepagePreviewRowsForProject(
     project.jurisdictions.map((jurisdiction) =>
       loadPublishedCardRowsForJurisdiction(
         { jurisdiction, supabase: project.supabase },
-        { limit }
+        { limit, splitUpcoming: true }
       )
     )
   );
