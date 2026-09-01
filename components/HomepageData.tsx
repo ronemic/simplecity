@@ -7,6 +7,7 @@ import { t } from "@/lib/i18n";
 import { HOMEPAGE_DECISION_CARD_COUNT, type HomepageCardSelection } from "@/lib/db/queries";
 import type { SummaryCardRow } from "@/lib/types";
 import { publicAgendaTitle } from "@/lib/utils/civicPriority";
+import { cardSharePath } from "@/lib/utils/cardShare";
 import { formatDisplayDate } from "@/lib/utils/date";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
 
@@ -223,9 +224,12 @@ export function HomepageDataContent({
                             )
                           : meeting.jurisdiction_name || card.jurisdiction_name || jurisdictionLabel}
                       </p>
-                      <p className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-[#285f75]">
+                      <Link
+                        href={cardSharePath(card.id)}
+                        className="mt-2 line-clamp-2 block text-sm font-semibold leading-5 text-[#285f75] underline-offset-4 hover:underline"
+                      >
                         {t(locale, "connectedDecision")}: {publicAgendaTitle(card)}
-                      </p>
+                      </Link>
                     </div>
                     <Link href={`/meetings/${meeting.id}`} className="action-secondary-sm">
                       {t(locale, "meetingDetails")}
