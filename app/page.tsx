@@ -31,8 +31,8 @@ const FEATURE_ARTICLE_URL =
 // Manually maintained from analytics. Last checked 2026-08-21; update the date
 // when you revise the figure so it is obvious when it has gone stale.
 const APPROX_USER_COUNT = "600+";
-// Rounded down from the aggregate published-card count. Last checked 2026-08-29.
-const APPROX_AGENDA_ITEMS_ANALYZED = "8000+";
+// Rounded down from the aggregate published-card count. Last checked 2026-09-03.
+const APPROX_AGENDA_ITEMS_ANALYZED = "8,400+";
 
 // Rounds down to a round hundred and adds "+" once there is a hundred to show;
 // below that the exact count is honest and "0+" is never rendered. Returns null
