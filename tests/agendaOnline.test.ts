@@ -9,7 +9,8 @@ import {
   attachLaserficheMinutes,
   downloadLaserficheMinutes,
   normalizeAgendaOnlineItemLink,
-  normalizeAgendaOnlineRows
+  normalizeAgendaOnlineRows,
+  openAgendaOnlineMeetingRows
 } from "@/lib/sources/agenda-online";
 import type { PrimeGovMeeting } from "@/lib/types";
 
@@ -42,6 +43,62 @@ test("normalizes Redwood City Agenda Online rows and document types", () => {
   assert.equal(meetings[0].externalId, "redwood-city-agenda-online-2716");
   assert.equal(meetings[0].status, "Upcoming");
   assert.deepEqual(meetings[0].documents.map((document) => document.type), ["Agenda", "Agenda Packet"]);
+});
+
+test("retries a transient empty Agenda Online landing page", async () => {
+  let navigations = 0;
+  let waits = 0;
+  const logs: string[] = [];
+  const page = {
+    goto: async () => {
+      navigations += 1;
+      return { status: () => 200, ok: () => true };
+    },
+    waitForFunction: async () => {
+      waits += 1;
+      if (waits === 1) throw new Error("meeting rows timed out");
+    },
+    title: async () => "Redwood City Agenda Online",
+    url: () => "https://meetings.redwoodcity.org/AgendaOnline/"
+  } as unknown as Page;
+
+  await openAgendaOnlineMeetingRows(
+    page,
+    "https://meetings.redwoodcity.org/AgendaOnline/",
+    (message) => logs.push(message),
+    { attempts: 3, timeoutMs: 10, retryDelayMs: 0 }
+  );
+
+  assert.equal(navigations, 2);
+  assert.equal(waits, 2);
+  assert.equal(logs.length, 1);
+  assert.match(logs[0], /attempt 1\/3.*HTTP 200.*retrying/);
+});
+
+test("reports Agenda Online landing-page diagnostics after bounded retries", async () => {
+  let navigations = 0;
+  const page = {
+    goto: async () => {
+      navigations += 1;
+      return { status: () => 503, ok: () => false };
+    },
+    waitForFunction: async () => {
+      throw new Error("meeting rows timed out");
+    },
+    title: async () => "Service unavailable",
+    url: () => "https://meetings.redwoodcity.org/AgendaOnline/"
+  } as unknown as Page;
+
+  await assert.rejects(
+    openAgendaOnlineMeetingRows(
+      page,
+      "https://meetings.redwoodcity.org/AgendaOnline/",
+      () => undefined,
+      { attempts: 2, timeoutMs: 10, retryDelayMs: 0 }
+    ),
+    /did not load after 2 attempts: Agenda Online returned HTTP 503/
+  );
+  assert.equal(navigations, 2);
 });
 
 test("attaches Redwood City Laserfiche minutes to the unique same-day City Council meeting", () => {

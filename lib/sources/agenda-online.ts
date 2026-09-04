@@ -44,6 +44,82 @@ export type ScrapeAgendaOnlineOptions = ScrapePortalOptions & {
   body?: string;
 };
 
+const AGENDA_ONLINE_PAGE_LOAD_ATTEMPTS = 3;
+const AGENDA_ONLINE_PAGE_LOAD_TIMEOUT_MS = 60_000;
+
+export async function openAgendaOnlineMeetingRows(
+  page: Page,
+  url: string,
+  log: (message: string) => void,
+  options: {
+    attempts?: number;
+    timeoutMs?: number;
+    retryDelayMs?: number;
+    shouldStop?: () => boolean;
+  } = {}
+) {
+  const attempts = Math.max(
+    1,
+    Math.min(5, Math.floor(options.attempts || AGENDA_ONLINE_PAGE_LOAD_ATTEMPTS))
+  );
+  const timeoutMs = Math.max(
+    1,
+    Math.min(120_000, Math.floor(options.timeoutMs || AGENDA_ONLINE_PAGE_LOAD_TIMEOUT_MS))
+  );
+  const retryDelayMs = Math.max(0, Math.min(5_000, options.retryDelayMs ?? 1_000));
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    if (options.shouldStop?.()) {
+      throw new Error("Agenda Online page load stopped because the pipeline deadline is near.");
+    }
+
+    let status: number | null = null;
+    try {
+      const response = await page.goto(url, {
+        waitUntil: "domcontentloaded",
+        timeout: timeoutMs
+      });
+      status = response?.status() ?? null;
+      if (response && !response.ok()) {
+        throw new Error(`Agenda Online returned HTTP ${response.status()}.`);
+      }
+      await page.waitForFunction(
+        () => Array.from(document.querySelectorAll("table tbody tr, table tr"))
+          .some((row) => {
+            if (row.querySelectorAll("td").length < 4) return false;
+            return Array.from(row.querySelectorAll("a[href]")).some((anchor) =>
+              /[?&](?:meetingId|id)=\d+/i.test(anchor.getAttribute("href") || "")
+            );
+          }),
+        undefined,
+        { timeout: timeoutMs }
+      );
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt === attempts) break;
+
+      const title = await page.title().catch(() => "Unavailable");
+      log(
+        `Agenda Online meeting rows did not load on attempt ${attempt}/${attempts} ` +
+        `(HTTP ${status ?? "unknown"}, URL ${page.url()}, title ${JSON.stringify(title)}); retrying: ${
+          error instanceof Error ? error.message : "Unknown page-load error"
+        }`
+      );
+      if (retryDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * retryDelayMs));
+      }
+    }
+  }
+
+  throw new Error(
+    `Agenda Online meeting rows did not load after ${attempts} attempts: ${
+      lastError instanceof Error ? lastError.message : "Unknown page-load error"
+    }`
+  );
+}
+
 function documentType(label: string, url: string): DocumentType {
   const code = new URL(url).searchParams.get("documentType");
   if (code === "5") return "Agenda Packet";
@@ -422,11 +498,12 @@ export async function scrapeAgendaOnlineMeetings(
 
   try {
     log(`Starting Agenda Online scraper for ${options.jurisdiction.slug}.`);
-    await page.goto(options.portalUrl || options.jurisdiction.sourceUrl, {
-      waitUntil: "domcontentloaded",
-      timeout: 60_000
-    });
-    await page.waitForSelector("table tbody tr", { timeout: 60_000 });
+    await openAgendaOnlineMeetingRows(
+      page,
+      options.portalUrl || options.jurisdiction.sourceUrl,
+      log,
+      { shouldStop: options.shouldStop }
+    );
     let rows = await page.evaluate<AgendaOnlineRow[]>(String.raw`(() => {
       const compact = (value = "") => value.replace(/\s+/g, " ").trim();
       return Array.from(document.querySelectorAll("table tbody tr")).map((row) => {
