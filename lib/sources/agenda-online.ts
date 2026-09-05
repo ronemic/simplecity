@@ -193,7 +193,8 @@ export async function downloadLaserficheMinutes(
   meetings: PrimeGovMeeting[],
   outputDir: string,
   log: (message: string) => void,
-  shouldStop?: () => boolean
+  shouldStop?: () => boolean,
+  fetchImpl?: typeof fetch
 ) {
   await fs.mkdir(outputDir, { recursive: true });
   const page = await context.newPage();
@@ -247,7 +248,8 @@ export async function downloadLaserficheMinutes(
                   Referer: document.url
                 },
                 budget,
-                shouldStop
+                shouldStop,
+                fetchImpl
               }
             );
             try {
@@ -283,7 +285,8 @@ export async function downloadLaserficheMinutes(
                 {
                   headers: replayHeaders,
                   budget,
-                  shouldStop
+                  shouldStop,
+                  fetchImpl
                 }
               );
               try {

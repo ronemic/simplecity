@@ -181,7 +181,9 @@ test("cancels Chromium and replays Laserfiche downloads through the bounded stre
     context,
     meetings,
     outputDir,
-    () => undefined
+    () => undefined,
+    undefined,
+    globalThis.fetch
   );
 
   assert.deepEqual(result, { downloaded: 1, failed: 0 });

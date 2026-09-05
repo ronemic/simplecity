@@ -367,7 +367,8 @@ export async function downloadSantaBarbaraPlanningCommissionDocuments(
   meetings: PrimeGovMeeting[],
   outputDir: string,
   log: (message: string) => void,
-  shouldStop?: () => boolean
+  shouldStop?: () => boolean,
+  fetchImpl?: typeof fetch
 ) {
   await fs.mkdir(outputDir, { recursive: true });
   const downloadBudget = createStreamDownloadBudget();
@@ -405,7 +406,8 @@ export async function downloadSantaBarbaraPlanningCommissionDocuments(
             headers: { Authorization: `Bearer ${metadata.token}` },
             validateUrl: isAllowedBoxDownloadUrl,
             shouldStop,
-            budget: downloadBudget
+            budget: downloadBudget,
+            fetchImpl
           },
           log
         );

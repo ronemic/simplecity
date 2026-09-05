@@ -202,7 +202,9 @@ test("streams Box PDFs beyond the old cap and strips authorization on the CDN re
     const result = await downloadSantaBarbaraPlanningCommissionDocuments(
       [meeting],
       outputDir,
-      () => undefined
+      () => undefined,
+      undefined,
+      globalThis.fetch
     );
     assert.deepEqual(result, { downloaded: 1, failed: 0 });
     assert.equal(
@@ -245,7 +247,9 @@ test("keeps the prior Box PDF and cleans partial files when a refresh is invalid
       await downloadSantaBarbaraPlanningCommissionDocuments(
         [meeting],
         outputDir,
-        () => undefined
+        () => undefined,
+        undefined,
+        globalThis.fetch
       ),
       { downloaded: 1, failed: 0 }
     );
@@ -257,7 +261,9 @@ test("keeps the prior Box PDF and cleans partial files when a refresh is invalid
       await downloadSantaBarbaraPlanningCommissionDocuments(
         [meeting],
         outputDir,
-        () => undefined
+        () => undefined,
+        undefined,
+        globalThis.fetch
       ),
       { downloaded: 0, failed: 1 }
     );
@@ -296,7 +302,9 @@ test("rejects a Box redirect to an untrusted host before requesting it", async (
     const result = await downloadSantaBarbaraPlanningCommissionDocuments(
       [meeting],
       outputDir,
-      () => undefined
+      () => undefined,
+      undefined,
+      globalThis.fetch
     );
     assert.deepEqual(result, { downloaded: 0, failed: 1 });
     assert.match(meeting.documents[0].downloadError || "", /disallowed URL/);

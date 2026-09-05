@@ -6,6 +6,7 @@ import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import type { BrowserContext } from "playwright";
+import { fetch as undiciFetch } from "undici";
 
 export const STREAM_DOWNLOAD_MAX_FILE_BYTES = 1024 * 1024 * 1024;
 export const STREAM_DOWNLOAD_MAX_TOTAL_BYTES = 4 * 1024 * 1024 * 1024;
@@ -252,7 +253,11 @@ export async function streamDownloadToTemp(
   targetPath: string,
   options: StreamDownloadOptions = {}
 ): Promise<StreamedDownload> {
-  const fetchImpl = options.fetchImpl || fetch;
+  // Node 22's bundled Undici can crash the process when an HTTP/1 peer closes
+  // while its parser is paused under response backpressure (undici#5360).
+  // The standalone client includes the upstream fix; callers can still inject
+  // a fetch implementation for tests and source-specific transports.
+  const fetchImpl = options.fetchImpl || (undiciFetch as unknown as typeof fetch);
   const statfsImpl = options.statfsImpl || fs.statfs;
   const budget = options.budget || createStreamDownloadBudget();
   const maxFileBytes = Math.min(
