@@ -78,7 +78,7 @@ test("unchanged agenda-summary sources reconcile before any new summary request"
     workerStart
   );
   const summaryRequest = pipeline.indexOf(
-    'generateWithinPipelineBudget(item.meeting, "meeting")',
+    'generateWithinPipelineBudget(generationMeeting, "meeting")',
     workerStart
   );
   assert.ok(summaryHashCheck >= 0);
@@ -98,7 +98,7 @@ test("a new summary hash version migrates already-completed sources without paid
     unchangedSource
   );
   const summaryRequest = pipeline.indexOf(
-    'generateWithinPipelineBudget(item.meeting, "meeting")',
+    'generateWithinPipelineBudget(generationMeeting, "meeting")',
     workerStart
   );
   assert.ok(unchangedSource >= 0);

@@ -3,6 +3,22 @@ import type { PrimeGovDocument } from "@/lib/types";
 export const MIN_USABLE_OFFICIAL_DOCUMENT_CHARACTERS = 40;
 const MAX_ERROR_RESPONSE_CHARACTERS = 10_000;
 
+/** A packet can be the meeting's only agenda, even during a light historical refresh. */
+export function isRequiredAgendaPacket(
+  document: PrimeGovDocument,
+  meetingDocuments: readonly PrimeGovDocument[]
+) {
+  return (
+    ["Agenda Packet", "Packet"].includes(document.type) &&
+    !document.isAgendaItemAttachment &&
+    !meetingDocuments.some((candidate) =>
+      !candidate.isAgendaItemAttachment &&
+      ["Agenda", "Accessible Agenda", "HTML Agenda"].includes(candidate.type) &&
+      Boolean(candidate.url)
+    )
+  );
+}
+
 const OFFICIAL_DOCUMENT_ERROR_PATTERNS = [
   /\baccess denied\b/i,
   /\b(?:401 unauthorized|403 forbidden|404 not found|502 bad gateway|503 service unavailable|504 gateway timeout)\b/i,

@@ -278,11 +278,15 @@ test("ships a single oversized document row rather than dropping it", () => {
 
 type CapturedWrite = { table: string; payload: unknown; options?: unknown };
 
-function fakeSupabaseClient(writes: CapturedWrite[], summaryHashesSupported = true) {
+function fakeSupabaseClient(writes: CapturedWrite[], summaryHashesSupported = true, previous?: Record<string, unknown>) {
   function chainFor(table: string) {
     let outcome: Record<string, unknown> = { data: [], error: null, count: 0 };
     const chain = {
       select: (columns?: string) => {
+        if (columns?.startsWith("raw,llm_input_text")) {
+          assert.equal(writes.length, 0, "previous input must be read before overwriting discovery");
+          outcome = { data: previous ? [previous] : [], error: null };
+        }
         if (
           table === "meetings" &&
           columns?.includes("summary_source_hash") &&
@@ -391,4 +395,30 @@ test("keeps meeting upserts compatible until summary hash columns are migrated",
   const payload = meetingWrite?.payload as Record<string, unknown>;
   assert.equal("summary_source_hash" in payload, false);
   assert.equal("summarized_summary_source_hash" in payload, false);
+});
+
+
+test("captures completed shared input before discovery overwrites the previous meeting", async () => {
+  const meeting = meetingWithDocuments([]);
+  meeting.items = [{ externalId: "item-1", title: "Approve contract", rowText: "Approve contract", fileNumber: null, agendaNumber: "1", itemType: null, action: null, result: null, sourceUrl: "https://example.test/1" }];
+  const previous = {
+    raw: { ...meeting, timeText: "Old time", llmInputText: "" },
+    llm_input_text: "Old participation instructions",
+    source_hash: "completed", summarized_source_hash: "completed"
+  };
+  const result = await upsertMeetings(fakeSupabaseClient([], true, previous), [meeting]);
+  assert.equal(result[0].previousSummarizedMeeting?.timeText, "Old time");
+  assert.equal(result[0].previousSummarizedMeeting?.llmInputText, "Old participation instructions");
+  assert.equal(result[0].meeting.llmInputText, "Agenda text.");
+});
+
+test("an unfinished prior discovery is not trusted as a legacy summary baseline", async () => {
+  const meeting = meetingWithDocuments([]);
+  meeting.items = [{ externalId: "item-1", title: "Approve contract", rowText: "Approve contract", fileNumber: null, agendaNumber: "1", itemType: null, action: null, result: null, sourceUrl: "https://example.test/1" }];
+  const result = await upsertMeetings(fakeSupabaseClient([], true, {
+    raw: meeting, llm_input_text: "Unfinished new input",
+    source_hash: "new", summarized_source_hash: "old",
+    summary_source_hash: "new-agenda", summarized_summary_source_hash: "old-agenda"
+  }), [meeting]);
+  assert.equal(result[0].previousSummarizedMeeting, null);
 });

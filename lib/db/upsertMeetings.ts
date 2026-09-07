@@ -1,3 +1,4 @@
+import { withAgendaItemInputHash, type ExistingItemInput } from "@/lib/llm/agendaItemReuse";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AgendaItem,
@@ -46,6 +47,7 @@ type UpsertedMeeting = {
   summarizedSourceHash: string | null;
   summarizedSummarySourceHash: string | null;
   existingCardCount: number;
+  previousSummarizedMeeting?: LlmReadyMeeting | null;
 };
 
 type PreservedCardAdminState = {
@@ -574,6 +576,7 @@ function cardInsertRow(
     isFeatured: boolean;
     adminNotes: string | null;
     modelInputText?: string | null;
+    sourceInputHash?: string;
   }
 ) {
   // A card whose body is entirely the "not listed in the source document"
@@ -617,7 +620,7 @@ function cardInsertRow(
       : { model_input_text: options.modelInputText }),
     is_featured: options.isFeatured,
     admin_notes: options.adminNotes,
-    raw_llm_json: rawLlmJson
+    raw_llm_json: withAgendaItemInputHash(rawLlmJson, options.sourceInputHash)
   });
 }
 
@@ -1033,6 +1036,27 @@ export async function upsertMeetings(
       : {};
     const regionalDatabase = Boolean(jurisdiction && usesRegionalSupabase(jurisdiction));
     const compactRaw = compactMeetingRawForStorage(safeMeeting);
+    // Capture the last completed shared context BEFORE the discovery upsert
+    // overwrites it. A failed/partial prior run is not a safe legacy baseline.
+    let previousSummarizedMeeting: LlmReadyMeeting | null = null;
+    if (safeMeeting.items?.length && summaryHashesAvailable) {
+      let previousQuery = supabase.from("meetings")
+        .select("raw,llm_input_text,source_hash,summarized_source_hash,summary_source_hash,summarized_summary_source_hash")
+        .eq("external_id", externalId);
+      if (jurisdiction) previousQuery = previousQuery.eq("jurisdiction_slug", jurisdiction.slug);
+      const { data: previousRows, error: previousError } = await previousQuery.limit(1);
+      if (previousError) throw new Error(`Failed to read previous summary input: ${previousError.message}`);
+      const previous = previousRows?.[0];
+      if (previous?.raw && (
+        (previous.source_hash && previous.source_hash === previous.summarized_source_hash) ||
+        (previous.summary_source_hash && previous.summary_source_hash === previous.summarized_summary_source_hash)
+      )) {
+        previousSummarizedMeeting = {
+          ...previous.raw,
+          llmInputText: previous.llm_input_text || ""
+        } as LlmReadyMeeting;
+      }
+    }
 
     const { data, error } = await retryTransientSupabaseWrite<{
       id: string;
@@ -1175,11 +1199,23 @@ export async function upsertMeetings(
       compatibleSourceHashes,
       summarizedSourceHash: data.summarized_source_hash || null,
       summarizedSummarySourceHash: data.summarized_summary_source_hash || null,
-      existingCardCount
+      existingCardCount,
+      previousSummarizedMeeting
     });
   }
 
   return upserted;
+}
+
+// Read-only and schema-compatible: older databases simply cannot reuse items
+// until stable item IDs and saved model input are available.
+export async function loadExistingAgendaItemInputs(supabase: SupabaseClient, meetingId: string) {
+  if (!(await supportsSourceItemId(supabase)) || !(await supportsModelInputText(supabase))) return null;
+  const { data, error } = await supabase.from("summary_cards")
+    .select("source_item_id,model_input_text,raw_llm_json")
+    .eq("meeting_id", meetingId);
+  if (error) throw new Error(`Failed to read existing item inputs: ${error.message}`);
+  return (data || []) as ExistingItemInput[];
 }
 
 export async function replaceSummaryCardsForMeeting(
@@ -1194,6 +1230,7 @@ export async function replaceSummaryCardsForMeeting(
     jurisdiction?: JurisdictionConfig | null;
     authoritativeSourceItemIds?: readonly string[];
     agendaItems?: readonly AgendaItem[];
+    itemInputHashes?: ReadonlyMap<string, string>;
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
@@ -1205,6 +1242,8 @@ export async function replaceSummaryCardsForMeeting(
       : null;
   const cardsToInsert = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(({ card }) => !options.itemInputHashes ||
+      Boolean(card.sourceItemId && options.itemInputHashes.has(card.sourceItemId)))
     .filter(
       ({ card }) =>
         !authoritativeSourceItemIds ||
@@ -1284,6 +1323,7 @@ export async function replaceSummaryCardsForMeeting(
       jurisdiction: options.jurisdiction,
       includeSourceItemId: sourceItemIdAvailable,
       modelInputText: cardModelInputText(card, options.agendaItems, modelInputAvailable),
+      sourceInputHash: options.itemInputHashes?.get(card.sourceItemId || ""),
       isPublished:
         typeof preserved?.is_published === "boolean" ? preserved.is_published : true,
       isFeatured:
@@ -1339,6 +1379,8 @@ export async function appendSummaryCardsForMeeting(
     jurisdiction?: JurisdictionConfig | null;
     authoritativeSourceItemIds?: readonly string[];
     agendaItems?: readonly AgendaItem[];
+    itemInputHashes?: ReadonlyMap<string, string>;
+    preserveMeetingTranslation?: boolean;
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
@@ -1420,6 +1462,8 @@ export async function appendSummaryCardsForMeeting(
   const seenLegacyKeys = new Set<string>();
   const cardsToPersist = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(({ card }) => !options.itemInputHashes ||
+      Boolean(card.sourceItemId && options.itemInputHashes.has(card.sourceItemId)))
     .filter(
       ({ card }) =>
         !authoritativeSourceItemIds ||
@@ -1474,7 +1518,9 @@ export async function appendSummaryCardsForMeeting(
   }
 
   if (cardsToPersist.length === 0) {
-    await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
+    if (!options.preserveMeetingTranslation) {
+      await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
+    }
     await markMeetingSummarized(
       supabase,
       meetingId,
@@ -1515,6 +1561,7 @@ export async function appendSummaryCardsForMeeting(
         // Adopting a row must never strip the identity it already carries.
         sourceItemId: entry.card.sourceItemId || existing.source_item_id || null,
         modelInputText: cardModelInputText(entry.card, options.agendaItems, modelInputAvailable),
+        sourceInputHash: options.itemInputHashes?.get(entry.card.sourceItemId || ""),
         isPublished: existing.is_published ?? true,
         isFeatured: existing.is_featured ?? false,
         adminNotes: existing.admin_notes || null
@@ -1544,6 +1591,7 @@ export async function appendSummaryCardsForMeeting(
           jurisdiction: options.jurisdiction,
           includeSourceItemId: sourceItemIdAvailable,
           modelInputText: cardModelInputText(card, options.agendaItems, modelInputAvailable),
+          sourceInputHash: options.itemInputHashes?.get(card.sourceItemId || ""),
           isPublished: true,
           isFeatured: false,
           adminNotes: null
@@ -1567,7 +1615,9 @@ export async function appendSummaryCardsForMeeting(
 
   const persistedCards = [...updatedCards, ...insertedCards];
 
-  await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
+  if (!options.preserveMeetingTranslation) {
+    await writeSpanishMeetingTranslation(supabase, meetingId, summary, rawLlmJson);
+  }
   await writeSpanishCardTranslations(
     supabase,
     persistedCards,

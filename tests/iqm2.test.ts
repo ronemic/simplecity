@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  classifyIqm2Link,
+  shouldIgnoreIqm2Link,
   extractIqm2AgendaItemAttachments,
   shouldDownloadIqm2DocumentForWindow
 } from "@/lib/sources/iqm2";
@@ -10,11 +12,20 @@ function document(type: DocumentType) {
   return { type, label: type, url: `https://example.test/${type}` };
 }
 
-test("deep IQM2 refreshes download only meeting agendas and minutes", () => {
+test("deep IQM2 refreshes skip packets when a standalone agenda is available", () => {
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Agenda"), 3), true);
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Minutes"), 3), true);
-  assert.equal(shouldDownloadIqm2DocumentForWindow(document("Agenda Packet"), 3), false);
+  assert.equal(shouldDownloadIqm2DocumentForWindow(document("Agenda Packet"), 3, [document("Agenda")]), false);
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Document"), 3), false);
+});
+
+test("deep IQM2 refresh keeps the HIV Executive Committee packet without a standalone agenda", () => {
+  const packet = document("Agenda Packet");
+  const documents = [packet, document("Minutes"), document("Meeting Details")];
+  assert.equal(shouldDownloadIqm2DocumentForWindow(packet, 3, documents), true);
+  assert.equal(shouldDownloadIqm2DocumentForWindow(
+    { ...packet, isAgendaItemAttachment: true }, 3, documents
+  ), false);
 });
 
 test("normal IQM2 refreshes retain all candidate document types", () => {
@@ -50,4 +61,16 @@ test("associates every IQM2 document row with the preceding agenda item", () => 
   assert.equal(discoveries[0].agendaNumber, "5");
   assert.equal(discoveries[0].attachments.length, 2);
   assert.equal(discoveries[0].sourceUrl, "https://iqm2.test/Detail_LegiFile.aspx?ID=5");
+});
+
+
+test("IQM2 motion and item pages containing agenda in their title are not agenda documents", () => {
+  for (const endpoint of ["Detail_Motion", "Detail_LegiFile"]) {
+    const url = `https://sccgov.iqm2.com/Citizens/${endpoint}.aspx?ID=446014`;
+    assert.equal(classifyIqm2Link("Propose future agenda items.", url), "Other");
+    assert.equal(shouldIgnoreIqm2Link("Propose future agenda items.", url), true);
+  }
+  const agenda = "https://sccgov.iqm2.com/Citizens/FileOpen.aspx?Type=1&ID=15907";
+  assert.equal(classifyIqm2Link("Agenda", agenda), "Agenda");
+  assert.equal(shouldIgnoreIqm2Link("Agenda", agenda), false);
 });

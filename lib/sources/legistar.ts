@@ -4,7 +4,7 @@ import { chromium, type BrowserContext, type Page } from "playwright";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 import type { LegistarItem, PrimeGovDocument, PrimeGovMeeting, ScrapePortalResult } from "@/lib/types";
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
-import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
+import { isRequiredAgendaPacket, isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { withEffectiveSourceMeetingStatus } from "@/lib/utils/meetingStatus";
@@ -431,7 +431,7 @@ export function selectLegistarDocumentsForDownload(
   return meeting.documents.filter((document) => {
     if (
       !shouldDownloadLegistarDocument(document) ||
-      !shouldDownloadLegistarDocumentForWindow(document, monthsBack)
+      !shouldDownloadLegistarDocumentForWindow(document, monthsBack, meeting.documents)
     ) {
       return false;
     }
@@ -550,7 +550,7 @@ function buildLegistarDocumentFilename(meeting: PrimeGovMeeting, docType: string
     .join("__");
 }
 
-async function downloadLegistarDocuments(
+export async function downloadLegistarDocuments(
   context: BrowserContext,
   meetings: PrimeGovMeeting[],
   options: {
@@ -672,10 +672,12 @@ async function downloadLegistarDocuments(
 
 export function shouldDownloadLegistarDocumentForWindow(
   document: PrimeGovDocument,
-  monthsBack = 1
+  monthsBack = 1,
+  meetingDocuments: readonly PrimeGovDocument[] = [document]
 ) {
   return (
     monthsBack <= 1 ||
+    isRequiredAgendaPacket(document, meetingDocuments) ||
     ["Agenda", "Accessible Agenda", "Minutes", "Accessible Minutes", "Notice of Cancellation"].includes(
       document.type
     )
@@ -1893,7 +1895,7 @@ export async function scrapeLegistarMeetings(
     if (options.downloadDocuments) {
       log("Downloading Legistar documents where available...");
       if ((options.monthsBack ?? 1) > 1) {
-        log("Deep Legistar refresh: skipping packets and item attachments.");
+        log("Deep Legistar refresh: keeping packets when they are the only agenda; skipping optional packets and item attachments.");
       }
       await downloadLegistarDocuments(context, meetings, {
         log,

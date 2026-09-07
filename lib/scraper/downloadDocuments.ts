@@ -103,7 +103,7 @@ export type DownloadDocumentsOptions = {
   idleTimeoutMs?: number;
   totalTimeoutMs?: number;
   validateFinalUrl?: (url: string) => boolean;
-  documentFilter?: (document: PrimeGovDocument) => boolean;
+  documentFilter?: (document: PrimeGovDocument, meeting: PrimeGovMeeting) => boolean;
   userAgent?: string;
   plainTextFallbackUrl?: (documentUrl: string) => string | null;
   validatePdfTextBeforeAccept?: boolean;
@@ -525,7 +525,7 @@ export async function downloadIqm2Documents(
       meeting.documents.filter(
         (doc) =>
           isIqm2DownloadCandidate(doc) &&
-          (options.documentFilter?.(doc) ?? true)
+          (options.documentFilter?.(doc, meeting) ?? true)
       )
     );
 
@@ -643,7 +643,7 @@ export async function downloadOfficialSiteDocuments(
     const officialDocs = prioritizedDocuments(
       meeting.documents.filter(
         (doc) =>
-          (options.documentFilter?.(doc) ?? isOfficialSiteDownloadCandidate(doc)) &&
+          (options.documentFilter?.(doc, meeting) ?? isOfficialSiteDownloadCandidate(doc)) &&
           (!options.onlyPending || (!doc.localPath && !doc.downloadError))
       )
     );
