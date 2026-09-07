@@ -34,6 +34,7 @@ import {
   STREAM_DOWNLOAD_TOTAL_TIMEOUT_MS
 } from "@/lib/scraper/streamDownload";
 import type { PrimeGovMeeting } from "@/lib/types";
+import { shouldDownloadIqm2DocumentForWindow } from "@/lib/sources/iqm2";
 
 type Call = {
   method: string;
@@ -399,6 +400,37 @@ test("does not reject PrimeGov documents at the former 100, 50, or 10 MiB caps",
     assert.deepEqual(result, { downloaded: 3, failed: 0 });
     assert.equal(fetchIndex, 3);
     assert.ok(meeting.documents.every((document) => document.downloadError === null));
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("IQM2 download filters use each meeting's agenda inventory during deep refresh", async () => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-iqm2-sole-agenda-"));
+  const packetOnly = primeGovMeeting([{
+    type: "Agenda Packet", label: "Agenda Packet",
+    url: "https://city.iqm2.com/Citizens/FileOpen.aspx?Type=1&ID=15907"
+  }]);
+  const standaloneAgenda = primeGovMeeting([
+    { type: "Agenda", label: "Agenda", url: "https://city.iqm2.com/Citizens/FileOpen.aspx?Type=14&ID=15804" },
+    { type: "Agenda Packet", label: "Agenda Packet", url: "https://city.iqm2.com/Citizens/FileOpen.aspx?Type=1&ID=15804" }
+  ]);
+  const downloadedUrls: string[] = [];
+  try {
+    const result = await downloadIqm2Documents(downloadTestContext(), [packetOnly, standaloneAgenda], {
+      outputDir,
+      minFreeBytes: 0,
+      documentFilter: (document, meeting) =>
+        shouldDownloadIqm2DocumentForWindow(document, 3, meeting.documents),
+      fetchImpl: (async (url) => {
+        downloadedUrls.push(String(url));
+        return fetchResponse("%PDF-test");
+      }) as typeof fetch
+    });
+    assert.deepEqual(result, { downloaded: 2, failed: 0 });
+    assert.deepEqual(downloadedUrls, [packetOnly.documents[0].url, standaloneAgenda.documents[0].url]);
+    assert.ok(packetOnly.documents[0].localPath);
+    assert.equal(standaloneAgenda.documents[1].localPath, undefined);
   } finally {
     await fs.rm(outputDir, { recursive: true, force: true });
   }

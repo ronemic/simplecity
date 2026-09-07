@@ -1316,3 +1316,61 @@ test("card provenance is null when no agenda item matches", () => {
   );
   assert.equal(cardModelInputText(provenanceCard({}), undefined, true), null);
 });
+
+test("partial item regeneration preserves unchanged rows and prunes only outside the full inventory", async () => {
+  const deleted: string[][] = [];
+  const updated: Array<{ id: string; row: Record<string, unknown> }> = [];
+  const existing = [0, 1, 2].map((index) => ({
+    id: `row-${index}`, source_item_id: `item-${index}`,
+    agenda_item: card(index).agendaItem, source_url: card(index).source,
+    is_published: false, is_featured: index !== 2, admin_notes: index === 2 ? null : "Reviewed"
+  }));
+  const supabase = {
+    from(table: string) {
+      assert.ok(["summary_cards", "meetings"].includes(table), `Unexpected translation/write: ${table}`);
+      let row: Record<string, unknown> | undefined;
+      let id = "";
+      const chain = {
+        select: () => chain,
+        limit: async () => ({ data: [], error: null }),
+        eq: (_column: string, value: string) => { id = value; return chain; },
+        update: (value: Record<string, unknown>) => { row = value; return chain; },
+        delete: () => ({ in: async (_column: string, ids: string[]) => { deleted.push(ids); return { error: null }; } }),
+        single: async () => {
+          if (table === "summary_cards" && row) updated.push({ id, row });
+          return { data: { id, ...row }, error: null };
+        },
+        then: (resolve: (value: unknown) => unknown) => Promise.resolve({
+          data: table === "summary_cards" ? existing : [], error: null
+        }).then(resolve)
+      };
+      return chain;
+    }
+  };
+  // Include an unwanted unchanged card in the response: persistence must still
+  // enforce the selected item boundary, independently of model compliance.
+  const incoming = summary(2);
+  incoming.translations = { es: { meeting: { title: "Should not overwrite", meetingType: "Should not overwrite" }, cards: [] } };
+  await appendSummaryCardsForMeeting(supabase as never, "meeting", incoming, { response: "model" }, {
+    authoritativeSourceItemIds: ["item-0", "item-1"],
+    itemInputHashes: new Map([["item-1", "new-fingerprint"]]),
+    preserveMeetingTranslation: true,
+    summarySourceHash: "agenda-hash"
+  });
+  assert.deepEqual(deleted, [["row-2"]]);
+  assert.deepEqual(updated.map((entry) => entry.id), ["row-1"]);
+  assert.equal(updated[0].row.is_published, false);
+  assert.equal(updated[0].row.is_featured, true);
+  assert.equal(updated[0].row.admin_notes, "Reviewed");
+  assert.equal((updated[0].row.raw_llm_json as Record<string, unknown>)._simplecitySourceInputHash, "new-fingerprint");
+
+  updated.length = 0;
+  deleted.length = 0;
+  await appendSummaryCardsForMeeting(supabase as never, "meeting", incoming, null, {
+    authoritativeSourceItemIds: ["item-0", "item-1", "item-2"],
+    itemInputHashes: new Map(), preserveMeetingTranslation: true,
+    summarySourceHash: "another-document-only-hash"
+  });
+  assert.deepEqual(updated, []);
+  assert.deepEqual(deleted, []);
+});

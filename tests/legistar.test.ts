@@ -15,12 +15,33 @@ function document(type: DocumentType) {
   return { type, label: type, url: `https://example.test/${type}` };
 }
 
-test("deep Legistar refreshes skip packets and item attachments", () => {
+test("deep Legistar refreshes skip optional packets and item attachments", () => {
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda"), 3), true);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Minutes"), 3), true);
-  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 3), false);
+  assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 3, [document("Agenda")]), false);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Document"), 3), false);
   assert.equal(shouldDownloadLegistarDocumentForWindow(document("Agenda Packet"), 1), true);
+});
+
+test("deep Legistar refresh downloads a Parks Commission packet when it is the only agenda", () => {
+  const packet = document("Agenda Packet");
+  const minutes = document("Minutes");
+  const attachment = { ...document("Attachment"), isAgendaItemAttachment: true };
+  const meeting = {
+    section: "Past Meetings" as const,
+    status: "Past" as const,
+    documents: [packet, minutes, attachment]
+  };
+  assert.deepEqual(selectLegistarDocumentsForDownload(meeting, 3), [packet, minutes]);
+
+  for (const type of ["Agenda", "Accessible Agenda", "HTML Agenda"] as const) {
+    assert.equal(selectLegistarDocumentsForDownload({
+      ...meeting, documents: [...meeting.documents, document(type)]
+    }, 3).includes(packet), false);
+  }
+  assert.equal(selectLegistarDocumentsForDownload({
+    ...meeting, documents: [{ ...packet, isAgendaItemAttachment: true }, minutes]
+  }, 3).some((doc) => doc.type === "Agenda Packet"), false);
 });
 
 test("prioritizes minutes and agendas ahead of optional Legistar attachments", () => {

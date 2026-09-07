@@ -1,0 +1,472 @@
+{
+  "date": "2026-09-07",
+  "scope": "Three SF and eighteen Santa Clara re-summarization events; read-only production inspection",
+  "limitations": [
+    "Card counts describe surviving rows; deleted rows are not recoverable from these tables. New row timestamps do not establish newly needed coverage.",
+    "Historical source bodies and previous per-card input versions are overwritten. Component hashes are not per-item diffs."
+  ],
+  "inventory": [
+    {
+      "jurisdiction": "san-francisco",
+      "title": "Public Safety and Neighborhood Services Committee",
+      "date": "9/10/2026",
+      "meetingId": "75048ce1-6398-46c9-90e1-0f78167dfff4",
+      "priorCheckpointPrefix": "d171acbe37",
+      "currentSourceHashPrefix": "8470b1297e",
+      "currentFingerprints": {
+        "metadata": "0eb137f557",
+        "llmInput": "cfaffab343",
+        "documents": "e53e9a5255",
+        "items": "e66d531d39"
+      },
+      "priorObservation": null,
+      "currentCardRows": 1,
+      "preexistingRowsUpdated": 1,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "san-francisco",
+      "title": "Board of Supervisors",
+      "date": "7/28/2026",
+      "meetingId": "4ba94d46-20c7-448a-a144-33648b60e98d",
+      "priorCheckpointPrefix": "71c812ad6a",
+      "currentSourceHashPrefix": "345d1170fa",
+      "currentFingerprints": {
+        "metadata": "b0c54368a4",
+        "llmInput": "503ce153a3",
+        "documents": "5503c0a05a",
+        "items": "561dee06a7"
+      },
+      "priorObservation": {
+        "date": "2026-08-31T19:14:24.304122+00:00",
+        "sourceHashPrefix": "71c812ad6a",
+        "matchesCheckpoint": true,
+        "changedComponents": [
+          "llmInput",
+          "items"
+        ],
+        "fingerprints": {
+          "metadata": "b0c54368a4",
+          "llmInput": "9351a47ef0",
+          "documents": "5503c0a05a",
+          "items": "918d6b5603"
+        }
+      },
+      "currentCardRows": 135,
+      "preexistingRowsUpdated": 131,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "san-francisco",
+      "title": "Board of Supervisors",
+      "date": "7/21/2026",
+      "meetingId": "fcf30b23-7c00-43e4-bf0d-2b015709cfc7",
+      "priorCheckpointPrefix": "97e13a632c",
+      "currentSourceHashPrefix": "3500643730",
+      "currentFingerprints": {
+        "metadata": "d85c28179d",
+        "llmInput": "b346af85e2",
+        "documents": "c1fb1d439c",
+        "items": "a63337e5f2"
+      },
+      "priorObservation": {
+        "date": "2026-08-31T19:14:24.304122+00:00",
+        "sourceHashPrefix": "97e13a632c",
+        "matchesCheckpoint": true,
+        "changedComponents": [
+          "llmInput",
+          "items"
+        ],
+        "fingerprints": {
+          "metadata": "d85c28179d",
+          "llmInput": "28b59f4a4a",
+          "documents": "c1fb1d439c",
+          "items": "fcf46673f5"
+        }
+      },
+      "currentCardRows": 107,
+      "preexistingRowsUpdated": 107,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Race and Health Disparities Community Board - Regular Meeting",
+      "date": "Jun 3, 2026",
+      "meetingId": "81047b03-b621-4125-bae9-0203e80d5634",
+      "priorCheckpointPrefix": "0e410606e8",
+      "currentSourceHashPrefix": "fbe626d88c",
+      "currentFingerprints": {
+        "metadata": "f511b553aa",
+        "llmInput": "67d2a177dc",
+        "documents": "69ed37af06",
+        "items": "c694d60b26"
+      },
+      "priorObservation": null,
+      "currentCardRows": 11,
+      "preexistingRowsUpdated": 10,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Board of Plumbing Examiners - Regular Meeting",
+      "date": "Jun 11, 2026",
+      "meetingId": "40ce8669-ce23-4392-9155-641befba3cd0",
+      "priorCheckpointPrefix": "d8a33cbf81",
+      "currentSourceHashPrefix": "dc31cd21c1",
+      "currentFingerprints": {
+        "metadata": "6a6ab2cb91",
+        "llmInput": "93c4279e46",
+        "documents": "1d6c27ed4f",
+        "items": "c5773348fa"
+      },
+      "priorObservation": null,
+      "currentCardRows": 10,
+      "preexistingRowsUpdated": 7,
+      "newRowsToday": 2
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Behavioral Health Board - Cultural Competency Advisory Committee",
+      "date": "Jun 15, 2026",
+      "meetingId": "edc58e11-81e6-49b4-8c58-7dc6c49f993a",
+      "priorCheckpointPrefix": "904acc3d42",
+      "currentSourceHashPrefix": "421692dc90",
+      "currentFingerprints": {
+        "metadata": "e78bb0d206",
+        "llmInput": "578d8f04a3",
+        "documents": "7a2594586b",
+        "items": "5223de152c"
+      },
+      "priorObservation": {
+        "date": "2026-08-24T11:21:27.898259+00:00",
+        "sourceHashPrefix": "904acc3d42",
+        "matchesCheckpoint": true,
+        "changedComponents": [
+          "documents"
+        ],
+        "fingerprints": {
+          "metadata": "e78bb0d206",
+          "llmInput": "578d8f04a3",
+          "documents": "a99052edfa",
+          "items": "5223de152c"
+        }
+      },
+      "currentCardRows": 9,
+      "preexistingRowsUpdated": 1,
+      "newRowsToday": 8
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Planning Commission - Regular Meeting",
+      "date": "Jun 25, 2026",
+      "meetingId": "fdb1eeba-6666-46e7-8d35-7d48d5e874cc",
+      "priorCheckpointPrefix": "8619078210",
+      "currentSourceHashPrefix": "80d5851dec",
+      "currentFingerprints": {
+        "metadata": "25f6356d8e",
+        "llmInput": "522b8d2197",
+        "documents": "7bc3173fdf",
+        "items": "8830caad22"
+      },
+      "priorObservation": null,
+      "currentCardRows": 12,
+      "preexistingRowsUpdated": 2,
+      "newRowsToday": 6
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Senior Care Commission - Regular Meeting",
+      "date": "Jul 8, 2026",
+      "meetingId": "918175c2-ed75-4d29-9d60-7c223058d3dd",
+      "priorCheckpointPrefix": "8ee4640155",
+      "currentSourceHashPrefix": "166b8ccf8f",
+      "currentFingerprints": {
+        "metadata": "a1d09ac2aa",
+        "llmInput": "f4713cdc65",
+        "documents": "644428851b",
+        "items": "2163ed9c83"
+      },
+      "priorObservation": null,
+      "currentCardRows": 18,
+      "preexistingRowsUpdated": 4,
+      "newRowsToday": 8
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Sustainability Commission - Regular Meeting",
+      "date": "Jul 9, 2026",
+      "meetingId": "0555fa48-a886-4a0b-85a4-8c7618d61c23",
+      "priorCheckpointPrefix": "a97a566cc5",
+      "currentSourceHashPrefix": "1beacbdbc8",
+      "currentFingerprints": {
+        "metadata": "bb6516ae7e",
+        "llmInput": "96357f8686",
+        "documents": "ba60e668ea",
+        "items": "f5074937f2"
+      },
+      "priorObservation": null,
+      "currentCardRows": 17,
+      "preexistingRowsUpdated": 4,
+      "newRowsToday": 8
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Fairgrounds Management Corporation Board of Directors - Regular Meeting",
+      "date": "Jul 22, 2026",
+      "meetingId": "f5547363-24bd-40b1-b869-66257ceca512",
+      "priorCheckpointPrefix": "ad291f6370",
+      "currentSourceHashPrefix": "2658b600de",
+      "currentFingerprints": {
+        "metadata": "b5e105a995",
+        "llmInput": "222414eef4",
+        "documents": "fe4a812d7e",
+        "items": "20a607bd48"
+      },
+      "priorObservation": null,
+      "currentCardRows": 35,
+      "preexistingRowsUpdated": 10,
+      "newRowsToday": 14
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Airports Commission - Regular Meeting",
+      "date": "Aug 4, 2026",
+      "meetingId": "a04e8997-f2ad-4ecf-bb1d-c253e84bbb98",
+      "priorCheckpointPrefix": "baf9c1c6fa",
+      "currentSourceHashPrefix": "99823c23ae",
+      "currentFingerprints": {
+        "metadata": "c13954d195",
+        "llmInput": "3229990d19",
+        "documents": "6f1927aa6c",
+        "items": "753e203160"
+      },
+      "priorObservation": null,
+      "currentCardRows": 17,
+      "preexistingRowsUpdated": 0,
+      "newRowsToday": 17
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Child Abuse Prevention Council - Allocations Committee Meeting",
+      "date": "Aug 5, 2026",
+      "meetingId": "dfed8fa2-62f0-4a6f-b02b-b65577eae958",
+      "priorCheckpointPrefix": "e91fa35f64",
+      "currentSourceHashPrefix": "77665991dd",
+      "currentFingerprints": {
+        "metadata": "4342e8e487",
+        "llmInput": "b67cf58518",
+        "documents": "6ca656f286",
+        "items": "301cd2b431"
+      },
+      "priorObservation": null,
+      "currentCardRows": 4,
+      "preexistingRowsUpdated": 4,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Behavioral Health Board - Access, Wellness, and Recovery Committee",
+      "date": "Aug 7, 2026",
+      "meetingId": "2be4f033-05d4-454e-bc22-a09907d36cff",
+      "priorCheckpointPrefix": "e9aeec3b79",
+      "currentSourceHashPrefix": "3c86757ce0",
+      "currentFingerprints": {
+        "metadata": "a6c14424fe",
+        "llmInput": "f2e07bb4d7",
+        "documents": "f36efc0eb6",
+        "items": "3d92dd2ed0"
+      },
+      "priorObservation": null,
+      "currentCardRows": 8,
+      "preexistingRowsUpdated": 0,
+      "newRowsToday": 8
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Behavioral Health Board - Executive Committee Special Meeting",
+      "date": "Aug 10, 2026",
+      "meetingId": "61ed64bf-c27b-4ff1-b9f9-5cded54dfb73",
+      "priorCheckpointPrefix": "7528df953f",
+      "currentSourceHashPrefix": "e7084df2a3",
+      "currentFingerprints": {
+        "metadata": "68263fca7d",
+        "llmInput": "a3a85f294a",
+        "documents": "13a04093d4",
+        "items": "ca6d87c772"
+      },
+      "priorObservation": null,
+      "currentCardRows": 18,
+      "preexistingRowsUpdated": 17,
+      "newRowsToday": 1
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Commission on the Status of Women - Regular Meeting",
+      "date": "Aug 10, 2026",
+      "meetingId": "d0a67baf-a620-42ca-a751-00e47803303c",
+      "priorCheckpointPrefix": "9615336935",
+      "currentSourceHashPrefix": "88d1cfff41",
+      "currentFingerprints": {
+        "metadata": "a18ec50531",
+        "llmInput": "aa2dd2d8e4",
+        "documents": "5e5b0b8788",
+        "items": "a9ea8ee15e"
+      },
+      "priorObservation": null,
+      "currentCardRows": 20,
+      "preexistingRowsUpdated": 0,
+      "newRowsToday": 20
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Public Safety and Justice Committee - Regular Meeting",
+      "date": "Aug 12, 2026",
+      "meetingId": "ae276793-cc94-4540-8bbb-6996286a17bd",
+      "priorCheckpointPrefix": "9815520e75",
+      "currentSourceHashPrefix": "bc5d1f10c9",
+      "currentFingerprints": {
+        "metadata": "886f7d9ce3",
+        "llmInput": "c84fd73eec",
+        "documents": "1d90d51d4f",
+        "items": "714373434a"
+      },
+      "priorObservation": null,
+      "currentCardRows": 8,
+      "preexistingRowsUpdated": 7,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Behavioral Health Board - Cultural Competency Advisory Committee",
+      "date": "Aug 17, 2026",
+      "meetingId": "5d357530-d0a1-47d5-b35c-25ae26867a44",
+      "priorCheckpointPrefix": "cc8e3bd304",
+      "currentSourceHashPrefix": "b7ddc63912",
+      "currentFingerprints": {
+        "metadata": "477f80103c",
+        "llmInput": "6c8b9f1777",
+        "documents": "a86a02f152",
+        "items": "bc62e7c576"
+      },
+      "priorObservation": null,
+      "currentCardRows": 9,
+      "preexistingRowsUpdated": 0,
+      "newRowsToday": 8
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Finance and Government Operations Committee - Regular Meeting",
+      "date": "Aug 18, 2026",
+      "meetingId": "47a4745d-8e53-4ffd-9484-cfded0f40cad",
+      "priorCheckpointPrefix": "d15f805527",
+      "currentSourceHashPrefix": "a27c3a814c",
+      "currentFingerprints": {
+        "metadata": "8feaefac7c",
+        "llmInput": "b7185495c4",
+        "documents": "746cf44536",
+        "items": "2a84841bc1"
+      },
+      "priorObservation": null,
+      "currentCardRows": 20,
+      "preexistingRowsUpdated": 0,
+      "newRowsToday": 20
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Housing, Land Use, Environment, and Transportation Committee - Regular Meeting",
+      "date": "Aug 20, 2026",
+      "meetingId": "037a1736-e957-4d9b-a9df-d83b0d81a873",
+      "priorCheckpointPrefix": "d21f1e2730",
+      "currentSourceHashPrefix": "bcac0985dc",
+      "currentFingerprints": {
+        "metadata": "6de42c78b5",
+        "llmInput": "42f45d2b44",
+        "documents": "ab98c9de3c",
+        "items": "a502e47ae4"
+      },
+      "priorObservation": {
+        "date": "2026-08-21T11:20:07.884181+00:00",
+        "sourceHashPrefix": "9098e13bf0",
+        "matchesCheckpoint": false,
+        "changedComponents": [
+          "documents",
+          "items"
+        ],
+        "fingerprints": {
+          "metadata": "6de42c78b5",
+          "llmInput": "42f45d2b44",
+          "documents": "41f31d7c34",
+          "items": "76c0cc094c"
+        }
+      },
+      "currentCardRows": 14,
+      "preexistingRowsUpdated": 12,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Veterans Commission of the County of Santa Clara - Regular Meeting",
+      "date": "Aug 20, 2026",
+      "meetingId": "d9ca411b-6778-469f-af2c-769fe049120a",
+      "priorCheckpointPrefix": "738fc20ec0",
+      "currentSourceHashPrefix": "0d0488030c",
+      "currentFingerprints": {
+        "metadata": "e165eef462",
+        "llmInput": "cea9bcf0f1",
+        "documents": "50c9fa6284",
+        "items": "77e8fc558f"
+      },
+      "priorObservation": {
+        "date": "2026-08-22T11:15:56.907171+00:00",
+        "sourceHashPrefix": "4858135c42",
+        "matchesCheckpoint": false,
+        "changedComponents": [
+          "llmInput",
+          "documents",
+          "items"
+        ],
+        "fingerprints": {
+          "metadata": "e165eef462",
+          "llmInput": "5129d3e649",
+          "documents": "6c1a72e7a1",
+          "items": "36661b5d16"
+        }
+      },
+      "currentCardRows": 14,
+      "preexistingRowsUpdated": 11,
+      "newRowsToday": 0
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "title": "Planning Commission - Regular Meeting",
+      "date": "Aug 27, 2026",
+      "meetingId": "bcc8d292-d5a8-426a-b48b-5bc5de0afb52",
+      "priorCheckpointPrefix": "706272a8db",
+      "currentSourceHashPrefix": "f316a057db",
+      "currentFingerprints": {
+        "metadata": "395d7550f3",
+        "llmInput": "62b8a1884d",
+        "documents": "c75b081dd4",
+        "items": "f6307d5212"
+      },
+      "priorObservation": {
+        "date": "2026-09-01T15:22:12.646465+00:00",
+        "sourceHashPrefix": "706272a8db",
+        "matchesCheckpoint": true,
+        "changedComponents": [
+          "documents",
+          "items"
+        ],
+        "fingerprints": {
+          "metadata": "395d7550f3",
+          "llmInput": "62b8a1884d",
+          "documents": "5060c662d1",
+          "items": "59b9884e16"
+        }
+      },
+      "currentCardRows": 14,
+      "preexistingRowsUpdated": 10,
+      "newRowsToday": 0
+    }
+  ]
+}

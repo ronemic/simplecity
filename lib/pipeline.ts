@@ -1,3 +1,4 @@
+import { selectAgendaItemsForGeneration } from "@/lib/llm/agendaItemReuse";
 import type { LlmReadyMeeting, PrimeGovMeeting, SimpleCitySummary } from "@/lib/types";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/llm/agendaItemCoverage";
 import {
   appendSummaryCardsForMeeting,
+  loadExistingAgendaItemInputs,
   replaceSummaryCardsForMeeting,
   restoreArchivedDocumentExtractions,
   setMeetingSummarizedSourceHash,
@@ -959,8 +961,23 @@ async function runSimpleCityPipelineInternal(
           try {
             const shouldAppendToExisting =
               Boolean(persistSummaries && supabase && item.id && item.existingCardCount > 0);
+            const existingItemInputs = persistSummaries && supabase && item.id && item.meeting.items?.length
+              ? await loadExistingAgendaItemInputs(supabase, item.id)
+              : null;
+            const itemSelection = existingItemInputs
+              ? selectAgendaItemsForGeneration(
+                  item.meeting,
+                  existingItemInputs,
+                  "previousSummarizedMeeting" in item ? item.previousSummarizedMeeting : null
+                )
+              : null;
+            const generationMeeting = itemSelection?.meeting || item.meeting;
+            if (itemSelection) {
+              log(`Item source audit for ${item.meeting.title}: ${itemSelection.retainedItemIds.length} unchanged cards retained; ${generationMeeting.items?.length || 0} changed, missing, or unverified items selected.`);
+            }
 
             if (
+              (!itemSelection || generationMeeting.items?.length === 0) &&
               shouldSkipUnchangedSummary(
                 item.sourceHash,
                 item.summarizedSourceHash,
@@ -1024,6 +1041,7 @@ async function runSimpleCityPipelineInternal(
             }
 
             if (
+              (!itemSelection || generationMeeting.items?.length === 0) &&
               shouldAppendToExisting &&
               supabase &&
               shouldSkipUnchangedSummary(
@@ -1064,6 +1082,7 @@ async function runSimpleCityPipelineInternal(
             }
 
             if (
+              (!itemSelection || generationMeeting.items?.length) &&
               item.sourceHash &&
               item.summarizedSourceHash &&
               item.summarizedSourceHash !== item.sourceHash
@@ -1081,13 +1100,15 @@ async function runSimpleCityPipelineInternal(
             let initialSummary: Awaited<ReturnType<typeof generateSummaryForMeeting>> | null = null;
             let initialSummaryError: unknown = null;
             try {
-              initialSummary = await generateWithinPipelineBudget(item.meeting, "meeting");
+              if (!itemSelection || generationMeeting.items?.length) {
+                initialSummary = await generateWithinPipelineBudget(generationMeeting, "meeting");
+              }
             } catch (error) {
               initialSummaryError = error;
             }
 
             const coverage = await completeAgendaItemCoverage(
-              item.meeting,
+              generationMeeting,
               initialSummary,
               {
                 initialGenerationFailed: Boolean(initialSummaryError),
@@ -1101,7 +1122,7 @@ async function runSimpleCityPipelineInternal(
               }
             );
             const { summary, raw } = coverage;
-            const requiredItemCount = agendaItemsRequiringCards(item.meeting).length;
+            const requiredItemCount = agendaItemsRequiringCards(generationMeeting).length;
             requiredAgendaItems += requiredItemCount;
             fallbackAgendaItems += coverage.fallbackItemIds.length;
             detailedAgendaItems += Math.max(
@@ -1124,7 +1145,7 @@ async function runSimpleCityPipelineInternal(
             }
             if (coverage.fallbackItemIds.length > 0) {
               const message =
-                `Published official-source fallback coverage for ${coverage.fallbackItemIds.length} of ${requiredItemCount} required agenda item(s) in ${item.meeting.title}; detailed summaries will be retried on a future run.`;
+                `Published official-source fallback coverage for ${coverage.fallbackItemIds.length} of ${requiredItemCount} required agenda item(s) in ${item.meeting.title}; detailed summaries can be retried when the item source changes.`;
               log(`Summary warning: ${message}`);
             }
             if (initialSummaryError) {
@@ -1152,6 +1173,8 @@ async function runSimpleCityPipelineInternal(
                       authoritativeSourceItemIds:
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
+                      preserveMeetingTranslation: Boolean(itemSelection?.retainedItemIds.length),
+                      itemInputHashes: itemSelection?.inputHashes,
                       summarySourceHash: item.summarySourceHash
                     }
                   )
@@ -1166,6 +1189,7 @@ async function runSimpleCityPipelineInternal(
                       authoritativeSourceItemIds:
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
+                      itemInputHashes: itemSelection?.inputHashes,
                       summarySourceHash: item.summarySourceHash
                     }
                   );
@@ -1183,7 +1207,8 @@ async function runSimpleCityPipelineInternal(
                 summary
               });
             }
-            summaryProgress.generated += 1;
+            if (itemSelection && generationMeeting.items?.length === 0) summaryProgress.unchanged += 1;
+            else summaryProgress.generated += 1;
             if (initialSummaryError && isLlmProcessBudgetExceededError(initialSummaryError)) {
               return "budget-exhausted";
             }

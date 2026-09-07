@@ -5,6 +5,7 @@ import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
 import { withEffectiveSourceMeetingStatus } from "@/lib/utils/meetingStatus";
+import { isRequiredAgendaPacket } from "@/lib/scraper/documentUsability";
 import {
   mergeDiscoveredAgendaItemAttachments,
   type DiscoveredAgendaItemAttachments
@@ -116,6 +117,7 @@ export function classifyIqm2Link(label = "", href = ""): Iqm2Document["type"] {
   const text = label.toLowerCase();
   const url = href.toLowerCase();
 
+  if (/detail_(?:motion|legislation|legifile)\.aspx/.test(url)) return "Other";
   if (text.includes("agenda packet")) return "Agenda Packet";
   if (text === "agenda" || text.includes("agenda")) return "Agenda";
   if (text.includes("minutes")) return "Minutes";
@@ -150,6 +152,7 @@ export function shouldIgnoreIqm2Link(label = "", href = "") {
     text === "help" ||
     url.startsWith("mailto:") ||
     url.includes("support@granicus.com") ||
+    /detail_(?:motion|legislation|legifile)\.aspx/.test(url) ||
     url.includes("/citizens/media.aspx") ||
     url.endsWith("#") ||
     url === "javascript:void(0)" ||
@@ -160,9 +163,11 @@ export function shouldIgnoreIqm2Link(label = "", href = "") {
 
 export function shouldDownloadIqm2DocumentForWindow(
   document: PrimeGovDocument,
-  monthsBack = 1
+  monthsBack = 1,
+  meetingDocuments: readonly PrimeGovDocument[] = [document]
 ) {
-  return monthsBack <= 1 || ["Agenda", "Minutes"].includes(document.type);
+  return monthsBack <= 1 || ["Agenda", "Minutes"].includes(document.type) ||
+    isRequiredAgendaPacket(document, meetingDocuments);
 }
 
 async function waitForIqm2Portal(page: Page, portalUrl: string) {
@@ -239,6 +244,7 @@ async function extractVisibleIqm2Meetings(
         const text = label.toLowerCase();
         const url = href.toLowerCase();
 
+        if (/detail_(?:motion|legislation|legifile)\.aspx/.test(url)) return "Other";
         if (text.includes("agenda packet")) return "Agenda Packet";
         if (text === "agenda" || text.includes("agenda")) return "Agenda";
         if (text.includes("minutes")) return "Minutes";
@@ -273,6 +279,7 @@ async function extractVisibleIqm2Meetings(
           text === "help" ||
           url.startsWith("mailto:") ||
           url.includes("support@granicus.com") ||
+          /detail_(?:motion|legislation|legifile)\.aspx/.test(url) ||
           url.includes("/citizens/media.aspx") ||
           url.endsWith("#") ||
           url === "javascript:void(0)" ||
@@ -851,15 +858,15 @@ export async function scrapeIqm2Meetings(
       const isDeepRefresh = (options.monthsBack ?? 1) > 1;
       log("Downloading IQM2 documents where available...");
       if (isDeepRefresh) {
-        log("Deep IQM2 refresh: downloading meeting agendas and minutes only.");
+        log("Deep IQM2 refresh: downloading agendas, minutes, and packets that are the only agenda.");
       }
       await downloadIqm2Documents(context, meetings, {
         log,
         outputDir: options.documentOutputDir,
         shouldStop: options.shouldStop,
         documentFilter: isDeepRefresh
-          ? (document) =>
-              shouldDownloadIqm2DocumentForWindow(document, options.monthsBack)
+          ? (document, meeting) =>
+              shouldDownloadIqm2DocumentForWindow(document, options.monthsBack, meeting.documents)
           : undefined
       });
     }
