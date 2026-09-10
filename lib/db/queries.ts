@@ -1199,9 +1199,10 @@ const getCachedPublishedCardCount = unstable_cache(countPublishedCards, ["publis
 
 const getCachedDecisionResultFreshness = unstable_cache(
   async (
-    santaBarbaraBody: SantaBarbaraBodyView | "" = ""
+    santaBarbaraBody: SantaBarbaraBodyView | "",
+    selection: JurisdictionSelection
   ): Promise<DecisionResultFreshness> => {
-    const clients = getSafePublicClients(ALL_JURISDICTIONS_SLUG);
+    const clients = getSafePublicClients(selection);
     if (clients.length === 0) return {};
 
     const results = await Promise.all(
@@ -1238,7 +1239,7 @@ const getCachedDecisionResultFreshness = unstable_cache(
 
     return Object.fromEntries(results.filter((result) => result !== null));
   },
-  ["decision-result-freshness-v2"],
+  ["decision-result-freshness-v3"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1369,7 +1370,6 @@ async function loadDecisionCardCandidatesForJurisdiction(
     supabase: SupabaseClient;
   },
   filters: Omit<DecisionCardPageFilters, "selection" | "locale">,
-  locale: Locale,
   range: { from: number; to: number }
 ) {
   const search = normalizeSearch(filters.search);
@@ -1431,10 +1431,31 @@ async function loadDecisionCardCandidatesForJurisdiction(
   );
 
   return {
-    cards: await enrichPublicCards(supabase, rows, locale),
+    cards: rows,
     count: count || 0,
     paginationSupported: true
   };
+}
+
+async function enrichDecisionPage(
+  selection: JurisdictionSelection,
+  cards: SummaryCardRow[],
+  locale: Locale
+) {
+  // Ordering uses base-row fields only. Enrich the displayed page, not every
+  // jurisdiction's candidates (which grow with the requested page number).
+  // Batch by database and preserve row identity across projects and ordering.
+  const enrichedByRow = new Map<SummaryCardRow, SummaryCardRow>();
+  await Promise.all(
+    getSafePublicProjects(selection).map(async (project) => {
+      const slugs = new Set(projectSlugs(project));
+      const rows = cards.filter((card) => slugs.has(card.jurisdiction_slug as JurisdictionSlug));
+      if (rows.length === 0) return;
+      const enriched = await enrichPublicCards(project.supabase, rows, locale);
+      rows.forEach((row, index) => enrichedByRow.set(row, enriched[index]));
+    })
+  );
+  return cards.map((card) => enrichedByRow.get(card) || card);
 }
 
 async function loadLegacyDecisionCardPage(
@@ -1448,19 +1469,34 @@ async function loadLegacyDecisionCardPage(
   pageSize: number
 ): Promise<DecisionCardPageResult> {
   const offset = (page - 1) * pageSize;
-  const matchingCards = sortCards(
-    (await loadPublishedCardsForSelection(selection, locale)).filter((card) =>
-      matchesDecisionFilters(card, search, category || undefined, result || undefined) &&
-      (!body ||
-        (card.meetings
-          ? matchesSantaBarbaraBody(card.meetings, body)
-          : false))
-    )
+  // Search uses rendered text, so translate before matching. Outcomes are not
+  // searchable: only load them before pagination when a result filter needs them.
+  const groups = await Promise.all(
+    getSafePublicProjects(selection).map(async (project) => {
+      const rowGroups = await Promise.all(
+        project.jurisdictions.map((jurisdiction) =>
+          loadPublishedCardRowsForJurisdiction({ jurisdiction, supabase: project.supabase })
+        )
+      );
+      const rows = await applyCardTranslations(project.supabase, rowGroups.flat(), locale);
+      const matching = rows.filter((card) =>
+        matchesDecisionFilters(card, search, category || undefined) &&
+        (!body || Boolean(card.meetings && matchesSantaBarbaraBody(card.meetings, body)))
+      );
+      if (!result) return matching;
+      const outcomes = await loadDecisionOutcomes(project.supabase, matching, locale);
+      return matching
+        .map((card) => ({ ...card, outcome: outcomes.get(card.id) || null }))
+        .filter((card) => matchesDecisionResultFilter(card, result));
+    })
   );
+  const matchingCards = sortCards(groups.flat());
   const totalCount = matchingCards.length;
 
   return {
-    cards: matchingCards.slice(offset, offset + pageSize),
+    cards: result
+      ? matchingCards.slice(offset, offset + pageSize)
+      : await enrichDecisionPage(selection, matchingCards.slice(offset, offset + pageSize), locale),
     totalCount,
     page,
     pageSize,
@@ -1527,7 +1563,6 @@ const getCachedDecisionCardPage = unstable_cache(
             page: normalizedPage,
             pageSize: normalizedPageSize
           },
-          locale,
           range
         )
       )
@@ -1552,7 +1587,7 @@ const getCachedDecisionCardPage = unstable_cache(
       : sortedCards;
 
     return {
-      cards,
+      cards: await enrichDecisionPage(selection, cards, locale),
       totalCount,
       page: normalizedPage,
       pageSize: normalizedPageSize,
@@ -2053,9 +2088,10 @@ export async function getUpcomingDecisionSnapshot(
 }
 
 export async function getDecisionResultFreshness(
-  santaBarbaraBody: SantaBarbaraBodyView | "" = ""
+  santaBarbaraBody: SantaBarbaraBodyView | "" = "",
+  selection: JurisdictionSelection = ALL_JURISDICTIONS_SLUG
 ) {
-  return getCachedDecisionResultFreshness(santaBarbaraBody);
+  return getCachedDecisionResultFreshness(santaBarbaraBody, selection);
 }
 
 export async function getPublishedDecisionCards(

@@ -257,7 +257,8 @@ export default async function DecisionsPage({
       page: currentPage
     }),
     getDecisionResultFreshness(
-      isSantaBarbara && santaBarbaraBody !== "all" ? santaBarbaraBody : ""
+      isSantaBarbara && santaBarbaraBody !== "all" ? santaBarbaraBody : "",
+      jurisdiction
     )
   ]);
 
