@@ -10,6 +10,7 @@ import {
   mergeDiscoveredAgendaItemAttachments,
   type DiscoveredAgendaItemAttachments
 } from "@/lib/scraper/itemAttachments";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 const IQM2_ORIGIN = "https://sccgov.iqm2.com";
 export const DEFAULT_SANTA_CLARA_COUNTY_IQM2_URL =
@@ -170,24 +171,12 @@ export function shouldDownloadIqm2DocumentForWindow(
     isRequiredAgendaPacket(document, meetingDocuments);
 }
 
-export async function retryIqm2PortalLoad<T>(
-  load: () => Promise<T>,
-  log: (message: string) => void = () => undefined
-) {
-  try {
-    return await load();
-  } catch {
-    log("IQM2 portal did not load on the first attempt; retrying once.");
-    return load();
-  }
-}
-
 async function waitForIqm2Portal(
   page: Page,
   portalUrl: string,
   log: (message: string) => void
 ) {
-  await retryIqm2PortalLoad(async () => {
+  await retryInitialNavigation(async () => {
     await page.goto(portalUrl, {
       waitUntil: "networkidle",
       timeout: 60000
@@ -196,7 +185,7 @@ async function waitForIqm2Portal(
     await page.waitForTimeout(5000);
     await page.waitForSelector("text=Upcoming Meetings", { timeout: 30000 });
     await page.waitForSelector("text=Past Meetings", { timeout: 30000 }).catch(() => undefined);
-  }, log);
+  }, { label: "IQM2 portal", log });
 }
 
 async function clickVisibleSeeMoreLinks(page: Page, log: (message: string) => void) {

@@ -4,8 +4,7 @@ import {
   classifyIqm2Link,
   shouldIgnoreIqm2Link,
   extractIqm2AgendaItemAttachments,
-  shouldDownloadIqm2DocumentForWindow,
-  retryIqm2PortalLoad
+  shouldDownloadIqm2DocumentForWindow
 } from "@/lib/sources/iqm2";
 import type { DocumentType } from "@/lib/types";
 
@@ -32,32 +31,6 @@ test("deep IQM2 refresh keeps the HIV Executive Committee packet without a stand
 test("normal IQM2 refreshes retain all candidate document types", () => {
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Agenda Packet"), 1), true);
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Document"), 1), true);
-});
-
-test("IQM2 portal loading retries one transient failure", async () => {
-  let attempts = 0;
-  const logs: string[] = [];
-  const result = await retryIqm2PortalLoad(async () => {
-    attempts += 1;
-    if (attempts === 1) throw new Error("temporary navigation timeout");
-    return "loaded";
-  }, (message) => logs.push(message));
-
-  assert.equal(result, "loaded");
-  assert.equal(attempts, 2);
-  assert.deepEqual(logs, ["IQM2 portal did not load on the first attempt; retrying once."]);
-});
-
-test("IQM2 portal loading surfaces a repeated failure after two attempts", async () => {
-  let attempts = 0;
-  await assert.rejects(
-    retryIqm2PortalLoad(async () => {
-      attempts += 1;
-      throw new Error("portal unavailable");
-    }),
-    /portal unavailable/
-  );
-  assert.equal(attempts, 2);
 });
 
 test("associates every IQM2 document row with the preceding agenda item", () => {

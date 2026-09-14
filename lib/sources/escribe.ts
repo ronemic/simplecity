@@ -18,6 +18,7 @@ import {
 import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 const ESCRIBE_USER_AGENT = "Mozilla/5.0 SimpleCity eSCRIBE agenda scraper";
 
@@ -404,10 +405,12 @@ export async function scrapeEscribeMeetings(
   try {
     log(`Starting eSCRIBE scraper for ${options.jurisdiction.slug}.`);
     log(`eSCRIBE source URL: ${portalUrl}`);
-    await page.goto(portalUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
-    await page.waitForSelector("#PastMeetingTypesAccordian, .upcoming-meetings", {
-      timeout: 60_000
-    });
+    await retryInitialNavigation(async () => {
+      await page.goto(portalUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+      await page.waitForSelector("#PastMeetingTypesAccordian, .upcoming-meetings", {
+        timeout: 60_000
+      });
+    }, { label: "eSCRIBE portal", log });
 
     const meetingTypes = await page.locator(".MeetingTypeContainer").evaluateAll((containers) =>
       containers

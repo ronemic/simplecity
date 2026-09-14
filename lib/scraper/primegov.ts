@@ -6,6 +6,7 @@ import {
 } from "@/lib/scraper/itemAttachments";
 import { slugify } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 export const DEFAULT_PORTAL_URL =
   process.env.SCRAPER_BASE_URL || "https://fostercity.primegov.com/public/portal";
@@ -59,15 +60,20 @@ export function dedupeMeetings(meetings: PrimeGovMeeting[]) {
   return result;
 }
 
-export async function waitForPortal(page: Page, portalUrl = DEFAULT_PORTAL_URL) {
-  await page.goto(portalUrl, {
-    waitUntil: "domcontentloaded",
-    timeout: 60000
-  });
+export async function waitForPortal(
+  page: Page,
+  portalUrl = DEFAULT_PORTAL_URL,
+  log?: (message: string) => void
+) {
+  await retryInitialNavigation(async () => {
+    await page.goto(portalUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    });
 
-  await page.waitForLoadState("load", { timeout: 15000 }).catch(() => undefined);
-
-  await page.waitForSelector(PORTAL_READY_SELECTOR, { timeout: 60000 });
+    await page.waitForLoadState("load", { timeout: 15000 }).catch(() => undefined);
+    await page.waitForSelector(PORTAL_READY_SELECTOR, { timeout: 60000 });
+  }, { label: "PrimeGov portal", log });
 }
 
 export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeeting[]> {
@@ -687,7 +693,7 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
 
   try {
     log("Opening PrimeGov portal...");
-    await waitForPortal(page, portalUrl);
+    await waitForPortal(page, portalUrl, log);
     await page.waitForFunction(
       () => document.querySelectorAll("table tbody tr, table tr").length > 3,
       { timeout: 5000 }

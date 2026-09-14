@@ -14,6 +14,7 @@ import { parseMeetingDate } from "@/lib/utils/date";
 import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import { getVideoEmbedUrl } from "@/lib/utils/videoEmbed";
 import { cleanText, slugify } from "@/lib/utils/slug";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 const DEFAULT_DOCUMENT_TIMEOUT_MS = 60_000;
 
@@ -197,11 +198,17 @@ export function normalizeCivicClerkEventCards(
   return meetings;
 }
 
-async function waitForEventList(page: Page, portalUrl: string) {
-  await page.goto(portalUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
-  await page.waitForSelector('[aria-label="Events by date"] a[role="button"][data-id]', {
-    timeout: 60_000
-  });
+async function waitForEventList(
+  page: Page,
+  portalUrl: string,
+  log: (message: string) => void
+) {
+  await retryInitialNavigation(async () => {
+    await page.goto(portalUrl, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.waitForSelector('[aria-label="Events by date"] a[role="button"][data-id]', {
+      timeout: 60_000
+    });
+  }, { label: "CivicClerk event list", log });
 }
 
 async function loadMoreEvents(page: Page, direction: "previous" | "upcoming", attempts: number) {
@@ -473,7 +480,7 @@ export async function scrapeCivicClerkMeetings(
     log(`Starting CivicClerk scraper for ${jurisdiction.slug}.`);
     log(`CivicClerk source URL: ${portalUrl}`);
     log(`CivicClerk target region: ${jurisdiction.regionSlug}.`);
-    await waitForEventList(page, portalUrl);
+    await waitForEventList(page, portalUrl, log);
     await loadMoreEvents(page, "previous", options.allVisible ? 3 : monthsBack);
     await loadMoreEvents(page, "upcoming", options.allVisible ? 3 : monthsForward);
 

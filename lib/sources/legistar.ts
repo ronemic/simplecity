@@ -15,6 +15,7 @@ import {
   createStreamDownloadBudget,
   STREAM_DOWNLOAD_MAX_FILE_BYTES
 } from "@/lib/scraper/streamDownload";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
 export const LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES = STREAM_DOWNLOAD_MAX_FILE_BYTES;
@@ -510,18 +511,22 @@ function acceptedDocumentType(type: string) {
   ].includes(type);
 }
 
-async function waitForLegistarPortal(page: Page, portalUrl: string) {
-  await page.goto(portalUrl, {
-    waitUntil: "networkidle",
-    timeout: 60000
-  });
+async function waitForLegistarPortal(
+  page: Page,
+  portalUrl: string,
+  log: (message: string) => void
+) {
+  await retryInitialNavigation(async () => {
+    await page.goto(portalUrl, {
+      waitUntil: "networkidle",
+      timeout: 60000
+    });
 
-  await page.waitForTimeout(5000);
-  await page
-    .waitForSelector("a[href*='MeetingDetail.aspx'], a[href*='MeetingDetail'], table", {
+    await page.waitForTimeout(5000);
+    await page.waitForSelector("a[href*='MeetingDetail.aspx'], a[href*='MeetingDetail'], table", {
       timeout: 30000
-    })
-    .catch(() => undefined);
+    });
+  }, { label: "Legistar portal", log });
 }
 
 function buildLegistarDocumentFilename(meeting: PrimeGovMeeting, docType: string, sourceUrl: string) {
@@ -1784,7 +1789,7 @@ export async function scrapeLegistarMeetings(
 
   try {
     log("Opening Legistar portal...");
-    await waitForLegistarPortal(page, portalUrl);
+    await waitForLegistarPortal(page, portalUrl, log);
 
     if ((options.monthsBack ?? 1) > 1 || options.allVisible) {
       const arrow = page.locator("#ctl00_ContentPlaceHolder1_lstYears_Arrow");

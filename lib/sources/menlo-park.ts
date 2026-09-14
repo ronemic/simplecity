@@ -10,6 +10,7 @@ import {
   discoverMenloParkAgendaAttachments,
   normalizeMenloParkAttachmentUrl
 } from "@/lib/scraper/agendaAttachments";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 export const DEFAULT_MENLO_PARK_AGENDAS_URL =
   "https://www.menlopark.gov/Agendas-and-minutes";
@@ -598,15 +599,21 @@ function yearsInMenloParkDateWindow(monthsBack: number, monthsForward: number, n
   return Array.from({ length: endYear - startYear + 1 }, (_, index) => startYear + index);
 }
 
-async function waitForMenloParkPage(page: Page, sourceUrl: string) {
-  await page.goto(sourceUrl, {
-    waitUntil: "domcontentloaded",
-    timeout: 60000
-  });
+async function waitForMenloParkPage(
+  page: Page,
+  sourceUrl: string,
+  log: (message: string) => void
+) {
+  await retryInitialNavigation(async () => {
+    await page.goto(sourceUrl, {
+      waitUntil: "domcontentloaded",
+      timeout: 60000
+    });
 
-  await page.waitForLoadState("load", { timeout: 15000 }).catch(() => undefined);
-  await page.waitForSelector("text=Agendas and minutes", { timeout: 60000 });
-  await page.waitForTimeout(1000);
+    await page.waitForLoadState("load", { timeout: 15000 }).catch(() => undefined);
+    await page.waitForSelector("text=Agendas and minutes", { timeout: 60000 });
+    await page.waitForTimeout(1000);
+  }, { label: "Menlo Park agendas page", log });
 }
 
 async function extractMenloParkRows(
@@ -1040,7 +1047,7 @@ export async function scrapeMenloParkMeetings(
   try {
     log(`Starting Menlo Park official-site scraper for ${portalUrl}.`);
     log(`Scraping Menlo Park meeting bodies: ${bodies.map((body) => body.bodyName).join(", ")}.`);
-    await waitForMenloParkPage(page, portalUrl);
+    await waitForMenloParkPage(page, portalUrl, log);
 
     const extracted = await extractMenloParkRows(page, bodies, {
       targetYears,
