@@ -18,6 +18,7 @@ const dedicatedWorkflows = [
 ];
 
 const losAltosSchoolDistrictWorkflow = dedicatedWorkflows.at(-1) ?? "";
+const santaBarbaraWorkflow = dedicatedWorkflows.at(-2) ?? "";
 
 test("nightly workflows do not rerun an entire paid pipeline after failure", () => {
   assert.doesNotMatch(nightlyWorkflow, /pipeline_args=/);
@@ -31,6 +32,22 @@ test("pipeline uses workload-aware paid-work ceilings and runtime deadlines", ()
   assert.doesNotMatch(pipeline, /MAX_AGENDA_ITEM_RECOVERIES_PER_PIPELINE/);
   assert.match(pipeline, /recordDeadline\("LLM summarization"\)/);
   assert.match(pipeline, /deadlineExceeded\(\) \|\|[\s\S]*reconciledOutcomeMeetingIds/);
+});
+
+test("extended Monday lookbacks receive matching workflow headroom", () => {
+  assert.match(
+    nightlyWorkflow,
+    /pipeline:los-altos --[\s\S]*--max-runtime-minutes=\$\(\[ "\$\(date -u \+%u\)" = "1" \] && echo 75 \|\| echo 45\)/
+  );
+  assert.match(
+    nightlyWorkflow,
+    /pipeline:los-altos-hills --[\s\S]*--max-runtime-minutes=\$\(\[ "\$\(date -u \+%u\)" = "1" \] && echo 75 \|\| echo 45\)/
+  );
+  assert.match(
+    santaBarbaraWorkflow,
+    /--max-runtime-minutes=\$\(\[ "\$\(date -u \+%u\)" = "1" \] && echo 100 \|\| echo 75\)/
+  );
+  assert.match(santaBarbaraWorkflow, /timeout-minutes: 120/);
 });
 
 test("multi-jurisdiction runs do not share one LLM budget", () => {

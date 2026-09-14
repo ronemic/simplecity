@@ -28,7 +28,7 @@ jobs:
   santa-barbara-county:
     name: Santa Barbara County pipeline
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     concurrency:
       group: santa-barbara-county-pipeline
       cancel-in-progress: false
@@ -48,4 +48,4 @@ jobs:
         run: npm ci
 
       - name: Run Santa Barbara County pipeline
-        run: npm run pipeline:santa-barbara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage
+        run: npm run pipeline:santa-barbara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 100 || echo 75) --require-results-coverage

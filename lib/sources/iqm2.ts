@@ -170,15 +170,33 @@ export function shouldDownloadIqm2DocumentForWindow(
     isRequiredAgendaPacket(document, meetingDocuments);
 }
 
-async function waitForIqm2Portal(page: Page, portalUrl: string) {
-  await page.goto(portalUrl, {
-    waitUntil: "networkidle",
-    timeout: 60000
-  });
+export async function retryIqm2PortalLoad<T>(
+  load: () => Promise<T>,
+  log: (message: string) => void = () => undefined
+) {
+  try {
+    return await load();
+  } catch {
+    log("IQM2 portal did not load on the first attempt; retrying once.");
+    return load();
+  }
+}
 
-  await page.waitForTimeout(5000);
-  await page.waitForSelector("text=Upcoming Meetings", { timeout: 30000 });
-  await page.waitForSelector("text=Past Meetings", { timeout: 30000 }).catch(() => undefined);
+async function waitForIqm2Portal(
+  page: Page,
+  portalUrl: string,
+  log: (message: string) => void
+) {
+  await retryIqm2PortalLoad(async () => {
+    await page.goto(portalUrl, {
+      waitUntil: "networkidle",
+      timeout: 60000
+    });
+
+    await page.waitForTimeout(5000);
+    await page.waitForSelector("text=Upcoming Meetings", { timeout: 30000 });
+    await page.waitForSelector("text=Past Meetings", { timeout: 30000 }).catch(() => undefined);
+  }, log);
 }
 
 async function clickVisibleSeeMoreLinks(page: Page, log: (message: string) => void) {
@@ -805,7 +823,7 @@ export async function scrapeIqm2Meetings(
 
   try {
     log("Opening IQM2 portal...");
-    await waitForIqm2Portal(page, portalUrl);
+    await waitForIqm2Portal(page, portalUrl, log);
 
     if (options.clickSeeMore || (options.monthsBack ?? 1) > 1 || options.allVisible) {
       await clickVisibleSeeMoreLinks(page, log);

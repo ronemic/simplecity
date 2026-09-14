@@ -280,7 +280,7 @@ jobs:
   los-altos:
     name: Los Altos scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'los-altos')) ||
@@ -307,7 +307,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Los Altos pipeline
-        run: npm run pipeline:los-altos -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: npm run pipeline:los-altos -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 75 || echo 45) --require-results-coverage
 
   redwood-city:
     name: Redwood City scraper
@@ -346,7 +346,7 @@ jobs:
   los-altos-hills:
     name: Los Altos Hills scraper
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
       (inputs.jurisdiction == 'all' || inputs.jurisdiction == 'los-altos-hills')) ||
@@ -373,7 +373,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Los Altos Hills pipeline
-        run: npm run pipeline:los-altos-hills -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: npm run pipeline:los-altos-hills -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 75 || echo 45) --require-results-coverage
 
   east-palo-alto:
     name: East Palo Alto scraper
