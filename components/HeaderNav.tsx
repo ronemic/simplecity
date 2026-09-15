@@ -388,11 +388,18 @@ export function HeaderNav({
             onClick={() => setIsMobileMenuOpen(false)}
             className={`relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
               isActive
-                ? "font-black text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
+                ? "text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
                 : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
             }`}
           >
-            {t(selectedLocale, item.labelKey)}
+            <span className="inline-grid">
+              <span aria-hidden="true" className="invisible col-start-1 row-start-1 font-black">
+                {t(selectedLocale, item.labelKey)}
+              </span>
+              <span className={`col-start-1 row-start-1 ${isActive ? "font-black" : "font-semibold"}`}>
+                {t(selectedLocale, item.labelKey)}
+              </span>
+            </span>
           </Link>
         );
       })}
