@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, FileText, Landmark, Users } from "lucide-react";
 import { cookies } from "next/headers";
 import { cache, Suspense } from "react";
@@ -26,8 +27,6 @@ import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
-const FEATURE_ARTICLE_URL =
-  "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 // Manually maintained from analytics. Last checked 2026-08-21; update the date
 // when you revise the figure so it is obvious when it has gone stale.
 const APPROX_USER_COUNT = "700+";
@@ -103,10 +102,7 @@ function GlanceStats({ locale }: { locale: Locale }) {
   if (glanceStats.length === 0) return null;
 
   return (
-    <div className="py-1 lg:-translate-y-4">
-      <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-        {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
-      </p>
+    <div className="py-1">
       <div
         className={`grid ${
           glanceStats.length === 3 ? "grid-cols-3" : "grid-cols-2"
@@ -137,13 +133,10 @@ function GlanceStats({ locale }: { locale: Locale }) {
 function GlanceStatsLoading({ locale }: { locale: Locale }) {
   return (
     <div
-      className="py-1 lg:-translate-y-4"
+      className="py-1"
       aria-busy="true"
       aria-label={locale === "es" ? "Cargando estadísticas" : "Loading statistics"}
     >
-      <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-        {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
-      </p>
       <div className="grid grid-cols-3">
         {[0, 1, 2].map((item) => (
           <div
@@ -264,27 +257,22 @@ export default async function Home({
       <section className="civic-hero">
         <div
           className={`section-shell relative z-10 grid gap-7 ${
-            hasSearch ? "py-7 sm:py-8" : "py-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-end lg:py-14"
+            hasSearch ? "py-7 sm:py-8" : "py-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:py-14"
           }`}
         >
           <div className="max-w-2xl">
             {!hasSearch ? (
-              <a
-                href={FEATURE_ARTICLE_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="group mb-6 inline-flex max-w-full items-center gap-2 rounded-sm text-sm font-semibold text-[#d9e2ec] underline decoration-white/25 underline-offset-4 transition hover:text-white hover:decoration-white/60 focus-visible:focus-ring"
-              >
-                <span>
-                  {locale === "es"
-                    ? "Lee sobre SimpleCity en Los Altos Town Crier"
-                    : "Read about SimpleCity in the Los Altos Town Crier"}
-                </span>
-                <ArrowRight
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 text-[#9fc4f4] transition-transform group-hover:translate-x-0.5"
-                />
-              </a>
+                    <Link
+                      href={locale === "es" ? "/about?lang=es#news" : "/about#news"}
+                      className="mb-6 inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#9fc4f4] underline-offset-4 hover:text-white hover:underline focus-visible:focus-ring"
+                    >
+                      <span>
+                        {locale === "es"
+                          ? "Lee sobre SimpleCity en las noticias"
+                          : "Read about SimpleCity in the news"}
+                      </span>
+                      <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
+                    </Link>
             ) : null}
             <p className="text-sm font-black uppercase text-[#9fc4f4]">
               {introLabel}
@@ -306,11 +294,15 @@ export default async function Home({
 
           <div className="space-y-5 lg:justify-self-stretch">
             {!hasSearch ? (
-              <Suspense fallback={<GlanceStatsLoading locale={locale} />}>
-                <GlanceStats locale={locale} />
-              </Suspense>
+              <div>
+                <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
+                  {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
+                </p>
+                <Suspense fallback={<GlanceStatsLoading locale={locale} />}>
+                  <GlanceStats locale={locale} />
+                </Suspense>
+              </div>
             ) : null}
-
             <div>
               <p className="mb-4 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
                 {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
@@ -363,6 +355,49 @@ export default async function Home({
           })}
         </div>
       </section>
+      {!hasSearch ? (
+              <section aria-labelledby="team-heading" className="section-shell pb-16">
+                <div className="quiet-card grid items-center gap-6 p-5 sm:p-6 md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
+                <div className="overflow-hidden rounded-lg">
+                  <Image
+                    src="https://midpenpost.org/wp-content/uploads/2026/09/Screenshot-2026-09-15-at-11.14.51-AM.png"
+                    width={1442}
+                    height={1118}
+                    quality={90}
+                    sizes="(max-width: 767px) calc(100vw - 5rem), 320px"
+                    alt={locale === "es"
+                      ? "Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity"
+                      : "Ruiwen, Patrick, and Samuel, the team behind SimpleCity"}
+                    className="aspect-[16/9] w-full object-cover object-[50%_65%]"
+                  />
+                </div>
+                <div>
+                  <p className="label-eyebrow !text-civic">{locale === "es" ? "Conoce al equipo" : "Meet the team"}</p>
+                  <h2 id="team-heading" className="mt-2 text-xl font-bold leading-snug text-ink sm:text-2xl">
+                    {locale === "es"
+                      ? "Creado por tres estudiantes del Área de la Bahía"
+                      : "Built by three Bay Area students"}
+                  </h2>
+                  <p className="mt-3 text-base leading-7 text-black/65">
+                    {locale === "es"
+                      ? "Somos Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity."
+                      : "We’re Ruiwen, Patrick, and Samuel—the team behind SimpleCity."}
+                  </p>
+                  <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <Link
+                      href={locale === "es" ? "/about?lang=es" : "/about"}
+                      className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
+                    >
+                      {locale === "es" ? "Nuestra historia" : "Our story"}
+                      <ArrowRight aria-hidden className="h-4 w-4" />
+                    </Link>
+
+                  </div>
+                </div>
+                </div>
+              </section>
+      ) : null}
+
     </div>
   );
 }

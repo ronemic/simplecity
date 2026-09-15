@@ -5,7 +5,6 @@ import {
   FileSearch,
   Landmark,
   Link as LinkIcon,
-  Newspaper,
   ShieldCheck
 } from "lucide-react";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -38,6 +37,10 @@ export async function generateMetadata({
 
 export const revalidate = 300;
 
+const MIDPEN_ARTICLE_URL =
+  "https://midpenpost.org/2026/09/15/how-three-bay-area-students-are-making-local-government-accessible/";
+const MIDPEN_IMAGE_URL =
+  "https://midpenpost.org/wp-content/uploads/2026/09/Screenshot-2026-09-15-at-11.14.51-AM.png";
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 const FEATURE_IMAGE_URL =
@@ -111,60 +114,103 @@ export default async function AboutPage() {
           </section>
       </div>
 
-      <section className="mt-10">
+      <section id="news" className="mt-10 scroll-mt-24">
         <p className="label-eyebrow !text-civic">
           {locale === "es" ? "En las noticias" : "In the news"}
         </p>
 
-        <article className="quiet-card mt-4 p-5 sm:p-6">
-          <div className="grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)_auto] sm:items-center">
-            <a
-              href={FEATURE_ARTICLE_URL}
-              target="_blank"
-              rel="noreferrer"
-              aria-label={locale === "es" ? "Leer la cobertura de Los Altos Town Crier" : "Read the Los Altos Town Crier coverage"}
-              className="block overflow-hidden rounded-lg border border-black/10 bg-black/[0.02]"
-            >
-              <Image
-                src={FEATURE_IMAGE_URL}
-                width={2008}
-                height={669}
-                sizes="(max-width: 639px) calc(100vw - 4.5rem), 220px"
-                alt={locale === "es"
-                  ? "Ruiwen, Patrick y Samuel, el equipo estudiantil detrás de SimpleCity"
-                  : "Ruiwen, Patrick, and Samuel, the student team behind SimpleCity"}
-                className="h-auto w-full"
-              />
-            </a>
-            <div className="min-w-0">
-              <p className="label-eyebrow !text-civic flex items-center gap-2">
-                <Newspaper aria-hidden className="h-4 w-4" />
-                {locale === "es" ? "Cobertura destacada" : "Featured coverage"}
-              </p>
-              <h2 className="mt-1 text-lg font-bold leading-7 text-ink sm:text-xl">
-                {locale === "es"
-                  ? "Estudiantes usan IA para crear un sitio web que resume las agendas de gobiernos locales"
-                  : "Using AI, students create website that summarizes local government agendas"}
-              </h2>
-              <p className="mt-1 text-sm font-semibold leading-6 text-black/60">
-                Los Altos Town Crier
-                <span aria-hidden className="mx-2 text-black/25">·</span>
-                {locale === "es"
-                  ? "Cobertura local sobre el equipo estudiantil detrás de SimpleCity"
-                  : "Local coverage of the student team behind SimpleCity"}
-              </p>
+        <div className="mt-4 grid gap-4 md:grid-cols-2">
+          <article className="quiet-card flex p-4 transition-colors hover:border-civic/30">
+            <div className="flex w-full flex-col gap-4">
+              <a
+                href={MIDPEN_ARTICLE_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={locale === "es" ? "Leer la cobertura de Midpeninsula Post" : "Read the Midpeninsula Post coverage"}
+                className="block overflow-hidden rounded-lg border border-black/10 bg-black/[0.02]"
+              >
+                <Image
+                  src={MIDPEN_IMAGE_URL}
+                  width={1442}
+                  height={1118}
+                  quality={90}
+                  sizes="(max-width: 767px) calc(165vw - 6.6rem), (max-width: 1152px) calc(82.5vw - 4.95rem), 865px"
+                  alt=""
+                  className="aspect-[2008/669] w-full scale-[1.65] object-cover object-[50%_51%]"
+                />
+              </a>
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-x-2 text-sm font-semibold leading-6 text-black/65">
+                  Midpeninsula Post
+                  <span aria-hidden className="text-black/25">·</span>
+                  <time dateTime="2026-09-15" className="font-normal">
+                    {locale === "es" ? "15 de septiembre de 2026" : "September 15, 2026"}
+                  </time>
+                </p>
+                <h2 className="mt-2 text-base font-semibold leading-6 text-ink">
+                  {locale === "es"
+                    ? "Cómo tres estudiantes del Área de la Bahía están haciendo más accesible el gobierno local"
+                    : "How three Bay Area students are making local government accessible"}
+                </h2>
+              </div>
+              <a
+                href={MIDPEN_ARTICLE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="action-secondary-sm mt-auto w-fit"
+              >
+                {locale === "es" ? "Leer artículo" : "Read article"}
+                <ExternalLink aria-hidden className="h-4 w-4" />
+              </a>
             </div>
-            <a
-              href={FEATURE_ARTICLE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="action-secondary-sm w-fit shrink-0"
-            >
-              {locale === "es" ? "Leer artículo" : "Read article"}
-              <ExternalLink aria-hidden className="h-4 w-4" />
-            </a>
-          </div>
-        </article>
+          </article>
+
+          <article className="quiet-card flex p-4 transition-colors hover:border-civic/30">
+            <div className="flex w-full flex-col gap-4">
+              <a
+                href={FEATURE_ARTICLE_URL}
+                target="_blank"
+                rel="noreferrer"
+                aria-label={locale === "es" ? "Leer la cobertura de Los Altos Town Crier" : "Read the Los Altos Town Crier coverage"}
+                className="block overflow-hidden rounded-lg border border-black/10 bg-black/[0.02]"
+              >
+                <Image
+                  src={FEATURE_IMAGE_URL}
+                  width={2008}
+                  height={669}
+                  sizes="(max-width: 767px) calc(100vw - 4rem), (max-width: 1152px) calc(50vw - 3rem), 524px"
+                  alt={locale === "es"
+                    ? "Ruiwen, Patrick y Samuel, el equipo estudiantil detrás de SimpleCity"
+                    : "Ruiwen, Patrick, and Samuel, the student team behind SimpleCity"}
+                  className="h-auto w-full"
+                />
+              </a>
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-x-2 text-sm font-semibold leading-6 text-black/65">
+                  Los Altos Town Crier
+                  <span aria-hidden className="text-black/25">·</span>
+                  <time dateTime="2026-07-19" className="font-normal">
+                    {locale === "es" ? "19 de julio de 2026" : "July 19, 2026"}
+                  </time>
+                </p>
+                <h2 className="mt-2 text-base font-semibold leading-6 text-ink">
+                  {locale === "es"
+                    ? "Estudiantes usan IA para crear un sitio web que resume las agendas de gobiernos locales"
+                    : "Using AI, students create website that summarizes local government agendas"}
+                </h2>
+              </div>
+              <a
+                href={FEATURE_ARTICLE_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="action-secondary-sm mt-auto w-fit"
+              >
+                {locale === "es" ? "Leer artículo" : "Read article"}
+                <ExternalLink aria-hidden className="h-4 w-4" />
+              </a>
+            </div>
+          </article>
+        </div>
       </section>
 
       <section className="mt-10">

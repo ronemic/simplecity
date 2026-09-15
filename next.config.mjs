@@ -60,7 +60,15 @@ const securityHeaders = [
 const nextConfig = {
   outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   images: {
+    qualities: [75, 90],
     remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "midpenpost.org",
+        port: "",
+        pathname: "/wp-content/uploads/2026/09/Screenshot-2026-09-15-at-11.14.51-AM.png",
+        search: ""
+      },
       {
         protocol: "https",
         hostname: "bloximages.newyork1.vip.townnews.com",
