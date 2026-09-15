@@ -198,7 +198,7 @@ export function SubscribeForm({
           {jurisdictionGroups.map((group) => (
             <div
               aria-labelledby={`${group.id}-label`}
-              className="rounded-lg bg-black/[0.025] p-3.5"
+              className="rounded-lg p-3.5"
               key={group.id}
               role="group"
             >
@@ -216,7 +216,7 @@ export function SubscribeForm({
                   return (
                     <label
                       key={jurisdiction.value}
-                      className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-bold shadow-[0_1px_2px_rgba(23,23,23,0.04)] ring-1 transition ${
+                      className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-bold shadow-[0_1px_2px_rgba(23,23,23,0.04)] ring-1 transition ${
                         checked
                           ? "bg-civic/10 text-civic ring-civic/35"
                           : "bg-white text-ink ring-black/[0.08] hover:bg-[#f8fbff] hover:ring-civic/25"
