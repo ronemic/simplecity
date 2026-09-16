@@ -360,10 +360,10 @@ export default async function Home({
                 <div className="quiet-card grid items-center gap-6 p-5 sm:p-6 md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
                 <div className="overflow-hidden rounded-lg">
                   <Image
-                    src="https://midpenpost.org/wp-content/uploads/2026/09/Screenshot-2026-09-15-at-11.14.51-AM.png"
+                    src="/images/simplecity-team.webp"
                     width={1442}
                     height={1118}
-                    quality={90}
+                    unoptimized
                     sizes="(max-width: 767px) calc(100vw - 5rem), 320px"
                     alt={locale === "es"
                       ? "Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity"

@@ -40,11 +40,11 @@ export const revalidate = 300;
 const MIDPEN_ARTICLE_URL =
   "https://midpenpost.org/2026/09/15/how-three-bay-area-students-are-making-local-government-accessible/";
 const MIDPEN_IMAGE_URL =
-  "https://midpenpost.org/wp-content/uploads/2026/09/Screenshot-2026-09-15-at-11.14.51-AM.png";
+  "/images/simplecity-team.webp";
 const FEATURE_ARTICLE_URL =
   "https://www.losaltosonline.com/news/using-ai-students-create-website-that-summarizes-local-government-agendas/article_63d31ed4-6317-434e-a77b-1c8f38d5d1a6.html";
 const FEATURE_IMAGE_URL =
-  "https://bloximages.newyork1.vip.townnews.com/losaltosonline.com/content/tncms/assets/v3/editorial/e/b2/eb267b69-9b78-4c8c-b5e0-0882d6aa24c7/6a5a8dac111ef.image.jpg?resize=2008%2C669";
+  "/images/simplecity-town-crier.jpg";
 const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
 const CONTACT_EMAIL = "simplecityadmin@gmail.com";
 
@@ -133,7 +133,7 @@ export default async function AboutPage() {
                   src={MIDPEN_IMAGE_URL}
                   width={1442}
                   height={1118}
-                  quality={90}
+                  unoptimized
                   sizes="(max-width: 767px) calc(165vw - 6.6rem), (max-width: 1152px) calc(82.5vw - 4.95rem), 865px"
                   alt=""
                   className="aspect-[2008/669] w-full scale-[1.65] object-cover object-[50%_51%]"
@@ -176,6 +176,7 @@ export default async function AboutPage() {
               >
                 <Image
                   src={FEATURE_IMAGE_URL}
+                  unoptimized
                   width={2008}
                   height={669}
                   sizes="(max-width: 767px) calc(100vw - 4rem), (max-width: 1152px) calc(50vw - 3rem), 524px"
