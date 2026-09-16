@@ -20,6 +20,8 @@ import { retryInitialNavigation } from "@/lib/scraper/navigation";
 const DEFAULT_LEGISTAR_URL = "https://sanmateocounty.legistar.com/Calendar.aspx";
 export const LEGISTAR_MAX_OPTIONAL_DOCUMENT_BYTES = STREAM_DOWNLOAD_MAX_FILE_BYTES;
 export const MAX_LEGISTAR_UPCOMING_ATTACHMENTS_PER_MEETING = 24;
+export const LEGISTAR_PORTAL_READY_SELECTOR =
+  "a[href*='MeetingDetail.aspx'], a[href*='MeetingDetail'], #ctl00_ContentPlaceHolder1_gridCalendar, #ctl00_ContentPlaceHolder1_btnSearch, #ctl00_ContentPlaceHolder1_lstYears";
 const MAX_BUFFERED_LEGISTAR_HTML_BYTES = 50 * 1024 * 1024;
 
 function legistarHtmlToText(html: string) {
@@ -511,7 +513,7 @@ function acceptedDocumentType(type: string) {
   ].includes(type);
 }
 
-async function waitForLegistarPortal(
+export async function waitForLegistarPortal(
   page: Page,
   portalUrl: string,
   log: (message: string) => void
@@ -523,7 +525,8 @@ async function waitForLegistarPortal(
     });
 
     await page.waitForTimeout(5000);
-    await page.waitForSelector("a[href*='MeetingDetail.aspx'], a[href*='MeetingDetail'], table", {
+    await page.waitForSelector(LEGISTAR_PORTAL_READY_SELECTOR, {
+      state: "attached",
       timeout: 30000
     });
   }, { label: "Legistar portal", log });
