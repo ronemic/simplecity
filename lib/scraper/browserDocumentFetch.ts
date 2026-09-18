@@ -6,7 +6,11 @@ import type { Page } from "playwright";
  * Pull one bounded chunk at a time so streamDownloadToTemp still enforces its
  * disk, byte, deadline and idle limits without buffering a PDF in Node memory.
  */
-export function createBrowserDocumentFetch(page: Page, portalUrl: string): typeof fetch {
+export function createBrowserDocumentFetch(
+  page: Page,
+  portalUrl: string,
+  log: (message: string) => void = () => undefined
+): typeof fetch {
   const origin = new URL(portalUrl).origin;
   return async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
@@ -28,9 +32,7 @@ export function createBrowserDocumentFetch(page: Page, portalUrl: string): typeo
     // Chromium owns cookies, User-Agent and the other forbidden fetch headers.
     // Reject redirects because browser fetch cannot expose their Location for
     // the streaming caller to validate before following them.
-    let response;
-    try {
-      response = await page.evaluateHandle(async ({ url, accept, controller }) => {
+    const request = () => page.evaluateHandle(async ({ url, accept, controller }) => {
         const result = await fetch(url, {
           credentials: "same-origin",
           cache: "no-store",
@@ -45,6 +47,9 @@ export function createBrowserDocumentFetch(page: Page, portalUrl: string): typeo
           pending: new Uint8Array(0)
         };
       }, { url: url.toString(), accept: headers.get("accept") || "*/*", controller });
+    let response: Awaited<ReturnType<typeof request>>;
+    try {
+      response = await request();
     } catch (error) {
       signal?.removeEventListener("abort", abort);
       await controller.dispose();
@@ -60,7 +65,41 @@ export function createBrowserDocumentFetch(page: Page, portalUrl: string): typeo
       await Promise.all([response.dispose(), controller.dispose()]);
     };
     try {
-      const metadata = await response.evaluate(({ status, headers }) => ({ status, headers }));
+      let metadata = await response.evaluate(({ status, headers }) => ({ status, headers }));
+      const isChallenge = () => metadata.status === 403 &&
+        new Headers(metadata.headers).get("cf-mitigated") === "challenge";
+      if (isChallenge()) {
+        log("Official document returned a Cloudflare challenge; opening it in the browser session.");
+        const challengePage = await page.context().newPage();
+        const closeChallenge = () => { void challengePage.close().catch(() => undefined); };
+        signal?.addEventListener("abort", closeChallenge, { once: true });
+        challengePage.on("download", (download) => { void download.cancel().catch(() => undefined); });
+        try {
+          // A fetch response cannot execute the challenge's scripts. A normal
+          // navigation lets full Chromium establish the site's browser session.
+          // Downloads are cancelled; only the bounded stream below is retained.
+          await challengePage.goto(url.toString(), {
+            waitUntil: "domcontentloaded", timeout: 10_000
+          }).catch(() => undefined);
+          const deadline = Date.now() + 25_000;
+          while (isChallenge() && Date.now() < deadline) {
+            signal?.throwIfAborted();
+            await response.evaluate(async (state) => { await state.reader?.cancel(); });
+            await response.dispose();
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            signal?.throwIfAborted();
+            response = await request();
+            metadata = await response.evaluate(({ status, headers }) => ({ status, headers }));
+          }
+          if (isChallenge()) {
+            throw new Error("Cloudflare browser challenge was not resolved; run eSCRIBE with --headful.");
+          }
+          log(`Official document browser session established (HTTP ${metadata.status}).`);
+        } finally {
+          signal?.removeEventListener("abort", closeChallenge);
+          await challengePage.close().catch(() => undefined);
+        }
+      }
       if ([204, 205, 304].includes(metadata.status)) {
         await cleanup();
         return new Response(null, metadata);

@@ -474,7 +474,7 @@ export async function scrapeEscribeMeetings(
         // bodies are neither downloaded nor extracted into SimpleCity.
         documentFilter: (document) => shouldDownloadEscribeDocument(document, portalUrl),
         validateFinalUrl: (url) => isOfficialEscribeUrl(url, portalUrl),
-        fetchImpl: createBrowserDocumentFetch(page, portalUrl)
+        fetchImpl: createBrowserDocumentFetch(page, portalUrl, log)
       });
       log(`eSCRIBE document downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
     }

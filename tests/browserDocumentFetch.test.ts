@@ -9,7 +9,7 @@ import { streamDownloadToTemp } from "@/lib/scraper/streamDownload";
 
 // Execute the browser callbacks with real Web streams and AbortControllers;
 // only the Playwright handle boundary and remote server are substituted.
-function pageHarness() {
+function pageHarness(challengePage?: unknown) {
   const handles = new Set<object>();
   function handle(value: unknown) {
     const result = {
@@ -22,6 +22,7 @@ function pageHarness() {
   }
   const page = {
     url: () => "https://city.example/",
+    context: () => ({ newPage: async () => challengePage }),
     evaluateHandle: async (fn: (arg: unknown) => unknown, arg?: Record<string, unknown>) => {
       const resolved = arg && Object.fromEntries(Object.entries(arg).map(([key, value]) => [
         key, value && typeof value === "object" && "value" in value ? value.value : value
@@ -74,6 +75,34 @@ test("browser transport preserves HTTP failures and cleans cancelled response ha
   const result = await browser.fetch("https://city.example/file.pdf");
   assert.equal(result.status, 403);
   await result.body!.cancel();
+  assert.equal(browser.handles.size, 0);
+});
+
+test("browser transport opens a challenge page then retries in the same session", async (t) => {
+  let opened = false;
+  let closed = false;
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls++;
+    if (!opened) return new Response("challenge", {
+      status: 403, headers: { "cf-mitigated": "challenge" }
+    });
+    return new Response("%PDF-verified", { headers: { "content-type": "application/pdf" } });
+  });
+  const browser = pageHarness({
+    on: () => undefined,
+    goto: async (url: string) => {
+      assert.equal(url, "https://city.example/file.pdf");
+      opened = true;
+    },
+    close: async () => { closed = true; }
+  });
+  const result = await browser.fetch("https://city.example/file.pdf");
+  assert.equal(result.status, 200);
+  assert.equal(await result.text(), "%PDF-verified");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(calls, 2);
+  assert.equal(closed, true);
   assert.equal(browser.handles.size, 0);
 });
 
