@@ -25,6 +25,7 @@ import {
 } from "@/lib/scraper/downloadDocuments";
 import {
   createStreamDownloadBudget,
+  DocumentHttpError,
   streamDownloadToTemp,
   STREAM_DOWNLOAD_HEADER_TIMEOUT_MS,
   STREAM_DOWNLOAD_IDLE_TIMEOUT_MS,
@@ -961,6 +962,12 @@ test("allows a source to use additional delayed retries and browser-like headers
   } finally {
     await fs.rm(outputDir, { recursive: true, force: true });
   }
+});
+
+test("preserves Retry-After guidance on rate-limited document responses", () => {
+  assert.equal(new DocumentHttpError(429, "3").retryAfterMs, 3_000);
+  assert.equal(new DocumentHttpError(429, null).retryAfterMs, 60_000);
+  assert.equal(new DocumentHttpError(503, null).retryAfterMs, 0);
 });
 
 test("uses the official text fallback after the primary file safety guard rejects", async () => {

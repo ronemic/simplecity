@@ -179,7 +179,7 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Foster City pipeline
-        run: npm run pipeline:foster-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: xvfb-run -a npm run pipeline:foster-city -- --headful --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
 
   santa-clara-county:
     name: Santa Clara County scraper

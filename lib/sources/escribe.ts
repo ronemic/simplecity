@@ -19,8 +19,7 @@ import { isMeetingDateInWindow } from "@/lib/utils/meetingWindow";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { retryInitialNavigation } from "@/lib/scraper/navigation";
-
-const ESCRIBE_USER_AGENT = "Mozilla/5.0 SimpleCity eSCRIBE agenda scraper";
+import { createBrowserDocumentFetch } from "@/lib/scraper/browserDocumentFetch";
 
 export type EscribeMeetingLink = {
   Title?: string | null;
@@ -397,7 +396,6 @@ export async function scrapeEscribeMeetings(
   );
   const browser = await chromium.launch({ headless: !options.headful });
   const context = await browser.newContext({
-    userAgent: ESCRIBE_USER_AGENT,
     viewport: { width: 1600, height: 1200 }
   });
   const page = await context.newPage();
@@ -476,7 +474,8 @@ export async function scrapeEscribeMeetings(
         // bodies are neither downloaded nor extracted into SimpleCity.
         documentFilter: (document) => shouldDownloadEscribeDocument(document, portalUrl),
         validateFinalUrl: (url) => isOfficialEscribeUrl(url, portalUrl),
-        userAgent: ESCRIBE_USER_AGENT
+        // Avoid bursts from fast CI runners that trigger eSCRIBE's rate limit.
+        fetchImpl: createBrowserDocumentFetch(page, portalUrl, log, 2000)
       });
       log(`eSCRIBE document downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
     }
