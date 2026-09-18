@@ -179,7 +179,26 @@ jobs:
         uses: ./.github/actions/setup-playwright
 
       - name: Run Foster City pipeline
-        run: npm run pipeline:foster-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
+        run: |
+          PLAYWRIGHT_BROWSERS_PATH=0 xvfb-run -a node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          for (const headless of [true, false]) {
+            const browser = await chromium.launch({ headless });
+            try {
+              const context = await browser.newContext();
+              const page = await context.newPage();
+              await page.goto('https://pub-fostercity.escribemeetings.com/', { waitUntil: 'domcontentloaded', timeout: 30000 });
+              console.log('MODE', headless, await page.evaluate(() => navigator.userAgent));
+              console.log('FETCH', await page.evaluate(async () => { const r = await fetch('/FileStream.ashx?DocumentId=519'); return { status: r.status, type: r.headers.get('content-type'), challenge: r.headers.get('cf-mitigated'), prefix: (await r.text()).slice(0,150) }; }));
+              const doc = await context.newPage();
+              doc.on('download', async d => { console.log('DOWNLOAD', headless, d.suggestedFilename()); await d.cancel(); });
+              try { const r = await doc.goto('https://pub-fostercity.escribemeetings.com/FileStream.ashx?DocumentId=519', { waitUntil:'domcontentloaded', timeout: 20000 }); console.log('NAV', r?.status(), await doc.title()); } catch(e) { console.log('NAV ERROR', e.message); }
+              await doc.waitForTimeout(15000);
+              console.log('AFTER', await doc.title(), (await doc.locator('body').innerText().catch(()=>'' )).slice(0,300));
+              console.log('RETRY', await page.evaluate(async () => { const r = await fetch('/FileStream.ashx?DocumentId=519'); const result = {status:r.status,type:r.headers.get('content-type')}; await r.body?.cancel(); return result; }));
+            } catch(e) { console.log('ERROR', e.message); } finally { await browser.close(); }
+          }
+          JS
 
   santa-clara-county:
     name: Santa Clara County scraper
