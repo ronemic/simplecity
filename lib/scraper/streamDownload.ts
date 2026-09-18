@@ -17,6 +17,22 @@ export const STREAM_DOWNLOAD_TOTAL_TIMEOUT_MS = 10 * 60_000;
 export const STREAM_DOWNLOAD_MAX_REDIRECTS = 5;
 export const STREAM_DOWNLOAD_PREFIX_BYTES = 4096;
 
+export class DocumentHttpError extends Error {
+  readonly retryAfterMs: number;
+
+  constructor(readonly status: number, retryAfter: string | null) {
+    super(`HTTP ${status}`);
+    const seconds = retryAfter?.trim() && /^\d+$/.test(retryAfter.trim())
+      ? Number(retryAfter) : NaN;
+    const date = retryAfter ? Date.parse(retryAfter) : NaN;
+    this.retryAfterMs = Number.isFinite(seconds)
+      ? seconds * 1000
+      : Number.isFinite(date)
+        ? Math.max(0, date - Date.now())
+        : status === 429 ? 60_000 : 0;
+  }
+}
+
 export type StreamDownloadBudget = {
   maxBytes: number;
   usedBytes: number;
@@ -407,7 +423,7 @@ export async function streamDownloadToTemp(
     if (!response.ok) {
       await cancelBody(response);
       await applyResponseCookies(context, response.headers, requestUrl);
-      throw new Error(`HTTP ${response.status}`);
+      throw new DocumentHttpError(response.status, response.headers.get("retry-after"));
     }
     if (!response.body) {
       await applyResponseCookies(context, response.headers, requestUrl);

@@ -12,6 +12,7 @@ import {
 } from "./primegov";
 import {
   createStreamDownloadBudget,
+  DocumentHttpError,
   streamDownloadToTemp,
   STREAM_DOWNLOAD_MAX_FILE_BYTES,
   type StreamDownloadBudget
@@ -67,16 +68,27 @@ export async function downloadOfficialDocumentWithRetries(
       lastError = error;
       if (
         attempt === attempts ||
-        !isTransientOfficialDocumentError(error)
+        !isTransientOfficialDocumentError(error) ||
+        (error instanceof DocumentHttpError && error.retryAfterMs > 5 * 60_000)
       ) {
         throw error;
       }
+      const delayMs = Math.max(
+        attempt * retryDelayMs,
+        error instanceof DocumentHttpError ? error.retryAfterMs : 0
+      );
       log(
-        `Transient official-document download failure for ${url}; retrying (${attempt + 1}/${attempts}): ${
+        `Transient official-document download failure for ${url}; retrying (${attempt + 1}/${attempts}) after ${delayMs}ms: ${
           error instanceof Error ? error.message : "Unknown download error"
         }`
       );
-      await new Promise((resolve) => setTimeout(resolve, attempt * retryDelayMs));
+      const retryAt = Date.now() + delayMs;
+      while (Date.now() < retryAt) {
+        if (options.shouldStop?.()) {
+          throw new Error("Document transfer stopped because the pipeline deadline is near.");
+        }
+        await new Promise((resolve) => setTimeout(resolve, Math.min(1000, retryAt - Date.now())));
+      }
     }
   }
   throw lastError;

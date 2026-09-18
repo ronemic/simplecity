@@ -9,7 +9,7 @@ import { streamDownloadToTemp } from "@/lib/scraper/streamDownload";
 
 // Execute the browser callbacks with real Web streams and AbortControllers;
 // only the Playwright handle boundary and remote server are substituted.
-function pageHarness(challengePage?: unknown) {
+function pageHarness(challengePage?: unknown, minimumIntervalMs = 0) {
   const handles = new Set<object>();
   function handle(value: unknown) {
     const result = {
@@ -30,7 +30,10 @@ function pageHarness(challengePage?: unknown) {
       return handle(await fn(resolved));
     }
   } as unknown as Page;
-  return { fetch: createBrowserDocumentFetch(page, page.url()), handles };
+  return {
+    fetch: createBrowserDocumentFetch(page, page.url(), () => undefined, minimumIntervalMs),
+    handles
+  };
 }
 
 test("browser transport streams binary chunks and leaves cookies to the browser", async (t) => {
@@ -66,6 +69,20 @@ test("browser transport rejects off-origin requests before making a request", as
   const browser = pageHarness();
   await assert.rejects(browser.fetch("https://other.example/file.pdf"), /official portal origin/);
   assert.equal(remote.mock.callCount(), 0);
+  assert.equal(browser.handles.size, 0);
+});
+
+test("browser transport spaces consecutive requests", async (t) => {
+  const requestTimes: number[] = [];
+  t.mock.method(globalThis, "fetch", async () => {
+    requestTimes.push(Date.now());
+    return new Response("%PDF", { headers: { "content-type": "application/pdf" } });
+  });
+  const browser = pageHarness(undefined, 25);
+  await (await browser.fetch("https://city.example/one.pdf")).body?.cancel();
+  await (await browser.fetch("https://city.example/two.pdf")).body?.cancel();
+  assert.equal(requestTimes.length, 2);
+  assert.ok(requestTimes[1] - requestTimes[0] >= 20);
   assert.equal(browser.handles.size, 0);
 });
 

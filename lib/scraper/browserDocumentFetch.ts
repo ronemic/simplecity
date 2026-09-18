@@ -1,4 +1,5 @@
 import type { Page } from "playwright";
+import { setTimeout as delay } from "node:timers/promises";
 
 /**
  * Keep public document requests in the portal's browser session. Some eSCRIBE
@@ -9,9 +10,11 @@ import type { Page } from "playwright";
 export function createBrowserDocumentFetch(
   page: Page,
   portalUrl: string,
-  log: (message: string) => void = () => undefined
+  log: (message: string) => void = () => undefined,
+  minimumIntervalMs = 0
 ): typeof fetch {
   const origin = new URL(portalUrl).origin;
+  let nextRequestAt = 0;
   return async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : String(input));
     if (url.origin !== origin || new URL(page.url()).origin !== origin) {
@@ -22,6 +25,11 @@ export function createBrowserDocumentFetch(
     }
     const signal = init?.signal;
     signal?.throwIfAborted();
+    const requestAt = Math.max(Date.now(), nextRequestAt);
+    nextRequestAt = requestAt + minimumIntervalMs;
+    if (requestAt > Date.now()) {
+      await delay(requestAt - Date.now(), undefined, { signal: signal || undefined });
+    }
     const controller = await page.evaluateHandle(() => new AbortController());
     const abort = () => {
       void controller.evaluate((value) => value.abort()).catch(() => undefined);
