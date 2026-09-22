@@ -1417,6 +1417,43 @@ test("falls back to a guarded minutes window when another item populated the str
   assert.equal(result.sourceUrl, "https://example.com/minutes.pdf");
 });
 
+test("matches a legacy card directly to a unique official result before broad minutes windows", () => {
+  const result = extractDecisionOutcome(
+    {
+      id: "legacy-unclaimed-property",
+      source_item_id: null,
+      agenda_item: "Update unclaimed property ordinance",
+      source_url: "https://example.com/meeting"
+    },
+    meeting("los-altos", {
+      items: [
+        agendaItem({
+          externalId: "agenda-parent",
+          agendaNumber: "2",
+          title: "Consent calendar",
+          action: null,
+          result: null,
+          sourceUrl: "https://example.com/meeting"
+        })
+      ],
+      documents: [{
+        type: "Minutes",
+        label: "Minutes",
+        url: "https://example.com/minutes.pdf",
+        extractedText: [
+          "2.24 Disposal of Unclaimed Property to update sections governing the holding, disposal and auction notice requirements for unclaimed property.",
+          "Motion carried unanimously by roll call vote."
+        ].join("\n")
+      }]
+    })
+  );
+
+  assert.ok(result);
+  assert.equal(result.matchedAgendaNumber, "2.24");
+  assert.equal(result.matchMethod, "title");
+  assert.equal(result.sourceUrl, "https://example.com/minutes.pdf");
+});
+
 test("does not mistake a shared meeting URL for an item-specific result URL", () => {
   const sharedUrl = "https://example.com/shared-meeting";
   const result = extractDecisionOutcome(

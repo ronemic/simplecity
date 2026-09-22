@@ -7,6 +7,7 @@ import type { BrowserContext, Download, Page } from "playwright";
 import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import {
   attachLaserficheMinutes,
+  discoverRedwoodCityMinutes,
   downloadLaserficheMinutes,
   normalizeAgendaOnlineItemLink,
   normalizeAgendaOnlineRows,
@@ -122,6 +123,27 @@ test("attaches Redwood City Laserfiche minutes to the unique same-day City Counc
   }]), 1);
   assert.equal(meetings[0].documents[0].type, "Minutes");
   assert.match(meetings[0].documents[0].url, /528589/);
+});
+
+test("treats an empty Laserfiche archive as optional", async () => {
+  let evaluated = false;
+  const page = {
+    goto: async () => ({ ok: () => true }),
+    locator: () => ({
+      first: () => ({
+        waitFor: async () => {
+          throw new Error("archive links timed out");
+        }
+      }),
+      evaluateAll: async () => {
+        evaluated = true;
+        return [];
+      }
+    })
+  } as unknown as Page;
+
+  assert.deepEqual(await discoverRedwoodCityMinutes(page, 10), []);
+  assert.equal(evaluated, false);
 });
 
 test("cancels Chromium and replays Laserfiche downloads through the bounded streamer", async (t) => {

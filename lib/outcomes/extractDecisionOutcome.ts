@@ -875,6 +875,25 @@ function minutesResultForCard(
       };
     }
   }
+  // Legacy cards can predate source_item_id while still having a unique,
+  // high-confidence match in the official result inventory. Resolve that
+  // direct match before deriving an agenda number from broader agenda data;
+  // otherwise a shared meeting URL or stale agenda identity can steer the
+  // card away from the exact result that its title identifies.
+  const directInventoryMatch = findGuardedAgendaItemMatch(title, inventory.items);
+  if (directInventoryMatch?.item.result) {
+    const document =
+      minutesDocuments(meeting).find(
+        (candidate) => candidate.url === directInventoryMatch.item.sourceUrl
+      ) || minutesDocuments(meeting)[0];
+    if (document) {
+      return {
+        item: directInventoryMatch.item,
+        document,
+        match: directInventoryMatch
+      };
+    }
+  }
   const sourceItem =
     card.source_item_id && uniqueSourceItemIds(meeting.items || []).has(card.source_item_id)
       ? (meeting.items || []).find((item) => item.externalId === card.source_item_id)
