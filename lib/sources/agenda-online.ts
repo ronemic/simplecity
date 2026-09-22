@@ -174,13 +174,21 @@ export function attachLaserficheMinutes(
   return attached;
 }
 
-async function discoverRedwoodCityMinutes(page: Page) {
+export async function discoverRedwoodCityMinutes(
+  page: Page,
+  timeoutMs = 60_000
+) {
   await page.goto(REDWOOD_CITY_MINUTES_FOLDER_URL, {
     waitUntil: "domcontentloaded",
-    timeout: 60_000
+    timeout: timeoutMs
   });
-  await page.waitForSelector("a.DocumentBrowserNameLink", { timeout: 60_000 });
-  return page.locator("a.DocumentBrowserNameLink").evaluateAll<LaserficheMinutesEntry[]>(
+  const links = page.locator("a.DocumentBrowserNameLink");
+  const archiveHasDocuments = await links.first()
+    .waitFor({ state: "attached", timeout: timeoutMs })
+    .then(() => true)
+    .catch(() => false);
+  if (!archiveHasDocuments) return [];
+  return links.evaluateAll<LaserficheMinutesEntry[]>(
     (anchors) => anchors.map((anchor) => ({
       label: String(anchor.textContent || "").replace(/\s+/g, " ").replace(/\[Icon\]/gi, "").trim(),
       url: (anchor as HTMLAnchorElement).href
@@ -553,9 +561,17 @@ export async function scrapeAgendaOnlineMeetings(
     if (options.jurisdiction.slug === "redwood-city") {
       const archivePage = await context.newPage();
       try {
-        const entries = await discoverRedwoodCityMinutes(archivePage);
-        const attached = attachLaserficheMinutes(meetings, entries);
-        log(`Redwood City Laserfiche archive exposed ${entries.length} approved minutes document(s); attached ${attached} to scraped meetings.`);
+        try {
+          const entries = await discoverRedwoodCityMinutes(archivePage);
+          const attached = attachLaserficheMinutes(meetings, entries);
+          log(`Redwood City Laserfiche archive exposed ${entries.length} approved minutes document(s); attached ${attached} to scraped meetings.`);
+        } catch (error) {
+          log(
+            `Redwood City Laserfiche archive was unavailable; continuing with Agenda Online documents: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
       } finally {
         await archivePage.close();
       }

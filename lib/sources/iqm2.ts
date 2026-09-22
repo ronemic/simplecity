@@ -200,7 +200,40 @@ async function clickVisibleSeeMoreLinks(page: Page, log: (message: string) => vo
     } catch {
       log("Skipped an IQM2 See more link that could not be clicked.");
     }
+    // A click can start a navigation even when Playwright reports that the
+    // click itself timed out. Let that navigation settle before inspecting
+    // the next link or evaluating the page.
+    await page.waitForLoadState("domcontentloaded", { timeout: 15_000 }).catch(() => undefined);
+    await page.waitForTimeout(1_000);
   }
+}
+
+function isIqm2NavigationRace(error: unknown) {
+  return error instanceof Error &&
+    /execution context was destroyed|cannot find context with specified id|most likely because of a navigation/i.test(
+      error.message
+    );
+}
+
+export async function extractVisibleIqm2MeetingsWithRetry(
+  page: Page,
+  jurisdiction: JurisdictionConfig,
+  log: (message: string) => void,
+  attempts = 3
+) {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await extractVisibleIqm2Meetings(page, jurisdiction);
+    } catch (error) {
+      lastError = error;
+      if (!isIqm2NavigationRace(error) || attempt === attempts) throw error;
+      log(`IQM2 page navigated during row extraction; retrying (${attempt}/${attempts}).`);
+      await page.waitForLoadState("domcontentloaded", { timeout: 30_000 }).catch(() => undefined);
+      await page.waitForTimeout(1_000);
+    }
+  }
+  throw lastError;
 }
 
 async function extractVisibleIqm2Meetings(
@@ -819,7 +852,9 @@ export async function scrapeIqm2Meetings(
     }
 
     log("Scraping IQM2 meeting rows...");
-    let meetings = dedupeIqm2Meetings(await extractVisibleIqm2Meetings(page, jurisdiction))
+    let meetings = dedupeIqm2Meetings(
+      await extractVisibleIqm2MeetingsWithRetry(page, jurisdiction, log)
+    )
       .map((meeting) => withEffectiveSourceMeetingStatus(meeting));
     if (!options.allVisible) {
       meetings = filterMeetingsToWindow(meetings, options);

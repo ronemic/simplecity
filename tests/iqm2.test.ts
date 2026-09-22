@@ -4,8 +4,11 @@ import {
   classifyIqm2Link,
   shouldIgnoreIqm2Link,
   extractIqm2AgendaItemAttachments,
-  shouldDownloadIqm2DocumentForWindow
+  shouldDownloadIqm2DocumentForWindow,
+  extractVisibleIqm2MeetingsWithRetry
 } from "@/lib/sources/iqm2";
+import type { Page } from "playwright";
+import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import type { DocumentType } from "@/lib/types";
 
 function document(type: DocumentType) {
@@ -31,6 +34,38 @@ test("deep IQM2 refresh keeps the HIV Executive Committee packet without a stand
 test("normal IQM2 refreshes retain all candidate document types", () => {
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Agenda Packet"), 1), true);
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Document"), 1), true);
+});
+
+test("retries IQM2 extraction when a See more click finishes navigating late", async () => {
+  const jurisdiction = getJurisdictionBySlug("santa-clara-county");
+  assert.ok(jurisdiction);
+  let evaluations = 0;
+  let loadWaits = 0;
+  let timeoutWaits = 0;
+  const page = {
+    evaluate: async () => {
+      evaluations += 1;
+      if (evaluations === 1) {
+        throw new Error("Execution context was destroyed, most likely because of a navigation");
+      }
+      return evaluations === 2 ? undefined : [];
+    },
+    waitForLoadState: async () => {
+      loadWaits += 1;
+    },
+    waitForTimeout: async () => {
+      timeoutWaits += 1;
+    }
+  } as unknown as Page;
+  const logs: string[] = [];
+
+  assert.deepEqual(
+    await extractVisibleIqm2MeetingsWithRetry(page, jurisdiction, (message) => logs.push(message)),
+    []
+  );
+  assert.equal(loadWaits, 1);
+  assert.equal(timeoutWaits, 1);
+  assert.match(logs[0], /retrying/);
 });
 
 test("associates every IQM2 document row with the preceding agenda item", () => {
