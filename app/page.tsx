@@ -27,9 +27,9 @@ import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
-// Manually maintained from analytics. Last checked 2026-08-21; update the date
+// Manually maintained from analytics. Last checked 2026-09-23; update the date
 // when you revise the figure so it is obvious when it has gone stale.
-const APPROX_USER_COUNT = "700+";
+const APPROX_USER_COUNT = "800+";
 // Rounded down from the aggregate published-card count. Last checked 2026-09-14.
 const APPROX_AGENDA_ITEMS_ANALYZED = "9,600+";
 
