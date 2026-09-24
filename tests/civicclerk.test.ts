@@ -7,6 +7,7 @@ import {
   civicClerkPlainTextFileUrl,
   classifyCivicClerkFile,
   normalizeCivicClerkEventCards,
+  retryEmptyEventCardLoad,
   type CivicClerkEventCard
 } from "@/lib/sources/civicclerk";
 import { buildLlmReadyMeeting } from "@/lib/scraper/prepareLlmInput";
@@ -142,4 +143,41 @@ test("includes Los Altos item staff-report context through the existing LLM prep
   assert.match(prepared.llmInputText, /Linked agenda-item context:/);
   assert.match(prepared.llmInputText, /Staff report context about the agreement/);
   assert.ok(prepared.extractionNotes.some((note) => note.includes("item-aware context")));
+});
+
+test("reloads the CivicClerk event list once when pagination leaves it empty", async () => {
+  const messages: string[] = [];
+  let attempts = 0;
+  const cards = await retryEmptyEventCardLoad(async () => {
+    attempts += 1;
+    return attempts === 1 ? [] : [event()];
+  }, (message) => messages.push(message));
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(cards, [event()]);
+  assert.ok(messages.some((message) => message.includes("reloading once")));
+});
+
+test("keeps CivicClerk event cards from the first attempt without reloading", async () => {
+  const messages: string[] = [];
+  let attempts = 0;
+  const cards = await retryEmptyEventCardLoad(async () => {
+    attempts += 1;
+    return [event()];
+  }, (message) => messages.push(message));
+
+  assert.equal(attempts, 1);
+  assert.equal(cards.length, 1);
+  assert.deepEqual(messages, []);
+});
+
+test("reports an empty CivicClerk calendar after the reload also finds nothing", async () => {
+  let attempts = 0;
+  const cards = await retryEmptyEventCardLoad(async () => {
+    attempts += 1;
+    return [];
+  }, () => undefined);
+
+  assert.equal(attempts, 2);
+  assert.deepEqual(cards, []);
 });

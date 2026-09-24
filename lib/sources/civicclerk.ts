@@ -266,6 +266,35 @@ async function extractEventCards(page: Page): Promise<CivicClerkEventCard[]> {
   })()`);
 }
 
+// Pagination can leave the portal re-rendering an empty list: `loadMoreEvents`
+// gives up silently when the card count never grows, so extraction then reads an
+// emptied container and the caller sees zero meetings. Reload once before
+// treating that as the real state of the calendar.
+export async function retryEmptyEventCardLoad<T>(
+  loadAndExtract: () => Promise<T[]>,
+  log: (message: string) => void
+): Promise<T[]> {
+  const cards = await loadAndExtract();
+  if (cards.length > 0) return cards;
+  log("CivicClerk event list was empty after pagination; reloading once.");
+  return loadAndExtract();
+}
+
+async function collectEventCards(
+  page: Page,
+  portalUrl: string,
+  previousPages: number,
+  upcomingPages: number,
+  log: (message: string) => void
+) {
+  return retryEmptyEventCardLoad(async () => {
+    await waitForEventList(page, portalUrl, log);
+    await loadMoreEvents(page, "previous", previousPages);
+    await loadMoreEvents(page, "upcoming", upcomingPages);
+    return extractEventCards(page);
+  }, log);
+}
+
 async function extractFilesPage(page: Page): Promise<CivicClerkFilesPage> {
   return page.evaluate<CivicClerkFilesPage>(String.raw`(() => {
     const compact = (value = "") => value.replace(/\s+/g, " ").trim();
@@ -480,11 +509,13 @@ export async function scrapeCivicClerkMeetings(
     log(`Starting CivicClerk scraper for ${jurisdiction.slug}.`);
     log(`CivicClerk source URL: ${portalUrl}`);
     log(`CivicClerk target region: ${jurisdiction.regionSlug}.`);
-    await waitForEventList(page, portalUrl, log);
-    await loadMoreEvents(page, "previous", options.allVisible ? 3 : monthsBack);
-    await loadMoreEvents(page, "upcoming", options.allVisible ? 3 : monthsForward);
-
-    let cards = await extractEventCards(page);
+    let cards = await collectEventCards(
+      page,
+      portalUrl,
+      options.allVisible ? 3 : monthsBack,
+      options.allVisible ? 3 : monthsForward,
+      log
+    );
     log(`CivicClerk event cards found: ${cards.length}.`);
     if (!options.allVisible) {
       cards = cards.filter((card) =>
