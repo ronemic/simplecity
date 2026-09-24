@@ -161,7 +161,7 @@ test("authoritative reconciliation removes stale identified cards but retains le
   );
 });
 
-test("initial replacement persists only cards in a complete official item inventory", async () => {
+test("initial replacement persists only substantive cards in a complete official item inventory", async () => {
   const insertedRows: Array<Record<string, unknown>> = [];
   const supabase = {
     from(table: string) {
@@ -202,10 +202,40 @@ test("initial replacement persists only cards in a complete official item invent
   const persisted = await replaceSummaryCardsForMeeting(
     supabase as never,
     "meeting-authoritative",
-    summary(2),
+    {
+      ...summary(2),
+      cards: [
+        card(1),
+        { ...card(2), agendaItem: "RESOLUTIONS FOR ADOPTION" }
+      ]
+    },
     { response: "summary" },
     {
-      authoritativeSourceItemIds: ["item-1"],
+      authoritativeSourceItemIds: ["item-1", "item-2"],
+      agendaItems: [
+        {
+          externalId: "item-1",
+          fileNumber: null,
+          agendaNumber: "1",
+          itemType: "Agenda Item",
+          title: "Neighborhood park maintenance contract",
+          action: null,
+          result: null,
+          sourceUrl: "https://example.test/items/1",
+          rowText: "Neighborhood park maintenance contract"
+        },
+        {
+          externalId: "item-2",
+          fileNumber: null,
+          agendaNumber: "2",
+          itemType: "Agenda Item",
+          title: "RESOLUTIONS FOR ADOPTION",
+          action: null,
+          result: null,
+          sourceUrl: "https://example.test/items/2",
+          rowText: "RESOLUTIONS FOR ADOPTION"
+        }
+      ],
       sourceHash: "authoritative-source-hash"
     }
   );

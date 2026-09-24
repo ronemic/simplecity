@@ -71,6 +71,22 @@ test("requires cards for substantive official items but not routine meeting admi
   );
 });
 
+test("does not create decision cards for structural agenda headings", () => {
+  const source = meeting([
+    item("1", "RESOLUTIONS FOR ADOPTION"),
+    item("2", "NEW BUSINESS"),
+    item("3", "OLD BUSINESS"),
+    item("4", "REPORTS"),
+    item("5", "STUDY SESSION"),
+    item("6", "Adopt a resolution funding the after-school bus program")
+  ]);
+
+  assert.deepEqual(
+    agendaItemsRequiringCards(source).map((agendaItem) => agendaItem.externalId),
+    ["6"]
+  );
+});
+
 test("measures coverage by stable source item id instead of meeting card count", () => {
   const source = meeting([item("2A", "First application"), item("2B", "Second application")]);
   const summary = officialSourceFallbackSummary(source, [source.items![0]]);

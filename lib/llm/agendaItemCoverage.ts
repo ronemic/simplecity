@@ -13,6 +13,7 @@ import {
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 import { categoryTagsForMeeting } from "@/lib/llm/topicPolicy";
 import { cardStatusForOfficialItem } from "@/lib/utils/officialItemStatus";
+import { isStructuralAgendaHeading } from "@/lib/utils/agendaItemStructure";
 
 type SummaryResult = { summary: SimpleCitySummary; raw: unknown };
 
@@ -51,7 +52,9 @@ function itemLabel(item: AgendaItem) {
 export function isRoutineAgendaItem(item: AgendaItem) {
   const label = itemLabel(item);
   const section = String(item.itemType || "").trim();
-  return ROUTINE_ITEM.test(label) || (ROUTINE_ITEM.test(section) && label === section);
+  return isStructuralAgendaHeading(item) ||
+    ROUTINE_ITEM.test(label) ||
+    (ROUTINE_ITEM.test(section) && label === section);
 }
 
 export function agendaItemsRequiringCards(meeting: Pick<LlmReadyMeeting, "items">) {

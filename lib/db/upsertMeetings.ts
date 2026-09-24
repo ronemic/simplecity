@@ -27,6 +27,10 @@ import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
 import { hasPublishableCardContent } from "@/lib/utils/cardContent";
 import {
+  isStructuralAgendaHeading,
+  isStructuralAgendaHeadingText
+} from "@/lib/utils/agendaItemStructure";
+import {
   findAgendaItemForCard,
   formatAgendaItemContexts
 } from "@/lib/scraper/agendaItemContext";
@@ -1240,8 +1244,17 @@ export async function replaceSummaryCardsForMeeting(
     sourceItemIdAvailable && options.authoritativeSourceItemIds?.length
       ? new Set(options.authoritativeSourceItemIds)
       : null;
+  const structuralSourceItemIds = new Set(
+    (options.agendaItems || [])
+      .filter(isStructuralAgendaHeading)
+      .map((item) => item.externalId)
+  );
   const cardsToInsert = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(({ card }) =>
+      !isStructuralAgendaHeadingText(card.agendaItem) &&
+      !structuralSourceItemIds.has(String(card.sourceItemId || ""))
+    )
     .filter(({ card }) => !options.itemInputHashes ||
       Boolean(card.sourceItemId && options.itemInputHashes.has(card.sourceItemId)))
     .filter(
@@ -1396,6 +1409,11 @@ export async function appendSummaryCardsForMeeting(
   if (existingError) throw new Error(`Failed to read existing cards: ${existingError.message}`);
 
   const existingCardRows = (existingCards || []) as unknown as ExistingAppendCard[];
+  const structuralSourceItemIds = new Set(
+    (options.agendaItems || [])
+      .filter(isStructuralAgendaHeading)
+      .map((item) => item.externalId)
+  );
   const authoritativeSourceItemIds =
     sourceItemIdAvailable && options.authoritativeSourceItemIds?.length
       ? new Set(options.authoritativeSourceItemIds)
@@ -1420,8 +1438,22 @@ export async function appendSummaryCardsForMeeting(
     existingCardRows,
     authoritativeSourceItemIds
   );
+  const structuralCardIds = existingCardRows
+    .filter((card) =>
+      card.is_featured !== true &&
+      !card.admin_notes?.trim() &&
+      (
+        isStructuralAgendaHeadingText(card.agenda_item) ||
+        structuralSourceItemIds.has(String(card.source_item_id || ""))
+      )
+    )
+    .map((card) => card.id);
   const existingCardIdsToDelete = [
-    ...new Set([...placeholderIdsToDelete, ...obsoleteSourceCardIds])
+    ...new Set([
+      ...placeholderIdsToDelete,
+      ...obsoleteSourceCardIds,
+      ...structuralCardIds
+    ])
   ];
   const retainedExistingCards = existingCardRows.filter(
     (card) => !existingCardIdsToDelete.includes(card.id)
@@ -1462,6 +1494,10 @@ export async function appendSummaryCardsForMeeting(
   const seenLegacyKeys = new Set<string>();
   const cardsToPersist = summary.cards
     .map((card, summaryIndex) => ({ card, summaryIndex }))
+    .filter(({ card }) =>
+      !isStructuralAgendaHeadingText(card.agendaItem) &&
+      !structuralSourceItemIds.has(String(card.sourceItemId || ""))
+    )
     .filter(({ card }) => !options.itemInputHashes ||
       Boolean(card.sourceItemId && options.itemInputHashes.has(card.sourceItemId)))
     .filter(
