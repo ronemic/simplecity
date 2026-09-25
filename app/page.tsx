@@ -30,8 +30,8 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 // Manually maintained from analytics. Last checked 2026-09-23; update the date
 // when you revise the figure so it is obvious when it has gone stale.
 const APPROX_USER_COUNT = "800+";
-// Rounded down from the aggregate published-card count. Last checked 2026-09-14.
-const APPROX_AGENDA_ITEMS_ANALYZED = "9,600+";
+// Rounded down from the aggregate published-card count. Last checked 2026-09-25.
+const APPROX_AGENDA_ITEMS_ANALYZED = "10,300+";
 
 // Rounds down to a round hundred and adds "+" once there is a hundred to show;
 // below that the exact count is honest and "0+" is never rendered. Returns null
