@@ -76,6 +76,17 @@ export async function waitForPortal(
   }, { label: "PrimeGov portal", log });
 }
 
+export async function navigatePrimeGovContentPage(page: Page, url: string) {
+  await page.goto(url, {
+    waitUntil: "domcontentloaded",
+    timeout: 60000
+  });
+  // PrimeGov pages can keep analytics or document requests open indefinitely.
+  // Give ordinary page resources a chance to finish, but do not make network
+  // idleness a prerequisite for reading content already present in the DOM.
+  await page.waitForLoadState("load", { timeout: 15000 }).catch(() => undefined);
+}
+
 export async function extractVisibleMeetings(page: Page): Promise<PrimeGovMeeting[]> {
   return (await page.evaluate(
     String.raw`(() => {
@@ -351,10 +362,7 @@ export async function scrapeHtmlAgendaText(context: BrowserContext, meeting: Pri
   const page = await context.newPage();
 
   try {
-    await page.goto(htmlAgenda.url, {
-      waitUntil: "networkidle",
-      timeout: 60000
-    });
+    await navigatePrimeGovContentPage(page, htmlAgenda.url);
 
     await page.waitForTimeout(3000);
     const text = await page.locator("#MeetingContents").innerText();
@@ -574,7 +582,7 @@ async function scrapePrimeGovItemAttachments(
 ): Promise<DiscoveredAgendaItemAttachments> {
   const page = await context.newPage();
   try {
-    await page.goto(row.itemDetailsUrl, { waitUntil: "networkidle", timeout: 60_000 });
+    await navigatePrimeGovContentPage(page, row.itemDetailsUrl);
     const heading = page.locator("#AttachmentsHeading");
     if ((await heading.count()) === 1) {
       await heading.click();
@@ -623,7 +631,7 @@ export async function discoverPrimeGovAgendaAttachments(
   if (!htmlAgenda) return { attachmentsAdded: 0, itemsWithAttachments: 0 };
   const page = await context.newPage();
   try {
-    await page.goto(htmlAgenda.url, { waitUntil: "networkidle", timeout: 60_000 });
+    await navigatePrimeGovContentPage(page, htmlAgenda.url);
     const rows = await extractPrimeGovAttachmentRows(page);
     const discoveries = (await mapWithConcurrency(rows, 4, async (row) => {
       if (options.shouldStop?.()) return null;

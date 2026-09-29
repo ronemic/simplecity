@@ -11,6 +11,7 @@ import {
   limitPrimeGovMeetings,
   normalizePrimeGovItemDetailsUrl,
   normalizePrimeGovHtmlAgendaText,
+  navigatePrimeGovContentPage,
   PORTAL_READY_SELECTOR,
   primeGovAttachmentDownloadDescriptor,
   resolvePrimeGovAttachmentDownloadUrl,
@@ -148,11 +149,40 @@ test("waitForPortal still waits for portal links if load state times out", async
   assert.ok(calls.some((call) => call.method === "waitForSelector"));
 });
 
+test("PrimeGov content pages do not require network idle", async () => {
+  const calls: Call[] = [];
+  const page = {
+    goto: async (url: string, options: unknown) => {
+      calls.push({ method: "goto", args: [url, options] });
+      return null;
+    },
+    waitForLoadState: async (state: string, options: unknown) => {
+      calls.push({ method: "waitForLoadState", args: [state, options] });
+      throw new Error("background requests kept the page busy");
+    }
+  } as unknown as Page;
+
+  await navigatePrimeGovContentPage(
+    page,
+    "https://city.primegov.com/Portal/Meeting?meetingTemplateId=11623"
+  );
+
+  const gotoCall = calls.find((call) => call.method === "goto");
+  const gotoOptions = gotoCall?.args[1] as { waitUntil?: string; timeout?: number };
+  assert.equal(gotoOptions.waitUntil, "domcontentloaded");
+  assert.equal(gotoOptions.timeout, 60000);
+  assert.deepEqual(
+    calls.find((call) => call.method === "waitForLoadState")?.args,
+    ["load", { timeout: 15000 }]
+  );
+});
+
 test("PrimeGov HTML agenda extraction scopes to MeetingContents and preserves line structure", async () => {
   const selectors: string[] = [];
   let closed = false;
   const page = {
     goto: async () => null,
+    waitForLoadState: async () => undefined,
     waitForTimeout: async () => undefined,
     locator: (selector: string) => {
       selectors.push(selector);

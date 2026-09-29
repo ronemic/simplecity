@@ -1215,9 +1215,18 @@ export async function upsertMeetings(
 // until stable item IDs and saved model input are available.
 export async function loadExistingAgendaItemInputs(supabase: SupabaseClient, meetingId: string) {
   if (!(await supportsSourceItemId(supabase)) || !(await supportsModelInputText(supabase))) return null;
-  const { data, error } = await supabase.from("summary_cards")
-    .select("source_item_id,model_input_text,raw_llm_json")
-    .eq("meeting_id", meetingId);
+  const { data, error } = await retryTransientSupabaseWrite(
+    () => supabase.from("summary_cards")
+      .select("source_item_id,model_input_text,raw_llm_json")
+      .eq("meeting_id", meetingId),
+    {
+      onRetry: (retryError, nextAttempt, delayMs) => {
+        console.warn(
+          `[SimpleCity] Existing agenda-item input lookup timed out; retrying attempt ${nextAttempt} in ${delayMs}ms: ${retryError.message || "transient database error"}`
+        );
+      }
+    }
+  );
   if (error) throw new Error(`Failed to read existing item inputs: ${error.message}`);
   return (data || []) as ExistingItemInput[];
 }
