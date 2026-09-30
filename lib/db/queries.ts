@@ -49,10 +49,12 @@ import { isUpcomingMeetingDate, meetingDateParts } from "@/lib/utils/date";
 import {
   decisionCardSearchFilters,
   decisionMeetingSearchFilters,
-  matchesDecisionFilters
+  matchesDecisionFilters,
+  matchesDecisionPeriod,
+  type DecisionPeriod
 } from "@/lib/utils/decisionFilters";
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
-import { withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
+import { civicDayBounds, withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
 import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
 import {
@@ -112,6 +114,7 @@ const PUBLIC_SUMMARY_CARD_COLUMNS = [
 ].join(",");
 const PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const PAGED_PUBLIC_SUMMARY_CARD_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings(${PUBLIC_CARD_MEETING_COLUMNS})`;
+const PAGED_PUBLIC_SUMMARY_CARD_INNER_MEETING_SELECT = `${PUBLIC_SUMMARY_CARD_COLUMNS},decision_sort_at,meetings!inner(${PUBLIC_CARD_MEETING_COLUMNS})`;
 const PUBLIC_DECISION_MAP_SELECT = [
   PUBLIC_SUMMARY_CARD_COLUMNS,
   "decision_sort_at",
@@ -200,6 +203,7 @@ type DecisionCardPageFilters = {
   category?: CategoryName;
   result?: DecisionResultFilter;
   body?: SantaBarbaraBodyView;
+  period?: DecisionPeriod;
   page: number;
   pageSize: number;
 };
@@ -1361,6 +1365,36 @@ async function getSantaBarbaraMeetingIdsForBody(
     .filter((id): id is string => Boolean(id));
 }
 
+/**
+ * Cards show the effective meeting status (withEffectiveMeetingStatus), which is
+ * derived from meeting_datetime, not the stored status column alone. Only
+ * meetings dated today or later, or undated, can be effectively upcoming, and
+ * that set is small, so resolve it exactly here and filter cards by ID.
+ */
+async function getEffectivelyUpcomingMeetingIds(
+  supabase: SupabaseClient,
+  jurisdiction: JurisdictionConfig
+) {
+  const { startIso } = civicDayBounds();
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("id,status,meeting_datetime,date_text,time_text")
+    .eq("jurisdiction_slug", jurisdiction.slug)
+    .in("status", ["Upcoming", "Past"])
+    .or(`meeting_datetime.gte.${startIso},and(status.eq.Upcoming,meeting_datetime.is.null)`)
+    .limit(1000);
+
+  if (error) {
+    logQueryError(`Failed to load ${jurisdiction.name} upcoming meetings`, error);
+    return null;
+  }
+
+  return ((data || []) as Array<Pick<MeetingRow, "id" | "status" | "meeting_datetime" | "date_text" | "time_text">>)
+    .filter((meeting) => withEffectiveMeetingStatus(meeting).status === "Upcoming")
+    .map((meeting) => meeting.id)
+    .filter((id): id is string => Boolean(id));
+}
+
 async function loadDecisionCardCandidatesForJurisdiction(
   {
     jurisdiction,
@@ -1389,11 +1423,36 @@ async function loadDecisionCardCandidatesForJurisdiction(
   if (bodyMeetingIds && bodyMeetingIds.length === 0) {
     return { cards: [] as SummaryCardRow[], count: 0, paginationSupported: true };
   }
+  const upcomingMeetingIds = filters.period
+    ? await getEffectivelyUpcomingMeetingIds(supabase, jurisdiction)
+    : null;
+  if (filters.period && !upcomingMeetingIds) {
+    return { cards: [] as SummaryCardRow[], count: 0, paginationSupported: true };
+  }
   let query = supabase
     .from("summary_cards")
-    .select(PAGED_PUBLIC_SUMMARY_CARD_SELECT, { count: "exact" })
+    .select(
+      filters.period === "past"
+        ? PAGED_PUBLIC_SUMMARY_CARD_INNER_MEETING_SELECT
+        : PAGED_PUBLIC_SUMMARY_CARD_SELECT,
+      { count: "exact" }
+    )
     .eq("jurisdiction_slug", jurisdiction.slug)
     .eq("is_published", true);
+
+  // Mirrors matchesDecisionPeriod against the effective meeting status.
+  if (filters.period === "upcoming" && upcomingMeetingIds) {
+    query = upcomingMeetingIds.length > 0
+      ? query.or(`status.eq."Upcoming vote",meeting_id.in.(${upcomingMeetingIds.join(",")})`)
+      : query.eq("status", "Upcoming vote");
+  }
+
+  if (filters.period === "past" && upcomingMeetingIds) {
+    query = query.in("meetings.status", ["Upcoming", "Past"]);
+    if (upcomingMeetingIds.length > 0) {
+      query = query.not("meeting_id", "in", `(${upcomingMeetingIds.join(",")})`);
+    }
+  }
 
   if (filters.category) {
     query = query.contains("category_tags", [filters.category]);
@@ -1465,6 +1524,7 @@ async function loadLegacyDecisionCardPage(
   category: CategoryName | "",
   result: DecisionResultFilter | "",
   body: SantaBarbaraBodyView | "",
+  period: DecisionPeriod | "",
   page: number,
   pageSize: number
 ): Promise<DecisionCardPageResult> {
@@ -1481,6 +1541,7 @@ async function loadLegacyDecisionCardPage(
       const rows = await applyCardTranslations(project.supabase, rowGroups.flat(), locale);
       const matching = rows.filter((card) =>
         matchesDecisionFilters(card, search, category || undefined) &&
+        matchesDecisionPeriod(card, period || undefined) &&
         (!body || Boolean(card.meetings && matchesSantaBarbaraBody(card.meetings, body)))
       );
       if (!result) return matching;
@@ -1512,6 +1573,7 @@ const getCachedDecisionCardPage = unstable_cache(
     category: CategoryName | "",
     result: DecisionResultFilter | "",
     body: SantaBarbaraBodyView | "",
+    period: DecisionPeriod | "",
     page: number,
     pageSize: number
   ): Promise<DecisionCardPageResult> => {
@@ -1528,6 +1590,7 @@ const getCachedDecisionCardPage = unstable_cache(
         category,
         result,
         body,
+        period,
         normalizedPage,
         normalizedPageSize
       );
@@ -1560,6 +1623,7 @@ const getCachedDecisionCardPage = unstable_cache(
             search: "",
             category: category || undefined,
             body: body || undefined,
+            period: period || undefined,
             page: normalizedPage,
             pageSize: normalizedPageSize
           },
@@ -1575,6 +1639,7 @@ const getCachedDecisionCardPage = unstable_cache(
         category,
         "",
         body,
+        period,
         normalizedPage,
         normalizedPageSize
       );
@@ -1594,7 +1659,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v8"],
+  ["decision-card-page-rendered-search-v9"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -1886,42 +1951,6 @@ const getCachedAdjacentMeetings = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
-const getCachedCategoryCards = unstable_cache(
-  async (selection: JurisdictionSelection, category: string, locale: Locale) => {
-    const projects = getSafePublicProjects(selection);
-    if (projects.length === 0) return [] as SummaryCardRow[];
-
-    const results = await Promise.all(
-      projects.map(async (project) => {
-        const { supabase } = project;
-        const { data, error } = await supabase
-          .from("summary_cards")
-          .select(PUBLIC_SUMMARY_CARD_SELECT)
-          .in("jurisdiction_slug", projectSlugs(project))
-          .eq("is_published", true)
-          .contains("category_tags", [category])
-          .order("is_featured", { ascending: false })
-          .order("created_at", { ascending: false });
-
-        if (error) {
-          logQueryError(`Failed to load ${projectLabel(project)} category ${category}`, error);
-          return [] as SummaryCardRow[];
-        }
-
-        const resolveJurisdiction = jurisdictionResolver(project.jurisdictions);
-        const rows = ((data || []) as unknown as SummaryCardRow[]).map((row) =>
-          withCardJurisdictionFallback(row, resolveJurisdiction(row.jurisdiction_slug))
-        );
-        return enrichPublicCards(supabase, rows, locale);
-      })
-    );
-
-    return sortCards(results.flat());
-  },
-  ["category-summary-cards"],
-  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
-);
-
 // null means "could not read", which is NOT the same as a real count of 0.
 // Rendering a failed read as 0 is how the homepage came to advertise "0+".
 const UNAVAILABLE_JURISDICTION_STATS = {
@@ -2145,6 +2174,7 @@ export async function getDecisionCardPage({
   category,
   result,
   body,
+  period,
   page = 1,
   pageSize = DECISION_CARD_PAGE_SIZE
 }: {
@@ -2154,6 +2184,7 @@ export async function getDecisionCardPage({
   category?: CategoryName;
   result?: DecisionResultFilter;
   body?: SantaBarbaraBodyView;
+  period?: DecisionPeriod;
   page?: number;
   pageSize?: number;
 }) {
@@ -2164,6 +2195,7 @@ export async function getDecisionCardPage({
     category || "",
     result || "",
     body || "",
+    period || "",
     normalizeDecisionPage(page),
     normalizeDecisionPageSize(pageSize)
   );
@@ -2287,14 +2319,6 @@ export async function getMeetingRawVideoDocuments(
   );
 
   return getMeetingVideoDocuments(results.flat());
-}
-
-export async function getCategoryCards(
-  category: string,
-  selection: JurisdictionSelection = getDefaultJurisdiction().slug,
-  locale: Locale = "en"
-) {
-  return getCachedCategoryCards(selection, category, locale);
 }
 
 export async function getPublicStats() {

@@ -108,7 +108,7 @@ test("new database bootstraps include the same restricted public grants", () => 
 test("public rendering reads internal meeting raw data only through a service client", () => {
   const source = readFileSync(new URL("../lib/db/queries.ts", import.meta.url), "utf8");
   const functionSource = source.match(
-    /export async function getMeetingRawVideoDocuments[\s\S]*?\n}\n\nexport async function getCategoryCards/
+    /export async function getMeetingRawVideoDocuments[\s\S]*?\n}\n\nexport async function getPublicStats/
   )?.[0];
 
   assert.ok(functionSource);

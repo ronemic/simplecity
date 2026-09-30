@@ -14,6 +14,25 @@ export function categoryFromSlug(
   return categories.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
 }
 
+export const DECISION_PERIODS = ["upcoming", "past"] as const;
+export type DecisionPeriod = (typeof DECISION_PERIODS)[number];
+
+export function decisionPeriodFromParam(value: string | null | undefined): DecisionPeriod | undefined {
+  return DECISION_PERIODS.find((period) => period === value);
+}
+
+/**
+ * Expects `card.meetings.status` to already be the effective status (see
+ * withEffectiveMeetingStatus). The paged database query mirrors this rule.
+ */
+export function matchesDecisionPeriod(card: SummaryCardRow, period?: DecisionPeriod) {
+  if (period === "upcoming") {
+    return card.status === "Upcoming vote" || card.meetings?.status === "Upcoming";
+  }
+  if (period === "past") return card.meetings?.status === "Past";
+  return true;
+}
+
 export function normalizeDecisionSearchText(value: string) {
   return value
     .normalize("NFKD")

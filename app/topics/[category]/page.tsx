@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { SummaryCard } from "@/components/SummaryCard";
 import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
-import { ALL_CATEGORIES, CATEGORY_DEFINITIONS } from "@/lib/constants";
-import { getCategoryCards } from "@/lib/db/queries";
+import { ALL_CATEGORIES, CATEGORY_DEFINITIONS, MAX_DECISION_CARD_PAGE } from "@/lib/constants";
+import { getDecisionCardPage } from "@/lib/db/queries";
+import { decisionPeriodFromParam } from "@/lib/utils/decisionFilters";
 import { cookies } from "next/headers";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -20,6 +21,18 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export const revalidate = 300;
 
+// Topics like Parks & Environment have 1,000+ cards across jurisdictions;
+// rendering them all produced ~8 MB pages.
+const TOPIC_CARD_PAGE_SIZE = 24;
+
+type TopicSearchParams = { period?: string; jurisdiction?: string; page?: string; lang?: string };
+
+function parsePage(value: string | undefined) {
+  const page = Number.parseInt(value || "", 10);
+  if (!Number.isFinite(page) || page < 1) return 1;
+  return Math.min(page, MAX_DECISION_CARD_PAGE);
+}
+
 function categoryFromSlug(slug: string) {
   return ALL_CATEGORIES.find((category) => CATEGORY_DEFINITIONS[category].slug === slug);
 }
@@ -29,7 +42,7 @@ export async function generateMetadata({
   searchParams
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ period?: string; jurisdiction?: string; lang?: string }>;
+  searchParams: Promise<TopicSearchParams>;
 }): Promise<Metadata> {
   const [{ category: slug }, query] = await Promise.all([params, searchParams]);
   const category = categoryFromSlug(slug);
@@ -57,7 +70,7 @@ export async function generateMetadata({
     title,
     description,
     alternates: { canonical: urls.canonical, languages: urls.languages },
-    robots: query.period ? { index: false, follow: true } : undefined,
+    robots: query.period || query.page ? { index: false, follow: true } : undefined,
     openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
     twitter: { card: "summary", title, description }
   };
@@ -68,7 +81,7 @@ export default async function CategoryDetailPage({
   searchParams
 }: {
   params: Promise<{ category: string }>;
-  searchParams: Promise<{ period?: string; jurisdiction?: string; lang?: string }>;
+  searchParams: Promise<TopicSearchParams>;
 }) {
   const [{ category: slug }, query, locale, cookieStore] = await Promise.all([
     params,
@@ -86,13 +99,22 @@ export default async function CategoryDetailPage({
     ? `jurisdiction=${encodeURIComponent(toPublicJurisdictionSlug(jurisdiction))}`
     : "";
   const definition = CATEGORY_DEFINITIONS[category];
-  const cards = await getCategoryCards(category, jurisdiction, locale);
-  const filtered =
-    query.period === "upcoming"
-      ? cards.filter((card) => card.status === "Upcoming vote" || card.meetings?.status === "Upcoming")
-      : query.period === "past"
-        ? cards.filter((card) => card.meetings?.status === "Past")
-        : cards;
+  const period = decisionPeriodFromParam(query.period);
+  const result = await getDecisionCardPage({
+    jurisdiction,
+    locale,
+    category,
+    period,
+    page: parsePage(query.page),
+    pageSize: TOPIC_CARD_PAGE_SIZE
+  });
+  const filtered = result.cards;
+  const pageHref = (page: number) =>
+    `/topics/${slug}?${[
+      jurisdictionParam,
+      period ? `period=${period}` : "",
+      page > 1 ? `page=${page}` : ""
+    ].filter(Boolean).join("&")}`.replace(/\?$/, "");
 
   const Icon = definition.icon;
 
@@ -114,7 +136,7 @@ export default async function CategoryDetailPage({
           {
             href: `/topics/${slug}${jurisdictionParam ? `?${jurisdictionParam}` : ""}`,
             label: t(locale, "all"),
-            selected: !query.period
+            selected: !period
           },
           {
             href: `/topics/${slug}?${[
@@ -122,7 +144,7 @@ export default async function CategoryDetailPage({
               "period=upcoming"
             ].filter(Boolean).join("&")}`,
             label: t(locale, "upcoming"),
-            selected: query.period === "upcoming"
+            selected: period === "upcoming"
           },
           {
             href: `/topics/${slug}?${[
@@ -130,7 +152,7 @@ export default async function CategoryDetailPage({
               "period=past"
             ].filter(Boolean).join("&")}`,
             label: t(locale, "past"),
-            selected: query.period === "past"
+            selected: period === "past"
           }
         ].map((item) => (
           <PendingLink
@@ -158,6 +180,45 @@ export default async function CategoryDetailPage({
           </div>
         ) : null}
       </div>
+
+      {result.pageCount > 1 ? (
+        <nav
+          aria-label={locale === "es" ? "Paginación de decisiones" : "Decision pagination"}
+          className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-5"
+        >
+          {result.page > 1 ? (
+            <PendingLink
+              href={pageHref(result.page - 1)}
+              className="action-secondary-sm min-w-24"
+              pendingLabel={locale === "es" ? "Cargando página anterior" : "Loading previous page"}
+            >
+              {locale === "es" ? "Anterior" : "Previous"}
+            </PendingLink>
+          ) : (
+            <span aria-disabled="true" className="action-disabled-sm min-w-24">
+              {locale === "es" ? "Anterior" : "Previous"}
+            </span>
+          )}
+          <span className="text-sm font-bold text-black/60">
+            {locale === "es"
+              ? `Página ${result.page} de ${result.pageCount} · ${result.totalCount} decisiones`
+              : `Page ${result.page} of ${result.pageCount} · ${result.totalCount} decisions`}
+          </span>
+          {result.page < result.pageCount ? (
+            <PendingLink
+              href={pageHref(result.page + 1)}
+              className="action-secondary-sm min-w-24"
+              pendingLabel={locale === "es" ? "Cargando página siguiente" : "Loading next page"}
+            >
+              {locale === "es" ? "Siguiente" : "Next"}
+            </PendingLink>
+          ) : (
+            <span aria-disabled="true" className="action-disabled-sm min-w-24">
+              {locale === "es" ? "Siguiente" : "Next"}
+            </span>
+          )}
+        </nav>
+      ) : null}
     </div>
   );
 }
