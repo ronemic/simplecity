@@ -129,6 +129,89 @@ test("classifies official outcome language and extracts vote details", () => {
   assert.equal(extractVoteDetail("The motion carried unanimously"), "Unanimous");
 });
 
+test("does not read item ranges, dates, or damaged tallies as vote counts", () => {
+  assert.equal(
+    extractVoteDetail(
+      "Refer item for final consideration and approval on June 18, 2026. Item Nos. 10-14, 16-25, 27, and 30 were considered concurrently. 24 RESULT: APPROVED [UNANIMOUS] MOVER: Sylvia Arenas, Vice President SECONDER: Margaret Abe-Koga, Supervisor AYES: Arenas, Duong, Lee, Ellenberg, Abe-Koga"
+    ),
+    "Ayes: Arenas, Duong, Lee, Ellenberg, Abe-Koga; Noes: None"
+  );
+  assert.equal(
+    extractVoteDetail(
+      "The motion was made by Committee Member Cutter to approve the 4-9-2026 Special Technical Advisory Committee draft meeting minutes. The motion passed unanimously."
+    ),
+    "Unanimous"
+  );
+  assert.equal(
+    extractVoteDetail(
+      "Motion and second (Cole/ Bailey), to adopt the Complete Streets Commission 2026-2027 work plan as revised (Attachment), passed 6.0-1 (Ierokomos absent)"
+    ),
+    null
+  );
+});
+
+test("keeps every part of a four-part vote tally", () => {
+  assert.equal(
+    extractVoteDetail(
+      "Motion and second (Kissel/ Meyer), to deny the appeal, failed 3-0-3-1 (Angiel, Hedley and Hernandez abstaining, McKenna recused)."
+    ),
+    "3–0–3–1"
+  );
+  assert.equal(extractVoteDetail("carried by roll call vote, passed 5-0-0-0."), "5–0–0–0");
+  assert.equal(extractVoteDetail("carried unanimously, 5-0-0, adopting Minute Order No"), "5–0–0");
+});
+
+test("never publishes a San Francisco Charter rule as an item's result", () => {
+  const nominationCard = {
+    id: "nomination-card",
+    source_item_id: null,
+    agenda_item:
+      "Motion approving the Mayor's nomination for the reappointment of Lindsey Maclise to the Building Inspection Commission",
+    source_url: "https://example.com/meeting"
+  };
+  const result = extractDecisionOutcome(
+    nominationCard,
+    meeting("san-francisco", {
+      title: "Board of Supervisors",
+      items: [],
+      documents: [
+        {
+          type: "Minutes",
+          label: "Minutes",
+          url: "https://example.com/sf-minutes.pdf",
+          extractedText:
+            "[Mayoral Reappointment, Building Inspection Commission - Lindsey Maclise]\n260662\nMotion approving/rejecting the Mayor's nomination for the reappointment of Lindsey Maclise to the Building Inspection Commission. (Clerk of the Board)\n(Charter, Section 4.117, provides that this nomination is subject to approval by the Board of Supervisors and shall be the subject of a public hearing and vote within 60 days from the date the nomination is transmitted to the Clerk of the Board. If the Board fails to act on the nomination within 60 days from the date the nomination is transmitted to the Clerk, then the nominee shall be deemed approved. Transmittal date: June 5, 2026.)\n06/05/26; RECEIVED AND ASSIGNED to Rules Committee."
+        }
+      ]
+    })
+  );
+  assert.equal(result, null);
+
+  const introducedCard = {
+    id: "introduced-card",
+    source_item_id: null,
+    agenda_item: "Ordinance designating Finocchio's at 500-508 Broadway as a landmark",
+    source_url: "https://example.com/meeting"
+  };
+  const introduced = extractDecisionOutcome(
+    introducedCard,
+    meeting("san-francisco", {
+      title: "Board of Supervisors",
+      items: [],
+      documents: [
+        {
+          type: "Minutes",
+          label: "Minutes",
+          url: "https://example.com/sf-minutes.pdf",
+          extractedText:
+            "LEGISLATION INTRODUCED AT ROLL CALL\nIntroduced by a Supervisor or the Mayor\nPursuant to Charter, Section 2.105, an Ordinance or Resolution may be introduced before the Board of Supervisors by a Member of the Board, a Committee of the Board, or the Mayor and shall be referred to and reported upon by an appropriate Committee of the Board.\nORDINANCES\n[Landmark Designation - Finocchio's - 500-508 Broadway]\n260801\nOrdinance designating Finocchio's at 500-508 Broadway as a landmark under Article 10 of the Planning Code."
+        }
+      ]
+    })
+  );
+  assert.equal(introduced, null);
+});
+
 test("never reads a negated outcome term as the outcome it negates", () => {
   assert.equal(classifyDecisionOutcome("The motion did not pass."), "rejected");
   assert.equal(classifyDecisionOutcome("Motion to approve was not adopted."), "rejected");

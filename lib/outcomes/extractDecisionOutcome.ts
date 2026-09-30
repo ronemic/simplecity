@@ -74,6 +74,14 @@ const STANDALONE_NO_ACTION_PATTERN =
   /(?:^|\n)\s*(no action(?: taken)?)[.!]?\s*(?=\n|$)/i;
 const DIRECTION_RESULT_PATTERN =
   /\b(?:city\s+)?(?:council|board|commission|committee|authority|supervisors?)\s+(?:directed|provided direction|gave direction)\b[\s\S]{0,680}/i;
+/**
+ * San Francisco minutes restate Charter rules beside the items they govern
+ * ("If the Board fails to act… the nominee shall be deemed approved"). Those
+ * describe what would happen, not what the body did, so a result drawn from
+ * one is withheld.
+ */
+const CHARTER_RULE_RESULT_PATTERN =
+  /\bshall\s+be\s+deemed\s+(?:approved|adopted)\b|\bshall\s+be\s+referred\s+to\s+and\s+reported\s+upon\b/i;
 const MIN_FUZZY_MATCH_SCORE = 0.72;
 const MIN_FUZZY_MATCH_MARGIN = 0.15;
 const MIN_SHARED_IDENTITY_TOKENS = 3;
@@ -240,12 +248,32 @@ function rollCallSegment(text: string, label: RegExp) {
   return segment ? segment.slice(0, 160) : null;
 }
 
+/**
+ * Item ranges ("Item Nos. 10-14"), dates ("4-9-2026") and OCR-damaged tallies
+ * ("6.0-1") share the shape of a vote, so a tally is only read where it is not
+ * part of a longer number or an identifier.
+ */
+const NUMERIC_VOTE_PATTERN =
+  /\b(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?(?:\s*[-–—]\s*(\d{1,2}))?\b/g;
+const NUMERIC_VOTE_IDENTIFIER_PREFIX = /(?:\bnos?\.?|\bitems?|#|§|\bsection)\s*$|[\d.\/-]$/i;
+const ITEM_NUMBER_LIST_PATTERN = /\bItems?\s+Nos?\.?\s*\d[\d\s,\-–—]*(?:and\s+\d{1,3})?/gi;
+
+function numericVoteDetail(value: string) {
+  const text = value.replace(ITEM_NUMBER_LIST_PATTERN, " ");
+  for (const match of text.matchAll(NUMERIC_VOTE_PATTERN)) {
+    const start = match.index ?? 0;
+    const following = text.slice(start + match[0].length);
+    if (NUMERIC_VOTE_IDENTIFIER_PREFIX.test(text.slice(Math.max(0, start - 12), start))) continue;
+    if (/^(?:\s*[-–—]\s*\d|[.\/]\d)/.test(following)) continue;
+    return match.slice(1, 5).filter(Boolean).join("–");
+  }
+  return null;
+}
+
 export function extractVoteDetail(value: string) {
   const text = compactOutcomeText(value);
-  const numericVote = text.match(/\b(\d{1,2})\s*[-–—]\s*(\d{1,2})(?:\s*[-–—]\s*(\d{1,2}))?\b/);
-  if (numericVote) {
-    return [numericVote[1], numericVote[2], numericVote[3]].filter(Boolean).join("–");
-  }
+  const numericVote = numericVoteDetail(text);
+  if (numericVote) return numericVote;
 
   const ayes = rollCallSegment(text, /\b(?:ayes?|yes)\s*:\s*/i);
   if (ayes) {
@@ -1025,7 +1053,7 @@ export function extractDecisionOutcome(
   const minutesMatch = structuredMatch ? null : minutesResultForCard(card, meeting);
   const match = structuredMatch || minutesMatch?.match;
   const item = structuredMatch?.item || minutesMatch?.item;
-  if (!item?.result) return null;
+  if (!item?.result || CHARTER_RULE_RESULT_PATTERN.test(item.result)) return null;
 
   const sourceText = [item.action, item.result].filter(Boolean).join(" | ");
   const canonical = interpretOfficialAction(item.action, item.result, meeting);
