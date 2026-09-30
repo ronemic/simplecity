@@ -6,23 +6,24 @@ import ts from "typescript";
 // Exercise the real query module with deterministic database responses and no
 // persistent Next cache, so query counts cannot be hidden by a warm cache.
 async function queryHarness() {
-  const calls: Array<{ table: string; ids: string[]; slug?: string }> = [];
+  const calls: Array<{ table: string; ids: string[]; slug?: string; categories?: string[] }> = [];
   const slugs = ["foster-city", "los-altos"];
   const rows = slugs.flatMap((slug, city) => Array.from({ length: 6 }, (_, index) => ({
     id: `${slug}-${index}`, jurisdiction_slug: slug, agenda_item: index === 2 ? "Park renovation" : "Road repair",
-    category_tags: ["Transportation"], what_is_happening: ["Review the project"],
+    category_tags: [index === 2 ? "Parks & Recreation" : "Transportation"], what_is_happening: ["Review the project"],
     why_it_matters: "Residents", who_it_affects: [], is_published: true,
     status: "Upcoming vote", meetings: null,
     created_at: `2026-09-${String(20 - index * 2 - city).padStart(2, "0")}T12:00:00Z`
   })));
   const supabase = {
     from(table: string) {
-      const call = { table, ids: [] as string[], slug: undefined as string | undefined };
+      const call = { table, ids: [] as string[], slug: undefined as string | undefined, categories: undefined as string[] | undefined };
       let range: [number, number] | undefined;
       const query = {
         select() { return query; },
         eq(column: string, value: string) { if (column === "jurisdiction_slug") call.slug = value; return query; },
         in(column: string, values: string[]) { if (column === "summary_card_id") call.ids = values; return query; },
+        contains(column: string, values: string[]) { if (column === "category_tags") call.categories = values; return query; },
         not() { return query; }, order() { return query; }, limit() { return query; },
         range(from: number, to: number) { range = [from, to]; return query; },
         maybeSingle() { return query; },
@@ -33,7 +34,8 @@ async function queryHarness() {
               ? call.ids.map((id) => ({ summary_card_id: id, kind: "approved", headline: "Approved" }))
               : { decided_at: "2026-09-01" }, error: null }));
           }
-          const matching = rows.filter((row) => row.jurisdiction_slug === call.slug);
+          const matching = rows.filter((row) => row.jurisdiction_slug === call.slug &&
+            (!call.categories || call.categories.every((category) => row.category_tags.includes(category))));
           return Promise.resolve(resolve({ data: range ? matching.slice(range[0], range[1] + 1) : matching,
             count: matching.length, error: null }));
         }
@@ -92,6 +94,16 @@ test("result filtering retains outcomes and correct counts", async () => {
   const result = await queries.getDecisionCardPage({ jurisdiction: "all", search: "park", result: "approved", pageSize: 1 });
   assert.equal(result.totalCount, 2);
   assert.equal(result.cards[0].outcome?.kind, "approved");
+});
+
+test("search with a category limits database rows before matching", async () => {
+  const { queries, calls } = await queryHarness();
+  const result = await queries.getDecisionCardPage({ jurisdiction: "all", search: "road", category: "Transportation", pageSize: 2 });
+  assert.equal(result.totalCount, 10);
+  assert.equal(result.cards.length, 2);
+  assert.ok(result.cards.every((card) => card.category_tags?.includes("Transportation")));
+  assert.deepEqual(calls.filter((call) => call.table === "summary_cards").map((call) => call.categories),
+    [["Transportation"], ["Transportation"]]);
 });
 
 test("single-city freshness never queries unrelated jurisdictions", async () => {

@@ -113,6 +113,9 @@ export function DecisionMapPanel({
 
   useEffect(() => {
     if (!apiKey) return;
+    // Download the canvas while its points load, rather than starting another
+    // network round trip after the API responds. Rendering stays lazy below.
+    void import("@/components/DecisionMapCanvas").catch(() => undefined);
     const controller = new AbortController();
     const cached = freshCachedPoints(requestUrl);
     const request = cached

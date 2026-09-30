@@ -363,7 +363,6 @@ export default async function Home({
                     src="/images/simplecity-team.webp"
                     width={1442}
                     height={1118}
-                    unoptimized
                     sizes="(max-width: 767px) calc(100vw - 5rem), 320px"
                     alt={locale === "es"
                       ? "Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity"

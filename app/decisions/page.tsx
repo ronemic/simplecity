@@ -24,7 +24,7 @@ import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
-import { CATEGORIES, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 import { PendingLink } from "@/components/PendingLink";
 
@@ -220,6 +220,7 @@ export default async function DecisionsPage({
     jurisdiction?: string;
     page?: string;
     lang?: string;
+    view?: string;
   }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([
@@ -244,7 +245,9 @@ export default async function DecisionsPage({
       : decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
   const [result, decisionResultFreshness] = await Promise.all([
-    getDecisionCardPage({
+    params.view === "map" ? Promise.resolve({
+      cards: [], page: currentPage, pageCount: 0, pageSize: DECISION_CARD_PAGE_SIZE, totalCount: 0
+    }) : getDecisionCardPage({
       jurisdiction,
       locale,
       search,

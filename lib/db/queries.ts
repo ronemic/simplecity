@@ -730,7 +730,7 @@ async function loadPublishedCardRowsForJurisdiction(
     jurisdiction: JurisdictionConfig;
     supabase: SupabaseClient;
   },
-  options: { limit?: number; splitUpcoming?: boolean } = {}
+  options: { limit?: number; splitUpcoming?: boolean; category?: CategoryName } = {}
 ) {
   // Ordered by decision date, not row-creation date.
   //
@@ -755,6 +755,8 @@ async function loadPublishedCardRowsForJurisdiction(
     }
 
     query = query.order("created_at", { ascending: false });
+
+    if (options.category) query = query.contains("category_tags", [options.category]);
 
     return options.limit ? query.limit(options.limit) : query;
   }
@@ -1535,7 +1537,10 @@ async function loadLegacyDecisionCardPage(
     getSafePublicProjects(selection).map(async (project) => {
       const rowGroups = await Promise.all(
         project.jurisdictions.map((jurisdiction) =>
-          loadPublishedCardRowsForJurisdiction({ jurisdiction, supabase: project.supabase })
+          loadPublishedCardRowsForJurisdiction(
+            { jurisdiction, supabase: project.supabase },
+            { category: category || undefined }
+          )
         )
       );
       const rows = await applyCardTranslations(project.supabase, rowGroups.flat(), locale);
