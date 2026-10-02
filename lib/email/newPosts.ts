@@ -3,6 +3,13 @@ import {
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { normalizeAppUrl } from "@/lib/appUrl";
+import {
+  EMAIL_THEME as T,
+  emailDivider,
+  emailEyebrow,
+  escapeHtml,
+  renderEmailLayout
+} from "@/lib/email/layout";
 import { sendEmail, type SendEmailResult } from "@/lib/email/resend";
 import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
 import { cardSharePath } from "@/lib/utils/cardShare";
@@ -22,11 +29,6 @@ type NewPostsDigestEmailInput = {
 type SendNewPostsDigestInput = NewPostsDigestEmailInput & {
   to: string | string[];
 };
-
-const EMAIL_BACKGROUND = "#f7f3eb";
-const EMAIL_INK = "#111827";
-const EMAIL_MUTED = "#52606d";
-const EMAIL_BORDER = "#e5ddcf";
 
 export type LocalizedDigestCard = SummaryCardRow & {
   translations?: {
@@ -88,15 +90,6 @@ const COPY: Record<
   }
 };
 
-function escapeHtml(value: string | null | undefined) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function cardUrl(card: SummaryCardRow, appUrl: string, locale: Locale) {
   const url = new URL(cardSharePath(card.id), normalizeAppUrl(appUrl));
   url.searchParams.set("lang", locale);
@@ -138,9 +131,8 @@ function titleForCard(card: SummaryCardRow, locale: Locale) {
   return publicAgendaTitle(card);
 }
 
-function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale = "en") {
+function cardMetadataParts(card: SummaryCardRow, locale: Locale) {
   const meeting = card.meetings;
-  const title = titleForCard(card, locale);
   const jurisdiction = cardJurisdictionLabel(card, locale);
   const meetingType = meeting
     ? displayMeetingType(meeting, COPY[locale].meetingTypeFallback, locale)
@@ -151,12 +143,18 @@ function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale =
     meeting?.time_text,
     locale
   );
+
+  return [jurisdiction, meetingType, meetingDate];
+}
+
+function textLinesForCard(card: SummaryCardRow, appUrl: string, locale: Locale = "en") {
+  const title = titleForCard(card, locale);
   const summary = compactSummary(card.what_is_happening, COPY[locale].summaryFallback);
   const url = cardUrl(card, appUrl, locale);
 
   return [
     title,
-    `${jurisdiction} - ${meetingType} - ${meetingDate}`,
+    cardMetadataParts(card, locale).join(" - "),
     summary,
     url
   ];
@@ -189,55 +187,60 @@ function htmlForOutcome(outcome: DecisionOutcome | null | undefined, locale: Loc
   if (!outcome) return "";
   const details = [
     outcome.decided_at
-      ? `<strong>${escapeHtml(COPY[locale].decided)}:</strong> ${escapeHtml(decidedAtLabel(outcome.decided_at, locale))}`
+      ? `<strong style="color: ${T.ink};">${escapeHtml(COPY[locale].decided)}:</strong> ${escapeHtml(decidedAtLabel(outcome.decided_at, locale))}`
       : "",
     outcome.vote
-      ? `<strong>${escapeHtml(COPY[locale].vote)}:</strong> ${escapeHtml(outcome.vote)}`
+      ? `<strong style="color: ${T.ink};">${escapeHtml(COPY[locale].vote)}:</strong> ${escapeHtml(outcome.vote)}`
       : "",
     outcome.next_step
-      ? `<strong>${escapeHtml(COPY[locale].nextStep)}:</strong> ${escapeHtml(outcome.next_step)}`
+      ? `<strong style="color: ${T.ink};">${escapeHtml(COPY[locale].nextStep)}:</strong> ${escapeHtml(outcome.next_step)}`
       : ""
   ].filter(Boolean);
 
-  return `<div style="margin: 14px 0; padding: 14px; border: 1px solid #9fc6b2; border-left: 4px solid #237a49; border-radius: 6px; background: #f1fbf4;">
-    <div style="font-size: 12px; font-weight: 800; color: #17683b; text-transform: uppercase; letter-spacing: .04em;">
-      ${escapeHtml(COPY[locale].decisionResult)}
-    </div>
-    <div style="margin-top: 4px; font-size: 18px; font-weight: 800; line-height: 1.3; color: ${EMAIL_INK};">
-      ${escapeHtml(outcome.headline)}
-    </div>
-    <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.55; color: ${EMAIL_INK};">
-      ${escapeHtml(outcome.summary)}
-    </p>
-    ${details.length > 0 ? `<p style="margin: 8px 0 0; font-size: 13px; line-height: 1.55; color: ${EMAIL_MUTED};">${details.join("<br>")}</p>` : ""}
-    ${outcome.source_url ? `<a href="${escapeHtml(outcome.source_url)}" style="display: inline-block; margin-top: 8px; color: #17683b; font-size: 13px; font-weight: 800; text-decoration: none;">${escapeHtml(COPY[locale].officialResult)}</a>` : ""}
-  </div>`;
+  return `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 16px 0 0;">
+    <tr>
+      <td style="padding: 14px 16px; border: 1px solid ${T.outcomeBorder}; border-radius: 8px; background: ${T.outcomeBackground};">
+        ${emailEyebrow(COPY[locale].decisionResult, T.outcomeText)}
+        <div style="margin-top: 4px; font-size: 16px; font-weight: 800; line-height: 1.35; color: ${T.ink};">
+          ${escapeHtml(outcome.headline)}
+        </div>
+        <p style="margin: 6px 0 0; font-size: 14px; line-height: 1.6; color: ${T.body};">
+          ${escapeHtml(outcome.summary)}
+        </p>
+        ${details.length > 0 ? `<p style="margin: 10px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">${details.join("<br>")}</p>` : ""}
+        ${outcome.source_url ? `<a href="${escapeHtml(outcome.source_url)}" style="display: inline-block; margin-top: 10px; font-size: 13px; font-weight: 700; color: ${T.outcomeText}; text-decoration: none;">${escapeHtml(COPY[locale].officialResult)} &rarr;</a>` : ""}
+      </td>
+    </tr>
+  </table>`;
 }
 
 function htmlForCardSection(card: SummaryCardRow, appUrl: string, locale: Locale) {
-  const [title, metadata, summary, url] = textLinesForCard(card, appUrl, locale);
+  const [title, , summary, url] = textLinesForCard(card, appUrl, locale);
+  const metadata = cardMetadataParts(card, locale)
+    .map((part) => escapeHtml(part))
+    .join(`<span style="color: ${T.border};">&nbsp;&nbsp;&bull;&nbsp;&nbsp;</span>`);
   const rawCategory = card.category_tags?.[0] || (locale === "es" ? "Actualización cívica" : "Civic update");
   const category = categoryLabel(locale, rawCategory) || rawCategory;
 
   return `
-        <div>
-          <div style="font-size: 12px; font-weight: 700; color: ${EMAIL_MUTED}; text-transform: uppercase; letter-spacing: .04em;">
+        <div style="font-size: 13px; font-weight: 600; line-height: 1.5; color: ${T.muted};">
+          ${metadata}
+        </div>
+        <h2 style="margin: 6px 0 0; font-size: 19px; font-weight: 800; line-height: 1.3; color: ${T.ink};">
+          ${escapeHtml(title)}
+        </h2>
+        <div style="margin: 10px 0 0;">
+          <span style="display: inline-block; padding: 3px 10px; border: 1px solid ${T.border}; border-radius: 999px; background: ${T.surface}; font-size: 12px; font-weight: 700; line-height: 1.5; color: ${T.muted};">
             ${escapeHtml(category)}
-          </div>
-          <h2 style="margin: 6px 0 8px; font-size: 20px; line-height: 1.25; color: ${EMAIL_INK};">
-            ${escapeHtml(title)}
-          </h2>
-          <p style="margin: 0 0 10px; font-size: 14px; line-height: 1.5; color: ${EMAIL_MUTED};">
-            ${escapeHtml(metadata)}
-          </p>
-          <p style="margin: 0 0 14px; font-size: 15px; line-height: 1.6; color: ${EMAIL_INK};">
-            ${escapeHtml(summary)}
-          </p>
-          ${htmlForOutcome(card.outcome, locale)}
-          <a href="${escapeHtml(url)}" style="display: inline-block; color: #0f5e7c; font-weight: 800; text-decoration: none;">
-            ${escapeHtml(COPY[locale].readCard)}
-          </a>
-        </div>`;
+          </span>
+        </div>
+        <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
+          ${escapeHtml(summary)}
+        </p>
+        ${htmlForOutcome(card.outcome, locale)}
+        <a href="${escapeHtml(url)}" style="display: inline-block; margin-top: 14px; font-size: 14px; font-weight: 700; color: ${T.civic}; text-decoration: none;">
+          ${escapeHtml(COPY[locale].readCard)} &rarr;
+        </a>`;
 }
 
 function textForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
@@ -248,8 +251,14 @@ function textForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
 function htmlForCard(card: SummaryCardRow, appUrl: string, locale: Locale) {
   return `
     <tr>
-      <td style="padding: 18px 0; border-top: 1px solid ${EMAIL_BORDER};">
-        ${htmlForCardSection(card, appUrl, locale)}
+      <td style="padding: 0 0 14px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="padding: 20px; border: 1px solid ${T.border}; border-radius: 8px; background: ${T.surface};">
+              ${htmlForCardSection(card, appUrl, locale)}
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>`;
 }
@@ -283,65 +292,53 @@ export function buildNewPostsDigestEmail({
   const spanishCardRows = spanishCards
     .map((card) => htmlForCard(card, safeAppUrl, "es"))
     .join("");
+  const updateCountLabel = count === 1 ? "1 new civic update" : `${count} new civic updates`;
+  const spanishCountLabel = count === 1
+    ? "1 nueva actualización cívica"
+    : `${count} nuevas actualizaciones cívicas`;
   const spanishSection = spanishCards.length > 0
-    ? `<div style="margin-top: 30px; padding-top: 24px; border-top: 3px solid #0f5e7c;">
-        <h2 style="margin: 0 0 8px; font-size: 22px; line-height: 1.25; color: ${EMAIL_INK};">
-          ${escapeHtml(COPY.es.sectionLabel)}
+    ? `${emailDivider(32)}
+        ${emailEyebrow(COPY.es.sectionLabel)}
+        <h2 style="margin: 8px 0 0; font-size: 22px; font-weight: 900; line-height: 1.2; color: ${T.ink};">
+          ${escapeHtml(spanishCountLabel)}
         </h2>
-        <p style="margin: 0 0 8px; font-size: 15px; line-height: 1.6; color: ${EMAIL_MUTED};">
+        <p style="margin: 10px 0 24px; font-size: 15px; line-height: 1.65; color: ${T.muted};">
           ${escapeHtml(COPY.es.intro)}
         </p>
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
           ${spanishCardRows}
-        </table>
-        <p style="margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: ${EMAIL_MUTED};">
-          ${escapeHtml(COPY.es.disclaimer)}
-        </p>
-      </div>`
+        </table>`
     : "";
-  const unsubscribeFooter = unsubscribeUrl
-    ? `<p style="margin: 18px 0 0; font-size: 12px; line-height: 1.5; color: ${EMAIL_MUTED};">
-        <a href="${escapeHtml(unsubscribeUrl)}" style="color: ${EMAIL_MUTED};">${COPY.en.unsubscribe} / ${COPY.es.unsubscribe}</a>
-      </p>`
-    : "";
+  const footer = `<p style="margin: 0; font-size: 12px; line-height: 1.6; color: ${T.faint};">
+      ${escapeHtml(COPY.en.disclaimer)}
+    </p>
+    ${spanishCards.length > 0
+      ? `<p style="margin: 8px 0 0; font-size: 12px; line-height: 1.6; color: ${T.faint};">
+      ${escapeHtml(COPY.es.disclaimer)}
+    </p>`
+      : ""}
+    ${unsubscribeUrl
+      ? `<p style="margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: ${T.faint};">
+      <a href="${escapeHtml(unsubscribeUrl)}" style="color: ${T.muted}; font-weight: 600; text-decoration: underline;">${COPY.en.unsubscribe} / ${COPY.es.unsubscribe}</a>
+    </p>`
+      : ""}`;
 
-  const html = `<!doctype html>
-<html>
-  <body style="margin: 0; padding: 0; background: ${EMAIL_BACKGROUND}; color: ${EMAIL_INK}; font-family: Arial, Helvetica, sans-serif;">
-    <div style="display: none; max-height: 0; overflow: hidden;">${escapeHtml(preheader)}</div>
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background: ${EMAIL_BACKGROUND}; padding: 24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 640px; background: #ffffff; border: 1px solid ${EMAIL_BORDER}; border-radius: 8px; overflow: hidden;">
-            <tr>
-              <td style="padding: 28px 28px 10px;">
-                <div style="font-size: 14px; font-weight: 900; color: #0f5e7c;">SimpleCity</div>
-                <h1 style="margin: 8px 0 8px; font-size: 28px; line-height: 1.15; color: ${EMAIL_INK};">
-                  ${escapeHtml(subject)}
+  const html = renderEmailLayout({
+    appUrl: safeAppUrl,
+    preheader,
+    footer,
+    body: `${emailEyebrow("Weekly digest")}
+                <h1 style="margin: 8px 0 0; font-size: 28px; font-weight: 900; line-height: 1.15; color: ${T.ink};">
+                  ${escapeHtml(updateCountLabel)} for ${escapeHtml(selectionLabel)}
                 </h1>
-                <p style="margin: 0; font-size: 15px; line-height: 1.6; color: ${EMAIL_MUTED};">
+                <p style="margin: 10px 0 24px; font-size: 15px; line-height: 1.65; color: ${T.muted};">
                   ${escapeHtml(COPY.en.intro)}
                 </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding: 0 28px 26px;">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                   ${englishCardRows}
                 </table>
-                <p style="margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: ${EMAIL_MUTED};">
-                  ${escapeHtml(COPY.en.disclaimer)}
-                </p>
-                ${spanishSection}
-                ${unsubscribeFooter}
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+                ${spanishSection}`
+  });
 
   const text = [
     subject,
