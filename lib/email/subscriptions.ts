@@ -10,6 +10,14 @@ import {
 } from "@/lib/config/jurisdictions";
 import { normalizeAppUrl } from "@/lib/appUrl";
 import { getEmailConfig } from "@/lib/email/config";
+import {
+  EMAIL_THEME as T,
+  emailDivider,
+  emailEyebrow,
+  emailPrimaryButton,
+  escapeHtml,
+  renderEmailLayout
+} from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/resend";
 
 export type EmailSubscriberStatus = "pending" | "active" | "unsubscribed";
@@ -95,15 +103,6 @@ function subscriptionSupabase() {
   return getServiceSupabaseClientForJurisdiction(getDefaultJurisdiction().slug);
 }
 
-function escapeHtml(value: string | null | undefined) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 function appUrl() {
   return getEmailConfig().appUrl;
 }
@@ -187,47 +186,29 @@ export function buildConfirmationEmail({
     spanishLabels.length === 1 ? spanishLabels[0] : spanishLabels.join(", ");
   const subject =
     "Confirm your SimpleCity email updates / Confirma tus actualizaciones por email de SimpleCity";
-  const html = `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f7f3eb;color:#111827;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f3eb;padding:24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5ddcf;border-radius:8px;overflow:hidden;">
-            <tr>
-              <td style="padding:28px;">
-                <div style="font-size:14px;font-weight:900;color:#0f5e7c;">SimpleCity</div>
-                <h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#111827;">Confirm your email updates</h1>
-                <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
-                  Confirm that ${escapeHtml(email)} should start or update weekly SimpleCity digests for ${escapeHtml(labelText)}.
+  const html = renderEmailLayout({
+    appUrl: baseUrl,
+    preheader: "Confirm your weekly SimpleCity digest. / Confirma tu resumen semanal de SimpleCity.",
+    body: `${emailEyebrow("Email updates")}
+                <h1 style="margin: 8px 0 0; font-size: 26px; font-weight: 900; line-height: 1.2; color: ${T.ink};">Confirm your email updates</h1>
+                <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
+                  Confirm that <strong>${escapeHtml(email)}</strong> should start or update weekly SimpleCity digests for <strong>${escapeHtml(labelText)}</strong>.
                 </p>
-                <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
-                  Confirm email updates
-                </a>
-                <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
+                ${emailPrimaryButton(link, "Confirm email updates")}
+                <p style="margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">
                   If you did not request this, you can ignore this email.
                 </p>
-                <div style="margin-top:30px;padding-top:24px;border-top:3px solid #0f5e7c;">
-                  <h2 style="margin:0 0 8px;font-size:22px;line-height:1.25;color:#111827;">En español</h2>
-                  <h3 style="margin:0 0 10px;font-size:19px;line-height:1.25;color:#111827;">Confirma tus actualizaciones por email</h3>
-                  <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
-                    Confirma que ${escapeHtml(email)} debe comenzar a recibir o actualizar los resúmenes semanales de SimpleCity para ${escapeHtml(spanishLabelText)}.
-                  </p>
-                  <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
-                    Confirmar actualizaciones por email
-                  </a>
-                  <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
-                    Si no solicitaste esto, puedes ignorar este email.
-                  </p>
-                </div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+                ${emailDivider(32)}
+                ${emailEyebrow("En español")}
+                <h2 style="margin: 8px 0 0; font-size: 20px; font-weight: 900; line-height: 1.25; color: ${T.ink};">Confirma tus actualizaciones por email</h2>
+                <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
+                  Confirma que <strong>${escapeHtml(email)}</strong> debe comenzar a recibir o actualizar los resúmenes semanales de SimpleCity para <strong>${escapeHtml(spanishLabelText)}</strong>.
+                </p>
+                ${emailPrimaryButton(link, "Confirmar actualizaciones por email")}
+                <p style="margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">
+                  Si no solicitaste esto, puedes ignorar este email.
+                </p>`
+  });
   const text = [
     "Confirm your SimpleCity email updates",
     "",
@@ -251,7 +232,7 @@ export function buildConfirmationEmail({
   return { subject, html, text };
 }
 
-function buildUnsubscribeConfirmationEmail({
+export function buildUnsubscribeConfirmationEmail({
   email,
   token,
   baseUrl = appUrl()
@@ -262,40 +243,29 @@ function buildUnsubscribeConfirmationEmail({
 }) {
   const link = unsubscribeUrl(token, baseUrl);
   const subject = "Confirm that you want to unsubscribe from SimpleCity";
-  const html = `<!doctype html>
-<html>
-  <body style="margin:0;padding:0;background:#f7f3eb;color:#111827;font-family:Arial,Helvetica,sans-serif;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f3eb;padding:24px 12px;">
-      <tr>
-        <td align="center">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border:1px solid #e5ddcf;border-radius:8px;overflow:hidden;">
-            <tr>
-              <td style="padding:28px;">
-                <div style="font-size:14px;font-weight:900;color:#0f5e7c;">SimpleCity</div>
-                <h1 style="margin:8px 0 10px;font-size:26px;line-height:1.15;color:#111827;">Stop all SimpleCity email updates</h1>
-                <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#52606d;">
-                  Confirm that ${escapeHtml(email)} should be removed from all SimpleCity email digests.
+  const html = renderEmailLayout({
+    appUrl: baseUrl,
+    preheader: "Confirm that you want to stop SimpleCity emails. / Confirma que quieres dejar de recibir emails.",
+    body: `${emailEyebrow("Unsubscribe")}
+                <h1 style="margin: 8px 0 0; font-size: 26px; font-weight: 900; line-height: 1.2; color: ${T.ink};">Stop all SimpleCity email updates</h1>
+                <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
+                  Confirm that <strong>${escapeHtml(email)}</strong> should be removed from all SimpleCity email digests.
                 </p>
-                <a href="${escapeHtml(link)}" style="display:inline-block;border-radius:8px;background:#2457a6;color:#ffffff;font-weight:800;text-decoration:none;padding:12px 18px;">
-                  Confirm unsubscribe
-                </a>
-                <p style="margin:18px 0 0;font-size:13px;line-height:1.5;color:#52606d;">
+                ${emailPrimaryButton(link, "Confirm unsubscribe")}
+                <p style="margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">
                   If you did not request this, ignore this email and your subscription will not change.
                 </p>
-                <hr style="margin:24px 0;border:0;border-top:1px solid #e5ddcf;" />
-                <h2 style="margin:0 0 8px;font-size:19px;line-height:1.25;color:#111827;">Cancelar todas las actualizaciones por email</h2>
-                <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#52606d;">
-                  Confirma que ${escapeHtml(email)} debe eliminarse de todos los resúmenes de SimpleCity.
+                ${emailDivider(32)}
+                ${emailEyebrow("En español")}
+                <h2 style="margin: 8px 0 0; font-size: 20px; font-weight: 900; line-height: 1.25; color: ${T.ink};">Cancelar todas las actualizaciones por email</h2>
+                <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
+                  Confirma que <strong>${escapeHtml(email)}</strong> debe eliminarse de todos los resúmenes de SimpleCity.
                 </p>
-                <a href="${escapeHtml(link)}" style="font-size:14px;font-weight:800;color:#2457a6;">Confirmar cancelación</a>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>`;
+                ${emailPrimaryButton(link, "Confirmar cancelación")}
+                <p style="margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">
+                  Si no solicitaste esto, ignora este email y tu suscripción no cambiará.
+                </p>`
+  });
   const text = [
     "Stop all SimpleCity email updates",
     "",
@@ -307,7 +277,9 @@ function buildUnsubscribeConfirmationEmail({
     "Cancelar todas las actualizaciones por email",
     "",
     `Confirma que ${email} debe eliminarse de todos los resúmenes de SimpleCity:`,
-    link
+    link,
+    "",
+    "Si no solicitaste esto, ignora este email y tu suscripción no cambiará."
   ].join("\n");
 
   return { subject, html, text };
