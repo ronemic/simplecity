@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, FileText, Landmark, Users } from "lucide-react";
+import { ArrowRight, FileText, Landmark } from "lucide-react";
 import { cookies } from "next/headers";
 import { cache, Suspense } from "react";
 import {
@@ -27,9 +27,6 @@ import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
-// Manually maintained from analytics. Last checked 2026-09-23; update the date
-// when you revise the figure so it is obvious when it has gone stale.
-const APPROX_USER_COUNT = "800+";
 // Rounded down from the aggregate published-card count. Last checked 2026-09-25.
 const APPROX_AGENDA_ITEMS_ANALYZED = "10,300+";
 
@@ -79,14 +76,9 @@ export async function generateMetadata({
 
 function GlanceStats({ locale }: { locale: Locale }) {
   // A stat with no value is one whose read failed or whose count is zero; drop it
-  // rather than advertise it. Jurisdiction coverage plus the maintained user and
-  // agenda-item counts are always present.
+  // rather than advertise it. Jurisdiction coverage plus the maintained
+  // agenda-item count are always present.
   const glanceStats = [
-    {
-      icon: Users,
-      value: APPROX_USER_COUNT,
-      label: locale === "es" ? "usuarios" : "users"
-    },
     {
       icon: Landmark,
       value: statValue(getJurisdictions().length, locale),
@@ -97,7 +89,7 @@ function GlanceStats({ locale }: { locale: Locale }) {
       value: APPROX_AGENDA_ITEMS_ANALYZED,
       label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
     }
-  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
+  ].filter((item): item is { icon: typeof FileText; value: string; label: string } => item.value !== null);
 
   if (glanceStats.length === 0) return null;
 
@@ -105,7 +97,7 @@ function GlanceStats({ locale }: { locale: Locale }) {
     <div className="py-1">
       <div
         className={`grid ${
-          glanceStats.length === 3 ? "grid-cols-3" : "grid-cols-2"
+          glanceStats.length === 2 ? "grid-cols-2" : "grid-cols-1"
         }`}
       >
         {glanceStats.map((item) => (
@@ -137,8 +129,8 @@ function GlanceStatsLoading({ locale }: { locale: Locale }) {
       aria-busy="true"
       aria-label={locale === "es" ? "Cargando estadísticas" : "Loading statistics"}
     >
-      <div className="grid grid-cols-3">
-        {[0, 1, 2].map((item) => (
+      <div className="grid grid-cols-2">
+        {[0, 1].map((item) => (
           <div
             key={item}
             className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-start sm:gap-2 sm:px-4"
