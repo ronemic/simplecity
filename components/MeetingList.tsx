@@ -137,10 +137,10 @@ function meetingTone(status?: string | null): MeetingTone {
   return "past";
 }
 
-const CALENDAR_CHIP_TONES: Record<MeetingTone, string> = {
-  upcoming: "border-l-civic bg-[#eef4ff] text-[#12365f] hover:bg-[#e2edff]",
-  cancelled: "border-l-[#d9907c] bg-[#fdf4f1] text-[#8a3a26] hover:bg-[#fbe9e3]",
-  past: "border-l-black/20 bg-[#f4f6f8] text-black/70 hover:bg-[#eaeff3] hover:text-ink"
+const CALENDAR_EVENT_TONES: Record<MeetingTone, string> = {
+  upcoming: "bg-[#e9f0fb] text-[#163a66] hover:bg-[#dde8f8]",
+  cancelled: "bg-[#f6f1ef] text-black/45 hover:bg-[#f0e8e5]",
+  past: "bg-[#f2f4f6] text-black/60 hover:bg-[#e9edf0] hover:text-ink"
 };
 
 const TONE_DOTS: Record<MeetingTone, string> = {
@@ -190,40 +190,41 @@ function CalendarMeetingLink({
       href={meetingHref(meeting)}
       mode="overlay"
       className={cn(
-        "pointer-events-auto relative z-20 block w-full shrink-0 !overflow-visible rounded-[5px] border-l-[3px] py-1 pl-2 pr-1.5 text-left transition-colors focus-visible:focus-ring",
-        CALENDAR_CHIP_TONES[tone]
+        "pointer-events-auto relative z-20 block w-full shrink-0 !overflow-visible rounded-md px-2 py-1.5 text-left transition-colors focus-visible:focus-ring",
+        CALENDAR_EVENT_TONES[tone]
       )}
-      contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
+      contentClassName="!flex !w-full !min-w-0 !items-start !gap-0"
       pendingLabel={t(locale, "openingMeeting")}
       title={calendarMeetingTitle(meeting, locale)}
     >
-      <span
-        className={cn(
-          "block w-full text-[10px] font-bold leading-4 tabular-nums",
-          hasTime ? "opacity-75" : "italic opacity-55"
-        )}
-      >
-        {tone === "cancelled" ? (
-          <span className="not-italic font-black uppercase tracking-[0.04em]">
-            {statusLabel(locale, "Cancelled")} ·{" "}
+      <span className="min-w-0 flex-1">
+        <span className="flex items-center gap-1.5 text-[10.5px] font-medium leading-4 tabular-nums opacity-75">
+          <span aria-hidden className={cn("h-1.5 w-1.5 flex-none rounded-full", TONE_DOTS[tone])} />
+          <span className="truncate">
+            {tone === "cancelled" ? <span className="sr-only">{statusLabel(locale, "Cancelled")}: </span> : null}
+            {hasTime ? (
+              <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
+            ) : (
+              t(locale, "timeNotListed")
+            )}
+          </span>
+        </span>
+        <span
+          lang={locale}
+          className={cn(
+            "mt-0.5 hyphens-auto break-words text-[11.5px] font-semibold leading-[15px]",
+            expanded ? "block" : "line-clamp-2",
+            tone === "cancelled" && "line-through decoration-black/25"
+          )}
+        >
+          <HighlightedText text={calendarMeetingTitle(meeting, locale)} query={highlight} />
+        </span>
+        {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
+          <span className="line-clamp-1 block text-[10px] font-semibold leading-4 opacity-70">
+            <HighlightedText text={searchMatch.text} query={highlight} />
           </span>
         ) : null}
-        <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
       </span>
-      <span
-        lang={locale}
-        className={cn(
-          "w-full hyphens-auto break-words text-[11.5px] font-bold leading-[15px]",
-          expanded ? "block" : "line-clamp-2"
-        )}
-      >
-        <HighlightedText text={calendarMeetingTitle(meeting, locale)} query={highlight} />
-      </span>
-      {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
-        <span className="line-clamp-1 w-full text-[10px] font-black leading-4 text-current">
-          <HighlightedText text={searchMatch.text} query={highlight} />
-        </span>
-      ) : null}
     </PendingLink>
   );
 }
@@ -828,8 +829,8 @@ export function MeetingList({
                               aria-expanded={isPopoverOpen}
                               aria-controls={`calendar-popover-${day}`}
                               className={cn(
-                                "relative z-20 self-start rounded-md px-1.5 py-0.5 text-left text-[11px] font-black leading-4 text-civic transition hover:bg-civic/[0.08] focus-visible:focus-ring",
-                                isPopoverOpen && "bg-civic/[0.08]"
+                                "relative z-20 self-start rounded px-1 py-0.5 text-left text-[11px] font-semibold leading-4 text-black/55 hover:text-ink transition hover:bg-black/[0.05] focus-visible:focus-ring",
+                                isPopoverOpen && "bg-black/[0.05] text-ink"
                               )}
                               aria-label={
                                 locale === "es"
