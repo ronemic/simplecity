@@ -11,9 +11,14 @@ import type {
 // pin when it was tried, so it needs its own change and its own verification.
 const STREET_SUFFIX =
   "(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Court|Ct|Way|Highway|Hwy|Place|Pl|Circle|Cir|Terrace|Ter|Parkway|Pkwy)";
+// At least one word must name the street. With none, ordinals that PDFs split
+// apart -- "1 st", "3 rd" -- read as a house number plus suffix, and the
+// geocoder returns whatever street in the region has that number.
 const ADDRESS_BODY =
-  `\\d{1,6}(?:-\\d{1,6})?\\s+(?:[A-Z0-9][A-Za-z0-9.'’/-]*\\s+){0,7}${STREET_SUFFIX}`;
-const STREET_ADDRESS_PATTERN = new RegExp(`\\b${ADDRESS_BODY}\\b`, "gi");
+  `\\d{1,6}(?:-\\d{1,6})?\\s+(?:[A-Z0-9][A-Za-z0-9.'’/-]*\\s+){1,7}${STREET_SUFFIX}`;
+// A house number never continues a comma-grouped amount: "$68,400 contingency
+// for Otay Avenue" is not 400 on any street.
+const STREET_ADDRESS_PATTERN = new RegExp(`(?<!\\d,)\\b${ADDRESS_BODY}\\b`, "gi");
 const WHOLE_ADDRESS_PATTERN = new RegExp(`^${ADDRESS_BODY}$`, "i");
 
 /**

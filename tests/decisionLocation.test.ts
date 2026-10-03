@@ -168,3 +168,48 @@ test("keeps an address range intact and geocodes it by its low number", async ()
   assert.doesNotMatch(requested, /2035-2047/);
   assert.equal(result?.location_status, "verified");
 });
+
+test("does not read a split ordinal as a house number on an unnamed street", () => {
+  // Agenda PDFs break "1st" and "3rd" apart, leaving "1 st" and "3 rd" -- a
+  // number followed by what looks like a street suffix but no street name. The
+  // geocoder answered these with 1 Main Street and 3 Farm Road in Los Altos.
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Official title: Topics for future meetings: - Monday November 7, 2026-Recommend FIC Workplan/Council Priorities 2027- 2028; 1 st\nAgenda section: Not listed in the source document."
+    ),
+    null
+  );
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Staff: Jay Bradford, Community Development Director Continued from September 3 rd , 2026, Planning Commission Special Meeting"
+    ),
+    null
+  );
+  // Each of these was geocoded to some unrelated street sharing the number.
+  for (const text of [
+    "Agenda section: NEW BUSINESS. 2 Dr. Martin Luther King Jr. Community Center Modernization",
+    "funded with the Senate Bill 1 Road Maintenance and Rehabilitation Account funds",
+    "Accept Hunters View HOPE SF Phase 2 street infrastructure",
+    "located on Chynoweth Board of Supervisors: Page 2 of 3 Agenda Date: June 23, 2026 Avenue, in the City of San José"
+  ]) {
+    assert.equal(extractStreetAddressCandidate(text), null, text);
+  }
+});
+
+test("does not start a house number inside a comma-grouped amount", () => {
+  // "$68,400" is a dollar figure, not 400 on some street; the geocoder pinned
+  // this Otay Avenue repair at 400 30th Avenue.
+  assert.equal(
+    extractStreetAddressCandidate("Establish $68,400 contingency for Otay Avenue slide repair project"),
+    null
+  );
+});
+
+test("finds the real address after a comma-grouped square footage", () => {
+  assert.equal(
+    extractStreetAddressCandidate(
+      "with buildings totaling approximately 22,965 square feet located at 125 Bayshore Boulevard, with W.Y."
+    )?.address,
+    "125 Bayshore Boulevard"
+  );
+});
