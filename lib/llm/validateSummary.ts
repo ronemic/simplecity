@@ -26,7 +26,7 @@ const MISSING_SOURCE_VALUE = "Not listed in the source document.";
 const NUMERIC_UNIT_SOURCE =
   "(?:(?:rentable|gross|net|usable|linear)\\s+)?(?:sq\\.?\\s*ft\\.?|square\\s+(?:feet|foot)|sq\\.?\\s*mi\\.?|square\\s+miles?|feet|foot|ft\\.?|miles?|mi\\.?|acres?|ac\\.?|homes?|units?|properties|parcels?|lots?|people|persons?|residents?|jobs?|trees?|spaces?|stalls?|vehicles?|lanes?|bedrooms?|seats?|gallons?|years?|months?|weeks?|days?|hours?|minutes?)";
 const GROUNDABLE_NUMERIC_VALUE_PATTERN = new RegExp(
-  `\\$?\\s*\\d[\\d,]*(?:\\.\\d+)?(?:\\s*(?:million|billion|thousand|bn|k))?(?:\\s*(?:%|percent)|\\s+${NUMERIC_UNIT_SOURCE})?`,
+  `\\$?\\s*\\d[\\d,]*(?:\\.\\d+)?(?:\\s*(?:million|billion|thousand|bn|k)(?![a-z]))?(?:\\s*(?:%|percent)|\\s+${NUMERIC_UNIT_SOURCE}(?![a-z]))?`,
   "gi"
 );
 const GROUNDABLE_VALUE_PATTERNS = [
@@ -35,7 +35,7 @@ const GROUNDABLE_VALUE_PATTERNS = [
   /\b(?:\+?1[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)\d{3}[\s.-]\d{4}\b/g,
   /\b\d{1,4}:\d{2}-[A-Z]{1,6}-\d{3,}(?:-[A-Z]+)?\b/gi,
   /\b\d{1,6}\s+(?:[A-Z0-9][A-Za-z0-9.'-]*\s+){1,6}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Lane|Ln|Way|Court|Ct|Place|Pl)\b/g,
-  /\$\s?\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k))?/gi,
+  /\$\s?\d[\d,]*(?:\.\d+)?(?:\s*(?:million|billion|thousand|m|bn|k)(?![a-z]))?/gi,
   /\b\d+(?:\.\d+)?\s?%/gi,
   /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}\b/gi,
   /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/g,
@@ -44,7 +44,7 @@ const GROUNDABLE_VALUE_PATTERNS = [
   GROUNDABLE_NUMERIC_VALUE_PATTERN
 ];
 const NUMERIC_VALUE_PATTERN = new RegExp(
-  `\\$?\\s*\\d[\\d,]*(?:\\.\\d+)?(?:\\s*(?:million|billion|thousand|m|bn|k))?(?:\\s*(?:%|percent)|\\s+${NUMERIC_UNIT_SOURCE})?`,
+  `\\$?\\s*\\d[\\d,]*(?:\\.\\d+)?(?:\\s*(?:million|billion|thousand|m|bn|k)(?![a-z]))?(?:\\s*(?:%|percent)|\\s+${NUMERIC_UNIT_SOURCE}(?![a-z]))?`,
   "gi"
 );
 const DATE_VALUE_PATTERN =
@@ -530,10 +530,17 @@ function hasEquivalentDateValue(value: string, sourceText: string) {
 function isGroundedValue(value: string, sourceText: string) {
   const normalizedValue = normalizeEvidenceText(value);
   if (!normalizedValue) return true;
-  const normalizedSourceText = normalizeEvidenceText(sourceText);
-  if (normalizedSourceText.includes(normalizedValue)) return true;
   const compactNumericSpacing = (text: string) =>
     text.replace(/(?<=\d)\s+(?=\d)/g, "");
+  // A substring cannot ground an amount or quantity: $160 is part of $160,000,
+  // and 5 homes is part of 15 homes. Compare the complete amount and unit first.
+  const numericValue = parseComparableNumericValue(value);
+  if (numericValue && (numericValue.kind !== "number" || numericValue.unit)) {
+    return hasEquivalentNumericValue(value, sourceText) ||
+      hasEquivalentNumericValue(value, compactNumericSpacing(sourceText));
+  }
+  const normalizedSourceText = normalizeEvidenceText(sourceText);
+  if (normalizedSourceText.includes(normalizedValue)) return true;
   if (
     compactNumericSpacing(normalizedSourceText).includes(
       compactNumericSpacing(normalizedValue)
