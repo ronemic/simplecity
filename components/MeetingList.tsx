@@ -1,16 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, Clock, FileText, List, Search } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight, FileText, List, Search } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { HighlightedText } from "@/components/HighlightedText";
 import { PendingLink } from "@/components/PendingLink";
-import { StatusPill } from "@/components/StatusPill";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
 import type { MeetingRow } from "@/lib/types";
 import {
   CIVIC_TIME_ZONE,
-  formatDisplayDate,
   hasDisplayableMeetingTime,
   parseMeetingDate
 } from "@/lib/utils/date";
@@ -27,7 +25,7 @@ import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisp
 import { meetingSearchMatch } from "@/lib/utils/meetingFilters";
 import { matchesNormalizedDecisionSearchText } from "@/lib/utils/decisionFilters";
 import { cn } from "@/lib/utils/cn";
-import { type Locale, t } from "@/lib/i18n";
+import { type Locale, statusLabel, t } from "@/lib/i18n";
 import {
   MEETING_VIEW_PREFERENCE_COOKIE,
   MEETING_VIEW_STORAGE_KEY,
@@ -55,14 +53,9 @@ type MeetingCalendarProps = {
  */
 const LIST_PAGE_SIZE = 60;
 
-const CALENDAR_AVAILABLE_HEIGHT = 248;
-const CALENDAR_CARD_GAP = 6;
-const CALENDAR_MORE_CONTROL_HEIGHT = 28;
-const CALENDAR_MIN_CARD_HEIGHT = 68;
+// A day cell shows this many meetings outright; a busier day shows one fewer and
+// a "+N more" control in its place, so every week row keeps the same height.
 const CALENDAR_MAX_VISIBLE_MEETINGS = 3;
-const CALENDAR_DEFAULT_CHARS_PER_LINE = 22;
-const CALENDAR_LINE_HEIGHT = 16;
-const CALENDAR_CARD_FIXED_HEIGHT = 30;
 
 function writeMeetingViewPreference(view: MeetingView) {
   document.cookie = `${MEETING_VIEW_PREFERENCE_COOKIE}=${view}; path=/; max-age=31536000; samesite=lax`;
@@ -135,19 +128,26 @@ function groupMeetingsByDate(meetings: MeetingRow[]) {
   return groups;
 }
 
-function calendarMeetingTone(status?: string | null) {
+type MeetingTone = "upcoming" | "cancelled" | "past";
+
+function meetingTone(status?: string | null): MeetingTone {
   const normalized = status?.toLowerCase() || "";
-
-  if (normalized.includes("cancel")) {
-    return "border-[#f0c8bb] bg-[#fff7f3] text-[#7d321f] hover:border-[#dc9f8d] hover:bg-[#fff1eb]";
-  }
-
-  if (normalized.includes("upcoming")) {
-    return "border-civic/20 bg-[#f3f7ff] text-[#12365f] hover:border-civic/35 hover:bg-[#eaf2ff]";
-  }
-
-  return "border-black/10 bg-white/90 text-ink hover:border-civic/25 hover:bg-[#f7fbff]";
+  if (normalized.includes("cancel")) return "cancelled";
+  if (normalized.includes("upcoming")) return "upcoming";
+  return "past";
 }
+
+const CALENDAR_CHIP_TONES: Record<MeetingTone, string> = {
+  upcoming: "border-l-civic bg-[#eef4ff] text-[#12365f] hover:bg-[#e2edff]",
+  cancelled: "border-l-[#d9907c] bg-[#fdf4f1] text-[#8a3a26] hover:bg-[#fbe9e3]",
+  past: "border-l-black/20 bg-[#f4f6f8] text-black/70 hover:bg-[#eaeff3] hover:text-ink"
+};
+
+const TONE_DOTS: Record<MeetingTone, string> = {
+  upcoming: "bg-civic",
+  cancelled: "bg-[#d9907c]",
+  past: "bg-black/25"
+};
 
 function calendarMeetingTitle(meeting: MeetingRow, locale: Locale) {
   return displayMeetingTitle(
@@ -157,70 +157,15 @@ function calendarMeetingTitle(meeting: MeetingRow, locale: Locale) {
   );
 }
 
-function calendarMeetingMinHeight(
-  meeting: MeetingRow,
-  locale: Locale,
-  columnWidth: number,
-  highlight: string
-) {
-  const charsPerLine = columnWidth
-    ? Math.max(12, Math.floor((columnWidth - 16) / 6.25))
-    : CALENDAR_DEFAULT_CHARS_PER_LINE;
-  const estimatedLines = Math.max(
-    1,
-    Math.ceil(calendarMeetingTitle(meeting, locale).length / charsPerLine)
-  );
-  const searchMatch = meetingSearchMatch(meeting, highlight, locale);
-  const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight, locale);
-  const extraSearchLine = searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? 1 : 0;
-
-  return Math.max(
-    CALENDAR_MIN_CARD_HEIGHT,
-    CALENDAR_CARD_FIXED_HEIGHT + (estimatedLines + extraSearchLine) * CALENDAR_LINE_HEIGHT
-  );
-}
-
-function buildCalendarDayLayout(
-  meetings: MeetingRow[],
-  locale: Locale,
-  columnWidth: number,
-  highlight: string
-) {
-  let visibleCount = 0;
-  let cardMinHeight = CALENDAR_MIN_CARD_HEIGHT;
-
-  for (const meeting of meetings.slice(0, CALENDAR_MAX_VISIBLE_MEETINGS)) {
-    const nextCount = visibleCount + 1;
-    const nextCardMinHeight = Math.max(
-      cardMinHeight,
-      calendarMeetingMinHeight(meeting, locale, columnWidth, highlight)
-    );
-    const hasOverflow = nextCount < meetings.length;
-    const requiredHeight =
-      nextCount * nextCardMinHeight +
-      (nextCount - 1) * CALENDAR_CARD_GAP +
-      (hasOverflow ? CALENDAR_MORE_CONTROL_HEIGHT : 0);
-
-    if (requiredHeight > CALENDAR_AVAILABLE_HEIGHT && visibleCount > 0) break;
-
-    visibleCount = nextCount;
-    cardMinHeight = nextCardMinHeight;
-  }
-
-  const visibleMeetings = meetings.slice(0, visibleCount);
-  const overflowCount = meetings.length - visibleCount;
-  const availableCardHeight =
-    CALENDAR_AVAILABLE_HEIGHT -
-    (visibleCount - 1) * CALENDAR_CARD_GAP -
-    (overflowCount > 0 ? CALENDAR_MORE_CONTROL_HEIGHT : 0);
+function visibleCalendarMeetings(meetings: MeetingRow[]) {
+  const visibleCount =
+    meetings.length > CALENDAR_MAX_VISIBLE_MEETINGS
+      ? CALENDAR_MAX_VISIBLE_MEETINGS - 1
+      : meetings.length;
 
   return {
-    visibleMeetings,
-    overflowCount,
-    cardMinHeight:
-      visibleCount > 1
-        ? Math.max(cardMinHeight, Math.floor(availableCardHeight / visibleCount))
-        : cardMinHeight
+    visibleMeetings: meetings.slice(0, visibleCount),
+    overflowCount: meetings.length - visibleCount
   };
 }
 
@@ -228,43 +173,82 @@ function CalendarMeetingLink({
   meeting,
   highlight,
   locale,
-  minHeight
+  expanded = false
 }: {
   meeting: MeetingRow;
   highlight: string;
   locale: Locale;
-  minHeight?: number;
+  expanded?: boolean;
 }) {
+  const tone = meetingTone(meeting.status);
   const searchMatch = meetingSearchMatch(meeting, highlight, locale);
   const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight, locale);
+  const hasTime = meetingTimeLabel(meeting, locale) !== t(locale, "timeNotListed");
 
   return (
     <PendingLink
       href={meetingHref(meeting)}
       mode="overlay"
       className={cn(
-        "pointer-events-auto relative z-20 block min-h-[68px] shrink-0 !overflow-visible rounded-md border px-2 py-1.5 text-left text-[10px] font-bold leading-4 shadow-[0_1px_1px_rgba(23,23,23,0.03)] transition focus-visible:focus-ring",
-        calendarMeetingTone(meeting.status)
+        "pointer-events-auto relative z-20 block w-full shrink-0 !overflow-visible rounded-[5px] border-l-[3px] py-1 pl-2 pr-1.5 text-left transition-colors focus-visible:focus-ring",
+        CALENDAR_CHIP_TONES[tone]
       )}
-      style={minHeight ? { minHeight: `${minHeight}px` } : undefined}
       contentClassName="!flex !w-full !min-w-0 !flex-col !items-start !gap-0"
       pendingLabel={t(locale, "openingMeeting")}
+      title={calendarMeetingTitle(meeting, locale)}
     >
-      <span className="block w-full text-[10px] font-black leading-4 text-current opacity-80">
+      <span
+        className={cn(
+          "block w-full text-[10px] font-bold leading-4 tabular-nums",
+          hasTime ? "opacity-75" : "italic opacity-55"
+        )}
+      >
+        {tone === "cancelled" ? (
+          <span className="not-italic font-black uppercase tracking-[0.04em]">
+            {statusLabel(locale, "Cancelled")} ·{" "}
+          </span>
+        ) : null}
         <HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} />
       </span>
-      <span className="block w-full whitespace-normal break-words text-[11px] leading-4">
-        <HighlightedText
-          text={calendarMeetingTitle(meeting, locale)}
-          query={highlight}
-        />
+      <span
+        lang={locale}
+        className={cn(
+          "w-full hyphens-auto break-words text-[11.5px] font-bold leading-[15px]",
+          expanded ? "block" : "line-clamp-2"
+        )}
+      >
+        <HighlightedText text={calendarMeetingTitle(meeting, locale)} query={highlight} />
       </span>
       {searchMatch && searchMatch.field !== "title" && !timeMatchIsVisible ? (
-        <span className="block w-full whitespace-normal break-words text-[10px] font-black leading-4 text-current">
+        <span className="line-clamp-1 w-full text-[10px] font-black leading-4 text-current">
           <HighlightedText text={searchMatch.text} query={highlight} />
         </span>
       ) : null}
     </PendingLink>
+  );
+}
+
+function MeetingStatusLabel({
+  status,
+  highlight,
+  locale
+}: {
+  status?: string | null;
+  highlight?: string;
+  locale: Locale;
+}) {
+  const tone = meetingTone(status);
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 font-bold",
+        tone === "upcoming" ? "text-[#164a91]" : tone === "cancelled" ? "text-[#9f2a20]" : "text-black/50"
+      )}
+    >
+      <span aria-hidden className={cn("h-1.5 w-1.5 rounded-full", TONE_DOTS[tone])} />
+      <HighlightedText text={statusLabel(locale, status || "Unknown")} query={highlight} />
+    </span>
   );
 }
 
@@ -283,6 +267,9 @@ function MeetingLine({
   const meetingType = displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale);
   const meetingJurisdiction = jurisdictionLabel(meeting, locale);
   const advisory = isSantaBarbaraPlanningMeeting(meeting);
+  const cancelled = meetingTone(meeting.status) === "cancelled";
+  const timeLabel = meetingTimeLabel(meeting, locale);
+  const hasTime = timeLabel !== t(locale, "timeNotListed");
   const searchMatch = meetingSearchMatch(meeting, highlight || "", locale);
   const timeMatchIsVisible = searchMatchesMeetingTime(meeting, highlight || "", locale);
   const showCompactSearchMatch =
@@ -294,20 +281,26 @@ function MeetingLine({
   return (
     <div
       className={cn(
-        "grid gap-2",
-        compact ? "sm:grid-cols-[4.25rem_1fr] sm:items-start" : "sm:grid-cols-[7rem_1fr_auto] sm:items-center"
+        "grid gap-x-4 gap-y-1",
+        compact ? "grid-cols-[4.5rem_1fr] items-baseline" : "sm:grid-cols-[6rem_1fr_auto] sm:items-center"
       )}
     >
-      <div className="flex items-center gap-1.5 text-sm font-black text-[#12365f]">
-        <Clock aria-hidden className="h-3.5 w-3.5" />
-        <span><HighlightedText text={meetingTimeLabel(meeting, locale)} query={highlight} /></span>
+      <div
+        className={cn(
+          "text-sm tabular-nums leading-6",
+          hasTime ? "font-black text-[#12365f]" : "font-semibold italic text-black/45",
+          cancelled && "text-black/40"
+        )}
+      >
+        <HighlightedText text={timeLabel} query={highlight} />
       </div>
       <div className="min-w-0">
         <PendingLink
           href={meetingHref(meeting)}
           className={cn(
             "block w-full font-black text-ink transition hover:text-civic focus-visible:focus-ring",
-            compact ? "line-clamp-3 text-sm leading-5" : "line-clamp-2 text-lg leading-snug sm:text-[1.05rem]"
+            compact ? "line-clamp-3 text-sm leading-5" : "line-clamp-2 text-base leading-snug sm:text-[1.05rem]",
+            cancelled && "text-black/55"
           )}
           contentClassName={cn(
             compact ? "!flex !w-full !flex-col !items-start !gap-0.5" : "items-center",
@@ -317,9 +310,15 @@ function MeetingLine({
         >
           <HighlightedText text={displayMeetingTitle(meeting, meetingTitleFallback, locale)} query={highlight} />
         </PendingLink>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs font-semibold leading-5 text-black/55">
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs font-semibold leading-5 text-black/55">
+          {!compact ? (
+            <>
+              <MeetingStatusLabel status={meeting.status} highlight={highlight} locale={locale} />
+              <span aria-hidden className="text-black/25">·</span>
+            </>
+          ) : null}
           <HighlightedText text={meetingType} query={highlight} />
-          <span aria-hidden>·</span>
+          <span aria-hidden className="text-black/25">·</span>
           <HighlightedText text={meetingJurisdiction} query={highlight} />
           {advisory ? (
             <span className="rounded-full border border-[#b8a06a] bg-[#fff8e7] px-1.5 py-0.5 text-[0.62rem] font-black uppercase tracking-[0.05em] text-[#765514]">
@@ -334,10 +333,63 @@ function MeetingLine({
         ) : null}
       </div>
       {!compact ? (
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <div className="mt-2 flex flex-wrap items-center gap-2 sm:mt-0 sm:justify-end">
           <AddToGoogleCalendarLink meeting={meeting} compact className="min-h-9 px-3 py-2" locale={locale} />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+type ListDateGroup = { key: string; meetings: MeetingRow[] };
+
+// The list is already sorted newest first; this keeps that order across days while
+// reading each day's meetings in the order they happen.
+function groupListMeetingsByDay(meetings: MeetingRow[]) {
+  const groups: ListDateGroup[] = [];
+
+  for (const meeting of meetings) {
+    const key = meetingDateKey(meeting) || "date-not-listed";
+    const last = groups[groups.length - 1];
+    if (last?.key === key) last.meetings.push(meeting);
+    else groups.push({ key, meetings: [meeting] });
+  }
+
+  for (const group of groups) {
+    group.meetings.sort((left, right) => meetingSortTime(left) - meetingSortTime(right));
+  }
+
+  return groups;
+}
+
+function ListDateBadge({ dateKey, isToday, locale }: { dateKey: string; isToday: boolean; locale: Locale }) {
+  if (dateKey === "date-not-listed") {
+    return (
+      <div className="flex h-[4.25rem] w-16 items-center justify-center rounded-lg border border-dashed border-black/15 bg-[#f8fafb] px-1 text-center text-[10px] font-bold uppercase leading-tight text-black/45">
+        {t(locale, "dateNotListed")}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "flex w-16 flex-col items-center overflow-hidden rounded-lg border text-center shadow-[0_1px_2px_rgba(23,23,23,0.04)]",
+        isToday ? "border-civic bg-civic text-white" : "border-black/10 bg-white text-ink"
+      )}
+    >
+      <span
+        className={cn(
+          "w-full py-0.5 text-[10px] font-black uppercase tracking-[0.08em]",
+          isToday ? "bg-[#1d4d92] text-white" : "bg-[#eef3f6] text-[#12365f]"
+        )}
+      >
+        {formatDateKey(dateKey, { month: "short" }, locale).replace(".", "")}
+      </span>
+      <span className="pt-1 text-2xl font-black leading-none tabular-nums">{Number(dateKey.slice(-2))}</span>
+      <span className={cn("pb-1.5 pt-0.5 text-[10px] font-bold uppercase", isToday ? "text-white/80" : "text-black/50")}>
+        {formatDateKey(dateKey, { weekday: "short" }, locale).replace(".", "")}
+      </span>
     </div>
   );
 }
@@ -363,9 +415,7 @@ export function MeetingList({
   });
   const [listPaging, setListPaging] = useState({ search: "", pages: 1 });
   const [openCalendarPopoverDate, setOpenCalendarPopoverDate] = useState<string | null>(null);
-  const [calendarColumnWidth, setCalendarColumnWidth] = useState(0);
   const calendarPopoverRef = useRef<HTMLDivElement>(null);
-  const calendarGridRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -413,21 +463,6 @@ export function MeetingList({
       window.cancelAnimationFrame(focusFrame);
     };
   }, [openCalendarPopoverDate]);
-
-  useEffect(() => {
-    const grid = calendarGridRef.current;
-    if (!grid) return;
-
-    const updateColumnWidth = () => {
-      setCalendarColumnWidth(grid.getBoundingClientRect().width / 7);
-    };
-
-    updateColumnWidth();
-    const observer = new ResizeObserver(updateColumnWidth);
-    observer.observe(grid);
-
-    return () => observer.disconnect();
-  }, [activeMonth, activeView]);
 
   // Sync form input helper
   const syncFormInput = (name: string, value: string) => {
@@ -585,6 +620,8 @@ export function MeetingList({
     year: "numeric"
   }, locale);
   const weekdayLabels = weekdays(locale);
+  const viewingCurrentMonth = activeMonth === todayKey.slice(0, 7);
+  const listDateGroups = groupListMeetingsByDay(visibleListMeetings);
 
   return (
     <div className="grid gap-6">
@@ -634,76 +671,100 @@ export function MeetingList({
             )}
           >
             <section className="quiet-card overflow-hidden">
-              <div className="grid gap-4 border-b border-black/10 bg-white p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start sm:p-5">
-                <div>
+              <div className="flex flex-col gap-4 border-b border-black/10 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="min-w-0">
                   <p className="label-eyebrow text-civic">{t(locale, "monthView")}</p>
-                  <h2 className="mt-1 text-2xl font-black text-ink">{activeMonthLabel}</h2>
-                  <p className="mt-1 text-sm font-semibold text-black/60">
-                    {locale === "es"
-                      ? `${monthMeetingCount} reuniones mostradas este mes.`
-                      : `${monthMeetingCount} meetings shown this month.`}
-                  </p>
+                  <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <h2 className="text-2xl font-black capitalize text-ink">{activeMonthLabel}</h2>
+                    <span className="text-sm font-semibold text-black/55">
+                      {monthMeetingCount === 1
+                        ? locale === "es"
+                          ? "1 reunión"
+                          : "1 meeting"
+                        : locale === "es"
+                          ? `${monthMeetingCount} reuniones`
+                          : `${monthMeetingCount} meetings`}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 md:flex-nowrap">
-                  <button
-                    type="button"
-                    onClick={handlePrevMonth}
-                    className="action-secondary-sm"
-                  >
-                    <ChevronLeft aria-hidden className="h-4 w-4" />
-                    {t(locale, "previous")}
-                  </button>
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleToday}
-                    className="action-civic-sm"
+                    disabled={viewingCurrentMonth && activeDate === todayKey}
+                    className="action-secondary-sm disabled:cursor-default disabled:opacity-50 disabled:hover:border-black/15 disabled:hover:bg-white"
                   >
                     {t(locale, "today")}
                   </button>
-                  <button
-                    type="button"
-                    onClick={handleNextMonth}
-                    className="action-secondary-sm"
-                  >
-                    {t(locale, "next")}
-                    <ChevronRight aria-hidden className="h-4 w-4" />
-                  </button>
+                  <div className="inline-flex overflow-hidden rounded-lg border border-black/15 bg-white shadow-sm">
+                    <button
+                      type="button"
+                      onClick={handlePrevMonth}
+                      aria-label={t(locale, "previous")}
+                      title={t(locale, "previous")}
+                      className="inline-flex h-10 w-10 items-center justify-center text-black/65 transition hover:bg-[#f7fbff] hover:text-civic focus-visible:focus-ring"
+                    >
+                      <ChevronLeft aria-hidden className="h-4 w-4" />
+                    </button>
+                    <span aria-hidden className="w-px bg-black/10" />
+                    <button
+                      type="button"
+                      onClick={handleNextMonth}
+                      aria-label={t(locale, "next")}
+                      title={t(locale, "next")}
+                      className="inline-flex h-10 w-10 items-center justify-center text-black/65 transition hover:bg-[#f7fbff] hover:text-civic focus-visible:focus-ring"
+                    >
+                      <ChevronRight aria-hidden className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-black/10 bg-[#fbfcfd] px-4 py-2 text-[11px] font-bold text-black/55 sm:px-5">
+                {(["upcoming", "past", "cancelled"] as MeetingTone[]).map((tone) => (
+                  <span key={tone} className="inline-flex items-center gap-1.5">
+                    <span aria-hidden className={cn("h-2 w-2 rounded-full", TONE_DOTS[tone])} />
+                    {statusLabel(locale, tone === "upcoming" ? "Upcoming" : tone === "past" ? "Past" : "Cancelled")}
+                  </span>
+                ))}
               </div>
 
               <div className="overflow-x-auto">
                 <div className="min-w-[620px] sm:min-w-[720px]">
-                  <div className="grid grid-cols-7 border-b border-black/10 bg-[#f4f7f9]">
-                    {weekdayLabels.map((day) => (
-                      <div key={day} className="px-3 py-2.5 text-center text-xs font-black uppercase text-black/55">
+                  <div className="grid grid-cols-7 border-b border-black/10 bg-white">
+                    {weekdayLabels.map((day, index) => (
+                      <div
+                        key={day}
+                        className={cn(
+                          "px-2 py-2 text-left text-[11px] font-bold uppercase tracking-[0.08em]",
+                          index === 0 || index === 6 ? "text-black/35" : "text-black/55"
+                        )}
+                      >
                         {day}
                       </div>
                     ))}
                   </div>
-                  <div
-                    ref={calendarGridRef}
-                    className="grid auto-rows-auto grid-cols-7 bg-[#edf2f5]"
-                  >
+                  <div className="grid auto-rows-auto grid-cols-7">
                     {monthDays.map((day, dayIndex) => {
                       const inMonth = day.startsWith(activeMonth);
                       const dayMeetings = inMonth ? meetingsByDate.get(day) || [] : [];
                       const isPopoverOpen = openCalendarPopoverDate === day;
-                      const calendarDayLayout = buildCalendarDayLayout(
-                        dayMeetings,
-                        locale,
-                        calendarColumnWidth,
-                        highlight
-                      );
+                      const calendarDayLayout = visibleCalendarMeetings(dayMeetings);
                       const isSelected = inMonth && day === activeDate;
                       const isToday = inMonth && day === todayKey;
+                      const isWeekend = dayIndex % 7 === 0 || dayIndex % 7 === 6;
 
                       return (
                         <div
                           key={day}
                           className={cn(
-                            "relative flex min-h-[300px] flex-col border-b border-r border-black/10 bg-white p-2",
-                            !inMonth && "bg-[#eef1f4] text-black/25",
-                            isSelected && "z-10 shadow-[inset_0_0_0_2px_#2f65e8]",
+                            "relative flex min-h-[132px] flex-col gap-1 border-b border-r border-black/[0.08] p-1.5 [&:nth-child(7n)]:border-r-0",
+                            !inMonth
+                              ? "bg-[repeating-linear-gradient(135deg,#f6f8fa_0,#f6f8fa_6px,#f1f4f7_6px,#f1f4f7_12px)]"
+                              : isWeekend
+                                ? "bg-[#fbfcfd]"
+                                : "bg-white",
+                            isSelected && "z-10 bg-[#f5f9ff] shadow-[inset_0_0_0_2px_rgba(36,87,166,0.55)]",
                             isPopoverOpen && "z-30"
                           )}
                         >
@@ -720,38 +781,39 @@ export function MeetingList({
                             }
                             className={cn(
                               "absolute inset-0 z-0 transition focus-visible:focus-ring",
-                              inMonth ? "cursor-pointer hover:bg-civic/[0.04]" : "cursor-default"
+                              inMonth ? "cursor-pointer hover:bg-civic/[0.035]" : "cursor-default"
                             )}
                           />
-                          <div className="pointer-events-none relative z-10 flex items-center gap-1">
+                          <div className="pointer-events-none relative z-10 flex items-center justify-between gap-1 px-0.5">
                             <span
                               className={cn(
-                                "inline-flex h-7 min-w-7 items-center justify-center rounded-md px-2 text-sm font-black leading-none transition",
-                                isSelected
-                                  ? "bg-civic text-white"
-                                  : isToday
-                                    ? "bg-[#dce9ff] text-civic ring-1 ring-civic/20"
+                                "inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black tabular-nums leading-none transition",
+                                isToday
+                                  ? "bg-civic text-white shadow-sm"
+                                  : isSelected
+                                    ? "text-civic"
                                     : inMonth
-                                      ? "text-ink"
-                                      : "text-black/25"
+                                      ? day < todayKey
+                                        ? "text-black/45"
+                                        : "text-ink"
+                                      : "text-black/20"
                               )}
                             >
                               {Number(day.slice(-2))}
                             </span>
+                            {dayMeetings.length > 0 ? (
+                              <span className="text-[10px] font-bold tabular-nums text-black/35">
+                                {dayMeetings.length}
+                              </span>
+                            ) : null}
                           </div>
-                          <div
-                            className={cn(
-                              "pointer-events-none relative z-10 mt-2 flex flex-none flex-col gap-1.5",
-                              calendarDayLayout.overflowCount > 0 && "pb-8"
-                            )}
-                          >
+                          <div className="pointer-events-none relative z-10 flex flex-none flex-col gap-1">
                             {calendarDayLayout.visibleMeetings.map((meeting) => (
                               <CalendarMeetingLink
                                 key={meeting.id}
                                 meeting={meeting}
                                 highlight={highlight}
                                 locale={locale}
-                                minHeight={calendarDayLayout.cardMinHeight}
                               />
                             ))}
                           </div>
@@ -765,7 +827,10 @@ export function MeetingList({
                               }}
                               aria-expanded={isPopoverOpen}
                               aria-controls={`calendar-popover-${day}`}
-                              className="absolute bottom-2 left-2 z-20 rounded-md bg-white/90 px-2 py-1 text-left text-[10px] font-black leading-4 text-civic transition hover:bg-civic/[0.08] focus-visible:focus-ring"
+                              className={cn(
+                                "relative z-20 self-start rounded-md px-1.5 py-0.5 text-left text-[11px] font-black leading-4 text-civic transition hover:bg-civic/[0.08] focus-visible:focus-ring",
+                                isPopoverOpen && "bg-civic/[0.08]"
+                              )}
                               aria-label={
                                 locale === "es"
                                   ? `Mostrar ${calendarDayLayout.overflowCount} reuniones más del ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
@@ -789,32 +854,33 @@ export function MeetingList({
                                 day: "numeric"
                               }, locale)}
                               className={cn(
-                                "pointer-events-auto absolute z-40 w-[min(280px,calc(100vw-2rem))] rounded-lg border border-black/15 bg-white shadow-[0_12px_30px_rgba(23,23,23,0.18)]",
-                                dayIndex % 7 >= 5 ? "right-2" : "left-2",
-                                dayIndex >= 35 ? "bottom-2" : "top-10"
+                                "floating-surface pointer-events-auto absolute z-40 w-[min(300px,calc(100vw-2rem))] bg-white outline-none",
+                                dayIndex % 7 >= 5 ? "right-1" : "left-1",
+                                dayIndex >= 28 ? "bottom-1" : "top-1"
                               )}
                             >
-                              <div className="border-b border-black/10 px-3 py-2.5">
-                                <p className="text-sm font-black text-ink">
+                              <div className="flex items-baseline justify-between gap-2 border-b border-black/10 px-3 py-2.5">
+                                <p className="text-sm font-black capitalize text-ink">
                                   {formatDateKey(day, {
                                     weekday: "long",
                                     month: "short",
                                     day: "numeric"
                                   }, locale)}
                                 </p>
-                                <p className="mt-0.5 text-[10px] font-bold text-black/55">
+                                <p className="text-[11px] font-bold text-black/50">
                                   {locale === "es"
                                     ? `${dayMeetings.length} reuniones`
                                     : `${dayMeetings.length} meetings`}
                                 </p>
                               </div>
-                              <div className="grid max-h-[min(55vh,420px)] gap-1.5 overflow-y-auto p-2">
+                              <div className="grid max-h-[min(55vh,420px)] gap-1 overflow-y-auto p-2">
                                 {dayMeetings.map((meeting) => (
                                   <CalendarMeetingLink
                                     key={meeting.id}
                                     meeting={meeting}
                                     highlight={highlight}
                                     locale={locale}
+                                    expanded
                                   />
                                 ))}
                               </div>
@@ -828,10 +894,10 @@ export function MeetingList({
               </div>
             </section>
 
-            <aside className="quiet-card overflow-hidden">
-              <div className="border-b border-black/10 p-4">
+            <aside className="quiet-card overflow-hidden lg:sticky lg:top-24">
+              <div className="border-b border-black/10 bg-[#fbfcfd] p-4">
                 <p className="label-eyebrow text-civic">{t(locale, "dayView")}</p>
-                <h2 className="mt-1 text-2xl font-black text-ink">
+                <h2 className="mt-1 text-xl font-black capitalize text-ink">
                   {activeDate
                     ? formatDateKey(activeDate, {
                         weekday: "long",
@@ -840,7 +906,7 @@ export function MeetingList({
                       }, locale)
                     : t(locale, "selectADay")}
                 </h2>
-                <p className="mt-1 text-sm font-semibold text-black/60">
+                <p className="mt-1 text-sm font-semibold text-black/55">
                   {activeDateMeetings.length === 1
                     ? locale === "es"
                       ? "1 reunión indicada."
@@ -850,16 +916,19 @@ export function MeetingList({
                       : `${activeDateMeetings.length} meetings listed.`}
                 </p>
               </div>
-              <div className="divide-y divide-black/10">
+              <div className="max-h-[calc(100vh-14rem)] divide-y divide-black/[0.08] overflow-y-auto">
                 {activeDateMeetings.length > 0 ? (
                   activeDateMeetings.map((meeting) => (
-                    <div key={meeting.id} className="p-3.5">
+                    <div key={meeting.id} className="px-4 py-3.5">
                       <MeetingLine meeting={meeting} compact highlight={highlight} locale={locale} />
                     </div>
                   ))
                 ) : (
-                  <div className="p-4">
-                    <p className="text-sm font-semibold leading-6 text-black/70">
+                  <div className="flex flex-col items-center px-4 py-8 text-center">
+                    <span className="icon-tile-sm">
+                      <CalendarDays aria-hidden className="h-5 w-5" />
+                    </span>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-black/60">
                       {t(locale, "noMeetingsForDay")}
                     </p>
                   </div>
@@ -874,7 +943,7 @@ export function MeetingList({
               activeView !== "list" && "hidden"
             )}
           >
-            <div className="flex flex-col gap-3 border-b border-black/10 p-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col gap-2 border-b border-black/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <div>
                 <p className="label-eyebrow text-civic">{t(locale, "allMatchingMeetings")}</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">
@@ -887,7 +956,7 @@ export function MeetingList({
                       : `${meetings.length} meetings`}
                 </h2>
               </div>
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/60">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/55">
                 <Search aria-hidden className="h-4 w-4" />
                 {locale === "es"
                   ? "La búsqueda se aplica a esta lista."
@@ -895,24 +964,60 @@ export function MeetingList({
               </p>
             </div>
             <div className="divide-y divide-black/10">
-              {visibleListMeetings.map((meeting) => (
-                <article key={meeting.id} className="grid gap-2 p-5 sm:p-6">
-                  <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-black/65">
-                    <StatusPill status={meeting.status} locale={locale} highlight={highlight} />
-                    <span className="inline-flex items-center gap-1.5">
-                      <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-                      <HighlightedText
-                        text={formatDisplayDate(meeting.date_text, meeting.meeting_datetime, meeting.time_text, locale)}
-                        query={highlight}
-                      />
-                    </span>
-                  </div>
-                  <MeetingLine meeting={meeting} highlight={highlight} locale={locale} />
-                </article>
-              ))}
+              {listDateGroups.map((group) => {
+                const isToday = group.key === todayKey;
+
+                return (
+                  <section
+                    key={group.key}
+                    aria-label={
+                      group.key === "date-not-listed"
+                        ? t(locale, "dateNotListed")
+                        : formatDateKey(group.key, { weekday: "long", month: "long", day: "numeric", year: "numeric" }, locale)
+                    }
+                    className={cn(
+                      "grid gap-3 px-4 py-4 sm:grid-cols-[4rem_minmax(0,1fr)] sm:gap-6 sm:px-6 sm:py-5",
+                      isToday && "bg-[#f7fbff]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 sm:block">
+                      <div className="sm:sticky sm:top-24">
+                        <ListDateBadge dateKey={group.key} isToday={isToday} locale={locale} />
+                      </div>
+                      <p className="text-sm font-bold text-black/60 sm:hidden">
+                        {group.key === "date-not-listed"
+                          ? null
+                          : formatDateKey(group.key, { weekday: "long", month: "long", day: "numeric", year: "numeric" }, locale)}
+                      </p>
+                    </div>
+                    <div className="min-w-0">
+                      {group.key !== "date-not-listed" ? (
+                        <p className="hidden pb-1 text-xs font-bold uppercase tracking-[0.06em] text-black/45 sm:block">
+                          <HighlightedText
+                            text={formatDateKey(group.key, { weekday: "long", month: "long", day: "numeric", year: "numeric" }, locale)}
+                            query={highlight}
+                          />
+                          {isToday ? (
+                            <span className="ml-2 rounded-full bg-civic px-2 py-0.5 text-[10px] tracking-[0.04em] text-white">
+                              {t(locale, "today")}
+                            </span>
+                          ) : null}
+                        </p>
+                      ) : null}
+                      <div className="divide-y divide-black/[0.07]">
+                        {group.meetings.map((meeting) => (
+                          <article key={meeting.id} className="py-3 first:pt-2 last:pb-0">
+                            <MeetingLine meeting={meeting} highlight={highlight} locale={locale} />
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  </section>
+                );
+              })}
             </div>
             {hiddenListCount > 0 ? (
-              <div className="border-t border-black/10 p-5 text-center">
+              <div className="border-t border-black/10 bg-[#fbfcfd] p-5 text-center">
                 <button
                   type="button"
                   onClick={() => setListPaging({ search: highlight, pages: listPages + 1 })}
