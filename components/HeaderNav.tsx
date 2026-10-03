@@ -326,7 +326,7 @@ export function HeaderNav({
           </div>
         ) : null}
       </div>
-      <div ref={languageMenuRef} className="relative col-span-5 md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-36 lg:mr-2">
+      <div ref={languageMenuRef} className="relative col-span-5 md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-32 lg:mr-2">
         <button
           type="button"
           aria-haspopup="listbox"
@@ -435,7 +435,7 @@ export function HeaderNavFallback() {
           ))}
         </select>
       </label>
-      <label className="menu-trigger md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-36 lg:mr-2">
+      <label className="menu-trigger md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-32 lg:mr-2">
         <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Language</span>
         <select

@@ -88,18 +88,16 @@ export default async function AboutPage() {
             <p className="label-eyebrow !text-civic">
               {locale === "es" ? "Por qué construimos SimpleCity" : "Why we built SimpleCity"}
             </p>
-            <div className="mt-4 space-y-4">
-              <p className="page-copy !max-w-none">
-                {locale === "es"
-                  ? "Somos Ruiwen, Patrick y Samuel, un equipo de tres estudiantes de secundaria del Área de la Bahía que queríamos entender qué estaban discutiendo nuestros gobiernos locales, pero encontramos agendas difíciles de leer y a menudo enterradas en paquetes, avisos o portales extensos."
-                  : "We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school students who wanted to understand what our local governments were discussing, but found meeting agendas difficult to read and often buried in long packets, notices, or portals."}
-              </p>
-              <p className="page-copy !max-w-none">
-                {locale === "es"
-                  ? "Construimos SimpleCity para que las decisiones locales sean más fáciles de entender y para que los registros oficiales sigan siendo fáciles de encontrar por transparencia. Nuestro objetivo no es reemplazar los registros oficiales, sino ayudar a residentes a descubrirlos y entenderlos para mantenerse informados sobre su comunidad y participar cuando sea necesario."
-                  : "We built SimpleCity to make local decisions easier to understand while ensuring that official records remain easily accessible for transparency. Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
-              </p>
-            </div>
+            <p className="mt-4 text-base leading-7 text-ink">
+              {locale === "es"
+                ? "Somos Ruiwen, Patrick y Samuel, un equipo de tres estudiantes de secundaria del Área de la Bahía que queríamos entender qué estaban discutiendo nuestros gobiernos locales, pero encontramos agendas difíciles de leer y a menudo enterradas en paquetes, avisos o portales extensos. Construimos SimpleCity para que las decisiones locales sean más fáciles de entender y para que los registros oficiales sigan siendo fáciles de encontrar por transparencia. Nuestro objetivo no es reemplazar los registros oficiales, sino ayudar a residentes a descubrirlos y entenderlos para mantenerse informados sobre su comunidad y participar cuando sea necesario."
+                : "We are Ruiwen, Patrick, and Samuel, a team of three local Bay Area high school students who wanted to understand what our local governments were discussing, but found meeting agendas difficult to read and often buried in long packets, notices, or portals. We built SimpleCity to make local decisions easier to understand while ensuring that official records remain easily accessible for transparency. Our goal is not to replace official records, but rather to help residents discover and understand them, helping them stay informed about their community and take action when needed."}
+            </p>
+            <p className="mt-4 text-base leading-7 text-ink">
+              {locale === "es"
+                ? "En octubre de 2026, SimpleCity cubre 13 jurisdicciones, ha analizado más de 10.300 puntos de agenda y ha llegado a más de 900 usuarios."
+                : "As of October 2026, SimpleCity covers 13 jurisdictions, has analyzed more than 10,300 agenda items, and has reached more than 900 users."}
+            </p>
             <p className="mt-5 text-sm font-semibold text-black/70">
               {locale === "es"
                 ? "¿Tienes una pregunta, corrección o idea? Contáctanos en"

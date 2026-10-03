@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight, FileText, Landmark, Users } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { cookies } from "next/headers";
 import { cache, Suspense } from "react";
 import {
@@ -16,7 +16,6 @@ import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/const
 import { getHomepageContent, type HomepageCardSelection } from "@/lib/db/queries";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
-  getJurisdictions,
   getJurisdictionLabel,
   isSchoolDistrictJurisdiction,
   normalizeJurisdictionSelection,
@@ -26,29 +25,6 @@ import {
 import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
-
-// Manually maintained from analytics. Last checked 2026-10-02; update the date
-// when you revise the figure so it is obvious when it has gone stale.
-const APPROX_USER_COUNT = "900+";
-// Rounded down from the aggregate published-card count. Last checked 2026-09-25.
-const APPROX_AGENDA_ITEMS_ANALYZED = "10,300+";
-
-// Rounds down to a round hundred and adds "+" once there is a hundred to show;
-// below that the exact count is honest and "0+" is never rendered. Returns null
-// for a stat with nothing worth stating -- null count (read failed) or zero.
-function statValue(count: number | null, locale: string) {
-  if (count === null || count <= 0) {
-    return null;
-  }
-
-  const formatter = new Intl.NumberFormat(locale === "es" ? "es-US" : "en-US");
-
-  if (count >= 100) {
-    return `${formatter.format(Math.floor(count / 100) * 100)}+`;
-  }
-
-  return formatter.format(count);
-}
 
 export const revalidate = 300;
 
@@ -75,84 +51,6 @@ export async function generateMetadata({
     openGraph: { title, description, type: "website", url: urls.canonical, siteName: "SimpleCity" },
     twitter: { card: "summary", title, description }
   };
-}
-
-function GlanceStats({ locale }: { locale: Locale }) {
-  // A stat with no value is one whose read failed or whose count is zero; drop it
-  // rather than advertise it. Jurisdiction coverage plus the maintained user and
-  // agenda-item counts are always present.
-  const glanceStats = [
-    {
-      icon: Users,
-      value: APPROX_USER_COUNT,
-      label: locale === "es" ? "usuarios" : "users"
-    },
-    {
-      icon: Landmark,
-      value: statValue(getJurisdictions().length, locale),
-      label: locale === "es" ? "jurisdicciones" : "jurisdictions"
-    },
-    {
-      icon: FileText,
-      value: APPROX_AGENDA_ITEMS_ANALYZED,
-      label: locale === "es" ? "puntos de agenda analizados" : "agenda items analyzed"
-    }
-  ].filter((item): item is { icon: typeof Users; value: string; label: string } => item.value !== null);
-
-  if (glanceStats.length === 0) return null;
-
-  return (
-    <div className="py-1">
-      <div
-        className={`grid ${
-          glanceStats.length === 3 ? "grid-cols-3" : "grid-cols-2"
-        }`}
-      >
-        {glanceStats.map((item) => (
-          <div
-            key={item.label}
-            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-start sm:gap-2 sm:px-4"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#182c45] sm:h-10 sm:w-10">
-              <item.icon aria-hidden className="h-4 w-4 text-[#9fc4f4] sm:h-5 sm:w-5" />
-            </span>
-            <p className="min-w-0 leading-tight">
-              <span className="block text-base font-black text-white sm:text-xl">{item.value}</span>
-              <span className="block text-[10px] font-semibold text-[#d9e2ec] sm:text-xs">
-                {item.label}
-              </span>
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Holds the strip's height while the counts resolve, so the hero does not jump. */
-function GlanceStatsLoading({ locale }: { locale: Locale }) {
-  return (
-    <div
-      className="py-1"
-      aria-busy="true"
-      aria-label={locale === "es" ? "Cargando estadísticas" : "Loading statistics"}
-    >
-      <div className="grid grid-cols-3">
-        {[0, 1, 2].map((item) => (
-          <div
-            key={item}
-            className="flex min-w-0 flex-col items-start gap-1 px-2 first:pl-0 last:pr-0 sm:flex-row sm:items-start sm:gap-2 sm:px-4"
-          >
-            <span className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-[#182c45] sm:h-10 sm:w-10" />
-            <p className="min-w-0 flex-1 leading-tight">
-              <span className="block h-5 w-12 max-w-full animate-pulse rounded bg-white/15 sm:h-7 sm:w-14" />
-              <span className="mt-1 block h-3 w-16 animate-pulse rounded bg-white/10" />
-            </p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 /**
@@ -293,16 +191,6 @@ export default async function Home({
           </div>
 
           <div className="space-y-5 lg:justify-self-stretch">
-            {!hasSearch ? (
-              <div>
-                <p className="mb-3 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-                  {locale === "es" ? "SimpleCity de un vistazo" : "SimpleCity at a glance"}
-                </p>
-                <Suspense fallback={<GlanceStatsLoading locale={locale} />}>
-                  <GlanceStats locale={locale} />
-                </Suspense>
-              </div>
-            ) : null}
             <div>
               <p className="mb-4 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
                 {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
