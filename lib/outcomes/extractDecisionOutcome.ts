@@ -66,8 +66,10 @@ const ITEM_RESULT_PATTERN = new RegExp(
   `(?:^|[.!?]\\s+)([^.!?]{0,220}\\b(?:item|motion|ordinance|resolution|application|contract|proposal|consent calendar)\\b[^.!?]{0,260}\\b(?:${OUTCOME_TERMS})\\b[^.!?]{0,260}[.!?]?)`,
   "i"
 );
+// "No. 2074" is part of the motion, not the end of its sentence.
+const RESULT_SENTENCE_FRAGMENT = "(?:\\bNo\\.\\s*(?=\\d)|[^.])";
 const CLEAR_RESULT_PATTERN = new RegExp(
-  `\\b(?:motion|council|board|commission|committee|authority|supervisors?)\\b[^.]{0,360}\\b(?:${OUTCOME_TERMS})\\b[^.]{0,600}`,
+  `\\b(?:motion|council|board|commission|committee|authority|supervisors?)\\b${RESULT_SENTENCE_FRAGMENT}{0,360}\\b(?:${OUTCOME_TERMS})\\b${RESULT_SENTENCE_FRAGMENT}{0,600}`,
   "i"
 );
 const STANDALONE_NO_ACTION_PATTERN =
@@ -160,7 +162,12 @@ function sentenceCase(value: string) {
 }
 
 export function classifyDecisionOutcome(value: string): DecisionOutcomeKind {
-  const raw = value.toLowerCase();
+  // A quoted resolution title describes the subject being adopted. Words such
+  // as "Second Amendment" or "Continued Participation" are not procedural
+  // outcomes. Keep action language outside the title, including "as amended".
+  const raw = value
+    .replace(/“A Resolution\b[^”]*(?:”|$)|"A Resolution\b[^"]*(?:"|$)/gi, " ")
+    .toLowerCase();
   // "The motion did not pass" must never read as a passage. Strip negated
   // outcome terms before matching so the surviving terms describe what the body
   // actually did, and remember a negated approval so it lands on rejection
@@ -812,6 +819,38 @@ function numberedMinuteBlock(
 }
 
 function guardedResultWindow(cardTitle: string, text: string) {
+  // Unnumbered minutes can identify motions with a resolution/minute-order
+  // reference in a wrapped uppercase heading. Keep that evidence inside the
+  // next heading; an outcome-centered window can include a neighboring motion.
+  const paragraphs = text.split(/\n{2,}/);
+  const headings = paragraphs.flatMap((paragraph, index) => {
+    const title = cleanText(paragraph);
+    return title.length <= 600 && /[A-Z]/.test(title) && title === title.toUpperCase()
+      ? [{ title, index }]
+      : [];
+  });
+  const headedItems = headings.flatMap((heading, index) => {
+    const reference = /\b(?:(?:CITY|EMID)\s+)?(?:RESOLUTION|MINUTE ORDER)\s+NO\.\s*\d/.exec(heading.title);
+    if (!reference) return [];
+    const end = headings[index + 1]?.index ?? paragraphs.length;
+    const body = paragraphs.slice(heading.index + 1, end).join("\n\n");
+    return [{
+      externalId: `minutes-heading-${heading.index}`,
+      fileNumber: null,
+      agendaNumber: null,
+      itemType: null,
+      // The record number is metadata, not part of the subject's identity.
+      title: heading.title.slice(0, reference.index).replace(/\.(?=\s|$)/g, "").trim(),
+      action: null,
+      result: extractResultText(body),
+      sourceUrl: "",
+      rowText: [paragraphs[heading.index], body].join("\n\n")
+    } satisfies AgendaItem];
+  });
+  const headingMatch = findGuardedAgendaItemMatch(cardTitle, headedItems);
+  // Retain a matched heading with no result so a nearby vote cannot replace it.
+  if (headingMatch) return headingMatch;
+
   const matches = Array.from(text.matchAll(new RegExp(`\\b(?:${OUTCOME_TERMS})\\b`, "gi")));
   const clusters: Array<{ start: number; end: number }> = [];
   for (const match of matches.slice(0, 250)) {
@@ -922,7 +961,9 @@ function minutesResultForCard(
     const numberedBlock = agendaNumber ? numberedMinuteBlock(agendaNumber, text) : null;
     const windowMatch = numberedBlock ? null : guardedResultWindow(title, text);
     const block = numberedBlock || windowMatch?.item.rowText || null;
-    const result = block ? extractResultText(block) : null;
+    const result = numberedBlock
+      ? extractResultText(numberedBlock)
+      : windowMatch?.item.result || null;
     if (!result || (!numberedBlock && !windowMatch)) continue;
 
     let match: GuardedAgendaItemMatch;

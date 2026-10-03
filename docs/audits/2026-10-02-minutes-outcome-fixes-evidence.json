@@ -1,0 +1,462 @@
+{
+  "baseline": "a2b16ee",
+  "savedSourceSnapshotsFrom": "2026-10-02 accuracy audit",
+  "freshPdfDownloadStatus": "HTTP 403",
+  "productionWrites": false,
+  "modelRequests": 0,
+  "fixtures": [
+    {
+      "file": "tests/fixtures/foster-city-2026-05-04-minutes.txt",
+      "sha256": "1dac52ae9249ede85ad7dac42e3b7e6ef02d46130571a3959f3fd27153642f71"
+    },
+    {
+      "file": "tests/fixtures/foster-city-2026-06-01-minutes.txt",
+      "sha256": "295f80a1dc193084355903d9b88423da7dbfb027526482a1f9c64c922f49c248"
+    },
+    {
+      "file": "tests/fixtures/foster-city-2026-06-15-minutes.txt",
+      "sha256": "fbbc4dfb7617da0505c1fed91d7c4aa6ec682d83c60f72a8258e0e2e4af8640a"
+    }
+  ],
+  "regressions": {
+    "newTests": 9,
+    "baselinePassed": 1,
+    "baselineFailed": 8,
+    "fixedPassed": 9
+  },
+  "replay": {
+    "publishedCards": 69,
+    "sourceItemInputs": 84,
+    "totalInputs": 153,
+    "beforeWithOutcome": 64,
+    "afterWithOutcome": 75,
+    "publishedCardsChanged": 2,
+    "sourceItemInputsChanged": 19,
+    "newlyExtracted": 12,
+    "incorrectAssociationRemoved": 1,
+    "retainedKindsOrVotesChanged": 0
+  },
+  "changes": [
+    {
+      "id": "116cdd25-f248-4091-9b81-1471558b83aa",
+      "inputKind": "published_card",
+      "title": "Adopt amended and restated City Manager employment agreement",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Corrected attribution or retained more of the same official motion.",
+      "before": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1"
+      },
+      "after": {
+        "sourceText": "Motion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President Niderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A Resolution of the City Council of the City of Foster City Approving the Amended and Restated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution No. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Amended and Restated District Manager Stefan Chatwin’s Employment Agreement",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "cb3548b801177a379a13a1dab85cfb9fee4e5f0c0c2bbeae3148e91b3a322fa7"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-6-7",
+      "inputKind": "source_item",
+      "title": "A Resolution of the City Council of the City of Foster City Adopting the Street Rehabilitation Project (2026-2027) and the Bicycle and Pedestrian Improvements Project (2026-2027) for Fiscal Year 2026-2027 To Be Funded by SB 1: The Road Repair and Accountability Act of 2017; and Finding the Approval Exempt from the California Environmental Quality Act (CEQA) Pursuant to Guidelines Section 15061(B)(3) and 15301(C) (Class 1-Existing Facilities) a) Staff Report b) Adopt Resolution",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Corrected attribution or retained more of the same official motion.",
+      "before": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting City Resolution No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "58714bdc2093bb07dee95e6dc85e163813e305e47f24aa2022c3cad428c6711b"
+      },
+      "after": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-054, “A Resolution of the City Council of the City of Foster City Adopting the Street Rehabilitation Project (2026-2027) and the Bicycle and Pedestrian Improvements Project (2026-2027) for Fiscal Year 2026- 2027 To Be Funded by SB 1: The Road Repair and Accountability Act of 2017; and Finding the Approval Exempt from the California Environmental Quality Act (CEQA) Pursuant to Guidelines Section 15061(B)(3) and 15301(C) (Class 1-Existing Facilities)” with a correction to the resolution to state the estimated project schedule as July 2026- Augu",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "58714bdc2093bb07dee95e6dc85e163813e305e47f24aa2022c3cad428c6711b"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-6-9",
+      "inputKind": "source_item",
+      "title": "a) A Resolution of the City Council of the City of Foster City Approving the Memorandum of Understanding for the Foster City Police Officers Association (FCPOA), Effective July 1, 2026 to June 30, 2029; and b) A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Memorandum of Understanding for the Foster City Police Officers Association (FCPOA) Effective July 1, 2026 to June 30, 2029 c) Staff Report d) Adopt Resolutions",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Councilmember/Director Jimenez, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-056, “A Resolution of the City Council of the City of Foster City Approving the Memorandum of Understanding for the Foster City Police Officers Association (FCPOA), Effective July 1, 2026 to June 30, 2029,” and EMID Resolution No. 3851, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Memorandum of Understanding for the Foster City Police Officers Association (FCPOA) Effective July 1, 2026 to June 30, 2029",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "46be1d839c3d8d8169fb30cb997e29dfcd8d12abddb5d04d0492d32ce1b35324"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-7-1",
+      "inputKind": "source_item",
+      "title": "A Public Hearing to Hear and Consider Comments Regarding the FY 2026-27 and FY 2027-28 Preliminary Budget a) Staff Report b) Open Public Hearing c) Receive Public Hearing d) Close Public Hearing e) Action – By Minute Order, Provide Policy Direction",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No. 2079, receiving and accepting the FY 2026-2027 and FY 2027-2028 Preliminary Budget and directing staff to proceed with incorporating the terms from the preliminary budget into the final budget for FY 2026- 2027 and FY 2027-2028 to be considered for adoption by the City Council/EMID Board of Directors on June 15, 2026",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "217d118de114f787da567b561e53fe70ae0718dbc89fb147caae739b5283b515"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-8-1",
+      "inputKind": "source_item",
+      "title": "Report on Fiscal Year 2025-26 Third Quarter Financial Update a) Staff Report b) Action – By Minute Order, Receive and Accept Report",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Councilmember/Director Sullivan, and carried unanimously, 5-0-0, adopting Minute Order No. 2078, receiving and accepting the report on Fiscal Year 2025-26 Third Quarter Financial Update",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "cbe158635c35e262249a60329cc6dfefba42fc59b1535f4996be69e9cdd98494"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-9-1",
+      "inputKind": "source_item",
+      "title": "Consideration of the Amended and Restated City/District Manager Stefan Chatwin’s Employment Agreement a) Staff Report b) Action - A Resolution of the City Council of the City of Foster City Approving the Amended and Restated City Manager Stefan Chatwin’s Employment Agreement c) Action - A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Amended and Restated District Manager Stefan Chatwin’s Employment Agreement",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Corrected attribution or retained more of the same official motion.",
+      "before": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1"
+      },
+      "after": {
+        "sourceText": "Motion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President Niderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A Resolution of the City Council of the City of Foster City Approving the Amended and Restated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution No. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Amended and Restated District Manager Stefan Chatwin’s Employment Agreement",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "cb3548b801177a379a13a1dab85cfb9fee4e5f0c0c2bbeae3148e91b3a322fa7"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-10-1",
+      "inputKind": "source_item",
+      "title": "City/District Warrants of Demands were processed via ACH on May 5, 2026, and Warrants of Demands were Processed and Issued on May 14, 2026 a) Information Item Only b) No Action Required",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Pre-existing wrong attribution remains; same wrong motion now has a longer excerpt.",
+      "before": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1"
+      },
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No. 2079, receiving and accepting the FY 2026-2027 and FY 2027-2028 Preliminary Budget and directing staff to proceed with incorporating the terms from the preliminary budget into the final budget for FY 2026- 2027 and FY 2027-2028 to be considered for adoption by the City Council/EMID Board of Directors on June 15, 2026",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1"
+      }
+    },
+    {
+      "id": "item:62ab89d5-8d1e-470a-8d93-bf0d385d36e4:city-council-regular-meeting-item-11",
+      "inputKind": "source_item",
+      "title": "CITY/DISTRICT MANAGER REPORTS, COUNCIL/BOARD STATEMENTS AND REQUESTS, AND COUNCIL LIAISON REPORTS",
+      "date": "Jun 01, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Pre-existing wrong attribution remains; same wrong motion now has a longer excerpt.",
+      "before": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1"
+      },
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No. 2079, receiving and accepting the FY 2026-2027 and FY 2027-2028 Preliminary Budget and directing staff to proceed with incorporating the terms from the preliminary budget into the final budget for FY 2026- 2027 and FY 2027-2028 to be considered for adoption by the City Council/EMID Board of Directors on June 15, 2026",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1"
+      }
+    },
+    {
+      "id": "c81af888-6029-455e-9073-3b0d9ce936d5",
+      "inputKind": "published_card",
+      "title": "Utility Box Art Pilot Program Update",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Corrected attribution or retained more of the same official motion.",
+      "before": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "3c51ceffb8c9cc7d101b6fbe68159f029e365e174ba0e198bf80ec63acac6579"
+      },
+      "after": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No. 2074, receiving and accepting the report and directing staff to continue and expand the program into Fiscal Years 2026-2027 and 2027-2028 using the Community Benefit Fund, and update the process to display signage during the painting or vinyl installation process that it is a City-sponsored project",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "575bdf4d308f89d1be7cb11d72a57a85e2816929c6cb61b0a56080bb1626e0bc"
+      }
+    },
+    {
+      "id": "item:c831339c-525a-47ac-ab59-de53497c3bd7:city-council-regular-meeting-6-3",
+      "inputKind": "source_item",
+      "title": "A Resolution of the City Council of the City of Foster City Authorizing the Mayor to Execute a School Crossing Guard Agreement With the San Mateo–Foster City School District for the 2026-2027 School Year in the Amount of $21,600 a) Staff Report b) Adopt Resolution",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Removed incorrect association with the neighboring utility-box motion; own motion not yet recognized.",
+      "before": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "3c51ceffb8c9cc7d101b6fbe68159f029e365e174ba0e198bf80ec63acac6579"
+      },
+      "after": null
+    },
+    {
+      "id": "item:c831339c-525a-47ac-ab59-de53497c3bd7:city-council-regular-meeting-7-1",
+      "inputKind": "source_item",
+      "title": "Update on the Utility Box Art Program a) Staff Report b) Action – By Minute Order, Receive and Accept Report and Provide Policy Direction",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No. 2074, receiving and accepting the report and directing staff to continue and expand the program into Fiscal Years 2026-2027 and 2027-2028 using the Community Benefit Fund, and update the process to display signage during the painting or vinyl installation process that it is a City-sponsored project",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "575bdf4d308f89d1be7cb11d72a57a85e2816929c6cb61b0a56080bb1626e0bc"
+      }
+    },
+    {
+      "id": "item:c831339c-525a-47ac-ab59-de53497c3bd7:city-council-regular-meeting-8-1",
+      "inputKind": "source_item",
+      "title": "A Resolution of the City Council of the City of Foster City Adopting Policy for Disruption of Remote Access During Public Open Meetings of City Council Consistent With SB 707 a) Staff Report b) Action - Adopt Resolution",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Vice Mayor Niederhofer, seconded by Councilmember Sullivan, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-042, “A Resolution of the City Council of the City of Foster City Adopting Policy for Disruption of Remote Access During Public Open Meetings of City Council Consistent with SB 707",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "b3efc9d3d4b50643706d3780b2fe78c6f77203c1d97e616f48f68769f335c0b5"
+      }
+    },
+    {
+      "id": "item:c831339c-525a-47ac-ab59-de53497c3bd7:city-council-regular-meeting-8-2",
+      "inputKind": "source_item",
+      "title": "Consideration of Authorizing the Execution of a Project Labor Agreement (PLA) Between the City of Foster City/Estero Municipal Improvement District and the San Mateo County Building and Construction Trades Council for Three (3) City/District Public Works Projects a) Staff Report b) Action – Adopt A Resolution of the City Council of the City of Foster City Approving and Authorizing the Mayor to Execute a Project Labor Agreement With the San Mateo County Building and Construction Trades Council c) Action – Adopt A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving and Authorizing the President to Execute a Project Labor Agreement With the San Mateo County Building and Construction Trades Council",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Councilmember/Director Jimeenz, seconded by Councilmember/Director Venkat, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-043, “A Resolution of the City Council of the City of Foster City Approving and Authorizing the Mayor to Execute a Project Labor Agreement With the San Mateo County Building and Construction Trades Council” and EMID Resolution No. 3846, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving and Authorizing the President to Execute a Project Labor Agreement With the San Mateo County Building and Construction Trades Council",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "ef127a76ba0668b30d871dec059e40d5c60bfa033490004b70f9c46253f64fd0"
+      }
+    },
+    {
+      "id": "item:c831339c-525a-47ac-ab59-de53497c3bd7:city-council-regular-meeting-8-3",
+      "inputKind": "source_item",
+      "title": "Consideration of Reinstating the Deputy City Manager Position Responsible for Economic Development and Oversight of Community Development Department a) Staff Report b) Action – Adopt A Resolution of the City Council of the City of Foster City Reinstating the Deputy City Manager Position Responsible for Economic Development and Oversight of the Community Development Department, Authorizing a Salary Change to the Current Deputy City Manager Position, Authorizing City Manager to Hire a Deputy City Manager During the Current Fiscal Year 2025-2026 and Adopting the Amended Pay Plan for Fiscal Year 2025-2026 c) Action - Adopt A Resolution of the Board of Directors of the Estero Municipal Improvement District Reinstating the Deputy City Manager Position Responsible for Economic Development and Oversight of the Community Development Department, Authorizing a Salary Change to the Current Deputy City Manager Position, Authorizing District Manager to Hire a Deputy City Manager During the Current Fiscal Year 2025-2026 and Adopting the Amended Pay Plan for Fiscal Year 2025-2026",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Councilmember/Director Sullivan, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-044, “A Resolution of the City Council of the City of Foster City Reinstating the Deputy City Manager Position Responsible for Economic Development and Oversight of the Community Development Department, Authorizing a Salary Change to the Current Deputy City Manager Position, Authorizing City Manager to Hire a Deputy City Manager During the Current Fiscal Year 2025-2026 and Adopting the Amended Pay Plan for Fiscal Year 2025-2026” and EMID Resolution No. 3847, “A Resolution of the Board of Directors of the Estero Municipal...",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "4d9a66f7ffcf935c116e273289f0de4b77dc7b713eecd7b625224e1aaa3dda89"
+      }
+    },
+    {
+      "id": "item:c831339c-525a-47ac-ab59-de53497c3bd7:city-council-regular-meeting-item-10",
+      "inputKind": "source_item",
+      "title": "CITY/DISTRICT MANAGER REPORTS, COUNCIL/BOARD STATEMENTS AND REQUESTS, AND COUNCIL LIAISON REPORTS",
+      "date": "May 04, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Pre-existing wrong attribution remains; same wrong motion now has a longer excerpt.",
+      "before": {
+        "sourceText": "Motion by Councilmember/Director Jimeenz, seconded by Councilmember/Director Venkat, and carried unanimously, 5-0-0, adopting City Resolution No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "agenda_number",
+        "matchedItemKey": "f8f5da0c2239dd1b67fbf74e447d7af7c6b53e0da038beed1e4884c0bbd72443"
+      },
+      "after": {
+        "sourceText": "Motion by Councilmember/Director Jimeenz, seconded by Councilmember/Director Venkat, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-043, “A Resolution of the City Council of the City of Foster City Approving and Authorizing the Mayor to Execute a Project Labor Agreement With the San Mateo County Building and Construction Trades Council” and EMID Resolution No. 3846, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving and Authorizing the President to Execute a Project Labor Agreement With the San Mateo County Building and Construction Trades Council",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "agenda_number",
+        "matchedItemKey": "f8f5da0c2239dd1b67fbf74e447d7af7c6b53e0da038beed1e4884c0bbd72443"
+      }
+    },
+    {
+      "id": "item:cc1bb9e2-1251-4470-8a17-c900405fe5ca:city-council-regular-meeting-6-6",
+      "inputKind": "source_item",
+      "title": "A Resolution of the City Council of the City of Foster City Authorizing the City Manager to Execute a Second Amendment to the Cooperation Agreement Dated September 20, 2017, with the County of San Mateo, for Continued Participation in the County’s Federally-Funded Housing and Community Development Programs in Fiscal Years 2027, 2028, and 2029 with an Automatic Renewal for Fiscal Years 2030, 2031, and 2032 a) Staff Report b) Adopt Resolution",
+      "date": "Jun 15, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Councilmember Venkat, seconded by Councilmember Sullivan, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-066, “A Resolution of the City Council of the City of Foster City Authorizing the City Manager to Execute a Second Amendment to the Cooperation Agreement Dated September 20, 2017, with the County of San Mateo, for Continued Participation in the County’s Federally- Funded Housing and Community Development Programs in Fiscal Years 2027, 2028, and 2029 with an Automatic Renewal for Fiscal Years 2030, 2031, and 2032",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "0600552dba1debb56a5ff93e1b830d51f6abd11245b23a8f18eb5ae5264d9124"
+      }
+    },
+    {
+      "id": "item:cc1bb9e2-1251-4470-8a17-c900405fe5ca:city-council-regular-meeting-7-1",
+      "inputKind": "source_item",
+      "title": "A Public Hearing to Hear and Consider Comments Regarding the Gilead Campus Expansion Master Plan Project a) Staff Report b) Open Public Hearing c) Receiving Public Hearing d) Close Public Hearing e) Action – Adopt A Resolution of the City Council of the City of Foster City to Approve the Second Addendum and the Mitigation Monitoring and Reporting Program (MMRP) to the Chess-Hatch Master Plan Environmental Impact Report (Sch #2008122065), and Addendum Thereto, for the Proposed Gilead Campus Expansion Project - Up to 800,000 Square Feet of Research and Development (R&D) and Ancillary Uses, Located in the Chess Drive/Hatch Drive Area (APNs: 094-010-500, 094-010-510, 094-010-100) – Gilead Sciences, Inc.- EA2025-0001 f) Action - An Ordinance of the City Council of the City of Foster City Amending the Foster City Zoning Map to Modify the Previously Approved General Development Plan (GDP) for an Approximately 11.87-Acre Land Known as Chess Hatch Master Plan Located at 1155-1159, 1161-1169, and 1175-1191 Chess Drive in the C-M/PD (Commercial Mix/Planned Development Combining) District with an Amended GDP Removing Office as a Primary Use and Updating Associated Exhibits to Facilitate the Gilead Campus Expansion Project to Allow up to 800,000 Square Feet (SF) of Biotechnology or Research and Development (R&D) Uses with a Reduced Parking Ratio (APNs: 094-010-500, 094-010-510, 094-010-100) -- Gilead Sciences, Inc -- RZ2025-0005 i) Introduce Ordinance by title only, by motion waive further reading ii) By motion, pass ordinance to second reading g) Action – Adopt A Resolution of the City Council of the City of Foster City Approving and Authorizing the Mayor to Execute a Parking Agreement Between the City of Foster City and Gilead Sciences, Inc. for the Proposed Gilead Campus Expansion Project - Up to 800,000 Square Feet of Research and Development (R&D) and Ancillary Uses, Located in the Chess Drive/Hatch Drive Area (APNs: 094-010-500, 094-010-510, 094-010-100) – Gilead Sciences, Inc.",
+      "date": "Jun 15, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Corrected attribution or retained more of the same official motion.",
+      "before": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting City Resolution No",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "e6a836f161eed5a411bb7643a755e05073b4e9d76df9fef5f8f6ccd87b63ff29"
+      },
+      "after": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-067, “A Resolution of the City Council of the City of Foster City to Approve the Second Addendum and the Mitigation Monitoring and Reporting Program (MMRP) to the Chess-Hatch Master Plan Environmental Impact Report (Sch #2008122065), and Addendum Thereto, for the Proposed Gilead Campus Expansion Project - Up to 800,000 Square Feet of Research and Development (R&D) and Ancillary Uses, Located in the Chess Drive/Hatch Drive Area (APNs: 094-010-500, 094-010-510, 094-010-100) – Gilead Sciences, Inc",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "21506819f6fa22f31930ba8f90cc1660ef4641de7830f7fd5ad7034d805f3a6a"
+      }
+    },
+    {
+      "id": "item:cc1bb9e2-1251-4470-8a17-c900405fe5ca:city-council-regular-meeting-7-5",
+      "inputKind": "source_item",
+      "title": "A Public Hearing to Hear and Consider Comments Regarding the Report on the Foster City Workforce Vacancies, Recruitment and Retention Trends in Compliance with Assembly Bill 2561 (AB 2561) a) Staff Report b) Open Public Hearing c) Receive Public Hearing d) Close Public Hearing e) Action – By Minute Order, Receive and Accept Report",
+      "date": "Jun 15, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Councilmember Venkat, seconded by Councilmember Sullivan, and carried unanimously, 5-0-0, adopting Minute Order No. 2080, receiving and accepting the Report on the Foster City Workforce Vacancies, Recruitment and Retention Trends in Compliance with Assembly Bill 2561 (AB 2561)",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "f24f83453c9b8e050761df7a9e69c964c865607ab0fc178b45696687962d2434"
+      }
+    },
+    {
+      "id": "item:cc1bb9e2-1251-4470-8a17-c900405fe5ca:city-council-regular-meeting-8-2",
+      "inputKind": "source_item",
+      "title": "Integrated Adaptive Canada Goose Management Plan Project Implementation Quarterly Report a) Staff Report b) Action - By Minute Order, Receive and Accept Report",
+      "date": "Jun 15, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Councilmember Sullivan, seconded by Vice Mayor Niederhofer, and carried unanimously, 5-0-0, adopting Minute Order No. 2081, receiving and accepting the Integrated Adaptive Canada Goose Management Plan Project Implementation Quarterly Report",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "e116adc9a92bc3931b47aa7a8bc08f97e4ed9a754078427d023ec5cae18c5cfb"
+      }
+    },
+    {
+      "id": "item:cc1bb9e2-1251-4470-8a17-c900405fe5ca:city-council-regular-meeting-9-1",
+      "inputKind": "source_item",
+      "title": "Consideration of Approving the Fiscal Years 2026-27 and 2027-28 City/District Budget a) Staff Report b) Action – Adopt A Resolution of the City Council of the City of Foster City Approving the Fiscal Year 2026-27 and 2027-28 City Budget c) Action – Adopt A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Fiscal Year 2026-27 and 2027-28 District Budget",
+      "date": "Jun 15, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Councilmember/Director Venkat, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-070, “A Resolution of the City Council of the City of Foster City Approving the Fiscal Year 2026- 27 and 2027-28 City Budget,” and EMID Resolution No. 3859, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Fiscal Year 2026- 27 and 2027-28 District Budget",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "7620bb1ec3adc45a8c47afd4025865a5022a7135d9c2f35242820fa894fcee29"
+      }
+    },
+    {
+      "id": "item:cc1bb9e2-1251-4470-8a17-c900405fe5ca:city-council-regular-meeting-9-2",
+      "inputKind": "source_item",
+      "title": "Consideration of the First Amendment to the Professional Services Agreement with Wildlife Innovations, Inc. For Continued Implementation of the Integrated Adaptive Canada Goose Management Plan (CEQA Status: IS/MND Approved on December 2, 2024) a) Staff Report b) Action – Adopt A Resolution of the City Council of the City of Foster City Authorizing the City Manager to Execute the First Amendment to the Professional Services Agreement with Wildlife Innovations, Inc. for Continued Implementation of the Integrated Adaptive Canada Goose Management Plan (CEQA Status: IS/MND Approved on December 2, 2024)",
+      "date": "Jun 15, 2026 06:30 PM",
+      "jurisdiction": "foster-city",
+      "disposition": "Newly extracted motion checked against its own official minutes section.",
+      "before": null,
+      "after": {
+        "sourceText": "Motion by Councilmember Venkat, seconded by Councilmember Sullivan, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-071, “A Resolution of the City Council of the City of Foster City Authorizing the City Manager to Execute the First Amendment to the Professional Services Agreement with Wildlife Innovations, Inc",
+        "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "canonicalStatus": "approved",
+        "vote": "5–0–0",
+        "matchMethod": "title",
+        "matchedItemKey": "8ef2f4ff7c4eee36334b5e83c7d62b86748eec54fc80ba825758d113f3c4d0b6"
+      }
+    }
+  ],
+  "verification": {
+    "fullSuitePassed": 733,
+    "baselineFullSuitePassed": 724,
+    "lint": "passed",
+    "productionBuild": "passed",
+    "typeScript": "passed",
+    "staticPageGeneration": "passed"
+  }
+}
