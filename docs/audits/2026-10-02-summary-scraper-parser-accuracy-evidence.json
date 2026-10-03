@@ -1,0 +1,866 @@
+{
+  "auditDate": "2026-10-02",
+  "baseCommit": "8c122aa",
+  "scope": {
+    "jurisdictions": 13,
+    "publishedPastCards": 10233,
+    "outcomes": 2902,
+    "sampleCards": 69,
+    "sampleMeetings": 59,
+    "sampleRawItems": 1244,
+    "modelRequests": 0,
+    "databaseWrites": 0
+  },
+  "screening": {
+    "note": "Heuristic leads, not confirmed accuracy failures or a representative error-rate estimate.",
+    "perJurisdiction": [
+      {
+        "jurisdiction": "foster-city",
+        "publishedPastCards": 376,
+        "outcomes": 63,
+        "meetingsWithUsableMinutes": 22,
+        "meetingsWithUsableMinutesAndAnOutcome": 14,
+        "outcomeCoverageOfMinutesMeetingsPercent": 63.6
+      },
+      {
+        "jurisdiction": "san-mateo-city",
+        "publishedPastCards": 438,
+        "outcomes": 60,
+        "meetingsWithUsableMinutes": 13,
+        "meetingsWithUsableMinutesAndAnOutcome": 6,
+        "outcomeCoverageOfMinutesMeetingsPercent": 46.2
+      },
+      {
+        "jurisdiction": "san-mateo-county",
+        "publishedPastCards": 679,
+        "outcomes": 417,
+        "meetingsWithUsableMinutes": 22,
+        "meetingsWithUsableMinutesAndAnOutcome": 20,
+        "outcomeCoverageOfMinutesMeetingsPercent": 90.9
+      },
+      {
+        "jurisdiction": "mountain-view",
+        "publishedPastCards": 230,
+        "outcomes": 24,
+        "meetingsWithUsableMinutes": 7,
+        "meetingsWithUsableMinutesAndAnOutcome": 7,
+        "outcomeCoverageOfMinutesMeetingsPercent": 100
+      },
+      {
+        "jurisdiction": "santa-clara-county",
+        "publishedPastCards": 3129,
+        "outcomes": 660,
+        "meetingsWithUsableMinutes": 170,
+        "meetingsWithUsableMinutesAndAnOutcome": 86,
+        "outcomeCoverageOfMinutesMeetingsPercent": 50.6
+      },
+      {
+        "jurisdiction": "los-altos",
+        "publishedPastCards": 520,
+        "outcomes": 43,
+        "meetingsWithUsableMinutes": 18,
+        "meetingsWithUsableMinutesAndAnOutcome": 14,
+        "outcomeCoverageOfMinutesMeetingsPercent": 77.8
+      },
+      {
+        "jurisdiction": "los-altos-hills",
+        "publishedPastCards": 532,
+        "outcomes": 13,
+        "meetingsWithUsableMinutes": 22,
+        "meetingsWithUsableMinutesAndAnOutcome": 8,
+        "outcomeCoverageOfMinutesMeetingsPercent": 36.4
+      },
+      {
+        "jurisdiction": "los-altos-school-district",
+        "publishedPastCards": 112,
+        "outcomes": 0,
+        "meetingsWithUsableMinutes": 0,
+        "meetingsWithUsableMinutesAndAnOutcome": 0,
+        "outcomeCoverageOfMinutesMeetingsPercent": null
+      },
+      {
+        "jurisdiction": "san-francisco",
+        "publishedPastCards": 1774,
+        "outcomes": 881,
+        "meetingsWithUsableMinutes": 99,
+        "meetingsWithUsableMinutesAndAnOutcome": 62,
+        "outcomeCoverageOfMinutesMeetingsPercent": 62.6
+      },
+      {
+        "jurisdiction": "menlo-park",
+        "publishedPastCards": 1229,
+        "outcomes": 185,
+        "meetingsWithUsableMinutes": 64,
+        "meetingsWithUsableMinutesAndAnOutcome": 53,
+        "outcomeCoverageOfMinutesMeetingsPercent": 82.8
+      },
+      {
+        "jurisdiction": "east-palo-alto",
+        "publishedPastCards": 151,
+        "outcomes": 0,
+        "meetingsWithUsableMinutes": 0,
+        "meetingsWithUsableMinutesAndAnOutcome": 0,
+        "outcomeCoverageOfMinutesMeetingsPercent": null
+      },
+      {
+        "jurisdiction": "redwood-city",
+        "publishedPastCards": 402,
+        "outcomes": 17,
+        "meetingsWithUsableMinutes": 10,
+        "meetingsWithUsableMinutesAndAnOutcome": 5,
+        "outcomeCoverageOfMinutesMeetingsPercent": 50
+      },
+      {
+        "jurisdiction": "santa-barbara-county",
+        "publishedPastCards": 661,
+        "outcomes": 539,
+        "meetingsWithUsableMinutes": 19,
+        "meetingsWithUsableMinutesAndAnOutcome": 19,
+        "outcomeCoverageOfMinutesMeetingsPercent": 100
+      }
+    ],
+    "outcomeFlags": 496,
+    "placeholderCards": [
+      {
+        "jurisdiction": "san-mateo-city",
+        "cardId": "e0d98197-e490-4d09-b4c7-c568f032bd58",
+        "agendaItem": "CIV-04046 item",
+        "status": "Under discussion",
+        "confidence": "high",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "san-mateo-city",
+        "cardId": "b340c79a-8061-41af-98d8-fae9591701b8",
+        "agendaItem": "CIV-09400 item",
+        "status": "Under discussion",
+        "confidence": "high",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "santa-clara-county",
+        "cardId": "78480416-f95a-496a-a491-01946962961d",
+        "agendaItem": "West Hedding Street, San Jose",
+        "status": "Information only",
+        "confidence": "medium",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "santa-clara-county",
+        "cardId": "6ffd5696-4044-4c8b-bbd6-f36666c1272b",
+        "agendaItem": "West Hedding Street, San Jose",
+        "status": "Passed",
+        "confidence": "low",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "santa-clara-county",
+        "cardId": "c874d653-eeb1-4400-a038-75c85ebf6108",
+        "agendaItem": "West Hedding Street project item",
+        "status": "Information only",
+        "confidence": "medium",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "los-altos",
+        "cardId": "8973dc92-0815-4c92-a757-7d76016017a7",
+        "agendaItem": "Arbor Day proclamation",
+        "status": "Routine approval",
+        "confidence": "high",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "los-altos-hills",
+        "cardId": "e55ef035-b3fb-49aa-af95-666aca568f82",
+        "agendaItem": "Fast Track Development at 26379 W Fremont Rd",
+        "status": "Information only",
+        "confidence": "low",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      },
+      {
+        "jurisdiction": "east-palo-alto",
+        "cardId": "38e5e331-da08-468a-81cd-2bcf3adce66b",
+        "agendaItem": "Amend Section 15332 Infill Development Process",
+        "status": "Information only",
+        "confidence": "medium",
+        "problems": [
+          "placeholder text leaked into card body"
+        ]
+      }
+    ]
+  },
+  "duplicateIdentityScan": [
+    {
+      "jurisdiction": "foster-city",
+      "publishedCards": 402,
+      "cardsWithSourceIdentity": 342,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "san-mateo-city",
+      "publishedCards": 479,
+      "cardsWithSourceIdentity": 278,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "san-mateo-county",
+      "publishedCards": 713,
+      "cardsWithSourceIdentity": 570,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "mountain-view",
+      "publishedCards": 253,
+      "cardsWithSourceIdentity": 212,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "santa-clara-county",
+      "publishedCards": 3418,
+      "cardsWithSourceIdentity": 3123,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "los-altos",
+      "publishedCards": 532,
+      "cardsWithSourceIdentity": 213,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "los-altos-hills",
+      "publishedCards": 589,
+      "cardsWithSourceIdentity": 473,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "los-altos-school-district",
+      "publishedCards": 112,
+      "cardsWithSourceIdentity": 99,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "san-francisco",
+      "publishedCards": 1862,
+      "cardsWithSourceIdentity": 1660,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "menlo-park",
+      "publishedCards": 1251,
+      "cardsWithSourceIdentity": 695,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "east-palo-alto",
+      "publishedCards": 180,
+      "cardsWithSourceIdentity": 150,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "redwood-city",
+      "publishedCards": 426,
+      "cardsWithSourceIdentity": 345,
+      "duplicateGroups": []
+    },
+    {
+      "jurisdiction": "santa-barbara-county",
+      "publishedCards": 726,
+      "cardsWithSourceIdentity": 712,
+      "duplicateGroups": []
+    }
+  ],
+  "liveScraperChecks": [
+    {
+      "adapter": "escribe",
+      "checks": [
+        {
+          "id": "foster-city:escribe-meeting:39e8e792-a2d7-471f-be13-b5f4a3dcb099",
+          "title": "City Council Regular Meeting",
+          "date": "Monday, October 05, 2026 @ 6:30 PM",
+          "time": null,
+          "itemCount": 0,
+          "uniqueItemIds": 0,
+          "source": "https://pub-fostercity.escribemeetings.com/Meeting.aspx?Id=39e8e792-a2d7-471f-be13-b5f4a3dcb099&lang=English",
+          "sourceCheck": null
+        },
+        {
+          "id": "foster-city:escribe-meeting:884dd41e-1c97-438e-8b39-39ce21917de2",
+          "title": "Planning Commission Regular Meeting",
+          "date": "October 01, 2026",
+          "time": "7:00 PM",
+          "itemCount": 15,
+          "uniqueItemIds": 15,
+          "source": "https://pub-fostercity.escribemeetings.com/Meeting.aspx?Id=884dd41e-1c97-438e-8b39-39ce21917de2&Agenda=Agenda&lang=English",
+          "sourceCheck": {
+            "status": 200,
+            "hasAgendaContainer": true,
+            "itemIdsPresentInHtml": true
+          }
+        }
+      ]
+    },
+    {
+      "adapter": "legistar-api",
+      "checks": [
+        {
+          "id": "2587",
+          "source": "https://webapi.legistar.com/v1/santabarbara/events/2587",
+          "date": "10/27/2026",
+          "rawDate": "2026-10-27T00:00:00",
+          "timeMatches": true,
+          "rawRows": 0,
+          "substantiveRows": 0,
+          "parsedRows": 0,
+          "uniqueItemIds": 0,
+          "itemFieldsMatch": true
+        },
+        {
+          "id": "2585",
+          "source": "https://webapi.legistar.com/v1/santabarbara/events/2585",
+          "date": "10/13/2026",
+          "rawDate": "2026-10-13T00:00:00",
+          "timeMatches": true,
+          "rawRows": 0,
+          "substantiveRows": 0,
+          "parsedRows": 0,
+          "uniqueItemIds": 0,
+          "itemFieldsMatch": true
+        },
+        {
+          "id": "2584",
+          "source": "https://webapi.legistar.com/v1/santabarbara/events/2584",
+          "date": "10/6/2026",
+          "rawDate": "2026-10-06T00:00:00",
+          "timeMatches": true,
+          "rawRows": 91,
+          "substantiveRows": 56,
+          "parsedRows": 56,
+          "uniqueItemIds": 56,
+          "itemFieldsMatch": true
+        },
+        {
+          "id": "2583",
+          "source": "https://webapi.legistar.com/v1/santabarbara/events/2583",
+          "date": "9/29/2026",
+          "rawDate": "2026-09-29T00:00:00",
+          "timeMatches": true,
+          "rawRows": 0,
+          "substantiveRows": 0,
+          "parsedRows": 0,
+          "uniqueItemIds": 0,
+          "itemFieldsMatch": true
+        },
+        {
+          "id": "2582",
+          "source": "https://webapi.legistar.com/v1/santabarbara/events/2582",
+          "date": "9/22/2026",
+          "rawDate": "2026-09-22T00:00:00",
+          "timeMatches": true,
+          "rawRows": 109,
+          "substantiveRows": 53,
+          "parsedRows": 53,
+          "uniqueItemIds": 53,
+          "itemFieldsMatch": true
+        },
+        {
+          "id": "2581",
+          "source": "https://webapi.legistar.com/v1/santabarbara/events/2581",
+          "date": "9/15/2026",
+          "rawDate": "2026-09-15T00:00:00",
+          "timeMatches": true,
+          "rawRows": 98,
+          "substantiveRows": 47,
+          "parsedRows": 47,
+          "uniqueItemIds": 47,
+          "itemFieldsMatch": true
+        }
+      ]
+    }
+  ],
+  "validatorReplay": {
+    "note": "Same current saved sources and validator options on both versions; includes four ID-ordered published cards per jurisdiction plus flagged cards. Not a random sample or a historical model-call replay.",
+    "beforeAccepted": 44,
+    "afterAccepted": 44,
+    "cards": [
+      {
+        "id": "116cdd25-f248-4091-9b81-1471558b83aa",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "c81af888-6029-455e-9073-3b0d9ce936d5",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "d57a4001-17f4-4a63-8c03-2837d2f88b0c",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "00168c75-3999-49a8-9248-167cdd79f6d2",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "00d40d0a-5fce-4acb-aa43-c80a98a27af7",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0123f8b3-ae23-4a0a-a58f-7e43ef4c703c",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "01c520fc-6530-482b-8241-339dfb07ef37",
+        "jurisdiction": "foster-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "2d09e64b-a6f5-4039-8718-766b07faf98f",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "940c1153-c0c0-4a9a-acb5-6ecc8857cdbe",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "b340c79a-8061-41af-98d8-fae9591701b8",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "e0d98197-e490-4d09-b4c7-c568f032bd58",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "f90748f4-ea5f-4ce0-8171-e8f3d2dcd979",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00577947-88fc-46eb-9526-2e40f612451f",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "007f37bc-5352-4179-92af-f97825834e59",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "015a1877-b171-403b-bf2d-a527cd3170f3",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "01ddfb85-5a49-441c-8f2a-192e1161922b",
+        "jurisdiction": "san-mateo-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "5fb195d5-7ba2-4478-bffb-7b433246a5fb",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "a219e2d1-226b-4135-9895-2617d6797b1c",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "d99a0556-25e3-460a-8ed4-6965a205edf0",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "012abd95-8693-4207-b37e-cbd22b1934e9",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "0151e808-5eb2-423a-bf0e-5a23fcdd4611",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0170a1eb-0893-4d93-b183-c713cd5ae4d1",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "01d3d83e-809e-4c49-8a9c-6175e2f251b5",
+        "jurisdiction": "san-mateo-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00789062-6bc5-4c7c-a8cc-6bb2bfcc406e",
+        "jurisdiction": "mountain-view",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00fbc73d-4016-4f34-9c3e-a2eb87d9771b",
+        "jurisdiction": "mountain-view",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "04180754-49bd-4649-8053-07b40b13a1f9",
+        "jurisdiction": "mountain-view",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0675b8ef-6e22-41e1-baee-2a5ef32035bb",
+        "jurisdiction": "mountain-view",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "6ffd5696-4044-4c8b-bbd6-f36666c1272b",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "78480416-f95a-496a-a491-01946962961d",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "c874d653-eeb1-4400-a038-75c85ebf6108",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "0019ae72-34a0-4aeb-8be2-b7acb88442f6",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "003e9eec-4384-40da-b29d-fb243e8a9f93",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "007783bf-eb5c-4324-aa7d-9ed9b6f4db70",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "009c273f-3c31-4aee-9b8e-d4d09c159eda",
+        "jurisdiction": "santa-clara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "8973dc92-0815-4c92-a757-7d76016017a7",
+        "jurisdiction": "los-altos",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00d5b5ca-90e6-40dd-befd-9e9ea45494d9",
+        "jurisdiction": "los-altos",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "01a7d868-2154-469a-91ec-f2432ac7ce18",
+        "jurisdiction": "los-altos",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "027ed7b5-7aa2-41cb-b19b-d675a7273ed1",
+        "jurisdiction": "los-altos",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "02a15a16-674b-4bdb-8965-4ba22c597377",
+        "jurisdiction": "los-altos",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "e55ef035-b3fb-49aa-af95-666aca568f82",
+        "jurisdiction": "los-altos-hills",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0063b1e9-f674-42b3-a2cc-48a91e1331bc",
+        "jurisdiction": "los-altos-hills",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00fb22ca-3e68-4922-901b-51cc24e34635",
+        "jurisdiction": "los-altos-hills",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "013bbc33-f81f-41ee-864f-462ed5ebec85",
+        "jurisdiction": "los-altos-hills",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "01aa11bc-b18e-4237-b405-32ec683afb5d",
+        "jurisdiction": "los-altos-hills",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "0560750b-e152-4a52-8963-71e2db8ce0dc",
+        "jurisdiction": "los-altos-school-district",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0987bc62-8966-4aaa-806f-48bedb7bd9da",
+        "jurisdiction": "los-altos-school-district",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "09f66be6-b405-4ed6-8a1d-1556fa560fb4",
+        "jurisdiction": "los-altos-school-district",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0b2d6c7c-19dd-47ed-bf0a-1108346e9ddf",
+        "jurisdiction": "los-altos-school-district",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "000c45aa-9b47-4fdd-8cc0-6ef35b94d839",
+        "jurisdiction": "san-francisco",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00a318ef-7a56-480d-ab59-1902aac2b82b",
+        "jurisdiction": "san-francisco",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "00ae6f58-b6f0-4f26-b2bb-6e1bdb714d23",
+        "jurisdiction": "san-francisco",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "01154186-0267-432f-a48a-f8d322e91d12",
+        "jurisdiction": "san-francisco",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "000491a8-f6af-41b4-9f82-55c05fbc598e",
+        "jurisdiction": "menlo-park",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "00272919-4300-40b9-8153-c68b1c93fd75",
+        "jurisdiction": "menlo-park",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "003c6df6-ace7-4d14-b038-e79b18fd5845",
+        "jurisdiction": "menlo-park",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "008916b1-9038-4b9c-af70-30c0de19c33e",
+        "jurisdiction": "menlo-park",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "38e5e331-da08-468a-81cd-2bcf3adce66b",
+        "jurisdiction": "east-palo-alto",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0021fede-8f9f-40e4-ba55-fa66070abc70",
+        "jurisdiction": "east-palo-alto",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "0068b6cd-2cb1-424c-b267-86241e9a3ef2",
+        "jurisdiction": "east-palo-alto",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "02e35666-68a7-43b9-a86f-d46d1671a52c",
+        "jurisdiction": "east-palo-alto",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "031c6dcd-3db2-417d-9bef-0bfc84638fb2",
+        "jurisdiction": "east-palo-alto",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00d4d211-6ae2-4c47-8ac2-498aef4d3d22",
+        "jurisdiction": "redwood-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "01f764e6-65a7-4c62-997e-bbae3c079f93",
+        "jurisdiction": "redwood-city",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "02b69d11-bbe4-4d19-a1e5-9da3120729b0",
+        "jurisdiction": "redwood-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "03cb5b98-a13d-4e3b-96d5-aa527983b306",
+        "jurisdiction": "redwood-city",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "002acf78-6b8e-4da6-be14-c36fe06c0649",
+        "jurisdiction": "santa-barbara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      },
+      {
+        "id": "00376153-a422-4d6f-bf3a-e72f1499f52d",
+        "jurisdiction": "santa-barbara-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "019f0a56-76d1-41ac-824d-0f0d30d2533e",
+        "jurisdiction": "santa-barbara-county",
+        "beforeAccepted": false,
+        "afterAccepted": false
+      },
+      {
+        "id": "01c03b7e-7784-468f-8289-4b6b7dc69229",
+        "jurisdiction": "santa-barbara-county",
+        "beforeAccepted": true,
+        "afterAccepted": true
+      }
+    ]
+  },
+  "unmodifiedOutcomeFindings": [
+    {
+      "outcomeId": "05d4fcda-88b0-4dc2-9e76-17785276e542",
+      "cardId": "c81af888-6029-455e-9073-3b0d9ce936d5",
+      "cardTitle": "Utility Box Art Pilot Program Update",
+      "meetingId": "c831339c-525a-47ac-ab59-de53497c3bd7",
+      "date": "May 04, 2026 06:30 PM",
+      "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7232&compileOutputType=1",
+      "storedSourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No",
+      "replayedSourceText": "Motion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No",
+      "replayedSourceContext": "Official action/result:\n\nMotion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried unanimously, 5-0-0, adopting Minute Order No\n\nOfficial item context:\n\nITY\nSCHOOL DISTRICT FOR THE 2026-2027 SCHOOL YEAR IN THE AMOUNT OF\n$21,600. CITY RESOLUTION NO. 2026-041.\n\nWithout objection from the City Council, Mayor Kiesel removed this item from the Consent\nCalendar at the request of Councilmember Venkat.\n\nDiscussion ensued.\n\nMotion by Vice Mayor Niederhofer, seconded by Councilmember Sullivan, and\nunanimously, 5-0-0, adopting City Resolution No. 2026-041, “A Resolution of the City\nCouncil of the City of Foster City Authorizing the Mayor to Execute a School Crossing\nGuard Agreement With the San Mateo–Foster City School District for the 2026-2027\nSchool Year in the Amount of $21,600.”\n\nREPORTS\n\nUPDATE ON THE UTILITY BOX ART PILOT PROGRAM. MINUTE ORDER NO. 2074.\n\nRecreation Manager Oren and Parks and Recreation Director Schweigart presented the\nstaff report.\n\nDiscussion ensued.\n\nMotion by Councilmember Sullivan, seconded by Councilmember Venkat, and carried\nunanimously, 5-0-0, adopting Minute Order No. 2074, receiving and accepting the report\nand directing staff to continue and expand the program into Fiscal Years 2026-2027 and\n2027-2028 using the Community Benefit Fund, and update the process to display signage\nduring the painting or vinyl installation process that it is a City-sponsored project.\n\nRESOLUTIONS FOR ADOPTION\n\nPOLICY FOR DISRUPTION OF REMOTE ACCESS DURING PUBLIC OPEN\nMEETINGS OF CITY COUNCIL CONSISTENT WITH SB 707. CITY RESOLUTION NO.\n2026-042.\n\nCommunications Director/City Clerk Schaus presented the staff report.\n\nDiscussion ensued.\n\nMotion by Vice Mayor Niederhofer, seconded by Councilmember Sullivan, and carried\nunanimously, 5-0-0, adopting City Resolution No. 2026-042, “A Resolution of the City\nCouncil of the City of Foster City Adopting Policy for Disruption of Remote Access During\nPublic Open Meetings of City Cou"
+    },
+    {
+      "outcomeId": "0e41ac3a-c04c-4231-b9cb-eb5140881b33",
+      "cardId": "d57a4001-17f4-4a63-8c03-2837d2f88b0c",
+      "cardTitle": "Adjournment with instructions for accommodation requests",
+      "meetingId": "cc1bb9e2-1251-4470-8a17-c900405fe5ca",
+      "date": "Jun 15, 2026 06:30 PM",
+      "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+      "storedSourceText": "Motion by Councilmember Venkat, seconded by Councilmember Sullivan, and carried unanimously, 5-0-0, adopting City Resolution No",
+      "replayedSourceText": null,
+      "replayedSourceContext": null
+    },
+    {
+      "outcomeId": "6958723d-dc9d-49f4-949c-fef6a2dc1868",
+      "cardId": "116cdd25-f248-4091-9b81-1471558b83aa",
+      "cardTitle": "Adopt amended and restated City Manager employment agreement",
+      "meetingId": "62ab89d5-8d1e-470a-8d93-bf0d385d36e4",
+      "date": "Jun 01, 2026 06:30 PM",
+      "sourceUrl": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+      "storedSourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+      "replayedSourceText": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+      "replayedSourceContext": "Official action/result:\n\nMotion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No\n\nOfficial item context:\n\n/Director\nSullivan, and carried unanimously, 5-0-0, adopting Minute Order No. 2078, receiving and\naccepting the report on Fiscal Year 2025-26 Third Quarter Financial Update.\n\nPUBLIC HEARING\n\nFY 2026-27 AND FY 2027-28 PRELIMINARY BUDGET. MINUTE ORDER NO. 2079.\n\nFinance Director Cruz presented the staff report.\n\nMayor/President Kiesel opened a public hearing to hear and consider comments\nregarding the FY 2026-27 and FY 2027-28 Preliminary Budget.\n\nThe following people addressed the City Council/EMID Board of Directors via email:\n1. Michael Crocker;\n2. Yiming Luo;\n3. Evan Adams; and\n4. Frederic de Sauvage.\n\nYiming Luo addressed the City Council/EMID Board of Directors via teleconference.\n\nWithout objection from the City Council/EMID Board of Directors, Mayor/President Kiesel\nclosed the public hearing.\n\nMotion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel,\nand carried unanimously, 5-0-0, adopting Minute Order No. 2079, receiving and accepting\nthe FY 2026-2027 and FY 2027-2028 Preliminary Budget and directing staff to proceed\nwith incorporating the terms from the preliminary budget into the final budget for FY 2026-\n2027 and FY 2027-2028 to be considered for adoption by the City Council/EMID Board\nof Directors on June 15, 2026.\n\nRESOLUTIONS FOR ADOPTION\n\nAMENDED AND RESTATED CITY/DISTRICT MANAGER STEFAN CHATWIN’S\nEMPLOYMENT AGREEMENT. CITY RESOLUTION NO. 2026-057. EMID\nRESOLUTION NO. 3852.\n\nCity Attorney/District Legal Counsel Stock presented the staff report.\n\nDiscussion ensued.\n\nMotion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President\nNiderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A\nResolution of the City Council of the City of Foster City Approving the Amended and\nRestated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution\nNo. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement\nDistrict Approving the Amended and Restated District Manager Stefan Chatwin’s\nEmployment Agreement.”\n\nCOMMUNICATIONS\n\nCITY/DISTRICT WARRANT OF DEMANDS. NO ACTION TAKEN.\n\nCity/District Warrants of Demands were processed via ACH on May 5, 2026, and\nWarrants of Demands were Processed and Issued on May 14, 2026.\n\nCITY/DISTRICT MANAGER REPORTS, COUNCIL/BOARD STATEMENTS AND\nREQUESTS, AND COUNCIL LIAISON REPORTS\n\nActing City/District Manager Subhashini, on behalf of City/District Manager Chatwin,\nthanked the City Council/EMID Board of Directors for their consideration and approval of\nthe Foster City Police Officers Association (FCPOA) Memorandum of Understanding\n(MOU), and thanked the FCPOA and the City’s Human Resources staff for their efforts\nthroughout the process.\n\nCouncilmember/Director Sullivan thanked the Police Department for their enforcement\nagainst unlawful use of electric motorcycles and electric scooters. He stated he attended\nBowditch Middle School’s Ribbon Cutting event for their new Gym and Academic Core\nfacilities on May 20. O"
+    }
+  ],
+  "verification": {
+    "baselineTestsPassed": 716,
+    "finalTestsPassed": 724,
+    "newTests": 8,
+    "newFailureCasesOnOriginalCode": 6,
+    "validatorSuiteOnOriginalCode": {
+      "passed": 50,
+      "failed": 6
+    },
+    "validatorSuiteAfterFix": {
+      "passed": 56,
+      "failed": 0
+    },
+    "lint": "passed",
+    "productionBuild": "passed"
+  }
+}

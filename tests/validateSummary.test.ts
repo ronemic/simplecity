@@ -444,6 +444,78 @@ test("accepts equivalent abbreviated and expanded numeric values", () => {
   assert.equal(result.cards.length, 1);
 });
 
+for (const scenario of [
+  { name: "currency prefixes", summaryValue: "$100", sourceValue: "$1000" },
+  { name: "currency decimals", summaryValue: "$100", sourceValue: "$100.50" },
+  { name: "currency scales", summaryValue: "$100", sourceValue: "$100 million" },
+  { name: "unit-bearing suffixes", summaryValue: "5 homes", sourceValue: "15 homes" },
+  { name: "percentage suffixes", summaryValue: "20 percent", sourceValue: "120 percent" },
+  { name: "incompatible units sharing a prefix", summaryValue: "5 miles", sourceValue: "5 minutes" }
+]) {
+  test(`rejects numeric substring matches for ${scenario.name}`, () => {
+    const issues: Array<{ reason: string; value?: string }> = [];
+    const result = validateSimpleCitySummary(
+      {
+        ...baseSummary,
+        cards: [groundedCard({
+          whatIsHappening: [`The proposal includes ${scenario.summaryValue}.`]
+        })]
+      },
+      {
+        fallbackSource: "https://city.example/agendas/4",
+        sourceText: `Item 4. The proposal includes ${scenario.sourceValue} at 7:00 PM.`,
+        onIssue: (issue) => issues.push(issue)
+      }
+    );
+
+    assert.equal(result.cards.length, 0);
+    assert.ok(issues.some((issue) => issue.value === scenario.summaryValue));
+  });
+}
+
+test("compares the full amount in the Menlo Park June 23 clinician agreement", () => {
+  // Official agenda, page 2, item I3:
+  // https://www.menlopark.gov/files/sharedassets/public/v/2/agendas-and-minutes/city-council/2026-meetings/20260623/20260623-city-council-special-and-regular-agenda.pdf
+  const sourceText = "I3. Authorize the city manager to execute a professional services agreement with Meredith Roberts, LMFT for an amount not to exceed $160,000 for services as a Community Wellness Crisis Response Team Clinician (Staff Report #26-106-CC)";
+  for (const [amount, expectedCards] of [["$160", 0], ["$160,000", 1], ["$160 thousand", 1]] as const) {
+    const result = validateSimpleCitySummary(
+      {
+        ...baseSummary,
+        cards: [groundedCard({
+          agendaItem: "Community Wellness Crisis Response Team clinician agreement",
+          whatIsHappening: [`The agreement with Meredith Roberts would cost up to ${amount}.`],
+          howToAct: {}
+        })]
+      },
+      { fallbackSource: "https://city.example/agendas/4", sourceText }
+    );
+
+    assert.equal(result.cards.length, expectedCards, amount);
+  }
+});
+
+test("keeps exact numbers next to words that start with scale abbreviations", () => {
+  for (const [summaryValue, sourceValue] of [
+    ["$100", "$100 maintenance contract"],
+    ["$100 maintenance contract", "$100 maintenance contract"],
+    ["100 minutes", "100 minutes"],
+    ["$100", "$100 known cost"],
+    ["$100 known cost", "$100 known cost"]
+  ]) {
+    const result = validateSimpleCitySummary(
+      {
+        ...baseSummary,
+        cards: [groundedCard({ whatIsHappening: [`The proposal includes ${summaryValue}.`] })]
+      },
+      {
+        fallbackSource: "https://city.example/agendas/4",
+        sourceText: `Item 4. The proposal includes ${sourceValue} at 7:00 PM.`
+      }
+    );
+    assert.equal(result.cards.length, 1, sourceValue);
+  }
+});
+
 test("does not interpret the first letter after a street number as millions", () => {
   const issues: Array<{ reason: string; value?: string }> = [];
   const result = validateSimpleCitySummary(
