@@ -2,6 +2,8 @@
 
 One narrowly scoped validator fix was implemented: currency amounts, percentages, and explicit quantities must match complete source values. Two additional current minutes-parser defects were reproduced and remain unresolved because a safe correction has not been established. This audit does not certify overall summary accuracy.
 
+Follow-up: the [source-backed minutes-parser fixes](./2026-10-02-minutes-outcome-fixes.md) address those two reproductions and the associated resolution-title classification defect. The findings below retain the original audit's status and evidence.
+
 The baseline was commit `8c122aa`. All production access was read-only. No model requests, database updates, card regeneration, or data deletion were performed. The [evidence file](./2026-10-02-summary-scraper-parser-accuracy-evidence.json) records counts, sampled card IDs, official URLs, and the reproduced outcome contexts.
 
 **Scope and method**
