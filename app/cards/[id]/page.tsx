@@ -2,8 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
+import { CardTimeline } from "@/components/CardTimeline";
+import { MarkFollowedCardSeen } from "@/components/MarkFollowedCardSeen";
 import { SummaryCard } from "@/components/SummaryCard";
-import { getPublishedCard } from "@/lib/db/queries";
+import { latestCardEventRecordedAt } from "@/lib/cardEvents";
+import { getCardEvents, getPublishedCard } from "@/lib/db/queries";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { getRequestLocale } from "@/lib/i18n/server";
 import {
@@ -53,6 +56,7 @@ export default async function SharedCardPage({
   const [{ id }, locale] = await Promise.all([params, getRequestLocale()]);
   const card = await getPublishedCard(id, locale);
   if (!card) notFound();
+  const events = await getCardEvents(card);
   const canonical = `${getConfiguredAppUrl()}/cards/${encodeURIComponent(id)}`;
   const title = cardShareTitle(card);
   const description = cardShareDescription(card, locale);
@@ -85,6 +89,13 @@ export default async function SharedCardPage({
         <div className="mt-4">
           <SummaryCard card={card} locale={locale} presentation="share" />
         </div>
+
+        {events.length > 0 ? (
+          <div className="quiet-card mt-4 px-6 py-5 sm:px-8">
+            <CardTimeline events={events} locale={locale} />
+          </div>
+        ) : null}
+        <MarkFollowedCardSeen cardId={card.id} seenThrough={latestCardEventRecordedAt(events)} />
 
       </div>
     </div>

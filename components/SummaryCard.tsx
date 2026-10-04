@@ -4,6 +4,7 @@ import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, In
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
 import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
+import { FollowButton } from "@/components/FollowButton";
 import { PendingLink } from "@/components/PendingLink";
 import { HighlightedText } from "@/components/HighlightedText";
 import { CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";
@@ -428,6 +429,7 @@ export function SummaryCard({
               title={agendaTitle}
             />
           ) : null}
+          <FollowButton cardId={card.id} title={agendaTitle} locale={locale} />
           <CardShareActions
             cardId={card.id}
             compact

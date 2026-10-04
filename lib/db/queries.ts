@@ -15,6 +15,7 @@ import {
   getPublicSupabaseProjectsForSelection,
   getServiceSupabaseClientsForSelection,
   getServiceSupabaseProjectsForSelection,
+  requireValidJurisdictionSlug,
   type JurisdictionConfig,
   type JurisdictionProject,
   type JurisdictionSelection,
@@ -41,6 +42,7 @@ import type {
   SummaryCardTranslationRow
 } from "@/lib/types";
 import { LOCALES, type Locale } from "@/lib/i18n";
+import { PUBLIC_CARD_EVENT_COLUMNS, sortCardEvents, type CardEvent } from "@/lib/cardEvents";
 import {
   applyDecisionOutcomeTranslation,
 } from "@/lib/i18n/decisionOutcome";
@@ -2170,6 +2172,67 @@ export async function getPublishedCardsByIds(
 
 export async function getPublishedCard(id: string, locale: Locale = "en") {
   return getCachedPublishedCard(id, locale);
+}
+
+async function loadCardEvents(cards: Array<Pick<SummaryCardRow, "id" | "jurisdiction_slug">>) {
+  const idsBySelection = new Map<JurisdictionSelection, string[]>();
+  for (const card of cards) {
+    let selection: JurisdictionSelection;
+    try {
+      selection = requireValidJurisdictionSlug(card.jurisdiction_slug);
+    } catch {
+      continue;
+    }
+    if (selection === ALL_JURISDICTIONS_SLUG) continue;
+    idsBySelection.set(selection, [...(idsBySelection.get(selection) || []), card.id]);
+  }
+
+  const results = await Promise.all(
+    [...idsBySelection].map(async ([selection, cardIds]) => {
+      const supabase = getSafePublicClients(selection)[0]?.supabase;
+      if (!supabase) return [] as CardEvent[];
+
+      const { data, error } = await supabase
+        .from("card_events")
+        .select(PUBLIC_CARD_EVENT_COLUMNS)
+        .in("summary_card_id", cardIds);
+      if (error) {
+        logQueryError(`Failed to load ${selection} card events`, error);
+        return [] as CardEvent[];
+      }
+      return (data || []) as unknown as CardEvent[];
+    })
+  );
+
+  const eventsByCard = new Map<string, CardEvent[]>();
+  for (const event of results.flat()) {
+    eventsByCard.set(event.summary_card_id, [
+      ...(eventsByCard.get(event.summary_card_id) || []),
+      event
+    ]);
+  }
+  for (const [cardId, events] of eventsByCard) {
+    eventsByCard.set(cardId, sortCardEvents(events));
+  }
+  return eventsByCard;
+}
+
+const getCachedCardEvents = unstable_cache(
+  async (id: string, jurisdictionSlug: string | null) =>
+    (await loadCardEvents([{ id, jurisdiction_slug: jurisdictionSlug }])).get(id) || [],
+  ["card-events"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
+export async function getCardEvents(card: Pick<SummaryCardRow, "id" | "jurisdiction_slug">) {
+  return getCachedCardEvents(card.id, card.jurisdiction_slug || null);
+}
+
+/** Uncached: followers check these for changes since their last visit. */
+export async function getCardEventsForCards(
+  cards: Array<Pick<SummaryCardRow, "id" | "jurisdiction_slug">>
+) {
+  return Object.fromEntries(await loadCardEvents(cards)) as Record<string, CardEvent[]>;
 }
 
 export async function getDecisionCardPage({

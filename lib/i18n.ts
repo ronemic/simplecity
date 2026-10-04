@@ -81,6 +81,7 @@ type TranslationKey =
   | "sourceNote"
   | "sourceTransparency"
   | "status"
+  | "following"
   | "subscribe"
   | "subscribeAlreadySubscribedHelp"
   | "subscribeConfirmedBody"
@@ -199,6 +200,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     sourceNote: "Source note",
     sourceTransparency: "Source transparency",
     status: "Status",
+    following: "Following",
     subscribe: "Subscribe",
     subscribeAlreadySubscribedHelp:
       "Already subscribed? Use the same email to update your areas. We’ll confirm changes by email.",
@@ -323,6 +325,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     sourceNote: "Nota sobre la fuente",
     sourceTransparency: "Transparencia de fuentes",
     status: "Estado",
+    following: "Siguiendo",
     subscribe: "Suscribirse",
     subscribeAlreadySubscribedHelp:
       "¿Ya estás suscrito? Usa el mismo email para actualizar tus áreas. Confirmaremos los cambios por email.",

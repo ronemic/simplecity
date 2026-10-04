@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Languages, Loader2, MapPin, Menu, School, X } from "lucide-react";
+import { Bell, Check, ChevronDown, Languages, Loader2, MapPin, Menu, School, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Fragment, useEffect, useRef, useState, useTransition } from "react";
@@ -23,6 +23,11 @@ const nav = [
   { href: "/decisions", labelKey: "decisions" },
   { href: "/meetings", labelKey: "meetings" },
   { href: "/topics", labelKey: "topics" },
+  // Six text links overflow the desktop header below xl, so this one is
+  // icon-only from 800px (with a narrower location picker at lg) and hidden
+  // in the 768-799px sliver where even the icon doesn't fit. The mobile menu
+  // always shows the full label.
+  { href: "/following", labelKey: "following", compactIcon: Bell },
   { href: "/subscribe", labelKey: "subscribe" },
   { href: "/about", labelKey: "about" }
 ] as const;
@@ -251,7 +256,7 @@ export function HeaderNav({
         } col-span-2 grid min-h-0 w-full grid-cols-5 items-center gap-1 transition-[max-height,margin,opacity,transform,visibility] duration-200 ease-out md:pointer-events-auto md:visible md:mt-0 md:flex md:max-h-none md:w-auto md:translate-y-0 md:items-center md:justify-end md:gap-1 md:overflow-visible md:opacity-100`}
         id="mobile-primary-navigation"
       >
-      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2">
+      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2 lg:max-xl:w-40">
         <button
           type="button"
           aria-haspopup="listbox"
@@ -390,9 +395,12 @@ export function HeaderNav({
               isActive
                 ? "text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
                 : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
-            }`}
+            } ${"compactIcon" in item ? "md:max-[799px]:hidden" : ""}`}
           >
-            <span className="inline-grid">
+            {"compactIcon" in item ? (
+              <item.compactIcon aria-hidden className="hidden h-4 w-4 md:max-xl:block" />
+            ) : null}
+            <span className={cn("inline-grid", "compactIcon" in item && "md:max-xl:sr-only")}>
               <span aria-hidden="true" className="invisible col-start-1 row-start-1 font-black">
                 {t(selectedLocale, item.labelKey)}
               </span>
@@ -419,7 +427,7 @@ export function HeaderNavFallback() {
         Menu
       </span>
       <div className="hidden md:flex md:items-center md:justify-end">
-      <label className="menu-trigger md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2">
+      <label className="menu-trigger md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2 lg:max-xl:w-40">
         <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
@@ -453,9 +461,17 @@ export function HeaderNavFallback() {
         <Link
           key={item.href}
           href={item.href}
-          className="inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5"
+          className={cn(
+            "inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5",
+            "compactIcon" in item && "md:max-[799px]:hidden"
+          )}
         >
-          {t("en", item.labelKey)}
+          {"compactIcon" in item ? (
+            <item.compactIcon aria-hidden className="hidden h-4 w-4 md:max-xl:block" />
+          ) : null}
+          <span className={cn("compactIcon" in item && "md:max-xl:sr-only")}>
+            {t("en", item.labelKey)}
+          </span>
         </Link>
       ))}
       </div>
