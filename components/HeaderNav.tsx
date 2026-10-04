@@ -28,9 +28,26 @@ const nav = [
   // in the 768-799px sliver where even the icon doesn't fit. The mobile menu
   // always shows the full label.
   { href: "/following", labelKey: "following", compactIcon: Bell },
-  { href: "/subscribe", labelKey: "subscribe" },
-  { href: "/about", labelKey: "about" }
+  { href: "/about", labelKey: "about" },
+  // Rendered as the header's call-to-action button on desktop.
+  { href: "/subscribe", labelKey: "subscribe", isCta: true }
 ] as const;
+
+// Desktop layout: the location and language pickers sit together beside the
+// logo, and the page links plus the Subscribe button are pushed right. Mobile
+// keeps the stacked menu, so these are all md: overrides.
+const desktopPickerTrigger =
+  "md:min-h-10 md:w-auto md:max-w-full md:bg-white";
+const desktopCta =
+  "md:ml-1 md:min-h-10 md:rounded-lg md:bg-civic md:px-3.5 md:font-bold md:text-white md:shadow-sm md:after:hidden md:hover:bg-[#1d4d92] md:hover:text-white lg:px-3.5";
+
+function navItemClasses(item: (typeof nav)[number], isFirstLink: boolean) {
+  return cn(
+    "isCta" in item ? cn("md:order-3", desktopCta) : "md:order-2",
+    isFirstLink && "md:ml-auto",
+    "compactIcon" in item && "md:max-[799px]:hidden"
+  );
+}
 
 const jurisdictions = getPublicJurisdictionOptions().map((jurisdiction) => ({
   slug: jurisdiction.slug,
@@ -216,7 +233,7 @@ export function HeaderNav({
   return (
     <nav
       aria-label="Primary navigation"
-      className="contents text-sm font-semibold text-ink md:ml-auto md:block"
+      className="contents text-sm font-semibold text-ink md:flex md:min-w-0 md:flex-1"
     >
       <button
         aria-controls="mobile-primary-navigation"
@@ -253,16 +270,16 @@ export function HeaderNav({
                   : "overflow-hidden"
               }`
             : "pointer-events-none invisible mt-0 max-h-0 -translate-y-2 overflow-hidden opacity-0"
-        } col-span-2 grid min-h-0 w-full grid-cols-5 items-center gap-1 transition-[max-height,margin,opacity,transform,visibility] duration-200 ease-out md:pointer-events-auto md:visible md:mt-0 md:flex md:max-h-none md:w-auto md:translate-y-0 md:items-center md:justify-end md:gap-1 md:overflow-visible md:opacity-100`}
+        } col-span-2 grid min-h-0 w-full grid-cols-5 items-center gap-1 transition-[max-height,margin,opacity,transform,visibility] duration-200 ease-out md:pointer-events-auto md:visible md:mt-0 md:flex md:max-h-none md:min-w-0 md:flex-1 md:translate-y-0 md:items-center md:gap-1 md:overflow-visible md:opacity-100`}
         id="mobile-primary-navigation"
       >
-      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2 lg:max-xl:w-40">
+      <div ref={jurisdictionMenuRef} className="relative col-span-5 md:order-1 md:ml-2 md:min-w-0 md:max-w-[11rem] lg:ml-4 lg:max-w-[15rem]">
         <button
           type="button"
           aria-haspopup="listbox"
           aria-expanded={isJurisdictionMenuOpen}
           aria-busy={isJurisdictionPending}
-          className="menu-trigger"
+          className={cn("menu-trigger", desktopPickerTrigger)}
           onClick={() => setIsJurisdictionMenuOpen((isOpen) => !isOpen)}
         >
           <span className="flex min-w-0 items-center gap-2">
@@ -289,7 +306,7 @@ export function HeaderNav({
           )}
         </button>
         {isJurisdictionMenuOpen ? (
-          <div className="menu-popover">
+          <div className="menu-popover md:w-60">
             <div role="listbox" aria-label="Jurisdiction" className="max-h-64 overflow-auto">
               {jurisdictions.map((jurisdiction, index) => {
                 const isSelected = jurisdiction.slug === selected;
@@ -331,18 +348,22 @@ export function HeaderNav({
           </div>
         ) : null}
       </div>
-      <div ref={languageMenuRef} className="relative col-span-5 md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-32 lg:mr-2">
+      <div ref={languageMenuRef} className="relative col-span-5 md:order-1 md:ml-2 md:shrink-0">
         <button
           type="button"
           aria-haspopup="listbox"
           aria-expanded={isLanguageMenuOpen}
           aria-busy={isLanguagePending}
-          className="menu-trigger"
+          aria-label={`${t(selectedLocale, "language")}: ${selectedLanguage.label}`}
+          className={cn("menu-trigger", desktopPickerTrigger)}
           onClick={() => setIsLanguageMenuOpen((isOpen) => !isOpen)}
         >
           <span className="flex min-w-0 items-center gap-2">
             <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
-            <span className="truncate">{selectedLanguage.label}</span>
+            <span className="truncate md:hidden">{selectedLanguage.label}</span>
+            <span aria-hidden="true" className="hidden md:inline">
+              {selectedLanguage.shortLabel}
+            </span>
           </span>
           {isLanguagePending ? (
             <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
@@ -356,7 +377,7 @@ export function HeaderNav({
           )}
         </button>
         {isLanguageMenuOpen ? (
-          <div className="menu-popover">
+          <div className="menu-popover md:w-40">
             <div role="listbox" aria-label={t(selectedLocale, "language")} className="max-h-64 overflow-auto">
               {LANGUAGE_OPTIONS.map((option) => {
                 const isSelected = option.locale === selectedLocale;
@@ -382,7 +403,7 @@ export function HeaderNav({
           </div>
         ) : null}
       </div>
-      {nav.map((item) => {
+      {nav.map((item, index) => {
         const isActive = isActiveNavItem(pathname, item.href);
 
         return (
@@ -391,11 +412,11 @@ export function HeaderNav({
             href={hrefWithJurisdiction(item.href)}
             aria-current={isActive ? "page" : undefined}
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
+            className={`${navItemClasses(item, index === 0)} relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
               isActive
                 ? "text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
                 : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
-            } ${"compactIcon" in item ? "md:max-[799px]:hidden" : ""}`}
+            }`}
           >
             {"compactIcon" in item ? (
               <item.compactIcon aria-hidden className="hidden h-4 w-4 md:max-xl:block" />
@@ -420,14 +441,14 @@ export function HeaderNavFallback() {
   return (
     <nav
       aria-label="Primary navigation"
-      className="contents text-sm font-semibold text-ink md:ml-auto md:block"
+      className="contents text-sm font-semibold text-ink md:flex md:min-w-0 md:flex-1"
     >
       <span className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 bg-white px-3 py-2 font-bold shadow-sm md:hidden">
         <Menu aria-hidden className="h-4 w-4 text-civic" />
         Menu
       </span>
-      <div className="hidden md:flex md:items-center md:justify-end">
-      <label className="menu-trigger md:mr-1 md:w-40 md:shrink-0 min-[900px]:w-52 lg:mr-2 lg:max-xl:w-40">
+      <div className="hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-1">
+      <label className={cn("menu-trigger md:order-1 md:ml-2 md:max-w-[11rem] lg:ml-4 lg:max-w-[15rem]", desktopPickerTrigger)}>
         <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Jurisdiction</span>
         <select
@@ -443,7 +464,8 @@ export function HeaderNavFallback() {
           ))}
         </select>
       </label>
-      <label className="menu-trigger md:mr-1 md:w-28 md:shrink-0 min-[900px]:!w-32 lg:mr-2">
+      <span className="relative md:order-1 md:ml-2 md:shrink-0">
+      <label className={cn("menu-trigger", desktopPickerTrigger)}>
         <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
         <span className="sr-only">Language</span>
         <select
@@ -452,18 +474,19 @@ export function HeaderNavFallback() {
         >
           {LANGUAGE_OPTIONS.map((option) => (
             <option key={option.locale} value={option.locale}>
-              {option.label}
+              {option.shortLabel}
             </option>
           ))}
         </select>
       </label>
-      {nav.map((item) => (
+      </span>
+      {nav.map((item, index) => (
         <Link
           key={item.href}
           href={item.href}
           className={cn(
             "inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5",
-            "compactIcon" in item && "md:max-[799px]:hidden"
+            navItemClasses(item, index === 0)
           )}
         >
           {"compactIcon" in item ? (
