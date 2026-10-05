@@ -61,10 +61,8 @@ import {
   enrichMenloParkMeetingTimesFromAgendaText,
   scrapeMenloParkMeetings
 } from "@/lib/sources/menlo-park";
-import {
-  attachCouncilMinutesFromAgendaPackets,
-  scrapeEastPaloAltoMeetings
-} from "@/lib/sources/east-palo-alto";
+import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
+import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAltoMinutes";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 import {
@@ -784,11 +782,6 @@ async function runSimpleCityPipelineInternal(
       if (recovered > 0) log(`OCR recovered text for ${recovered} scanned minutes document(s).`);
     }
 
-    if (jurisdiction.slug === "east-palo-alto") {
-      const attached = attachCouncilMinutesFromAgendaPackets(scrapeResult.meetings, log);
-      log(`Attached ${attached} East Palo Alto City Council minutes section(s) from later agenda packets.`);
-    }
-
     for (const agendaError of agendaIngestionErrors(scrapeResult.meetings)) {
       errors.push(agendaError);
       log(agendaError);
@@ -1333,6 +1326,21 @@ async function runSimpleCityPipelineInternal(
         }
         if (recordDeadline("decision outcome reconciliation")) break;
         await reconcileOutcomesForItem(item);
+      }
+      if (jurisdiction.slug === "east-palo-alto" && !recordDeadline("East Palo Alto minutes")) {
+        try {
+          const withMinutes = await attachEastPaloAltoMinutesFromStoredPackets(supabase, jurisdiction, log);
+          for (const meeting of withMinutes) {
+            if (recordDeadline("decision outcome reconciliation")) break;
+            await reconcileOutcomesForItem({ id: meeting.id as string, meeting });
+          }
+        } catch (error) {
+          const message = `East Palo Alto minutes from stored agenda packets failed: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          errors.push(message);
+          log(message);
+        }
       }
       if (outcomesUpserted > 0) {
         log(`Published ${outcomesUpserted} verified decision outcome update(s) from official meeting records.`);
