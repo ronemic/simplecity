@@ -1895,8 +1895,13 @@ test("official card queries and pipeline runs attach verified outcomes outside t
   assert.match(summaryCard, /<DecisionOutcomePanel/);
 });
 
-function eastPaloAltoMeeting(dateText: string, fixture: string) {
+function eastPaloAltoMeeting(dateText: string, fixture: string, agendaFixture?: string) {
   const minutes = fs.readFileSync(new URL(`./fixtures/${fixture}`, import.meta.url), "utf8");
+  // Production builds agenda items from the agenda packet; fall back to the
+  // minutes when no agenda fixture is available.
+  const agenda = agendaFixture
+    ? fs.readFileSync(new URL(`./fixtures/${agendaFixture}`, import.meta.url), "utf8")
+    : minutes;
   const base = meeting("east-palo-alto", {
     id: `east-palo-alto-${fixture}`,
     externalId: `east-palo-alto-${fixture}`,
@@ -1906,7 +1911,7 @@ function eastPaloAltoMeeting(dateText: string, fixture: string) {
   });
   return {
     ...base,
-    items: extractAgendaItemsFromText(base, minutes),
+    items: extractAgendaItemsFromText(base, agenda),
     documents: [{
       type: "Minutes" as const,
       label: `Minutes of ${dateText}`,
@@ -1962,7 +1967,7 @@ test("East Palo Alto results follow the item's own motion, never a neighbor's", 
 });
 
 test("a numbered consent calendar applies only to its own section's items", () => {
-  const september1 = eastPaloAltoMeeting("Sep 1, 2026", "east-palo-alto-2026-09-01-minutes.txt");
+  const september1 = eastPaloAltoMeeting("Sep 1, 2026", "east-palo-alto-2026-09-01-minutes.txt", "east-palo-alto-2026-09-01-agenda.txt");
 
   const treasury = eastPaloAltoOutcome(september1, "3.2", "June 2026 Treasury Cash Report");
   assert.equal(treasury?.kind, "approved");
@@ -2005,16 +2010,7 @@ test("each numbered consent section applies its own motion, including another bo
   assert.match(april?.sourceText || "", /approve the EPASD Consent Calendar/);
 
   // 3.10 is listed last, so its own block ends with the City consent motion.
-  const september1 = eastPaloAltoMeeting("Sep 1, 2026", "east-palo-alto-2026-09-01-minutes.txt");
-  september1.items.push(agendaItem({
-    externalId: "east-palo-alto-sep-1-item-3-10",
-    agendaNumber: "3.10",
-    itemType: null,
-    title: "City Council Meeting Minutes",
-    action: null,
-    result: null,
-    rowText: "3.10 City Council Meeting Minutes"
-  }));
+  const september1 = eastPaloAltoMeeting("Sep 1, 2026", "east-palo-alto-2026-09-01-minutes.txt", "east-palo-alto-2026-09-01-agenda.txt");
   const minutes = eastPaloAltoOutcome(september1, "3.10", "Adopt July 21, 2026 City Council Meeting Minutes");
   assert.equal(minutes?.kind, "approved");
   assert.match(minutes?.sourceText || "", /approve the Consent Calendar, excluding Item 3\.3 and 3\.4/);
