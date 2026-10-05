@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { CalendarCheck2 } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
 import { DecisionResultSelect } from "@/components/DecisionResultSelect";
 import {
@@ -16,8 +15,7 @@ import {
   getJurisdictionLabel,
   normalizeJurisdictionSelection,
   toInternalJurisdictionSlug,
-  toPublicJurisdictionSlug,
-  type JurisdictionSelection
+  toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { categoryFromSlug } from "@/lib/utils/decisionFilters";
 import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
@@ -27,6 +25,7 @@ import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 import { CATEGORIES, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 import { PendingLink } from "@/components/PendingLink";
+import { ResultsFreshnessMenu } from "@/components/ResultsFreshnessMenu";
 
 export const revalidate = 300;
 
@@ -115,36 +114,44 @@ function santaBarbaraBodyHref(
   return `/decisions?${nextParams.toString()}`;
 }
 
+function freshnessDate(freshness: DecisionResultFreshness, slug: string) {
+  const internalSlug = toInternalJurisdictionSlug(slug);
+  if (!internalSlug || !Object.prototype.hasOwnProperty.call(freshness, internalSlug)) {
+    return { status: "unavailable" as const };
+  }
+  const value = freshness[internalSlug as keyof DecisionResultFreshness];
+  if (!value) return { status: "none" as const };
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return { status: "unavailable" as const };
+  return { status: "dated" as const, date: parsed };
+}
+
+function formatFreshnessDate(date: Date, locale: "en" | "es", withYear = true) {
+  return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
+    timeZone: "America/Los_Angeles",
+    month: "short",
+    day: "numeric",
+    ...(withYear ? { year: "numeric" as const } : {})
+  }).format(date);
+}
+
 function freshnessLabel(
   freshness: DecisionResultFreshness,
   slug: string,
   locale: "en" | "es",
   advisory = false
 ) {
-  const internalSlug = toInternalJurisdictionSlug(slug);
-  if (!internalSlug || !Object.prototype.hasOwnProperty.call(freshness, internalSlug)) {
+  const entry = freshnessDate(freshness, slug);
+  if (entry.status === "unavailable") {
     return locale === "es" ? "Fecha no disponible" : "Date unavailable";
   }
-
-  const value = freshness[internalSlug as keyof DecisionResultFreshness];
-  if (!value) {
+  if (entry.status === "none") {
     return advisory
       ? locale === "es" ? "Aún no hay recomendaciones" : "No recommendations yet"
       : locale === "es" ? "Aún no hay resultados" : "No results yet";
   }
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return locale === "es" ? "Fecha no disponible" : "Date unavailable";
-  }
-
-  const formattedDate = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
-    timeZone: "America/Los_Angeles",
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  }).format(parsed);
-
+  const formattedDate = formatFreshnessDate(entry.date, locale);
   return advisory
     ? locale === "es"
       ? `Recomendaciones hasta el ${formattedDate}`
@@ -154,59 +161,39 @@ function freshnessLabel(
       : `Results through ${formattedDate}`;
 }
 
-function DecisionResultsCoverage({
-  jurisdiction,
-  jurisdictionLabel,
-  freshness,
-  locale,
-  advisory = false
-}: {
-  jurisdiction: JurisdictionSelection;
-  jurisdictionLabel: string;
-  freshness: DecisionResultFreshness;
-  locale: "en" | "es";
-  advisory?: boolean;
-}) {
-  const isAll = jurisdiction === ALL_JURISDICTIONS_SLUG;
-  const jurisdictions = isAll
-    ? getPublicJurisdictionOptions().filter((option) => option.slug !== ALL_JURISDICTIONS_SLUG)
-    : [{ name: jurisdictionLabel, slug: toPublicJurisdictionSlug(jurisdiction) }];
+function allJurisdictionsFreshness(freshness: DecisionResultFreshness, locale: "en" | "es") {
+  const currentYear = new Date().getFullYear();
+  const entries = getPublicJurisdictionOptions()
+    .filter((option) => option.slug !== ALL_JURISDICTIONS_SLUG)
+    .map((option) => ({
+      slug: option.slug,
+      label: getJurisdictionDisplayLabel(option.slug, locale),
+      ...freshnessDate(freshness, option.slug)
+    }))
+    // Most recently updated first, then places without results.
+    .sort((a, b) => {
+      const aTime = a.status === "dated" ? a.date.getTime() : -Infinity;
+      const bTime = b.status === "dated" ? b.date.getTime() : -Infinity;
+      return bTime - aTime || a.label.localeCompare(b.label);
+    });
+  const latest = entries[0]?.status === "dated" ? entries[0].date : null;
+  const summary = latest
+    ? locale === "es"
+      ? `Resultados hasta el ${formatFreshnessDate(latest, locale)}`
+      : `Results through ${formatFreshnessDate(latest, locale)}`
+    : locale === "es" ? "Aún no hay resultados" : "No results yet";
 
-  return (
-    <section className="border-b border-black/10 pb-2.5" aria-labelledby="decision-results-coverage">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-        <div className="flex items-center gap-1.5">
-          <CalendarCheck2 aria-hidden className="h-4 w-4 shrink-0 text-civic" />
-          <h2 id="decision-results-coverage" className="font-black text-ink">
-            {advisory
-              ? locale === "es" ? "Recomendaciones recientes" : "Latest recommendations"
-              : locale === "es" ? "Resultados recientes" : "Latest results"}
-          </h2>
-        </div>
-        <dl className="flex flex-wrap gap-x-3 gap-y-1">
-        {jurisdictions.map((option) => (
-          <div key={option.slug} className="flex min-w-0 items-baseline gap-1.5">
-            <dt className="shrink-0 font-bold text-black/55">
-              {getJurisdictionDisplayLabel(option.slug, locale)}
-            </dt>
-            <dd className="min-w-0 font-black text-civic">
-              {freshnessLabel(freshness, option.slug, locale, advisory)}
-            </dd>
-          </div>
-        ))}
-        </dl>
-        <p className="font-medium text-black/55">
-          {advisory
-            ? locale === "es"
-              ? "Las recomendaciones son asesoras, no decisiones finales."
-              : "Recommendations are advisory, not final decisions."
-            : locale === "es"
-              ? "Las actas oficiales pueden tardar días o semanas en publicarse."
-              : "Official minutes may take days or weeks to appear."}
-        </p>
-      </div>
-    </section>
-  );
+  return {
+    summary,
+    entries: entries.map((entry) => ({
+      slug: entry.slug,
+      label: entry.label,
+      date:
+        entry.status === "dated"
+          ? formatFreshnessDate(entry.date, locale, entry.date.getFullYear() !== currentYear)
+          : null
+    }))
+  };
 }
 
 export default async function DecisionsPage({
@@ -354,27 +341,23 @@ export default async function DecisionsPage({
             ? undefined
             : <DecisionResultSelect selectedResult={selectedResult} locale={locale} />
         }
-        resultsCoverage={
-          isAllJurisdictions ?
-          <DecisionResultsCoverage
-            jurisdiction={jurisdiction}
-            jurisdictionLabel={jurisdictionLabel}
-            freshness={decisionResultFreshness}
-            locale={locale}
-            advisory={false}
-          />
-          : undefined
-        }
         resultsCoverageInline={
-          !isAllJurisdictions && !(isSantaBarbara && santaBarbaraBody === "planning") ? (
+          !(isSantaBarbara && santaBarbaraBody === "planning") ? (
             <>
-              <span className="font-bold text-civic">
-                {freshnessLabel(
-                  decisionResultFreshness,
-                  toPublicJurisdictionSlug(jurisdiction),
-                  locale
-                )}
-              </span>
+              {isAllJurisdictions ? (
+                <ResultsFreshnessMenu
+                  locale={locale}
+                  {...allJurisdictionsFreshness(decisionResultFreshness, locale)}
+                />
+              ) : (
+                <span className="font-bold text-civic">
+                  {freshnessLabel(
+                    decisionResultFreshness,
+                    toPublicJurisdictionSlug(jurisdiction),
+                    locale
+                  )}
+                </span>
+              )}
               <span aria-hidden className="mx-1.5 hidden text-black/25 sm:inline">·</span>
               <span className="hidden sm:inline">
                 {locale === "es"
