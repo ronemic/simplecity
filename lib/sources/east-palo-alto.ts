@@ -122,6 +122,115 @@ function discardCrossDateDocumentLeakage(meetings: PrimeGovMeeting[]) {
   }
 }
 
+const COUNCIL_MINUTES_HEADER =
+  /EAST PALO ALTO\s+CITY COUNCIL\s+(?:REGULAR|SPECIAL)\s+MEETING\s+MINUTES\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+([A-Z][a-z]+\s+\d{1,2},\s+20\d{2})(?:,\s*(\d{1,2}:\d{2}\s*[AP]\.?\s*M\.?))?/gi;
+const MINUTES_ADJOURNMENT = /\badjourned the meeting at\s+\d{1,2}:\d{2}\s*[AP]\.?\s*M\.?/i;
+const NEXT_PACKET_SECTION = /\bCITY COUNCIL\s+STAFF REPORT\b|\bCONSENT ITEM\s+\d/i;
+const MAX_MINUTES_SECTION_CHARACTERS = 80_000;
+
+function minutesOfDay(value?: string | null) {
+  const match = String(value || "").match(/\b(\d{1,2}):(\d{2})\s*([ap])\.?\s*m\b/i);
+  if (!match) return null;
+  return ((Number(match[1]) % 12) + (match[3].toLowerCase() === "p" ? 12 : 0)) * 60 + Number(match[2]);
+}
+
+function isCityCouncilMeeting(meeting: PrimeGovMeeting) {
+  return /\bcity council\b/i.test(`${meeting.bodyName || ""} ${meeting.title || ""}`);
+}
+
+/**
+ * East Palo Alto does not post standalone minutes; Granicus "Minutes" links
+ * open the agenda outline. The clerk instead attaches each meeting's minutes to
+ * a later meeting's agenda packet for adoption ("Adopt the August 10, 2026, and
+ * September 1, 2026 City Council Meeting Minutes"). Cut each minutes section
+ * out of packets whose meeting has already happened, and attach it to the one
+ * City Council meeting it records, identified by the date and start time
+ * printed in the minutes header.
+ */
+export function attachCouncilMinutesFromAgendaPackets(
+  meetings: PrimeGovMeeting[],
+  log: (message: string) => void = () => undefined
+) {
+  const packets = meetings
+    .filter((meeting) => meeting.status === "Past")
+    .flatMap((meeting) =>
+      meeting.documents
+        .filter((document) => document.type === "Agenda Packet" && document.extractedText)
+        .map((document) => ({ meeting, document }))
+    )
+    // Revised packets repeat the same minutes; pick one deterministically.
+    .sort((left, right) => left.document.url.localeCompare(right.document.url));
+  const attachedKeys = new Set<string>();
+  let attached = 0;
+
+  for (const { meeting: packetMeeting, document: packet } of packets) {
+    const text = packet.extractedText || "";
+    const headers = [...text.matchAll(COUNCIL_MINUTES_HEADER)];
+    for (const [index, header] of headers.entries()) {
+      const minutesDay = civicCalendarDay(header[1]);
+      if (!minutesDay || header.index === undefined) continue;
+      const minutesTime = minutesOfDay(header[2]);
+      const key = `${minutesDay}|${minutesTime ?? ""}`;
+      if (attachedKeys.has(key)) continue;
+
+      let candidates = meetings.filter((meeting) =>
+        meeting !== packetMeeting &&
+        isCityCouncilMeeting(meeting) &&
+        civicCalendarDay(meeting.dateText) === minutesDay
+      );
+      if (candidates.length > 1 && minutesTime !== null) {
+        candidates = candidates.filter((meeting) => minutesOfDay(meeting.timeText) === minutesTime);
+      }
+      // The same meeting can be listed twice (Granicus and the /meetings page);
+      // agenda cards hang off the copy that carries the agenda documents.
+      if (candidates.length > 1) {
+        const withAgenda = candidates.filter((meeting) =>
+          meeting.documents.some((document) => /^(?:Agenda|Agenda Packet)$/.test(document.type))
+        );
+        if (withAgenda.length > 0) candidates = withAgenda;
+      }
+      if (candidates.length !== 1) {
+        if (candidates.length > 1) {
+          log(`East Palo Alto minutes for ${header[1]} matched ${candidates.length} City Council meetings; not attached.`);
+        }
+        continue;
+      }
+      const target = candidates[0];
+      if (target.documents.some((document) => document.type === "Minutes" && document.extractedText)) {
+        attachedKeys.add(key);
+        continue;
+      }
+
+      const start = header.index;
+      const nextHeader = headers[index + 1]?.index ?? text.length;
+      let section = text.slice(start, Math.min(nextHeader, start + MAX_MINUTES_SECTION_CHARACTERS));
+      const afterHeader = section.slice(header[0].length);
+      const adjournment = afterHeader.match(MINUTES_ADJOURNMENT);
+      const nextSection = afterHeader.search(NEXT_PACKET_SECTION);
+      const end = adjournment?.index !== undefined
+        ? adjournment.index + adjournment[0].length
+        : nextSection >= 0 ? nextSection : afterHeader.length;
+      // Keep line breaks: the minutes parser reads numbered items line by line.
+      section = section.slice(0, header[0].length + end).trim();
+
+      target.documents.push({
+        type: "Minutes",
+        // The date in the label must be the minutes' own date: outcome matching
+        // drops minutes whose label names a different meeting day.
+        label: `Minutes of ${header[1]} (in the ${packetMeeting.dateText} agenda packet)`,
+        url: `${packet.url}#minutes-${minutesDay}${minutesTime !== null ? `-${minutesTime}` : ""}`,
+        extractedText: section,
+        extractionCharacterCount: section.length,
+        isScanned: false
+      });
+      target.hasPdf = true;
+      attachedKeys.add(key);
+      attached += 1;
+    }
+  }
+  return attached;
+}
+
 export function normalizeEastPaloAltoRows(
   rows: EastPaloAltoExtractedRow[],
   jurisdiction: JurisdictionConfig

@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { getJurisdictionBySlug } from "../lib/config/jurisdictions";
-import { classifyEastPaloAltoLink, normalizeEastPaloAltoRows } from "../lib/sources/east-palo-alto";
+import {
+  attachCouncilMinutesFromAgendaPackets,
+  classifyEastPaloAltoLink,
+  normalizeEastPaloAltoRows
+} from "../lib/sources/east-palo-alto";
 
 test("classifies East Palo Alto table links by label and column", () => {
   assert.equal(classifyEastPaloAltoLink("Agenda", "Agenda", "", "https://example.test/a.pdf"), "Agenda");
@@ -95,4 +99,65 @@ test("does not attach one dated committee packet to every historical meeting row
   assert.equal(meetings[0].documents.length, 1);
   assert.equal(meetings[1].documents.length, 0);
   assert.ok(meetings[1].extractionNotes?.some((note) => note.includes("different meeting date")));
+});
+
+test("attaches council minutes from a later meeting's agenda packet to the meeting they record", () => {
+  const jurisdiction = getJurisdictionBySlug("east-palo-alto");
+  assert.ok(jurisdiction);
+  const row = (dateTimeText: string, links: Array<{ label: string; column: string; url: string }> = []) => ({
+    bodyName: "City Council",
+    dateTimeText,
+    rowText: `City Council ${dateTimeText}`,
+    links
+  });
+  const meetings = normalizeEastPaloAltoRows([
+    row("Aug 10, 2026 - 12:00 PM", [{ label: "Agenda", column: "Agenda", url: "https://example.test/aug10-agenda.pdf" }]),
+    row("Sep 1, 2026 - 06:00 PM", [{ label: "Agenda", column: "Agenda", url: "https://example.test/sep1-agenda.pdf" }]),
+    // The same meeting again from the /meetings page, without agenda documents.
+    row("09/01/2026 6:00pm"),
+    row("Sep 15, 2026 - 06:00 PM", [{ label: "Agenda Packet", column: "Agenda Packet", url: "https://example.test/sep15-packet.pdf" }]),
+    row("Oct 6, 2026 - 06:00 PM", [{ label: "Agenda Packet", column: "Agenda Packet", url: "https://example.test/oct6-packet.pdf" }])
+  ], jurisdiction);
+  for (const meeting of meetings) meeting.status = meeting.dateText?.startsWith("Oct") ? "Upcoming" : "Past";
+  const [aug10, sep1, sep1Copy, sep15, oct6] = meetings;
+  sep15.documents[0].extractedText = [
+    "SUBJECT: City Council Meeting Minutes",
+    "Adopt the August 10, 2026, and September 1, 2026 City Council Meeting Minutes.",
+    "EAST PALO ALTO CITY COUNCIL",
+    "SPECIAL MEETING MINUTES",
+    "Monday, August 10, 2026, 12:00 PM",
+    "Motion: Councilmember Romero moved; Councilmember Barragan seconded to approve the Consent Calendar as presented. Motion carried unanimously.",
+    "Mayor Lincoln adjourned the meeting at 12:02 PM",
+    "111",
+    "EAST PALO ALTO CITY COUNCIL",
+    "REGULAR MEETING MINUTES",
+    "Tuesday, September 1, 2026, 6:00 PM",
+    "Motion: Mayor Lincoln moved, Councilmember Dinan seconded, to approve the agenda as proposed. Motion carried unanimously (5-0).",
+    "15. ADJOURNMENT",
+    "Mayor Lincoln adjourned the meeting at 9:13 PM",
+    "115",
+    "CONSENT ITEM 3.6",
+    "EAST PALO ALTO",
+    "CITY COUNCIL",
+    "STAFF REPORT"
+  ].join("\n");
+  oct6.documents[0].extractedText =
+    "EAST PALO ALTO CITY COUNCIL\nREGULAR MEETING MINUTES\nTuesday, September 15, 2026, 6:00 PM\nMotion carried unanimously.";
+
+  assert.equal(attachCouncilMinutesFromAgendaPackets(meetings), 2);
+
+  const august = aug10.documents.find((document) => document.type === "Minutes");
+  assert.equal(august?.label, "Minutes of August 10, 2026 (in the Sep 15, 2026 agenda packet)");
+  assert.match(august?.extractedText || "", /adjourned the meeting at 12:02 PM$/);
+
+  const september = sep1.documents.find((document) => document.type === "Minutes");
+  assert.ok(september?.url.startsWith("https://example.test/sep15-packet.pdf#minutes-2026-09-01"));
+  assert.match(september?.extractedText || "", /^EAST PALO ALTO CITY COUNCIL\nREGULAR MEETING MINUTES/);
+  assert.match(september?.extractedText || "", /adjourned the meeting at 9:13 PM$/);
+  assert.doesNotMatch(september?.extractedText || "", /STAFF REPORT/);
+
+  // One meeting per minutes section, and never from a packet whose meeting has
+  // not happened yet (its minutes are still unadopted drafts).
+  assert.ok(!sep1Copy.documents.some((document) => document.type === "Minutes"));
+  assert.ok(!sep15.documents.some((document) => document.type === "Minutes"));
 });

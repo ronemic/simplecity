@@ -61,7 +61,10 @@ import {
   enrichMenloParkMeetingTimesFromAgendaText,
   scrapeMenloParkMeetings
 } from "@/lib/sources/menlo-park";
-import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
+import {
+  attachCouncilMinutesFromAgendaPackets,
+  scrapeEastPaloAltoMeetings
+} from "@/lib/sources/east-palo-alto";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 import {
@@ -779,6 +782,11 @@ async function runSimpleCityPipelineInternal(
         shouldStop: deadlineExceeded
       });
       if (recovered > 0) log(`OCR recovered text for ${recovered} scanned minutes document(s).`);
+    }
+
+    if (jurisdiction.slug === "east-palo-alto") {
+      const attached = attachCouncilMinutesFromAgendaPackets(scrapeResult.meetings, log);
+      log(`Attached ${attached} East Palo Alto City Council minutes section(s) from later agenda packets.`);
     }
 
     for (const agendaError of agendaIngestionErrors(scrapeResult.meetings)) {
