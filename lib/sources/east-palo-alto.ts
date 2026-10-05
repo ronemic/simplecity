@@ -231,6 +231,29 @@ export function attachCouncilMinutesFromAgendaPackets(
   return attached;
 }
 
+const MONTH_ABBREVIATIONS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * Granicus writes "Sep 1, 2026" / "06:00 PM" and the /meetings page writes
+ * "09/01/2026" / "6:00pm". The meeting id is built from these strings, so one
+ * meeting seen through both pages became two records. Normalize to the
+ * Granicus form, which leaves every Granicus-built id unchanged.
+ */
+export function canonicalEastPaloAltoDateTime(dateText: string, timeText: string | null) {
+  const day = civicCalendarDay(dateText)?.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const time = timeText?.match(/^\s*(\d{1,2}):(\d{2})\s*([ap])\.?\s*m\.?\s*$/i);
+  return {
+    dateText: day ? `${MONTH_ABBREVIATIONS[Number(day[2]) - 1]} ${Number(day[3])}, ${day[1]}` : dateText,
+    timeText: time ? `${time[1].padStart(2, "0")}:${time[2]} ${time[3].toUpperCase()}M` : timeText
+  };
+}
+
+export function eastPaloAltoMeetingExternalId(bodyName: string, dateText: string, timeText: string | null) {
+  const identity = `${bodyName}|${dateText}|${timeText || ""}`;
+  const hash = crypto.createHash("sha256").update(identity).digest("hex").slice(0, 10);
+  return `east-palo-alto-official-site-${slugify(bodyName)}-${slugify(dateText)}-${slugify(timeText || "no-time")}-${hash}`;
+}
+
 export function normalizeEastPaloAltoRows(
   rows: EastPaloAltoExtractedRow[],
   jurisdiction: JurisdictionConfig
@@ -239,8 +262,9 @@ export function normalizeEastPaloAltoRows(
   const seen = new Set<string>();
   for (const row of rows) {
     const bodyName = cleanText(row.bodyName);
-    const { dateText, timeText } = splitDateTime(row.dateTimeText);
-    if (!bodyName || !dateText) continue;
+    const split = splitDateTime(row.dateTimeText);
+    if (!bodyName || !split.dateText) continue;
+    const { dateText, timeText } = canonicalEastPaloAltoDateTime(split.dateText, split.timeText);
     const iso = parseMeetingDate(`${dateText}${timeText ? ` ${timeText}` : ""}`);
     const documents: PrimeGovDocument[] = [];
     const docKeys = new Set<string>();
@@ -257,12 +281,11 @@ export function normalizeEastPaloAltoRows(
     const identity = `${bodyName}|${dateText}|${timeText || ""}`;
     if (seen.has(identity)) continue;
     seen.add(identity);
-    const hash = crypto.createHash("sha256").update(identity).digest("hex").slice(0, 10);
     const status = statusFor(row, iso);
     const primary = documents.find((doc) => doc.type === "Agenda") ||
       documents.find((doc) => doc.type === "Agenda Packet") || details;
     meetings.push({
-      externalId: `east-palo-alto-official-site-${slugify(bodyName)}-${slugify(dateText)}-${slugify(timeText || "no-time")}-${hash}`,
+      externalId: eastPaloAltoMeetingExternalId(bodyName, dateText, timeText),
       jurisdictionName: jurisdiction.name,
       jurisdictionSlug: jurisdiction.slug,
       platform: jurisdiction.platform,

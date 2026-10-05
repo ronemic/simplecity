@@ -3,7 +3,9 @@ import test from "node:test";
 import { getJurisdictionBySlug } from "../lib/config/jurisdictions";
 import {
   attachCouncilMinutesFromAgendaPackets,
+  canonicalEastPaloAltoDateTime,
   classifyEastPaloAltoLink,
+  eastPaloAltoMeetingExternalId,
   normalizeEastPaloAltoRows
 } from "../lib/sources/east-palo-alto";
 
@@ -113,13 +115,15 @@ test("attaches council minutes from a later meeting's agenda packet to the meeti
   const meetings = normalizeEastPaloAltoRows([
     row("Aug 10, 2026 - 12:00 PM", [{ label: "Agenda", column: "Agenda", url: "https://example.test/aug10-agenda.pdf" }]),
     row("Sep 1, 2026 - 06:00 PM", [{ label: "Agenda", column: "Agenda", url: "https://example.test/sep1-agenda.pdf" }]),
-    // The same meeting again from the /meetings page, without agenda documents.
+    // The same meeting again from the /meetings page, in its own date format.
     row("09/01/2026 6:00pm"),
     row("Sep 15, 2026 - 06:00 PM", [{ label: "Agenda Packet", column: "Agenda Packet", url: "https://example.test/sep15-packet.pdf" }]),
     row("Oct 6, 2026 - 06:00 PM", [{ label: "Agenda Packet", column: "Agenda Packet", url: "https://example.test/oct6-packet.pdf" }])
   ], jurisdiction);
   for (const meeting of meetings) meeting.status = meeting.dateText?.startsWith("Oct") ? "Upcoming" : "Past";
-  const [aug10, sep1, sep1Copy, sep15, oct6] = meetings;
+  // Both spellings of Sep 1 normalize to one meeting.
+  assert.equal(meetings.length, 4);
+  const [aug10, sep1, sep15, oct6] = meetings;
   sep15.documents[0].extractedText = [
     "SUBJECT: City Council Meeting Minutes",
     "Adopt the August 10, 2026, and September 1, 2026 City Council Meeting Minutes.",
@@ -156,8 +160,20 @@ test("attaches council minutes from a later meeting's agenda packet to the meeti
   assert.match(september?.extractedText || "", /adjourned the meeting at 9:13 PM$/);
   assert.doesNotMatch(september?.extractedText || "", /STAFF REPORT/);
 
-  // One meeting per minutes section, and never from a packet whose meeting has
-  // not happened yet (its minutes are still unadopted drafts).
-  assert.ok(!sep1Copy.documents.some((document) => document.type === "Minutes"));
+  // Never from a packet whose meeting has not happened yet (its minutes are
+  // still unadopted drafts).
   assert.ok(!sep15.documents.some((document) => document.type === "Minutes"));
+});
+
+test("the two East Palo Alto date formats produce one meeting id", () => {
+  const granicus = canonicalEastPaloAltoDateTime("Sep 1, 2026", "06:00 PM");
+  const meetingsPage = canonicalEastPaloAltoDateTime("09/01/2026", "6:00pm");
+  assert.deepEqual(meetingsPage, granicus);
+  assert.deepEqual(granicus, { dateText: "Sep 1, 2026", timeText: "06:00 PM" });
+  assert.equal(
+    eastPaloAltoMeetingExternalId("City Council", granicus.dateText, granicus.timeText),
+    // The id already stored for this Granicus meeting must not change.
+    "east-palo-alto-official-site-city-council-sep-1-2026-06-00-pm-564ce47ccc"
+  );
+  assert.deepEqual(canonicalEastPaloAltoDateTime("09/29/2026", null), { dateText: "Sep 29, 2026", timeText: null });
 });
