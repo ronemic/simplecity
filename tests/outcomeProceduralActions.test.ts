@@ -91,6 +91,20 @@ test("a roll call stops before document labels glued onto the tally", () => {
   );
 });
 
+test("a roll call does not absorb the next numbered item", () => {
+  // Real shape from los-altos-school-district OCR'd minutes.
+  assert.equal(
+    extractVoteDetail(
+      "Voting results: Unanimously approved\nYes: Vaishali Sirkay, Jim Malone, Brandon Stroy\n\n1. Minutes of the August 3, 2026 Regular Meeting"
+    ),
+    "Ayes: Vaishali Sirkay, Jim Malone, Brandon Stroy; Noes: None"
+  );
+  assert.equal(
+    extractVoteDetail("Yes: Vaishali Sirkay, Jim Malone, Brandon Stroy | Noes: None"),
+    "Ayes: Vaishali Sirkay, Jim Malone, Brandon Stroy; Noes: None"
+  );
+});
+
 test("a plain roll call with ayes and noes is still captured in full", () => {
   assert.equal(
     extractVoteDetail("AYES: Arenas, Duong, Lee, Ellenberg, Abe-Koga. NOES: Simitian."),

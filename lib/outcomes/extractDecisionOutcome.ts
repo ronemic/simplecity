@@ -240,10 +240,14 @@ function rollCallSegment(text: string, label: RegExp) {
   if (!match || match.index === undefined) return null;
   const rest = text.slice(match.index + match[0].length);
   const boundary = rest.search(ROLL_CALL_SEGMENT_BOUNDARY);
-  const segment = cleanText(boundary >= 0 ? rest.slice(0, boundary) : rest)
+  let segment = cleanText(boundary >= 0 ? rest.slice(0, boundary) : rest)
     // Minutes glue the tally onto the last name ("and Canepa5 - No: 0"), so a
     // trailing separator is left behind once the boundary is applied.
     .replace(/[\s,;:\-–—]+$/, "");
+  // A roll call that ends a line runs into the next numbered item ("Brandon
+  // Stroy\n1. Minutes of ...") or an OCR'd table rule, which the "." boundary
+  // leaves behind as a stray "1" or "|". Names never end that way.
+  if (/[A-Za-z]/.test(segment)) segment = segment.replace(/\s+(?:\d{1,3}|\|)$/, "");
   return segment ? segment.slice(0, 160) : null;
 }
 
