@@ -1995,3 +1995,27 @@ test("an unlisted item under a numbered consent heading takes the consent motion
   assert.equal(minutes?.kind, "approved");
   assert.match(minutes?.sourceText || "", /approve the Consent Calendar, excluding Item 3\.4/);
 });
+
+test("each numbered consent section applies its own motion, including another body's", () => {
+  const july21 = eastPaloAltoMeeting("Jul 21, 2026", "east-palo-alto-2026-07-21-minutes.txt");
+  // 11.1 has no motion of its own; the Sanitary District's consent motion covers it.
+  const april = eastPaloAltoOutcome(july21, "11.1", "Cash Disbursement Report for EPASD April 2026");
+  assert.equal(april?.kind, "approved");
+  assert.equal(april?.matchedAgendaNumber, "11.1");
+  assert.match(april?.sourceText || "", /approve the EPASD Consent Calendar/);
+
+  // 3.10 is listed last, so its own block ends with the City consent motion.
+  const september1 = eastPaloAltoMeeting("Sep 1, 2026", "east-palo-alto-2026-09-01-minutes.txt");
+  september1.items.push(agendaItem({
+    externalId: "east-palo-alto-sep-1-item-3-10",
+    agendaNumber: "3.10",
+    itemType: null,
+    title: "City Council Meeting Minutes",
+    action: null,
+    result: null,
+    rowText: "3.10 City Council Meeting Minutes"
+  }));
+  const minutes = eastPaloAltoOutcome(september1, "3.10", "Adopt July 21, 2026 City Council Meeting Minutes");
+  assert.equal(minutes?.kind, "approved");
+  assert.match(minutes?.sourceText || "", /approve the Consent Calendar, excluding Item 3\.3 and 3\.4/);
+});

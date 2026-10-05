@@ -690,42 +690,42 @@ function parsedMinuteItems(meeting: LlmReadyMeeting, document: PrimeGovDocument)
     });
 }
 
-function majorSectionBlock(title: string, text: string) {
+function majorSectionBlocks(title: string, text: string) {
   const lines = normalizeSourceText(text).split("\n");
   const escapedTitle = escapeRegExp(title);
   // Letter headings ("E. CONSENT CALENDAR") and numbered ones ("3. APPROVAL
-  // OF THE CONSENT CALENDAR", East Palo Alto).
+  // OF THE CONSENT CALENDAR", "11. EPASD CONSENT CALENDAR", East Palo Alto).
   const titlePattern = new RegExp(
-    `^(?:(?:[A-Z]|(\\d{1,2}))\\s*[.):-]\\s*)?(?:approval\\s+of\\s+(?:the\\s+)?)?${escapedTitle}\\s*$`,
+    `^(?:(?:[A-Z]|(\\d{1,2}))\\s*[.):-]\\s*)?(?:approval\\s+of\\s+(?:the\\s+)?)?(?:([A-Z]{2,8})\\s+)?${escapedTitle}\\s*$`,
     "i"
   );
   const sectionPattern = /^[A-Z]\s*[.):-]\s*[A-Z][\s\S]{1,100}$/;
   const uppercaseSectionPattern = /^[A-Z][A-Z0-9/&,'’() -]{3,100}[.:]?$/;
   const numberedSectionPattern = /^\d{1,2}\s*[.)]\s+[A-Z][A-Z0-9/&,'’() -]{3,100}[.:]?$/;
-  let start = -1;
-  let number: string | null = null;
-  for (const [index, line] of lines.entries()) {
-    const match = line.trim().match(titlePattern);
-    if (!match) continue;
-    start = index;
-    number = match[1] || null;
-    break;
-  }
-  if (start < 0) return null;
+  const blocks: Array<{ text: string; number: string | null }> = [];
+  for (let start = 0; start < lines.length; start += 1) {
+    const match = lines[start].trim().match(titlePattern);
+    // A body prefix ("EPASD") is only trusted on a numbered heading.
+    if (!match || (match[2] && !match[1])) continue;
+    const number = match[1] || null;
+    // Without a number a later heading cannot be told apart from the first.
+    if (number === null && blocks.some((block) => block.number === null)) continue;
 
-  let end = lines.length;
-  for (let index = start + 1; index < lines.length; index += 1) {
-    const line = lines[index].trim();
-    if (
-      sectionPattern.test(line) ||
-      uppercaseSectionPattern.test(line) ||
-      (number !== null && numberedSectionPattern.test(line))
-    ) {
-      end = index;
-      break;
+    let end = lines.length;
+    for (let index = start + 1; index < lines.length; index += 1) {
+      const line = lines[index].trim();
+      if (
+        sectionPattern.test(line) ||
+        uppercaseSectionPattern.test(line) ||
+        (number !== null && numberedSectionPattern.test(line))
+      ) {
+        end = index;
+        break;
+      }
     }
+    blocks.push({ text: lines.slice(start, end).join("\n"), number });
   }
-  return { text: lines.slice(start, end).join("\n"), number };
+  return blocks;
 }
 
 function consentItemWasSeparated(agendaNumber: string, section: string) {
@@ -744,13 +744,19 @@ function consentCalendarOutcomeItems(
   document: PrimeGovDocument,
   items: AgendaItem[]
 ) {
-  const block = majorSectionBlock(
-    "Consent Calendar",
-    document.extractedText || ""
+  return majorSectionBlocks("Consent Calendar", document.extractedText || "").flatMap((block) =>
+    consentSectionOutcomeItems(document, items, block)
   );
-  const section = block?.text || null;
-  const result = section ? extractResultText(section) : null;
-  if (!block || !section || !result) return [];
+}
+
+function consentSectionOutcomeItems(
+  document: PrimeGovDocument,
+  items: AgendaItem[],
+  block: { text: string; number: string | null }
+) {
+  const section = block.text;
+  const result = extractResultText(section);
+  if (!result) return [];
 
   const consentSectionNumbers = items.flatMap((item) => {
     const number = String(item.agendaNumber || "").trim();
@@ -761,9 +767,8 @@ function consentCalendarOutcomeItems(
 
   return items.flatMap((item) => {
     const agendaNumber = String(item.agendaNumber || "").trim();
-    // A numbered heading names its own items. Without this, another body's
-    // consent items ("11.1" under "11. EPASD CONSENT CALENDAR") would take the
-    // City Council's consent motion.
+    // A numbered heading names its own items, so the Sanitary District's
+    // "11. EPASD CONSENT CALENDAR" motion stays off City items 3.x.
     const belongsToNumberedConsentSection = block.number !== null
       ? agendaNumber.startsWith(`${block.number}.`)
       : consentSectionNumbers.some((sectionNumber) => agendaNumber.startsWith(`${sectionNumber}.`));
@@ -814,11 +819,18 @@ export function extractMeetingOutcomeItems(meeting: LlmReadyMeeting) {
   for (const document of minutesDocuments(meeting)) {
     const parsed = parsedMinuteItems(meeting, document);
     agendaItemsFound = Math.max(agendaItemsFound, parsed.length);
+    const parsedResults = parsed.filter((candidate) => Boolean(candidate.result));
+    // The last item listed under a consent heading runs on into the consent
+    // motion, so its own block yields the same result. Two copies under one id
+    // read as ambiguous and the item would get no result at all.
+    const sameMotion = (left: AgendaItem, right: AgendaItem) =>
+      left.externalId === right.externalId &&
+      cleanText(String(left.result || "")).toLowerCase() === cleanText(String(right.result || "")).toLowerCase();
     const consentItems = consentCalendarOutcomeItems(
       document,
       (meeting.items || []).length > 0 ? meeting.items || [] : parsed
-    );
-    for (const item of [...parsed.filter((candidate) => Boolean(candidate.result)), ...consentItems]) {
+    ).filter((item) => !parsedResults.some((candidate) => sameMotion(candidate, item)));
+    for (const item of [...parsedResults, ...consentItems]) {
       outcomes.set(outcomeItemIdentity(item), item);
     }
   }
