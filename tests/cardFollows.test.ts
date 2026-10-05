@@ -124,6 +124,38 @@ test("event labels name the change in both languages", () => {
     cardEventLabel(event({ kind: "status_changed", previous_value: "Upcoming vote", new_value: "Tabled" }), "en"),
     "Status changed from Upcoming vote to Tabled"
   );
+  assert.equal(
+    cardEventLabel(event({ kind: "outcome_vote_changed", previous_value: "4-1", new_value: "5-0" }), "en"),
+    "Official vote corrected from 4-1 to 5-0"
+  );
+  assert.equal(
+    cardEventLabel(event({ kind: "outcome_vote_changed", previous_value: null, new_value: "5-0" }), "es"),
+    "Votación oficial agregada: 5-0"
+  );
+  assert.equal(
+    cardEventLabel(event({
+      kind: "meeting_rescheduled",
+      previous_value: "2026-10-04T17:00:00Z",
+      new_value: "2026-10-05T18:30:00Z"
+    }), "en"),
+    "Meeting rescheduled from Oct 4, 2026, 10:00 AM PT to Oct 5, 2026, 11:30 AM PT"
+  );
+  assert.equal(
+    cardEventLabel(event({
+      kind: "meeting_rescheduled",
+      previous_value: "October 4, 2026",
+      new_value: "October 5, 2026"
+    }), "en"),
+    "Meeting rescheduled from October 4, 2026 to October 5, 2026"
+  );
+  assert.match(
+    cardEventLabel(event({
+      kind: "outcome_date_changed",
+      previous_value: "2026-10-04T17:00:00Z",
+      new_value: "2026-10-05T17:00:00Z"
+    }), "es"),
+    /^Fecha de la decisión corregida de .+ a .+$/
+  );
 });
 
 test("card_events migration logs only real changes and exposes safe columns", () => {
@@ -147,5 +179,24 @@ test("card_events migration logs only real changes and exposes safe columns", ()
     const bootstrap = readFileSync(new URL(path, import.meta.url), "utf8");
     assert.match(bootstrap, /create table if not exists public\.card_events/i, path);
     assert.doesNotMatch(bootstrap, /Seed history for existing cards/i, `${path} must not touch row data`);
+  }
+});
+
+test("follow-up migration watches material schedule and outcome corrections", () => {
+  const migration = readFileSync(
+    new URL("../supabase/migrations/20261004010000_log_schedule_and_outcome_corrections.sql", import.meta.url),
+    "utf8"
+  );
+  assert.match(migration, /after insert or update of kind, vote, decided_at on public\.decision_outcomes/i);
+  assert.match(migration, /after update of status, meeting_datetime, date_text, time_text on public\.meetings/i);
+  assert.match(migration, /old\.meeting_datetime is distinct from new\.meeting_datetime/i);
+  assert.match(migration, /btrim\(new\.vote\).*distinct from.*btrim\(old\.vote\)/i);
+  assert.match(migration, /new\.decided_at is distinct from old\.decided_at/i);
+  assert.doesNotMatch(migration, /new\.(?:summary|headline) is distinct from old\.(?:summary|headline)/i);
+
+  for (const path of ["../supabase/bootstrap_full.sql", "../supabase/bootstrap_county.sql"]) {
+    const bootstrap = readFileSync(new URL(path, import.meta.url), "utf8");
+    assert.match(bootstrap, /after update of status, meeting_datetime, date_text, time_text on public\.meetings/i, path);
+    assert.match(bootstrap, /after insert or update of kind, vote, decided_at on public\.decision_outcomes/i, path);
   }
 });
