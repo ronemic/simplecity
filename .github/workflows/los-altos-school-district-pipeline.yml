@@ -61,6 +61,9 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        uses: ./.github/actions/setup-ocr
+
       - name: Select meeting lookback
         id: lookback
         env:

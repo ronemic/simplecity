@@ -1,0 +1,22 @@
+name: Set up OCR tools
+description: Install Ghostscript and tesseract so scanned minutes PDFs can be read
+
+runs:
+  using: composite
+  steps:
+    - name: Install Ghostscript and tesseract
+      shell: bash
+      run: |
+        set -euo pipefail
+        for attempt in 1 2 3; do
+          if timeout 5m sudo apt-get update -qq && timeout 5m sudo apt-get install -y -qq --no-install-recommends ghostscript tesseract-ocr tesseract-ocr-eng; then
+            gs --version
+            tesseract --version | head -1
+            exit 0
+          fi
+          echo "::warning::OCR tool installation attempt ${attempt} failed."
+          sleep $((attempt * 10))
+        done
+        # Scanned minutes stay unread without these tools; the pipeline logs that
+        # and continues, so a mirror outage should not fail the whole run.
+        echo "::warning::OCR tools could not be installed; scanned minutes will be skipped."

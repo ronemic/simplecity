@@ -31,6 +31,7 @@ import { meetingSourceHashComponents } from "@/lib/db/meetingSourceHash";
 import { reconcileMeetingRecords } from "@/lib/db/reconcileMeetings";
 import { reconcileDecisionOutcomesForMeeting } from "@/lib/db/upsertDecisionOutcomes";
 import { extractPdfTextForMeetings } from "@/lib/scraper/pdfText";
+import { ocrScannedMinutesForMeetings } from "@/lib/scraper/ocr";
 import {
   authoritativeAgendaItemSourceIds,
   isCancellationNoticeText,
@@ -770,6 +771,14 @@ async function runSimpleCityPipelineInternal(
           }`
         );
       }
+    }
+
+    if (!recordDeadline("minutes OCR")) {
+      const recovered = await ocrScannedMinutesForMeetings(scrapeResult.meetings, {
+        log,
+        shouldStop: deadlineExceeded
+      });
+      if (recovered > 0) log(`OCR recovered text for ${recovered} scanned minutes document(s).`);
     }
 
     for (const agendaError of agendaIngestionErrors(scrapeResult.meetings)) {
