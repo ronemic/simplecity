@@ -63,6 +63,7 @@ import {
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAltoMinutes";
+import { reconcileEastPaloAltoMeetingIds } from "@/lib/db/eastPaloAltoMeetings";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
 import {
@@ -804,6 +805,10 @@ async function runSimpleCityPipelineInternal(
     if (canPersist && supabase) {
       log(`Upserting meetings and documents to Supabase for ${jurisdiction.name}.`);
       try {
+        if (jurisdiction.slug === "east-palo-alto") {
+          // Before upserting, so normalized ids update the stored records.
+          await reconcileEastPaloAltoMeetingIds(supabase, jurisdiction, { log });
+        }
         upserted = await upsertMeetings(
           supabase,
           llmReadyMeetings,
