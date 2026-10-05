@@ -39,7 +39,6 @@ export function DecisionBrowser({
   locale,
   emptyDescription,
   resultFilter,
-  resultsCoverage,
   resultsCoverageInline,
   showTopicFilters = true,
   showSantaBarbaraInterestPilot = false,
@@ -57,7 +56,6 @@ export function DecisionBrowser({
   locale: Locale;
   emptyDescription: string;
   resultFilter?: ReactNode;
-  resultsCoverage?: ReactNode;
   resultsCoverageInline?: ReactNode;
   showTopicFilters?: boolean;
   showSantaBarbaraInterestPilot?: boolean;
@@ -211,7 +209,6 @@ export function DecisionBrowser({
       {santaBarbaraView === "all" ? (
         <>
           <div className="mb-5">
-            {resultsCoverage}
             <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 border-b border-black/10 py-2.5 sm:py-3">
               <div>
                 <h2 className="text-base font-black text-ink sm:text-lg">
@@ -235,7 +232,7 @@ export function DecisionBrowser({
                   {resultsCoverageInline ? (
                     <>
                       <span aria-hidden className="text-black/25">·</span>
-                      <p>{resultsCoverageInline}</p>
+                      <div>{resultsCoverageInline}</div>
                     </>
                   ) : null}
                 </div>
