@@ -233,20 +233,40 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
   const hasStandaloneWholeNumberItems =
     (agendaText.match(/(?:^|\n)\s*\d{1,2}\s*[.):-]\s*(?=\n)/g) || []).length >= 2;
   let lastWholeNumber = 0;
+  // A recommendation's own numbered list ("1. Finding ... 5. Finding that the
+  // action is not a project") restarts at 1 inside an item. Its later numbers
+  // used to pass as agenda items 4 and 5, which pushed the section counter past
+  // the real next item: East Palo Alto's "3.10 City Council Meeting Minutes"
+  // was then dropped as a citation.
+  let subListNext: number | null = null;
   ITEM_START.lastIndex = 0;
 
   const matches = Array.from(agendaText.matchAll(ITEM_START));
   const acceptedMatches: Array<{ match: RegExpMatchArray; rawBlock: string }> = [];
-  for (const match of matches) {
-    const agendaNumber = match[1].toUpperCase();
-    const rawTitle = match[2].trimStart();
+  for (const found of matches) {
+    let match: RegExpMatchArray = found;
+    let agendaNumber = match[1].toUpperCase();
+    let rawTitle = match[2].trimStart();
     if (!/^(?:[a-z]\)\s*)?[A-Z0-9]/.test(rawTitle)) continue;
     if (/^\d/.test(rawTitle)) {
       const matchSource = agendaText.slice(match.index || 0, (match.index || 0) + 40);
       const standaloneNumber = new RegExp(
         `^\\s*${agendaNumber.replace(".", "\\.")}\\s*[.):-]\\s*\\n`
       ).test(matchSource);
-      if (!standaloneNumber) {
+      // A bare page number directly above an item ("3" then "3.10 City Council
+      // Meeting Minutes") swallows that item as its title. Read the item itself.
+      const embedded = /^\d{1,3}$/.test(agendaNumber) && !standaloneNumber
+        ? rawTitle.match(/^(\d{1,2}\.\d{1,3})\s+([A-Z][\s\S]*)$/)
+        : null;
+      if (embedded) {
+        const offset = (match.index || 0) + match[0].indexOf(embedded[1]);
+        match = Object.assign([match[0].slice(match[0].indexOf(embedded[1])), embedded[1], embedded[2]], {
+          index: offset,
+          input: match.input
+        }) as RegExpMatchArray;
+        agendaNumber = embedded[1];
+        rawTitle = embedded[2];
+      } else if (!standaloneNumber) {
         const previous = acceptedMatches.at(-1);
         if (previous) previous.rawBlock += ` ${agendaNumber}.${match[2]}`;
         continue;
@@ -266,9 +286,33 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
         continue;
       }
       lastWholeNumber = Math.max(lastWholeNumber, sectionNumber);
+      subListNext = null;
     }
     if (/^\d+$/.test(agendaNumber)) {
       const wholeNumber = Number(agendaNumber);
+      // Headings ("4. CLOSED SESSION") are agenda structure, never list entries.
+      const isHeading = /^[^a-z]{4,}$/.test(cleanItemTitle(match[2]));
+      // Only a restart inside an item's recommendation is a list. A restart
+      // after a lettered heading ("E. CONSENT CALENDAR", Los Altos School
+      // District) begins the next section's items.
+      const previousBlock = acceptedMatches.at(-1)?.rawBlock || "";
+      const restartsInsideRecommendation =
+        /\brecommend(?:ation|ed action)?\b|\bresolution:/i.test(previousBlock) &&
+        !/(?:^|\n|\s)[A-Z]\s*[.)]\s+[A-Z][A-Z &/-]{3,}(?:\n|\s|$)/.test(previousBlock);
+      if (
+        !isHeading &&
+        wholeNumber === 1 &&
+        lastWholeNumber >= 1 &&
+        restartsInsideRecommendation
+      ) {
+        subListNext = 2;
+        continue;
+      }
+      if (!isHeading && subListNext !== null && wholeNumber === subListNext) {
+        subListNext += 1;
+        continue;
+      }
+      subListNext = null;
       if (!hasNumberedOpening && !hasStandaloneWholeNumberItems) {
         // Even when whole-number items are too ambiguous to emit, numbered
         // section headings provide sequence context for their decimal children.

@@ -341,3 +341,60 @@ Recommendation: Approve a historical contract.
   assert.ok(items.every((item) => item.agendaNumber === null));
   assert.doesNotMatch(items.map((item) => item.rowText).join(" "), /historical contract/i);
 });
+
+test("a recommendation's numbered list does not become agenda items", () => {
+  // Real shape from East Palo Alto's Sep 1, 2026 agenda packet, including the
+  // page number printed directly above item 3.10.
+  const items = extractAgendaItemsFromText(meeting, `
+1. CALL TO ORDER AND ROLL CALL
+2. APPROVAL OF THE AGENDA
+3. APPROVAL OF CONSENT CALENDAR
+3.8 PD Patrol Vehicles
+Recommendation: Adopt the resolution
+3.9 Second Amendment Retroactively Extending the Term of the Agreement
+with Willdan Financial Services
+Recommendation:
+Adopt a resolution:
+1. Finding, on the basis of this report, that the services were authorized; and
+2. Authorizing the City Manager to execute the Second Amendment; and
+3. Approving the City Manager to execute the Second Amendment; and
+4. Ratifying payment of invoices totaling $12,000; and
+5. Finding that the action is not a "project" within the meaning of CEQA.
+East Palo Alto City Council September 1, 2026 Agenda
+
+3
+
+3.10 City Council Meeting Minutes
+4. CLOSED SESSION
+5. PUBLIC COMMENT
+6. INFORMATIONAL REPORTS
+6.1 City Council Strategic Priorities Work Plan
+`);
+  const numbers = items.map((item) => item.agendaNumber);
+  assert.ok(numbers.includes("3.10"), "item 3.10 is kept");
+  assert.equal(items.find((item) => item.agendaNumber === "3.10")?.title, "City Council Meeting Minutes");
+  assert.ok(!items.some((item) => /^Finding|^Ratifying/.test(String(item.title))));
+  assert.ok(numbers.includes("6.1"));
+});
+
+test("numbering that restarts under a lettered section still yields items", () => {
+  // Los Altos School District numbers each lettered section from 1.
+  const items = extractAgendaItemsFromText(meeting, `
+D. RECONVENE TO OPEN SESSION
+1. Roll Call
+2. Pledge of Allegiance
+3. Agenda Approval
+4. Closed Session Report
+5. Superintendent's Update
+E. CONSENT CALENDAR
+1. Minutes of the August 17, 2026 Regular Meeting
+2. Purchase Order Report, August 2026
+3. Warrant Report, August 2026
+4. Agreement with A1 Fence for Almond School
+5. Construction Services Agreement with Ross Recreation - Almond School Improvements
+6. Construction Services Agreement with Ross Recreation - Covington School Improvements
+7. Construction Services Agreement with Ross Recreation - Oak School Improvements
+`);
+  assert.ok(items.some((item) => /Ross Recreation - Covington/.test(String(item.title))));
+  assert.ok(items.some((item) => /Ross Recreation - Oak/.test(String(item.title))));
+});
