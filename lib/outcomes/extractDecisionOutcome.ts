@@ -161,6 +161,12 @@ function sentenceCase(value: string) {
   return `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`;
 }
 
+/**
+ * The first "to <verb>" after the mover names what the motion does: "Romero
+ * moved, seconded by Abrica, to reject the ordinance. Motion carried 3-2".
+ */
+const MOTION_PURPOSE_PATTERN = /\b(?:moved|motion)\b[^.;]{0,160}?\bto\s+([a-z]+)/;
+
 export function classifyDecisionOutcome(value: string): DecisionOutcomeKind {
   // A quoted resolution title describes the subject being adopted. Words such
   // as "Second Amendment" or "Continued Participation" are not procedural
@@ -174,6 +180,18 @@ export function classifyDecisionOutcome(value: string): DecisionOutcomeKind {
   // rather than falling through to an unclassified outcome.
   const negatedApproval = NEGATED_APPROVAL_PATTERN.test(raw);
   const text = raw.replace(NEGATED_OUTCOME_TERM_PATTERN, " ");
+  // "Carried" only says the motion passed. A passed motion to reject or deny
+  // rejected the item, and a passed motion to continue it continued it.
+  const purpose = text.match(MOTION_PURPOSE_PATTERN)?.[1];
+  if (
+    purpose &&
+    !negatedApproval &&
+    APPROVAL_TERM_PATTERN.test(text) &&
+    !FAILURE_TERM_PATTERN.test(text)
+  ) {
+    if (/^(?:reject|deny)$/.test(purpose)) return "rejected";
+    if (/^(?:continue|postpone|table|defer|refer)$/.test(purpose)) return "continued";
+  }
   // An amendment that was denied is a rejection, not an amendment, so the
   // amendment branch must yield whenever the record also carries a failure.
   if (/\bamend(?:ed|ment|ments)?\b/.test(text) && !FAILURE_TERM_PATTERN.test(text)) {
@@ -675,31 +693,49 @@ function parsedMinuteItems(meeting: LlmReadyMeeting, document: PrimeGovDocument)
 function majorSectionBlock(title: string, text: string) {
   const lines = normalizeSourceText(text).split("\n");
   const escapedTitle = escapeRegExp(title);
+  // Letter headings ("E. CONSENT CALENDAR") and numbered ones ("3. APPROVAL
+  // OF THE CONSENT CALENDAR", East Palo Alto).
   const titlePattern = new RegExp(
-    `^(?:[A-Z]\\s*[.):-]\\s*)?${escapedTitle}\\s*$`,
+    `^(?:(?:[A-Z]|(\\d{1,2}))\\s*[.):-]\\s*)?(?:approval\\s+of\\s+(?:the\\s+)?)?${escapedTitle}\\s*$`,
     "i"
   );
   const sectionPattern = /^[A-Z]\s*[.):-]\s*[A-Z][\s\S]{1,100}$/;
   const uppercaseSectionPattern = /^[A-Z][A-Z0-9/&,'’() -]{3,100}[.:]?$/;
-  const start = lines.findIndex((line) => titlePattern.test(line.trim()));
+  const numberedSectionPattern = /^\d{1,2}\s*[.)]\s+[A-Z][A-Z0-9/&,'’() -]{3,100}[.:]?$/;
+  let start = -1;
+  let number: string | null = null;
+  for (const [index, line] of lines.entries()) {
+    const match = line.trim().match(titlePattern);
+    if (!match) continue;
+    start = index;
+    number = match[1] || null;
+    break;
+  }
   if (start < 0) return null;
 
   let end = lines.length;
   for (let index = start + 1; index < lines.length; index += 1) {
     const line = lines[index].trim();
-    if (sectionPattern.test(line) || uppercaseSectionPattern.test(line)) {
+    if (
+      sectionPattern.test(line) ||
+      uppercaseSectionPattern.test(line) ||
+      (number !== null && numberedSectionPattern.test(line))
+    ) {
       end = index;
       break;
     }
   }
-  return lines.slice(start, end).join("\n");
+  return { text: lines.slice(start, end).join("\n"), number };
 }
 
 function consentItemWasSeparated(agendaNumber: string, section: string) {
   const number = escapeRegExp(agendaNumber);
+  // Allow decimal points so "excluding Item 3.3 and 3.4" reaches 3.4.
+  const gap = "(?:[^.\\n]|\\.(?=\\d)){0,180}";
+  const separated = "(?:pulled|removed|separate(?:ly)?|continued|exclud(?:ed|ing)|except)";
   return new RegExp(
-    `\\b(?:item\\s+)?${number}\\b[^.\\n]{0,180}\\b(?:pulled|removed|separate(?:ly)?|continued)\\b|` +
-      `\\b(?:pulled|removed|separate(?:ly)?|continued)\\b[^.\\n]{0,180}\\b(?:item\\s+)?${number}\\b`,
+    `\\b(?:item\\s+)?${number}\\b${gap}\\b${separated}\\b|` +
+      `\\b${separated}\\b${gap}\\b(?:item\\s+)?${number}\\b`,
     "i"
   ).test(section);
 }
@@ -708,12 +744,13 @@ function consentCalendarOutcomeItems(
   document: PrimeGovDocument,
   items: AgendaItem[]
 ) {
-  const section = majorSectionBlock(
+  const block = majorSectionBlock(
     "Consent Calendar",
     document.extractedText || ""
   );
+  const section = block?.text || null;
   const result = section ? extractResultText(section) : null;
-  if (!section || !result) return [];
+  if (!block || !section || !result) return [];
 
   const consentSectionNumbers = items.flatMap((item) => {
     const number = String(item.agendaNumber || "").trim();
@@ -724,11 +761,18 @@ function consentCalendarOutcomeItems(
 
   return items.flatMap((item) => {
     const agendaNumber = String(item.agendaNumber || "").trim();
-    const belongsToNumberedConsentSection = consentSectionNumbers.some(
-      (sectionNumber) => agendaNumber.startsWith(`${sectionNumber}.`)
-    );
-    const explicitlyConsent = /consent calendar/i.test(String(item.itemType || ""));
+    // A numbered heading names its own items. Without this, another body's
+    // consent items ("11.1" under "11. EPASD CONSENT CALENDAR") would take the
+    // City Council's consent motion.
+    const belongsToNumberedConsentSection = block.number !== null
+      ? agendaNumber.startsWith(`${block.number}.`)
+      : consentSectionNumbers.some((sectionNumber) => agendaNumber.startsWith(`${sectionNumber}.`));
+    const explicitlyConsent =
+      block.number === null && /consent calendar/i.test(String(item.itemType || ""));
+    // Under a numbered heading the item number itself places the item on the
+    // calendar; East Palo Alto minutes often record only the consent motion.
     const itemAppearsInConsentRecord =
+      (block.number !== null && belongsToNumberedConsentSection) ||
       agendaItemSimilarity(String(item.title || item.rowText), section) >= MIN_FUZZY_MATCH_SCORE;
     if (
       !agendaNumber ||
@@ -799,27 +843,40 @@ function numberedMinuteBlock(
   const itemLinePattern =
     /^\s*(?:agenda\s+)?(?:item\s+)?([A-Z]?\d{1,2}(?:\.\d{1,3})?)\s*(?:[.)]|:\s+(?!\d)|-\s+(?!\d)|\s+)\s*\S/i;
   const sectionLinePattern = /^\s*[A-Z]\s*[.)-]\s+[A-Z][\s\S]{1,120}$/;
-  const start = lines.findIndex((line) => {
+  const starts = lines.flatMap((line, index) => {
     const match = line.match(itemLinePattern);
-    return normalizedIdentifier(match?.[1]) === requestedNumber;
+    return normalizedIdentifier(match?.[1]) === requestedNumber ? [index] : [];
   });
-  if (start < 0) return null;
+  if (starts.length === 0) return null;
 
-  let end = lines.length;
-  for (let index = start + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    const match = line.match(itemLinePattern);
-    const nextNumber = normalizedIdentifier(match?.[1]);
-    if (
-      (nextNumber && nextNumber !== requestedNumber) ||
-      sectionLinePattern.test(line)
-    ) {
-      end = index;
-      break;
+  const blockAt = (start: number) => {
+    let end = lines.length;
+    for (let index = start + 1; index < lines.length; index += 1) {
+      const line = lines[index];
+      const match = line.match(itemLinePattern);
+      const nextNumber = normalizedIdentifier(match?.[1]);
+      if (
+        (nextNumber && nextNumber !== requestedNumber) ||
+        sectionLinePattern.test(line)
+      ) {
+        end = index;
+        break;
+      }
+    }
+    return lines.slice(start, end).join("\n").trim() || null;
+  };
+
+  // An item pulled from consent is listed with the calendar and recorded again
+  // after the consent vote with its own motion (East Palo Alto). Use the
+  // occurrence that records a result. Only sub-item numbers ("3.3") qualify:
+  // a bare "3." recurs inside recommendation lists.
+  if (requestedNumber.includes(".") && starts.length > 1) {
+    for (const start of starts) {
+      const block = blockAt(start);
+      if (block && extractResultText(block)) return block;
     }
   }
-
-  return lines.slice(start, end).join("\n").trim() || null;
+  return blockAt(starts[0]);
 }
 
 function guardedResultWindow(cardTitle: string, text: string) {
@@ -889,6 +946,10 @@ function guardedResultWindow(cardTitle: string, text: string) {
   });
 }
 
+function comparableAgendaNumber(value?: string | null) {
+  return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "") || null;
+}
+
 function minutesResultForCard(
   card: Pick<SummaryCardRow, "source_item_id" | "agenda_item" | "source_url">,
   meeting: LlmReadyMeeting
@@ -918,13 +979,30 @@ function minutesResultForCard(
       };
     }
   }
+  // A card that knows its own agenda number may not take the result of a
+  // differently numbered item by title similarity ("Cash Disbursement Report
+  // for April" must not take item 11.2's May report).
+  const ownItem =
+    sourceItemId && uniqueSourceItemIds(meeting.items || []).has(sourceItemId)
+      ? (meeting.items || []).find((item) => item.externalId === sourceItemId)
+      : null;
+  const ownAgendaNumber = comparableAgendaNumber(ownItem?.agendaNumber);
+  const conflictsWithOwnItem = (item: AgendaItem) => {
+    const number = comparableAgendaNumber(item.agendaNumber);
+    return Boolean(ownAgendaNumber && number && number !== ownAgendaNumber);
+  };
   // Legacy cards can predate source_item_id while still having a unique,
   // high-confidence match in the official result inventory. Resolve that
   // direct match before deriving an agenda number from broader agenda data;
   // otherwise a shared meeting URL or stale agenda identity can steer the
   // card away from the exact result that its title identifies.
   const directInventoryMatch = findGuardedAgendaItemMatch(title, inventory.items);
-  if (directInventoryMatch?.item.result) {
+  // Once the title has pointed at a differently numbered item, the loose title
+  // window below would only find that item's motion again.
+  let titlePointsElsewhere = Boolean(
+    directInventoryMatch?.item.result && conflictsWithOwnItem(directInventoryMatch.item)
+  );
+  if (directInventoryMatch?.item.result && !titlePointsElsewhere) {
     const document =
       minutesDocuments(meeting).find(
         (candidate) => candidate.url === directInventoryMatch.item.sourceUrl
@@ -937,12 +1015,8 @@ function minutesResultForCard(
       };
     }
   }
-  const sourceItem =
-    card.source_item_id && uniqueSourceItemIds(meeting.items || []).has(card.source_item_id)
-      ? (meeting.items || []).find((item) => item.externalId === card.source_item_id)
-      : null;
-  const agendaMatch = sourceItem
-    ? { item: sourceItem }
+  const agendaMatch = ownItem
+    ? { item: ownItem }
     : findGuardedAgendaItemMatch(title, meeting.items || [], {
         sourceUrl: card.source_url
       });
@@ -950,7 +1024,9 @@ function minutesResultForCard(
   const inventoryMatch = findGuardedAgendaItemMatch(title, inventory.items, {
     agendaNumber
   });
-  if (inventoryMatch?.item.result) {
+  if (inventoryMatch?.item.result && conflictsWithOwnItem(inventoryMatch.item)) {
+    titlePointsElsewhere = true;
+  } else if (inventoryMatch?.item.result) {
     const document =
       minutesDocuments(meeting).find(
         (candidate) => candidate.url === inventoryMatch.item.sourceUrl
@@ -963,7 +1039,7 @@ function minutesResultForCard(
   for (const document of minutesDocuments(meeting)) {
     const text = normalizeSourceText(document.extractedText || "");
     const numberedBlock = agendaNumber ? numberedMinuteBlock(agendaNumber, text) : null;
-    const windowMatch = numberedBlock ? null : guardedResultWindow(title, text);
+    const windowMatch = numberedBlock || titlePointsElsewhere ? null : guardedResultWindow(title, text);
     const block = numberedBlock || windowMatch?.item.rowText || null;
     const result = numberedBlock
       ? extractResultText(numberedBlock)

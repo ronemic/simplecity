@@ -1894,3 +1894,104 @@ test("official card queries and pipeline runs attach verified outcomes outside t
   assert.match(summaryCard, /outcome = card\.outcome/);
   assert.match(summaryCard, /<DecisionOutcomePanel/);
 });
+
+function eastPaloAltoMeeting(dateText: string, fixture: string) {
+  const minutes = fs.readFileSync(new URL(`./fixtures/${fixture}`, import.meta.url), "utf8");
+  const base = meeting("east-palo-alto", {
+    id: `east-palo-alto-${fixture}`,
+    externalId: `east-palo-alto-${fixture}`,
+    dateText,
+    timeText: "6:00 PM",
+    platform: "official-site"
+  });
+  return {
+    ...base,
+    items: extractAgendaItemsFromText(base, minutes),
+    documents: [{
+      type: "Minutes" as const,
+      label: `Minutes of ${dateText}`,
+      url: `https://example.com/epa/${fixture}`,
+      extractedText: minutes
+    }]
+  };
+}
+
+function eastPaloAltoOutcome(
+  epaMeeting: ReturnType<typeof eastPaloAltoMeeting>,
+  agendaNumber: string,
+  title: string
+) {
+  const item = epaMeeting.items.find((candidate) => candidate.agendaNumber === agendaNumber);
+  assert.ok(item, `agenda item ${agendaNumber} is parsed`);
+  return extractDecisionOutcome(
+    { id: `card-${agendaNumber}`, source_item_id: item.externalId, agenda_item: title, source_url: "https://example.com/epa" },
+    epaMeeting
+  );
+}
+
+test("a carried motion to reject or continue is not reported as approval", () => {
+  // Real wording from East Palo Alto minutes.
+  assert.equal(
+    classifyDecisionOutcome(
+      "Councilmember Romero moved, seconded by Vice Mayor Abrica, to reject the Temporary Housing Development Incentive Program for Smaller Projects Ordinance. Motion carried by roll call vote, 3-2"
+    ),
+    "rejected"
+  );
+  assert.equal(
+    classifyDecisionOutcome(
+      "Mayor Lincoln moved, Councilmember Dinan seconded, to continue Item 6.2 to a future meeting. Motion carried unanimously (5-0)."
+    ),
+    "continued"
+  );
+  // Only the motion's own verb counts, not a later clause.
+  assert.equal(
+    classifyDecisionOutcome("Councilmember Dinan moved to approve the contract and refer the policy to committee. Motion carried."),
+    "approved"
+  );
+});
+
+test("East Palo Alto results follow the item's own motion, never a neighbor's", () => {
+  const july21 = eastPaloAltoMeeting("Jul 21, 2026", "east-palo-alto-2026-07-21-minutes.txt");
+
+  const rejected = eastPaloAltoOutcome(july21, "8.2", "Adopt temporary housing incentive program for small projects");
+  assert.equal(rejected?.kind, "rejected");
+
+  // 11.1 has no motion of its own; it must not take 11.2's by title similarity.
+  const april = eastPaloAltoOutcome(july21, "11.1", "Cash Disbursement Report for EPASD April 2026");
+  assert.ok(!april || april.matchedAgendaNumber === "11.1");
+});
+
+test("a numbered consent calendar applies only to its own section's items", () => {
+  const september1 = eastPaloAltoMeeting("Sep 1, 2026", "east-palo-alto-2026-09-01-minutes.txt");
+
+  const treasury = eastPaloAltoOutcome(september1, "3.2", "June 2026 Treasury Cash Report");
+  assert.equal(treasury?.kind, "approved");
+  assert.match(treasury?.sourceText || "", /Consent Calendar, excluding Item 3\.3 and 3\.4/);
+  assert.doesNotMatch(treasury?.sourceText || "", /EPASD/);
+
+  // Pulled from consent and voted on separately.
+  const veolia = eastPaloAltoOutcome(september1, "3.3", "Reimburse Veolia for water system improvements");
+  assert.match(veolia?.sourceText || "", /payments to Veolia/);
+
+  const sanitary = eastPaloAltoOutcome(september1, "11.1", "Accept cash disbursement report for June 2026");
+  assert.match(sanitary?.sourceText || "", /EPASD Consent Calendar/);
+});
+
+test("an unlisted item under a numbered consent heading takes the consent motion", () => {
+  // Jul 21 records only "approve the Consent Calendar, excluding Item 3.4";
+  // item 3.5 (adopting the July 7 minutes) must not borrow a nearby motion.
+  const july21 = eastPaloAltoMeeting("Jul 21, 2026", "east-palo-alto-2026-07-21-minutes.txt");
+  // Agenda items come from the agenda, which lists 3.5; the minutes do not.
+  july21.items.push(agendaItem({
+    externalId: "east-palo-alto-jul-21-item-3-5",
+    agendaNumber: "3.5",
+    itemType: null,
+    title: "City Council Meeting Minutes",
+    action: null,
+    result: null,
+    rowText: "3.5 City Council Meeting Minutes"
+  }));
+  const minutes = eastPaloAltoOutcome(july21, "3.5", "Adopt July 7, 2026 City Council meeting minutes");
+  assert.equal(minutes?.kind, "approved");
+  assert.match(minutes?.sourceText || "", /approve the Consent Calendar, excluding Item 3\.4/);
+});
