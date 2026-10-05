@@ -1,13 +1,16 @@
 import { statusLabel, type Locale } from "@/lib/i18n";
-import { CIVIC_TIME_ZONE } from "@/lib/utils/date";
+import { CIVIC_TIME_ZONE, formatPacificTimestamp } from "@/lib/utils/date";
 
 export const CARD_EVENT_KINDS = [
   "posted",
   "status_changed",
   "outcome_recorded",
   "outcome_changed",
+  "outcome_vote_changed",
+  "outcome_date_changed",
   "meeting_cancelled",
-  "meeting_reinstated"
+  "meeting_reinstated",
+  "meeting_rescheduled"
 ] as const;
 
 export type CardEventKind = (typeof CARD_EVENT_KINDS)[number];
@@ -47,6 +50,22 @@ function outcomeLabel(locale: Locale, kind: string | null) {
   return outcomeKindLabels[locale][kind] || kind;
 }
 
+function scheduleLabel(value: string | null, locale: Locale) {
+  if (!value) return null;
+  // Database timestamps are stored as UTC ISO strings. Older or unparseable
+  // meeting dates are kept as source text and must not be assigned a timezone.
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)
+    ? formatPacificTimestamp(value, locale) || value
+    : value;
+}
+
+function decisionDateLabel(value: string | null, locale: Locale) {
+  if (!value) return null;
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(value)
+    ? formatCardEventDate(value, locale) || value
+    : value;
+}
+
 export function cardEventLabel(event: CardEvent, locale: Locale) {
   const es = locale === "es";
   switch (event.kind) {
@@ -64,10 +83,40 @@ export function cardEventLabel(event: CardEvent, locale: Locale) {
       return es
         ? `Resultado oficial cambiado de ${outcomeLabel(locale, event.previous_value)} a ${outcomeLabel(locale, event.new_value)}`
         : `Official result changed from ${outcomeLabel(locale, event.previous_value)} to ${outcomeLabel(locale, event.new_value)}`;
+    case "outcome_vote_changed":
+      if (event.previous_value && event.new_value) {
+        return es
+          ? `Votación oficial corregida de ${event.previous_value} a ${event.new_value}`
+          : `Official vote corrected from ${event.previous_value} to ${event.new_value}`;
+      }
+      if (event.new_value) {
+        return es ? `Votación oficial agregada: ${event.new_value}` : `Official vote added: ${event.new_value}`;
+      }
+      return es ? "Votación oficial eliminada" : "Official vote removed";
+    case "outcome_date_changed": {
+      const previous = decisionDateLabel(event.previous_value, locale);
+      const next = decisionDateLabel(event.new_value, locale);
+      if (previous && next) {
+        return es
+          ? `Fecha de la decisión corregida de ${previous} a ${next}`
+          : `Decision date corrected from ${previous} to ${next}`;
+      }
+      if (next) return es ? `Fecha de la decisión agregada: ${next}` : `Decision date added: ${next}`;
+      return es ? "Fecha de la decisión eliminada" : "Decision date removed";
+    }
     case "meeting_cancelled":
       return es ? "Reunión cancelada" : "Meeting cancelled";
     case "meeting_reinstated":
       return es ? "La reunión volvió al calendario" : "Meeting back on the schedule";
+    case "meeting_rescheduled": {
+      const previous = scheduleLabel(event.previous_value, locale);
+      const next = scheduleLabel(event.new_value, locale);
+      if (previous && next) {
+        return es ? `Reunión reprogramada de ${previous} a ${next}` : `Meeting rescheduled from ${previous} to ${next}`;
+      }
+      if (next) return es ? `Reunión programada para ${next}` : `Meeting scheduled for ${next}`;
+      return es ? "Fecha de la reunión eliminada" : "Meeting date removed";
+    }
   }
 }
 

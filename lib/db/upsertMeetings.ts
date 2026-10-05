@@ -21,7 +21,7 @@ import {
   meetingTranslationFingerprint,
   summaryCardTranslationFingerprint
 } from "@/lib/db/translationFingerprint";
-import { externalMeetingId } from "@/lib/utils/slug";
+import { cleanText, externalMeetingId } from "@/lib/utils/slug";
 import { parseMeetingDate } from "@/lib/utils/date";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { summaryPointsStorageText } from "@/lib/utils/summaryPoints";
@@ -737,8 +737,79 @@ type ExistingMeetingDetailsIdentity = {
   meeting_details_url?: string | null;
 };
 
+type OfficialDocumentIdentityInput = Pick<
+  LlmReadyMeeting,
+  "sourceUrl" | "meetingType" | "bodyName" | "documents"
+>;
+
+type ExistingOfficialDocumentIdentity = {
+  external_id?: string | null;
+  source_url?: string | null;
+  meeting_type?: string | null;
+};
+
 function normalizedIdentityUrl(value?: string | null) {
   return String(value || "").trim().replace(/\/$/, "");
+}
+
+const MEETING_DOCUMENT_IDENTITY_TYPES = new Set([
+  "Agenda",
+  "Agenda Packet",
+  "Minutes",
+  "Notice of Cancellation",
+  "Special Event Notice",
+  "Early Staff Report Release",
+  "Document"
+]);
+
+function officialDocumentIdentity(meeting: OfficialDocumentIdentityInput) {
+  const url = normalizedIdentityUrl(meeting.sourceUrl);
+  const body = cleanText(meeting.meetingType || meeting.bodyName || "").toLowerCase();
+  if (!url || !body || !meeting.documents.some((document) =>
+    MEETING_DOCUMENT_IDENTITY_TYPES.has(document.type) &&
+    normalizedIdentityUrl(document.url) === url
+  )) return null;
+  return { url, key: JSON.stringify([body, url]) };
+}
+
+export function uniqueOfficialDocumentIdentityUrls(meetings: OfficialDocumentIdentityInput[]) {
+  const counts = new Map<string, number>();
+  const urls = new Map<string, string>();
+  for (const meeting of meetings) {
+    const identity = officialDocumentIdentity(meeting);
+    if (!identity) continue;
+    counts.set(identity.key, (counts.get(identity.key) || 0) + 1);
+    urls.set(identity.key, identity.url);
+  }
+  return [...counts.entries()].flatMap(([key, count]) => count === 1 ? [urls.get(key)!] : []);
+}
+
+export function uniqueExistingExternalIdsByOfficialDocument(
+  rows: ExistingOfficialDocumentIdentity[],
+  meetings: OfficialDocumentIdentityInput[]
+) {
+  const incoming = new Map<string, number>();
+  for (const meeting of meetings) {
+    const identity = officialDocumentIdentity(meeting);
+    if (identity) incoming.set(identity.key, (incoming.get(identity.key) || 0) + 1);
+  }
+
+  const existing = new Map<string, ExistingOfficialDocumentIdentity[]>();
+  for (const row of rows) {
+    if (!row.external_id || !row.source_url || !row.meeting_type) continue;
+    const key = JSON.stringify([
+      cleanText(row.meeting_type).toLowerCase(),
+      normalizedIdentityUrl(row.source_url)
+    ]);
+    existing.set(key, [...(existing.get(key) || []), row]);
+  }
+
+  const externalIds = new Map<string, string>();
+  for (const [key, matches] of existing) {
+    if (incoming.get(key) !== 1 || matches.length !== 1) continue;
+    externalIds.set(key, matches[0].external_id!);
+  }
+  return externalIds;
 }
 
 export function uniqueMeetingDetailsIdentityUrls(
@@ -836,6 +907,30 @@ async function loadExistingExternalIdsByMeetingDetailsUrl(
   }
 
   return externalIds;
+}
+
+async function loadExistingExternalIdsByOfficialDocument(
+  supabase: SupabaseClient,
+  meetings: LlmReadyMeeting[],
+  jurisdiction?: JurisdictionConfig
+) {
+  // These official-site scrapers use dates in their fallback IDs. Preserve the
+  // existing row when the same body still links to the same official document.
+  if (jurisdiction?.slug !== "menlo-park" && jurisdiction?.slug !== "east-palo-alto") {
+    return new Map<string, string>();
+  }
+  const urls = [...new Set(uniqueOfficialDocumentIdentityUrls(meetings))];
+  const rows: ExistingOfficialDocumentIdentity[] = [];
+  for (const batch of chunks(urls, 50)) {
+    const { data, error } = await supabase
+      .from("meetings")
+      .select("external_id,source_url,meeting_type")
+      .eq("jurisdiction_slug", jurisdiction.slug)
+      .in("source_url", batch);
+    if (error) throw new Error(`Failed to reconcile official document identifiers: ${error.message}`);
+    rows.push(...((data || []) as ExistingOfficialDocumentIdentity[]));
+  }
+  return uniqueExistingExternalIdsByOfficialDocument(rows, meetings);
 }
 
 async function countCardsForMeeting(supabase: SupabaseClient, meetingId: string) {
@@ -1012,12 +1107,19 @@ export async function upsertMeetings(
     meetings,
     jurisdiction
   );
+  const existingDocumentExternalIds = await loadExistingExternalIdsByOfficialDocument(
+    supabase,
+    meetings,
+    jurisdiction
+  );
 
   for (const meeting of meetings) {
     const safeMeeting = sanitizeForDatabase(meeting);
     const identitySourceUrl = canonicalMeetingSourceUrl(meeting);
     const selectedSourceUrl = meeting.sourceUrl || identitySourceUrl;
+    const documentIdentity = officialDocumentIdentity(meeting);
     const externalId =
+      (documentIdentity ? existingDocumentExternalIds.get(documentIdentity.key) : null) ||
       (meeting.meetingDetailsUrl
         ? existingExternalIds.get(normalizedIdentityUrl(meeting.meetingDetailsUrl))
         : null) ||

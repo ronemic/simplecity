@@ -10,10 +10,13 @@ import {
   restoreArchivedDocumentExtractions,
   upsertMeetings,
   retryTransientSupabaseWrite,
+  uniqueOfficialDocumentIdentityUrls,
+  uniqueExistingExternalIdsByOfficialDocument,
   uniqueExistingExternalIdsByMeetingDetailsUrl,
   uniqueMeetingDetailsIdentityUrls
 } from "@/lib/db/upsertMeetings";
 import type { LlmReadyMeeting, PrimeGovDocument } from "@/lib/types";
+import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 
 test("restores archived extraction text after a transient current download miss", async () => {
   const document: PrimeGovDocument = {
@@ -91,6 +94,60 @@ test("allows a unique event-specific meeting details URL", () => {
     ]),
     [detailsUrl]
   );
+});
+
+test("reuses a date-based meeting ID when its body and official agenda URL stay the same", () => {
+  const agendaUrl = "https://city.example/20261007-agenda.pdf";
+  const meeting = {
+    sourceUrl: agendaUrl,
+    meetingType: "Planning Commission",
+    bodyName: "Planning Commission",
+    documents: [{ type: "Agenda Packet", url: agendaUrl }]
+  } as LlmReadyMeeting;
+
+  assert.deepEqual(uniqueOfficialDocumentIdentityUrls([meeting]), [agendaUrl]);
+  const matches = uniqueExistingExternalIdsByOfficialDocument([
+    { external_id: "meeting-original-date", source_url: agendaUrl, meeting_type: "Planning Commission" }
+  ], [meeting]);
+  assert.equal(matches.size, 1);
+  assert.equal([...matches.values()][0], "meeting-original-date");
+});
+
+test("does not merge distinct meetings that share an agenda link", () => {
+  const agendaUrl = "https://city.example/shared-agenda.pdf";
+  const meeting = (bodyName: string) => ({
+    sourceUrl: agendaUrl,
+    meetingType: bodyName,
+    bodyName,
+    documents: [{ type: "Agenda", url: agendaUrl }]
+  }) as LlmReadyMeeting;
+  const existing = [
+    { external_id: "council-1", source_url: agendaUrl, meeting_type: "City Council" },
+    { external_id: "council-2", source_url: agendaUrl, meeting_type: "City Council" },
+    { external_id: "planning-1", source_url: agendaUrl, meeting_type: "Planning Commission" }
+  ];
+
+  const matches = uniqueExistingExternalIdsByOfficialDocument(existing, [
+    meeting("City Council"), meeting("Planning Commission")
+  ]);
+  assert.equal(matches.size, 1);
+  assert.equal([...matches.values()][0], "planning-1");
+  assert.equal(uniqueExistingExternalIdsByOfficialDocument(existing, [
+    meeting("Planning Commission"), meeting("Planning Commission")
+  ]).size, 0);
+  assert.deepEqual(uniqueOfficialDocumentIdentityUrls([{
+    ...meeting("City Council"),
+    documents: [{ type: "Meeting Details", label: "Details", url: agendaUrl }]
+  }]), []);
+});
+
+test("a unique official notice can keep a date-based meeting identity", () => {
+  const noticeUrl = "https://city.example/reschedule-notice.pdf";
+  assert.deepEqual(uniqueOfficialDocumentIdentityUrls([{
+    sourceUrl: noticeUrl,
+    meetingType: "Planning Commission",
+    documents: [{ type: "Special Event Notice", label: "Notice", url: noticeUrl }]
+  } as LlmReadyMeeting]), [noticeUrl]);
 });
 
 test("stores large extracted source text only in its dedicated database columns", () => {
@@ -278,7 +335,12 @@ test("ships a single oversized document row rather than dropping it", () => {
 
 type CapturedWrite = { table: string; payload: unknown; options?: unknown };
 
-function fakeSupabaseClient(writes: CapturedWrite[], summaryHashesSupported = true, previous?: Record<string, unknown>) {
+function fakeSupabaseClient(
+  writes: CapturedWrite[],
+  summaryHashesSupported = true,
+  previous?: Record<string, unknown>,
+  documentRows: Array<{ external_id: string; source_url: string; meeting_type: string }> = []
+) {
   function chainFor(table: string) {
     let outcome: Record<string, unknown> = { data: [], error: null, count: 0 };
     const chain = {
@@ -286,6 +348,9 @@ function fakeSupabaseClient(writes: CapturedWrite[], summaryHashesSupported = tr
         if (columns?.startsWith("raw,llm_input_text")) {
           assert.equal(writes.length, 0, "previous input must be read before overwriting discovery");
           outcome = { data: previous ? [previous] : [], error: null };
+        }
+        if (table === "meetings" && columns === "external_id,source_url,meeting_type") {
+          outcome = { data: documentRows, error: null };
         }
         if (
           table === "meetings" &&
@@ -324,6 +389,34 @@ function fakeSupabaseClient(writes: CapturedWrite[], summaryHashesSupported = tr
 
   return { from: (table: string) => chainFor(table) } as unknown as Parameters<typeof upsertMeetings>[0];
 }
+
+test("a rescheduled Menlo Park agenda updates the original meeting row", async () => {
+  const writes: CapturedWrite[] = [];
+  const agendaUrl = "https://city.example/20261007-agenda.pdf";
+  const meeting = {
+    ...meetingWithDocuments([{ type: "Agenda Packet", label: "Agenda", url: agendaUrl }]),
+    externalId: "menlo-park-new-date",
+    sourceUrl: agendaUrl,
+    meetingType: "Planning Commission",
+    bodyName: "Planning Commission",
+    dateText: "Oct 14, 2026"
+  } as LlmReadyMeeting;
+  const jurisdiction = { slug: "menlo-park", regionSlug: "south-san-mateo" } as JurisdictionConfig;
+  await upsertMeetings(
+    fakeSupabaseClient(writes, true, undefined, [{
+      external_id: "menlo-park-original-date",
+      source_url: agendaUrl,
+      meeting_type: "Planning Commission"
+    }]),
+    [meeting],
+    undefined,
+    jurisdiction
+  );
+
+  const payload = writes.find((write) => write.table === "meetings")?.payload as Record<string, unknown>;
+  assert.equal(payload.external_id, "menlo-park-original-date");
+  assert.equal(payload.date_text, "Oct 14, 2026");
+});
 
 function meetingWithDocuments(documents: LlmReadyMeeting["documents"]): LlmReadyMeeting {
   return {
