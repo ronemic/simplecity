@@ -127,7 +127,8 @@ export function statusSummary(
   const advisory = isSantaBarbaraPlanningCard(card);
   const compactMeetingDate = formatCompactDisplayDate(
     card.meetings?.date_text,
-    card.meetings?.meeting_datetime
+    card.meetings?.meeting_datetime,
+    locale
   );
 
   if (status === "Cancelled" || status === "Canceled" || card.meetings?.status === "Cancelled") {
@@ -151,7 +152,7 @@ export function statusSummary(
   if (status === "Upcoming vote" || status === "Upcoming") {
     return {
       label:
-        compactMeetingDate === "Date not listed"
+        compactMeetingDate === t(locale, "dateNotListed")
           ? t(locale, "voteUpcoming")
           : status === "Upcoming vote"
             ? advisory

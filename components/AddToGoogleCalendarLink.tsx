@@ -21,7 +21,7 @@ export function AddToGoogleCalendarLink({
   compact = false,
   locale = "en"
 }: AddToGoogleCalendarLinkProps) {
-  const calendarUrl = buildGoogleCalendarUrl(meeting);
+  const calendarUrl = buildGoogleCalendarUrl(meeting, locale);
   if (!calendarUrl) return null;
 
   return (

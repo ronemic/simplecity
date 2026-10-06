@@ -40,6 +40,7 @@ type TranslationKey =
   | "googleCalendar"
   | "hideSummary"
   | "howToAct"
+  | "jurisdiction"
   | "language"
   | "list"
   | "loading"
@@ -69,6 +70,7 @@ type TranslationKey =
   | "pageNotFound"
   | "past"
   | "previous"
+  | "primaryNavigation"
   | "publicCommentInformation"
   | "readSummary"
   | "search"
@@ -159,6 +161,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     googleCalendar: "Google Calendar",
     hideSummary: "Hide summary",
     howToAct: "How to act",
+    jurisdiction: "Jurisdiction",
     language: "Language",
     list: "List",
     loading: "Loading",
@@ -188,6 +191,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     pageNotFound: "Page not found",
     past: "Past",
     previous: "Previous",
+    primaryNavigation: "Primary navigation",
     publicCommentInformation: "Public comment information",
     readSummary: "Read summary",
     search: "Search",
@@ -260,8 +264,8 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
   es: {
     about: "Acerca de",
     addToGoogleCalendar: "Agregar a Google Calendar",
-    adminAnnouncement: "Anuncio del administrador",
-    all: "Todos",
+    adminAnnouncement: "Aviso de la administración",
+    all: "Todas",
     allMatchingMeetings: "Todas las reuniones coincidentes",
     allStatuses: "Todos los estados",
     allTopics: "Todos los temas",
@@ -269,14 +273,14 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     calendar: "Calendario",
     clearSearch: "Borrar búsqueda",
     commentDeadline: "Fecha límite para comentar",
-    commentOptionListed: "Opción para comentar indicada",
+    commentOptionListed: "Hay una forma de comentar",
     connectedDecision: "Decisión relacionada",
     contact: "Contacto",
     dateNotListed: "Fecha no indicada",
     dayView: "Vista del día",
     decisions: "Decisiones",
     decisionsDescription:
-      "Lee resúmenes en lenguaje claro de decisiones del gobierno local, ordenados para mostrar primero las decisiones próximas y luego por actualidad e impacto comunitario.",
+      "Lee resúmenes en lenguaje claro de decisiones del gobierno local, con enlaces a las fuentes, ordenados para mostrar primero las decisiones próximas y luego las más recientes y de mayor impacto comunitario.",
     everydayImpactTitle: "Encuentra decisiones por impacto cotidiano",
     filter: "Filtrar",
     filterByTopic: "Filtrar por tema",
@@ -284,6 +288,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     googleCalendar: "Google Calendar",
     hideSummary: "Ocultar resumen",
     howToAct: "Cómo participar",
+    jurisdiction: "Jurisdicción",
     language: "Idioma",
     list: "Lista",
     loading: "Cargando",
@@ -313,6 +318,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     pageNotFound: "Página no encontrada",
     past: "Pasadas",
     previous: "Anterior",
+    primaryNavigation: "Navegación principal",
     publicCommentInformation: "Información para comentarios públicos",
     readSummary: "Leer resumen",
     search: "Buscar",
@@ -328,33 +334,33 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     following: "Siguiendo",
     subscribe: "Suscribirse",
     subscribeAlreadySubscribedHelp:
-      "¿Ya estás suscrito? Usa el mismo email para actualizar tus áreas. Confirmaremos los cambios por email.",
+      "¿Ya tienes una suscripción? Usa el mismo correo electrónico para actualizar tus áreas. Confirmaremos los cambios por correo electrónico.",
     subscribeConfirmedBody:
       "Los resúmenes semanales usarán las áreas que elegiste más recientemente cuando se publiquen nuevas tarjetas de SimpleCity.",
-    subscribeConfirmedTitle: "Tus actualizaciones por email están confirmadas",
+    subscribeConfirmedTitle: "Tus actualizaciones por correo electrónico están confirmadas",
     subscribeRegionalCoverage: "Cobertura regional",
     subscribeSchoolDistricts: "Distritos escolares",
     subscribeSanMateoCountyCities: "Ciudades del condado de San Mateo",
     subscribeSantaClaraCountyCities: "Ciudades del condado de Santa Clara",
-    subscribeEmailAddress: "Email",
+    subscribeEmailAddress: "Correo electrónico",
     subscribeEmailPlaceholder: "tu@ejemplo.com",
     subscribeErrorBody: "Inténtalo de nuevo en un momento.",
     subscribeErrorTitle: "Algo salió mal",
-    subscribeEyebrow: "Actualizaciones por email",
+    subscribeEyebrow: "Actualizaciones por correo electrónico",
     subscribeFormFallbackError: "Algo salió mal. Inténtalo de nuevo.",
     subscribeFormSuccess:
-      "Revisa tu inbox para confirmar tus actualizaciones de SimpleCity. Si ya estabas suscrito, tus preferencias se actualizarán después de confirmar.",
+      "Revisa tu bandeja de entrada para confirmar tus actualizaciones de SimpleCity. Si ya tenías una suscripción, tus preferencias se actualizarán después de confirmar.",
     subscribeFormUnsubscribeHelp:
-      "No hay áreas seleccionadas. Envía tu email para dejar de recibir todos los resúmenes de SimpleCity.",
+      "No hay áreas seleccionadas. Envía tu correo electrónico para dejar de recibir todos los resúmenes de SimpleCity.",
     subscribeFormUnsubscribeSuccess:
-      "Si ese email está suscrito, revisa su inbox para confirmar que deben detenerse todas las actualizaciones de SimpleCity.",
+      "Si ese correo electrónico está suscrito, revisa su bandeja de entrada para confirmar que deben detenerse todas las actualizaciones de SimpleCity.",
     subscribeInvalidBody:
-      "Si ya confirmaste, todo está listo. Envía el formulario de nuevo solo si necesitas un email de confirmación nuevo.",
+      "Si ya confirmaste, todo está listo. Envía el formulario de nuevo solo si necesitas un nuevo correo de confirmación.",
     subscribeInvalidTitle: "Ese enlace venció o ya fue usado",
     subscribePageDescription:
       "Elige las ciudades y condados que te interesan. Enviaremos un resumen semanal cuando se publiquen nuevas tarjetas de reuniones públicas.",
-    subscribePageTitle: "Recibe nuevas publicaciones de SimpleCity por email.",
-    subscribeUnsubscribedBody: "Ya no recibirás resúmenes por email de SimpleCity.",
+    subscribePageTitle: "Recibe nuevas publicaciones de SimpleCity por correo electrónico.",
+    subscribeUnsubscribedBody: "Ya no recibirás resúmenes de SimpleCity por correo electrónico.",
     subscribeUnsubscribedTitle: "Cancelaste la suscripción",
     subscribeWeeklyDigestAreas: "Áreas del resumen semanal",
     unsubscribe: "Cancelar suscripción",
@@ -377,7 +383,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     viewCards: "Ver tarjetas",
     viewMeetingCalendar: "Ver calendario de reuniones",
     viewResults: "Ver resultados",
-    voteUpcoming: "Votación próxima",
+    voteUpcoming: "Próxima votación",
     whatIsHappening: "Qué está pasando",
     whoIsAffected: "A quién afecta",
     whyItMatters: "Por qué importa"
@@ -407,7 +413,7 @@ const categoryLabels: Record<Locale, Record<CategoryName, string>> = {
     Housing: "Vivienda",
     Transportation: "Transporte",
     "Public Safety": "Seguridad pública",
-    "Parks & Environment": "Parques y ambiente",
+    "Parks & Environment": "Parques y medio ambiente",
     "Budget & Taxes": "Presupuesto e impuestos",
     "Business & Development": "Negocios y desarrollo",
     "Schools & Youth": "Escuelas y jóvenes",
@@ -443,7 +449,7 @@ const categoryShortLabels: Record<Locale, Partial<Record<CategoryName, string>>>
   },
   es: {
     Transportation: "Transporte",
-    "Public Safety": "Seguridad",
+    "Public Safety": "Seguridad pública",
     "Parks & Environment": "Parques",
     "Budget & Taxes": "Presupuesto",
     "Business & Development": "Negocios",
@@ -507,8 +513,8 @@ const statusLabels: Record<Locale, Record<string, string>> = {
     Past: "Pasada",
     Cancelled: "Cancelada",
     Canceled: "Cancelada",
-    Unknown: "Desconocido",
-    "Upcoming vote": "Votación próxima",
+    Unknown: "Desconocida",
+    "Upcoming vote": "Próxima votación",
     "Routine approval": "Aprobación rutinaria",
     "Under discussion": "En discusión",
     Passed: "Aprobada",

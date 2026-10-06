@@ -20,7 +20,7 @@ import {
 import { categoryFromSlug } from "@/lib/utils/decisionFilters";
 import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 import { CATEGORIES, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
@@ -35,7 +35,7 @@ export async function generateMetadata({
   searchParams: Promise<{ q?: string; category?: string; result?: string; body?: string; jurisdiction?: string; page?: string; lang?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
-  const locale = seoLocale(params.lang);
+  const locale = await getPageLocale(params.lang);
   const jurisdiction = params.jurisdiction
     ? normalizeJurisdictionSelection(params.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
@@ -53,7 +53,7 @@ export async function generateMetadata({
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
-  const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, locale);
+  const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, seoLocale(params.lang));
   const isFiltered = Boolean(params.q || params.category || params.result || params.body || params.page);
 
   return {

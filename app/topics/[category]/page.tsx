@@ -15,7 +15,7 @@ import {
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
@@ -46,8 +46,13 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const [{ category: slug }, query] = await Promise.all([params, searchParams]);
   const category = categoryFromSlug(slug);
-  if (!category) return { title: "Topic not found | SimpleCity", robots: { index: false } };
-  const locale = seoLocale(query.lang);
+  const locale = await getPageLocale(query.lang);
+  if (!category) {
+    return {
+      title: locale === "es" ? "Tema no encontrado | SimpleCity" : "Topic not found | SimpleCity",
+      robots: { index: false }
+    };
+  }
 
   const jurisdiction = query.jurisdiction
     ? normalizeJurisdictionSelection(query.jurisdiction)
@@ -64,7 +69,7 @@ export async function generateMetadata({
   if (query.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
-  const urls = localizedSeoUrls(canonicalUrl, locale);
+  const urls = localizedSeoUrls(canonicalUrl, seoLocale(query.lang));
 
   return {
     title,

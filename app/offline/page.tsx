@@ -4,10 +4,14 @@ import type { Metadata } from "next";
 import { getRequestLocale } from "@/lib/i18n/server";
 import { t } from "@/lib/i18n";
 
-export const metadata: Metadata = {
-  title: "Offline | SimpleCity",
-  description: "SimpleCity offline fallback."
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+
+  return {
+    title: locale === "es" ? "Sin conexión | SimpleCity" : "Offline | SimpleCity",
+    description: locale === "es" ? "Página de SimpleCity sin conexión." : "SimpleCity offline fallback."
+  };
+}
 
 export default async function OfflinePage() {
   const locale = await getRequestLocale();

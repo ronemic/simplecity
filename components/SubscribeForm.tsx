@@ -13,6 +13,26 @@ type JurisdictionOption = {
 
 type SubscribeStatus = "idle" | "success" | "error";
 
+// The subscribe API answers in English (lib/email/subscriptions.ts and
+// app/api/email/subscribe/route.ts). Known messages are translated here; any
+// other error falls back to the generic message.
+const spanishSubscribeErrors: Record<string, string> = {
+  "Enter a valid email address.": "Escribe un correo electrónico válido.",
+  "Choose at least one valid city or county.": "Elige al menos una ciudad o condado válido.",
+  "Choose at least one city or county.": "Elige al menos una ciudad o condado.",
+  "A confirmation email was sent recently. Please wait before trying again.":
+    "Ya enviamos un correo de confirmación hace poco. Espera un momento antes de intentarlo de nuevo.",
+  "Too many requests. Please try again later.":
+    "Demasiadas solicitudes. Inténtalo de nuevo más tarde.",
+  "We could not start that subscription. Please try again in a moment.":
+    "No pudimos iniciar la suscripción. Inténtalo de nuevo en un momento."
+};
+
+function subscribeErrorMessage(locale: Locale, error: string | undefined) {
+  if (locale === "en") return error || t(locale, "subscribeFormFallbackError");
+  return (error && spanishSubscribeErrors[error]) || t(locale, "subscribeFormFallbackError");
+}
+
 export function SubscribeForm({
   jurisdictions,
   initialJurisdiction,
@@ -110,11 +130,7 @@ export function SubscribeForm({
 
       if (!response.ok) {
         setStatus("error");
-        setMessage(
-          locale === "en"
-            ? result.error || t(locale, "subscribeFormFallbackError")
-            : t(locale, "subscribeFormFallbackError")
-        );
+        setMessage(subscribeErrorMessage(locale, result.error));
         return;
       }
 

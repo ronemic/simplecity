@@ -423,6 +423,40 @@ test("drops only a corrupted translation and reports a validation issue", () => 
   assert.match(issues[0]?.reason || "", /translated agenda item/i);
 });
 
+test("drops a Spanish translation that was left in English", () => {
+  const issues: Array<{ reason: string }> = [];
+  const result = validateSimpleCitySummary(
+    {
+      ...baseSummary,
+      cards: [groundedCard()],
+      translations: {
+        es: {
+          cards: [
+            {
+              agendaItem: "Punto 4 - Aprobación de contrato",
+              whatIsHappening: ["The council will consider a $100 contract for park maintenance."],
+              whyItMatters: "El contrato afecta el mantenimiento del parque.",
+              whoItAffects: ["usuarios del parque"],
+              status: "Upcoming vote"
+            }
+          ]
+        }
+      }
+    },
+    {
+      fallbackSource: "https://city.example/agendas/4",
+      allowedSourceUrls: ["https://city.example/agendas/4"],
+      sourceText:
+        "Item 4 - Contract approval. The council will consider a $100 contract at 7:00 PM for park maintenance.",
+      onIssue: (issue) => issues.push(issue)
+    }
+  );
+
+  assert.equal(result.cards.length, 1);
+  assert.equal(result.translations?.es?.cards[0], null);
+  assert.match(issues[0]?.reason || "", /left in English in whatIsHappening/);
+});
+
 test("accepts equivalent abbreviated and expanded numeric values", () => {
   const result = validateSimpleCitySummary(
     {

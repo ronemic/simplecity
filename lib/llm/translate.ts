@@ -1,5 +1,6 @@
 import { jsonrepair } from "jsonrepair";
 import { decisionOutcomeTranslationIssues } from "@/lib/i18n/decisionOutcome";
+import { untranslatedEnglishCardFields } from "@/lib/i18n/untranslatedEnglish";
 import {
   fetchLlmResponse,
   getConfiguredLlmProviders,
@@ -214,6 +215,16 @@ function validateIds(input: TranslationPayload, result: TranslationResult) {
 
   for (const id of expectedOutcomeIds) {
     if (!actualOutcomeIds.has(id)) throw new Error(`Translation response omitted outcome ${id}.`);
+  }
+
+  for (const card of result.cards || []) {
+    const { id, ...fields } = card;
+    const englishFields = untranslatedEnglishCardFields(fields);
+    if (englishFields.length > 0) {
+      throw new Error(
+        `Translation response left card ${id} in English: ${englishFields.join(", ")}.`
+      );
+    }
   }
 
   const outcomeResults = new Map((result.outcomes || []).map((row) => [row.id, row]));

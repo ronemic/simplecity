@@ -3,12 +3,19 @@ import { FollowingList } from "@/components/FollowingList";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
-export const metadata: Metadata = {
-  title: "Following | SimpleCity",
-  description: "Decisions you follow and what has changed since your last visit.",
-  // Contents live in each reader's browser, so there is nothing to index.
-  robots: { index: false, follow: true }
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+
+  return {
+    title: `${t(locale, "following")} | SimpleCity`,
+    description:
+      locale === "es"
+        ? "Las decisiones que sigues y lo que ha cambiado desde tu última visita."
+        : "Decisions you follow and what has changed since your last visit.",
+    // Contents live in each reader's browser, so there is nothing to index.
+    robots: { index: false, follow: true }
+  };
+}
 
 export default async function FollowingPage() {
   const locale = await getRequestLocale();

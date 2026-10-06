@@ -119,7 +119,7 @@ test("marking seen only moves lastSeenAt forward", () => {
 test("event labels name the change in both languages", () => {
   const changed = event({ kind: "outcome_changed", previous_value: "continued", new_value: "approved" });
   assert.equal(cardEventLabel(changed, "en"), "Official result changed from Continued to Approved");
-  assert.equal(cardEventLabel(changed, "es"), "Resultado oficial cambiado de Aplazado a Aprobado");
+  assert.equal(cardEventLabel(changed, "es"), "Resultado oficial cambiado de Aplazada a Aprobada");
   assert.equal(
     cardEventLabel(event({ kind: "status_changed", previous_value: "Upcoming vote", new_value: "Tabled" }), "en"),
     "Status changed from Upcoming vote to Tabled"

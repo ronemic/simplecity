@@ -7,6 +7,7 @@ import {
 } from "@/lib/config/jurisdictions";
 import { publicEmailJurisdictionOptions } from "@/lib/email/subscriptions";
 import { LOCALE_COOKIE, normalizeLocale, t, type Locale } from "@/lib/i18n";
+import { getPageLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -15,8 +16,8 @@ export async function generateMetadata({
   searchParams: Promise<{ status?: string; lang?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
-  const locale = seoLocale(params.lang);
-  const urls = localizedSeoUrls("/subscribe", locale);
+  const locale = await getPageLocale(params.lang);
+  const urls = localizedSeoUrls("/subscribe", seoLocale(params.lang));
 
   return {
     title: `${t(locale, "subscribe")} | SimpleCity`,

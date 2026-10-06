@@ -3,6 +3,7 @@ import { jsonrepair } from "jsonrepair";
 import { ALL_CATEGORIES } from "@/lib/constants";
 import { CARD_STATUSES } from "@/lib/cardStatus";
 import type { LlmReadyMeeting, MeetingStatus, SimpleCityCardTranslation, SimpleCitySummary } from "@/lib/types";
+import { untranslatedEnglishCardFields } from "@/lib/i18n/untranslatedEnglish";
 import { getCommentDeadlineInfo } from "@/lib/utils/commentDeadline";
 import { areLikelySameAgendaItem } from "@/lib/utils/agendaItemIdentity";
 import { resolveCardSourceItemId } from "@/lib/utils/cardSourceIdentity";
@@ -1123,6 +1124,19 @@ export function validateSimpleCitySummary(
           outcome: "warning"
         });
       }
+      // An English "translation" is dropped rather than published under the
+      // Spanish locale; the card then has no translation, which the
+      // translation backfill picks up.
+      const englishTranslationFields = corruptedTranslationField
+        ? []
+        : untranslatedEnglishCardFields(spanishTranslation);
+      if (englishTranslationFields.length > 0) {
+        options.onIssue?.({
+          agendaItem,
+          reason: `Spanish translation was left in English in ${englishTranslationFields.join(", ")}; the translation was dropped.`,
+          outcome: "warning"
+        });
+      }
 
       return {
         card: {
@@ -1142,7 +1156,7 @@ export function validateSimpleCitySummary(
           status,
           confidence: capConfidence(card.confidence, maxConfidence)
         },
-        spanishTranslation: corruptedTranslationField
+        spanishTranslation: corruptedTranslationField || englishTranslationFields.length > 0
           ? null
           : cleanCardTranslation(spanishTranslation, status, whatIsHappening.length)
       };

@@ -7,7 +7,7 @@ import {
   Link as LinkIcon,
   ShieldCheck
 } from "lucide-react";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -15,7 +15,8 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
-  const locale = seoLocale((await searchParams).lang);
+  const { lang } = await searchParams;
+  const locale = await getPageLocale(lang);
   const title =
     locale === "es"
       ? "Acerca de SimpleCity | Decisiones locales fáciles de entender"
@@ -24,7 +25,7 @@ export async function generateMetadata({
     locale === "es"
       ? "Descubre cómo SimpleCity ayuda a residentes a seguir decisiones, votaciones, opciones de participación y resultados oficiales del Área de la Bahía."
       : "Learn how SimpleCity helps residents follow Bay Area decisions, upcoming votes, participation options, and official outcomes.";
-  const urls = localizedSeoUrls("/about", locale);
+  const urls = localizedSeoUrls("/about", seoLocale(lang));
 
   return {
     title,

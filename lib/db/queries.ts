@@ -618,13 +618,14 @@ async function applyCardTranslations(
     if (!translation) return baseRow;
     if (translation.source_fingerprint !== summaryCardTranslationFingerprint(row)) return baseRow;
 
+    // status stays the English enum that badge logic compares against;
+    // statusLabel translates it at display time.
     return {
       ...baseRow,
       agenda_item: translation.agenda_item || row.agenda_item,
       what_is_happening: translation.what_is_happening || row.what_is_happening,
       why_it_matters: translation.why_it_matters || row.why_it_matters,
       who_it_affects: translation.who_it_affects || row.who_it_affects,
-      status: translation.status || row.status,
       comment_window_opens: translation.comment_window_opens || row.comment_window_opens,
       comment_window_closes: translation.comment_window_closes || row.comment_window_closes,
       how_to_act_attend: translation.how_to_act_attend || row.how_to_act_attend,

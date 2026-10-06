@@ -1,3 +1,4 @@
+import type { Locale } from "@/lib/i18n";
 import type { MeetingRow } from "@/lib/types";
 import { CIVIC_TIME_ZONE, hasDisplayableMeetingTime, parseMeetingDate } from "@/lib/utils/date";
 import { displayMeetingText } from "@/lib/utils/meetingDisplay";
@@ -18,6 +19,7 @@ function toGoogleCalendarDate(date: Date) {
 
 export function buildGoogleCalendarUrl(
   meeting: CalendarMeeting,
+  locale: Locale = "en",
   durationMinutes = DEFAULT_MEETING_DURATION_MINUTES
 ) {
   const startValue = meeting.meeting_datetime || parseMeetingDate(meeting.date_text);
@@ -28,16 +30,20 @@ export function buildGoogleCalendarUrl(
   if (Number.isNaN(start.getTime())) return null;
 
   const end = new Date(start.getTime() + durationMinutes * 60 * 1000);
+  const es = locale === "es";
+  const notListed = es ? "No indicado" : "Not listed";
   const details = [
-    meeting.meeting_type ? `Meeting type: ${displayMeetingText(meeting.meeting_type)}` : null,
-    meeting.source_url ? `Official source: ${meeting.source_url}` : null
+    meeting.meeting_type
+      ? `${es ? "Tipo de reunión" : "Meeting type"}: ${displayMeetingText(meeting.meeting_type, notListed, locale)}`
+      : null,
+    meeting.source_url ? `${es ? "Fuente oficial" : "Official source"}: ${meeting.source_url}` : null
   ]
     .filter(Boolean)
     .join("\n");
 
   const params = new URLSearchParams({
     action: "TEMPLATE",
-    text: displayMeetingText(meeting.title),
+    text: displayMeetingText(meeting.title, notListed, locale),
     dates: `${toGoogleCalendarDate(start)}/${toGoogleCalendarDate(end)}`,
     ctz: CIVIC_TIME_ZONE
   });

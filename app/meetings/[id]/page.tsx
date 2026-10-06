@@ -23,7 +23,7 @@ import { displayDocumentLabel, displayDocumentType } from "@/lib/utils/documentD
 import { formatDisplayDate } from "@/lib/utils/date";
 import { getEmbeddableVideoDocuments, getVideoLinkUrl } from "@/lib/utils/videoEmbed";
 import { t } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { localizedSeoUrls, seoLocale, serializeJsonLd } from "@/lib/seo";
 import type { DecisionOutcome, SummaryCardRow } from "@/lib/types";
@@ -138,10 +138,15 @@ export async function generateMetadata({
   searchParams: Promise<{ jurisdiction?: string; previewOutcome?: string; lang?: string }>;
 }): Promise<Metadata> {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const locale = seoLocale(query.lang);
+  const locale = await getPageLocale(query.lang);
   const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
   const { meeting } = await getMeetingDetail(id, jurisdiction, locale);
-  if (!meeting) return { title: "Meeting not found | SimpleCity", robots: { index: false } };
+  if (!meeting) {
+    return {
+      title: locale === "es" ? "Reunión no encontrada | SimpleCity" : "Meeting not found | SimpleCity",
+      robots: { index: false }
+    };
+  }
 
   const jurisdictionSlug = toPublicJurisdictionSlug(jurisdiction);
   const jurisdictionLabel = getJurisdictionDisplayLabel(
@@ -161,7 +166,7 @@ export async function generateMetadata({
       : `${meetingTitle} on ${date}. View the agenda, official documents, and decision briefings from ${jurisdictionLabel}.`;
   const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
   canonicalUrl.searchParams.set("jurisdiction", jurisdictionSlug);
-  const urls = localizedSeoUrls(canonicalUrl, locale);
+  const urls = localizedSeoUrls(canonicalUrl, seoLocale(query.lang));
 
   return {
     title,

@@ -18,7 +18,12 @@ export default function ErrorPage({
         <h1 className="text-2xl font-bold text-ink">
           {locale === "es" ? "Algo salió mal" : "Something went wrong"}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-black/75">{error.message}</p>
+        <p className="mt-2 text-sm leading-6 text-black/75">
+          {/* The message comes from code in English, so Spanish readers get a generic one. */}
+          {locale === "es"
+            ? "No pudimos cargar esta página. Inténtalo de nuevo en un momento."
+            : error.message}
+        </p>
         <button
           type="button"
           onClick={reset}
