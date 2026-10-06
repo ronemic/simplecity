@@ -20,10 +20,18 @@ import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 export const DECISION_OUTCOME_JURISDICTIONS = new Set<string>(KNOWN_JURISDICTION_SLUGS);
 
+/**
+ * Menlo Park and Los Altos Hills minutes report votes as "…; passes 6-0" or
+ * "Motion passes 5 out of 5". Bare "passes" is also a noun ("transportation
+ * passes for"), so it counts only before the tally. Without a tally the motion's
+ * subject can sit in another sentence ("voted not to accept the fee schedule…
+ * The motion passes"), where "Passed" would mislead.
+ */
+const VOTE_PASSES_TERM = "passes(?=\\s+\\d)";
 const OUTCOME_TERMS =
-  "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|determined|reported|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?";
+  `approved|adopted|pass(?:ed)?|${VOTE_PASSES_TERM}|carried|accepted|authorized|confirmed|denied|rejected|fail(?:ed)?|defeated|continued|postponed|tabled|deferred|referred|amended|determined|reported|directed|provided direction|gave direction|received and filed|introduced and waived(?: the)? reading|no action(?: taken)?`;
 const OUTCOME_TERM_PATTERN = new RegExp(`\\b(?:${OUTCOME_TERMS})\\b`, "i");
-const APPROVAL_TERMS = "approved|adopted|pass(?:ed)?|carried|accepted|authorized|confirmed";
+const APPROVAL_TERMS = `approved|adopted|pass(?:ed)?|${VOTE_PASSES_TERM}|carried|accepted|authorized|confirmed`;
 const APPROVAL_TERM_PATTERN = new RegExp(`\\b(?:${APPROVAL_TERMS})\\b`, "i");
 const FAILURE_TERM_PATTERN = /\b(?:denied|rejected|fail(?:ed)?|defeated)\b/i;
 /**
@@ -56,6 +64,30 @@ const RESCINDED_VOTE_PATTERN =
   /\brescind(?:ed|ing|s)?\b[^.]{0,40}?\b(?:previous|prior|earlier)\b|\b(?:previous|prior|earlier)\s+(?:vote|motion|action)\b[^.]{0,40}?\brescind/i;
 const RECONSIDERED_VOTE_PATTERN =
   /\b(?:motion|moved|move)\b[^.]{0,40}?\breconsider/i;
+/**
+ * San Francisco committees record "MEETING RECESSED" with a "Pass" flag when they
+ * stop mid-agenda. The flag reports the recess; the item waits for the
+ * reconvened meeting without a vote.
+ */
+const MEETING_RECESSED_PATTERN = /^\s*meeting\s+recessed\b/i;
+/**
+ * Minutes repeat a running header on every page ("Planning Commission Regular
+ * Meeting Approved Minutes / June 8, 2026 / Page 4"). Its "Approved" describes the
+ * document, so an item block that crosses a page break must not read it as a vote.
+ */
+const MINUTES_PAGE_HEADER_PATTERN = /^[^\n]{0,80}\bmeeting\s+approved\s+minutes\b[^\n]*$/gim;
+/**
+ * A motion to extend the meeting's end time is recorded wherever the clock ran
+ * out, often inside the item under discussion. It is never that item's result.
+ * Its "ACTION:" label goes with it, or the label would claim the next paragraph.
+ */
+const EXTEND_MEETING_MOTION_PATTERN =
+  /(?:\b(?:action|result|decision)\s*[:\-]\s*)?\bmotion\b[^.;\n]{0,80}?\bto\s+extend\s+the\s+meeting\b[\s\S]{0,400}?\b(?:passe[sd]|carried|failed)\b[^.\n]*\.?/gi;
+/**
+ * Santa Clara County's minutes give every item the body acted on its own
+ * "15 RESULT:" line, consent items included.
+ */
+const ITEM_RESULT_LINE_PATTERN = /^\s*\d{1,3}(?:\.[a-z0-9]+)?\s+RESULT\s*:/im;
 
 const RESULT_PARAGRAPH_FRAGMENT = "(?:(?!\\n\\n)[\\s\\S])";
 const RESULT_MARKER_PATTERN = new RegExp(
@@ -347,6 +379,15 @@ export function interpretOfficialAction(
     };
   }
 
+  if (MEETING_RECESSED_PATTERN.test(actionText)) {
+    return {
+      kind: "continued",
+      canonicalStatus: "continued",
+      headline: "Meeting recessed",
+      nextStep: "The meeting was recessed before a vote on this item."
+    };
+  }
+
   if (isSantaBarbaraPlanningCommission(meeting)) {
     const advisoryKind = classifyDecisionOutcome(sourceText);
     if (advisoryKind === "continued") {
@@ -471,7 +512,9 @@ export function interpretOfficialAction(
 }
 
 export function extractResultText(value: string) {
-  const text = normalizeSourceText(value);
+  const text = normalizeSourceText(value)
+    .replace(MINUTES_PAGE_HEADER_PATTERN, "")
+    .replace(EXTEND_MEETING_MOTION_PATTERN, " ");
   if (!text || !OUTCOME_TERM_PATTERN.test(text)) return null;
 
   const candidate =
@@ -755,6 +798,11 @@ function consentSectionOutcomeItems(
   block: { text: string; number: string | null }
 ) {
   const section = block.text;
+  // Minutes that give each item its own result line leave the calendar motion
+  // nothing to add. Copying it reached Santa Clara County's Announcements and
+  // Adjourn items, which follow the calendar under unrecognized headings with
+  // no vote.
+  if (ITEM_RESULT_LINE_PATTERN.test(section)) return [];
   const result = extractResultText(section);
   if (!result) return [];
 
@@ -891,10 +939,13 @@ function numberedMinuteBlock(
   return blockAt(starts[0]);
 }
 
-function guardedResultWindow(cardTitle: string, text: string) {
+function headedMinutesResult(cardTitle: string, text: string) {
   // Unnumbered minutes can identify motions with a resolution/minute-order
   // reference in a wrapped uppercase heading. Keep that evidence inside the
-  // next heading; an outcome-centered window can include a neighboring motion.
+  // next heading. Minutes without such a heading get no result here: the old
+  // fallback took the first vote in a text window around the title's words,
+  // and a 2026-10-05 sample found 26 of 36 such results belonged to a
+  // neighboring item, a procedural motion, or page boilerplate.
   const paragraphs = text.split(/\n{2,}/);
   const headings = paragraphs.flatMap((paragraph, index) => {
     const title = cleanText(paragraph);
@@ -920,42 +971,7 @@ function guardedResultWindow(cardTitle: string, text: string) {
       rowText: [paragraphs[heading.index], body].join("\n\n")
     } satisfies AgendaItem];
   });
-  const headingMatch = findGuardedAgendaItemMatch(cardTitle, headedItems);
-  // Retain a matched heading with no result so a nearby vote cannot replace it.
-  if (headingMatch) return headingMatch;
-
-  const matches = Array.from(text.matchAll(new RegExp(`\\b(?:${OUTCOME_TERMS})\\b`, "gi")));
-  const clusters: Array<{ start: number; end: number }> = [];
-  for (const match of matches.slice(0, 250)) {
-    const position = match.index || 0;
-    const previous = clusters[clusters.length - 1];
-    if (previous && position - previous.end <= 450) {
-      previous.end = position;
-    } else {
-      clusters.push({ start: position, end: position });
-    }
-  }
-
-  const items = clusters.map((cluster, index) => {
-    const start = Math.max(0, cluster.start - 900);
-    const end = Math.min(text.length, cluster.end + 900);
-    const window = text.slice(start, end);
-    return {
-      externalId: `minutes-window-${index}-${start}-${end}`,
-      fileNumber: null,
-      agendaNumber: null,
-      itemType: null,
-      title: window,
-      action: null,
-      result: extractResultText(window),
-      sourceUrl: "",
-      rowText: window
-    } satisfies AgendaItem;
-  }).filter((item) => Boolean(item.result));
-
-  return findGuardedAgendaItemMatch(cardTitle, items, {
-    enforceNumericConsistency: false
-  });
+  return findGuardedAgendaItemMatch(cardTitle, headedItems);
 }
 
 function comparableAgendaNumber(value?: string | null) {
@@ -1051,12 +1067,13 @@ function minutesResultForCard(
   for (const document of minutesDocuments(meeting)) {
     const text = normalizeSourceText(document.extractedText || "");
     const numberedBlock = agendaNumber ? numberedMinuteBlock(agendaNumber, text) : null;
-    const windowMatch = numberedBlock || titlePointsElsewhere ? null : guardedResultWindow(title, text);
-    const block = numberedBlock || windowMatch?.item.rowText || null;
+    const headingMatch = numberedBlock || titlePointsElsewhere ? null : headedMinutesResult(title, text);
+    const block = numberedBlock || headingMatch?.item.rowText || null;
     const result = numberedBlock
       ? extractResultText(numberedBlock)
-      : windowMatch?.item.result || null;
-    if (!result || (!numberedBlock && !windowMatch)) continue;
+      : headingMatch?.item.result || null;
+    // A matched heading with no result keeps a nearby vote from replacing it.
+    if (!result || (!numberedBlock && !headingMatch)) continue;
 
     let match: GuardedAgendaItemMatch;
     if (numberedBlock) {
@@ -1076,8 +1093,8 @@ function minutesResultForCard(
           score: 1,
           runnerUpScore: null
         };
-    } else if (windowMatch) {
-      match = windowMatch;
+    } else if (headingMatch) {
+      match = headingMatch;
     } else {
       continue;
     }

@@ -477,7 +477,7 @@ export async function reconcileDecisionOutcomesForMeeting(
       .filter((proposal) => resultCardIds.has(proposal.cardId))
       .map((proposal) => proposal.cardId)
   );
-  // A few platforms expose results only in a guarded minutes-text window,
+  // Some minutes expose results only under a resolution/minute-order heading,
   // outside the structured result inventory.
   const knownResultItemCount = Math.max(inventory.items.length, matchedItemKeys.size);
   const report = {
