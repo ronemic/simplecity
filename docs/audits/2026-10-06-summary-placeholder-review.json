@@ -1,0 +1,39 @@
+[
+  {
+    "jurisdiction": "los-altos",
+    "card": {
+      "id": "8973dc92-0815-4c92-a757-7d76016017a7",
+      "agenda_item": "Arbor Day proclamation",
+      "what_is_happening": "Not listed in the source document.",
+      "source_item_id": "los-altos-civicclerk-event-26-item-1",
+      "meeting_id": "1d8c0c95-9b96-442c-a388-26df276ee313",
+      "confidence": "high"
+    },
+    "item": {
+      "title": "Arbor Day Proclamation",
+      "rowText": "1. Meeting Minutes: Approve minutes of the regular meeting of April 8, 2026. Draft Meeting Minutes_04.08.26",
+      "attachments": [
+        {
+          "label": "Draft Meeting Minutes_04.08.26",
+          "url": "https://losaltosca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=7024,plainText=false)"
+        }
+      ]
+    },
+    "sourceExcerpt": "",
+    "disposition": "Needs source repair and regeneration; placeholder cannot be published under the new validation gate."
+  },
+  {
+    "jurisdiction": "santa-clara-county",
+    "card": {
+      "id": "0f17306a-7d53-4f27-81a8-a9df0ef3230c",
+      "agenda_item": "Assessment Appeals Hearing",
+      "what_is_happening": "The city will hold an assessment appeals hearing.\nThe meeting is not available at this time, please check back later.",
+      "source_item_id": null,
+      "meeting_id": "7eefc4e0-8cdb-4f93-8218-0618e22b3c83",
+      "confidence": "medium"
+    },
+    "item": null,
+    "sourceExcerpt": "",
+    "disposition": "Source availability message, not substantive agenda evidence; needs official agenda before regeneration."
+  }
+]

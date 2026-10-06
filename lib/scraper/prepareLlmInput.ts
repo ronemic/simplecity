@@ -12,7 +12,8 @@ import {
 } from "@/lib/scraper/agendaItemContext";
 import {
   hasUsableOfficialDocumentText,
-  isUsableOfficialSourceText
+  isUsableOfficialSourceText,
+  isSourceAvailabilityMessage
 } from "@/lib/scraper/documentUsability";
 import { isUsablePrimeGovHtmlAgendaText } from "@/lib/scraper/primegov";
 
@@ -262,6 +263,10 @@ async function selectFirstUsableSource(
 
   for (const candidate of candidates) {
     const text = normalizeSourceText(await candidate.loadText());
+    if (isSourceAvailabilityMessage(text)) {
+      extractionNotes.push(`${candidate.sourceType} reports that the source is not available.`);
+      continue;
+    }
 
     if (text && !firstNonEmpty) {
       firstNonEmpty = {

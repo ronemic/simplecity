@@ -1299,3 +1299,91 @@ test("keeps English cards that carry Spanish place names", () => {
     "Attend in person at De La Guerra Plaza in Santa Barbara."
   );
 });
+
+function validateClaim(claim: string, source: string) {
+  return validateSimpleCitySummary({ ...baseSummary, cards: [groundedCard({
+    agendaItem: "Contract details", whatIsHappening: [claim],
+    whyItMatters: "The contract affects residents.", howToAct: { attend: "Not listed in the source document.", email: "Not listed in the source document.", submitComment: "Not listed in the source document." }
+  })] }, { sourceText: source, fallbackSource: "https://city.example/agendas/4" });
+}
+
+test("bare numbers need complete numeric matches, including joined PDF text", () => {
+  assert.equal(validateClaim("The count is 200.", "The count is 2000.").cards.length, 0);
+  assert.equal(validateClaim("The count is 200.", "The count is200people.").cards.length, 1);
+  assert.equal(validateClaim("The count is 200.", "The count is 1,200.").cards.length, 0);
+});
+
+test("amounts must belong to their claimed subjects, even within one item", () => {
+  const source = "The park contract costs $250 and the road contract costs $100.";
+  assert.equal(validateClaim("The park contract costs $100 and the road contract costs $250.", source).cards.length, 0);
+  assert.equal(validateClaim(source, source).cards.length, 1);
+});
+
+test("checks contradictory actions and proposed versus approved wording", () => {
+  assert.equal(validateClaim("The contract eliminates park maintenance.", "The contract expands park maintenance.").cards.length, 0);
+  assert.equal(validateClaim("The contract expands park maintenance.", "The contract expands park maintenance.").cards.length, 1);
+  assert.equal(validateClaim("The park contract was approved.", "Staff recommends approval of the park contract.").cards.length, 0);
+  assert.equal(validateClaim("The park contract was approved.", "The park contract was not approved.").cards.length, 0);
+});
+
+test("checks deadline attribution and preserves reimbursements", () => {
+  assert.equal(validateClaim("Park bids are due by October 10, 2026.", "Park bids are due by October 20, 2026. Road bids are due by October 10, 2026.").cards.length, 0);
+  const source = "Gilbane's amendment adds $189,940, bringing the ceiling to $5,526,565. Thompson Builders Corporation will reimburse both amendments.";
+  assert.equal(validateClaim("Gilbane's amendment adds $189,940.", source).cards.length, 0);
+  assert.equal(validateClaim("Gilbane's amendment adds $189,940. Thompson Builders Corporation will reimburse both amendments.", source).cards.length, 1);
+});
+
+test("placeholder and unavailable-source cards are not publishable", () => {
+  assert.equal(validateClaim("Not listed in the source document.", "Arbor Day Proclamation").cards.length, 0);
+  assert.equal(validateClaim("The meeting is not available.", "County assessment appeals board. The meeting is not available.").cards.length, 0);
+});
+
+test("confidence is capped per item and conflicts block publication", () => {
+  const meeting = itemScopedMeeting();
+  meeting.llmInputText = "Full official agenda text. ".repeat(100);
+  const input = { ...baseSummary, cards: [groundedCard({ sourceItemId: "item-parks" })] };
+  assert.equal(validateSimpleCitySummary(input, validationOptionsForMeeting(meeting)).cards[0].confidence, "low");
+  meeting.items![0].extractionError = 'Conflicting agenda titles: Arbor Day / Meeting minutes';
+  assert.equal(validateSimpleCitySummary(input, validationOptionsForMeeting(meeting)).cards.length, 0);
+});
+
+test("preserves action negation and distinguishes additional spending from ceilings", () => {
+  assert.equal(validateClaim("The contract will not expand park maintenance.", "The contract will expand park maintenance.").cards.length, 0);
+  assert.equal(validateClaim("The contract will expand park maintenance.", "The contract will not expand park maintenance.").cards.length, 0);
+  assert.equal(validateClaim("The park contract total is $100.", "The park contract increase is $100.").cards.length, 0);
+  assert.equal(validateClaim("The park contract increase is $100.", "The park contract increase is $100.").cards.length, 1);
+});
+
+
+test("spending preserves explicitly named payers and funding sources", () => {
+  const source = "The park contract costs $100. Thompson Builders Corporation will reimburse the city.";
+  assert.equal(validateClaim("The park contract costs $100. The city will reimburse the contractor.", source).cards.length, 0);
+  assert.equal(validateClaim("The park contract costs $100. Thompson Builders Corporation will reimburse the city.", source).cards.length, 1);
+  const funded = "The park contract costs $100. The contract is funded by the Community Benefit Fund.";
+  assert.equal(validateClaim("The park contract costs $100.", funded).cards.length, 0);
+  assert.equal(validateClaim("The park contract costs $100, funded by the Community Benefit Fund.", funded).cards.length, 1);
+});
+
+test("unrelated financial qualifiers do not block a correctly scoped spending summary", () => {
+  for (const qualifier of [
+    "The previous road contract was reimbursed by the county.",
+    "The road contract will be reimbursed by the county.",
+    "The road contract is funded by the General Fund."
+  ]) {
+    assert.equal(validateClaim("The park contract costs $100.", `The park contract costs $100. ${qualifier}`).cards.length, 1, qualifier);
+  }
+  const source = "The park contract costs $100. The road contract costs $250. It will be reimbursed by the county.";
+  assert.equal(validateClaim("The park contract costs $100.", source).cards.length, 1);
+  assert.equal(validateClaim("The road contract costs $250.", source).cards.length, 0);
+});
+
+test("funding-source names end before subsequent clauses", () => {
+  for (const suffix of [" and will start next summer", ", with work starting next summer", " which also supports other projects"]) {
+    const source = `The park contract costs $100. It is funded by the General Fund${suffix}.`;
+    assert.equal(validateClaim("The park contract costs $100, funded by the General Fund.", source).cards.length, 1, suffix);
+    assert.equal(validateClaim("The park contract costs $100.", source).cards.length, 0, suffix);
+  }
+  const joint = "The park contract costs $100. It is funded by the General Fund and the Community Benefit Fund.";
+  assert.equal(validateClaim("The park contract costs $100, funded by the General Fund.", joint).cards.length, 0);
+  assert.equal(validateClaim("The park contract costs $100, funded by the General Fund and the Community Benefit Fund.", joint).cards.length, 1);
+});

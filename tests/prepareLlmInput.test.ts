@@ -509,3 +509,14 @@ Recommendation: Approve the playground repair contract.
     )
   );
 });
+
+test("availability messages cannot survive through the row-text fallback", async () => {
+  const prepared = await buildLlmReadyMeeting({
+    section: "Upcoming Meetings", title: "Assessment Appeals Board", dateText: "November 3, 2026",
+    meetingType: "Assessment Appeals Board", sourceUrl: "https://county.example/meeting",
+    jurisdictionSlug: "santa-clara-county", rowText: "County navigation. The meeting is not available.",
+    hasHtmlAgenda: false, hasPdf: false, documents: []
+  });
+  assert.doesNotMatch(prepared.llmInputText, /The meeting is not available/);
+  assert.ok(prepared.extractionNotes.some((note) => /source is not available/.test(note)));
+});

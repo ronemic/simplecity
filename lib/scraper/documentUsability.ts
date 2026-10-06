@@ -19,6 +19,11 @@ export function isRequiredAgendaPacket(
   );
 }
 
+/** Portal availability is metadata, not an agenda or a cancellation notice. */
+export function isSourceAvailabilityMessage(value: string) {
+  return /\b(?:this |the )?(?:meeting|agenda|packet)(?: information)? (?:is |are )?(?:currently )?(?:not (?:yet )?available|unavailable|has not been (?:published|posted)|not published)\b/i.test(value);
+}
+
 const OFFICIAL_DOCUMENT_ERROR_PATTERNS = [
   /\baccess denied\b/i,
   /\b(?:401 unauthorized|403 forbidden|404 not found|502 bad gateway|503 service unavailable|504 gateway timeout)\b/i,
@@ -37,7 +42,8 @@ export function isUsableOfficialSourceText(
   if (text.length < minimumCharacters) return false;
   if (
     text.length <= MAX_ERROR_RESPONSE_CHARACTERS &&
-    OFFICIAL_DOCUMENT_ERROR_PATTERNS.some((pattern) => pattern.test(text))
+    (isSourceAvailabilityMessage(text) ||
+      OFFICIAL_DOCUMENT_ERROR_PATTERNS.some((pattern) => pattern.test(text)))
   ) {
     return false;
   }

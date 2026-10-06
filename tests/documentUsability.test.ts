@@ -10,3 +10,8 @@ test("rejects Incapsula block pages as official source text", () => {
     false
   );
 });
+
+test("portal meeting availability is metadata rather than official agenda text", () => {
+  assert.equal(isUsableOfficialSourceText("County assessment appeals board navigation. The meeting is not available."), false);
+  assert.equal(isUsableOfficialSourceText("The proposed library contract is available for public review at the clerk's office."), true);
+});

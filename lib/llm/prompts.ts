@@ -147,7 +147,11 @@ Rules:
 - Use “low” confidence when the item comes from minimal row/detail text or the source is very short, but the core agenda item is still visible.
 - Do not include URLs, email addresses, phone numbers, deadlines, meeting times, ordinance numbers, resolution numbers, vote counts, contract amounts, or project quantities unless they appear in the provided text.
 - Do not invent facts.
-- If information is missing, write “Not listed in the source document.”
+- Use “Not listed in the source document.” only for missing optional participation or metadata fields, never as the substantive summary.
+- Portal messages such as “meeting is not available” describe source availability, not a civic action. Return no cards when only navigation, metadata, or availability messages are supplied.
+- Preserve each claim's subject, action, negation, deadline, and proposed-versus-approved wording. Never swap amounts between contracts or describe a recommendation as an approval.
+- For spending, preserve who pays, material reimbursements and funding sources, and whether each amount is an increase or a total ceiling. When a third party reimburses amendments, say who reimburses them.
+- Refer to the actual governing body: a county is not a city, and an advisory commission recommendation is not final council approval.
 - If no non-routine or transparency-worthy source-supported agenda items are visible, return an empty cards array.
 - Always include translations.es.
 - translations.es.cards must have the same number of items as cards, in the exact same order.

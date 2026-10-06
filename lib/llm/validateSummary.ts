@@ -1,3 +1,5 @@
+import { isSourceAvailabilityMessage } from "@/lib/scraper/documentUsability";
+import { summaryClaimIssue } from "@/lib/llm/summaryClaims";
 import { z } from "zod";
 import { jsonrepair } from "jsonrepair";
 import { ALL_CATEGORIES } from "@/lib/constants";
@@ -210,6 +212,8 @@ export type SummaryValidationOptions = {
   allowedSourceUrls?: string[];
   sourceText?: string;
   maxConfidence?: "high" | "medium" | "low";
+  maxConfidenceForCard?: (sourceItemId: string | null) => "high" | "medium" | "low";
+  sourceIssueForCard?: (sourceItemId: string | null) => string | null;
   meetingStatus?: MeetingStatus;
   allowedSourceItemIds?: string[];
   resolveSourceItemIdForCard?: (card: {
@@ -536,7 +540,7 @@ function isGroundedValue(value: string, sourceText: string) {
   // A substring cannot ground an amount or quantity: $160 is part of $160,000,
   // and 5 homes is part of 15 homes. Compare the complete amount and unit first.
   const numericValue = parseComparableNumericValue(value);
-  if (numericValue && (numericValue.kind !== "number" || numericValue.unit)) {
+  if (numericValue) {
     return hasEquivalentNumericValue(value, sourceText) ||
       hasEquivalentNumericValue(value, compactNumericSpacing(sourceText));
   }
@@ -803,6 +807,23 @@ export function validationOptionsForMeeting(
     sourceText: buildMeetingSourceText(meeting),
     meetingWideParticipationText,
     maxConfidence: maxConfidenceForMeeting(meeting),
+    sourceIssueForCard: (sourceItemId) => {
+      const item = resolveItem(sourceItemId);
+      if (item?.extractionError) return item.extractionError;
+      const evidence = item ? [item.title, item.action, item.rowText].filter(Boolean).join("\n") : meeting.llmInputText;
+      if (!evidence.trim() || isSourceAvailabilityMessage(evidence)) return "No substantive agenda source is available for this item.";
+      return null;
+    },
+    maxConfidenceForCard: (sourceItemId) => {
+      const item = resolveItem(sourceItemId);
+      if (!item) return "low";
+      const evidence = [item.action, item.recommendedAction, item.rowText, item.legislationText,
+        ...(item.attachments || []).filter((doc) => !/Public Comment/.test(doc.type)).map((doc) => doc.extractedText)]
+        .filter(Boolean).join("\n");
+      if (item.extractionError || evidence.length < 150) return "low";
+      if (evidence.length < 500 || evidence.includes("[TRUNCATED:")) return "medium";
+      return "high";
+    },
     meetingStatus: meeting.status,
     allowedSourceItemIds: Array.from(uniqueIds),
     ...(uniqueIds.size > 0
@@ -968,6 +989,23 @@ export function validateSimpleCitySummary(
       const groundingSourceText = options.sourceTextForCard
         ? cardSourceText || ""
         : sourceText;
+      const substantivePoints = card.whatIsHappening.filter((point) =>
+        point.trim() && !/^(?:not listed in the source document[.]?|(?:no|insufficient) (?:information|details)(?: available)?[.]?)$/i.test(point.trim()) &&
+        !isSourceAvailabilityMessage(point)
+      );
+      const evidenceIssue = options.sourceIssueForCard?.(sourceItemId) ||
+        (isSourceAvailabilityMessage(groundingSourceText) ? "The source is a portal availability message." : null);
+
+      if (!substantivePoints.length || evidenceIssue) {
+        options.onIssue?.({
+          agendaItem: card.agendaItem,
+          reason: evidenceIssue || "Card has no substantive item-specific fact.",
+          cardIndex: index,
+          repairable: !evidenceIssue,
+          outcome: "reject"
+        });
+        return null;
+      }
       const itemUnsupportedValues = groundingSourceText
         ? extractGroundableValues(cardItemGroundingText(card)).filter(
             (value) => !isGroundedValue(value, groundingSourceText)
@@ -1072,6 +1110,15 @@ export function validateSimpleCitySummary(
         return null;
       }
 
+      const claimIssue = groundingSourceText && summaryClaimIssue(
+        [...substantivePoints, card.whyItMatters].join("\n"), groundingSourceText, isGroundedValue
+      );
+      if (claimIssue) {
+        options.onIssue?.({ agendaItem: card.agendaItem, reason: claimIssue,
+          cardIndex: index, repairable: true, outcome: "reject" });
+        return null;
+      }
+
       const agendaItem = card.agendaItem.trim();
       const whatIsHappening = card.whatIsHappening.map((point) => point.trim()).filter(Boolean);
       const whyItMatters = card.whyItMatters.trim();
@@ -1154,7 +1201,8 @@ export function validateSimpleCitySummary(
           howToAct,
           source,
           status,
-          confidence: capConfidence(card.confidence, maxConfidence)
+          confidence: capConfidence(capConfidence(card.confidence, maxConfidence),
+            options.maxConfidenceForCard?.(sourceItemId) || maxConfidence)
         },
         spanishTranslation: corruptedTranslationField || englishTranslationFields.length > 0
           ? null

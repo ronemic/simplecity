@@ -1,0 +1,79 @@
+{
+  "parserVersion": "2026-10-05-bounded-item-results",
+  "reviewedAt": "2026-10-06",
+  "changes": [
+    {
+      "cardId": "d57a4001-17f4-4a63-8c03-2837d2f88b0c",
+      "cardTitle": "Adjournment with instructions for accommodation requests",
+      "meetingId": "cc1bb9e2-1251-4470-8a17-c900405fe5ca",
+      "before": {
+        "id": "0e41ac3a-c04c-4231-b9cb-eb5140881b33",
+        "summary_card_id": "d57a4001-17f4-4a63-8c03-2837d2f88b0c",
+        "meeting_id": "cc1bb9e2-1251-4470-8a17-c900405fe5ca",
+        "jurisdiction_name": "Foster City",
+        "jurisdiction_slug": "foster-city",
+        "platform": "primegov",
+        "kind": "approved",
+        "headline": "Passed unanimously",
+        "summary": "The City Council adopted a resolution authorizing the city manager to execute a second amendment to the cooperation agreement with San Mateo County for continued participation in federally funded housing programs for FY 2027‑2029 and automatic renewal through FY 2032.",
+        "decided_at": "2026-06-16T01:30:00+00:00",
+        "vote": "5–0–0",
+        "next_step": "City manager to sign the amendment.",
+        "source_url": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7250&compileOutputType=1",
+        "source_hash": "1e2b60ace42d6e5a29e5b070f817491a603ed00eb3e0d1cde9c4130fa1d70384",
+        "source_text": "Motion by Councilmember Venkat, seconded by Councilmember Sullivan, and carried unanimously, 5-0-0, adopting City Resolution No",
+        "matched_item_key": "6c499417210540538ab6b5a88868b430ed4533725fd29bec7f9d4fcb3aa7a0d9",
+        "match_method": "agenda_number",
+        "match_score": 1,
+        "created_at": "2026-07-28T12:25:07.93808+00:00",
+        "updated_at": "2026-08-10T12:12:41.594789+00:00"
+      },
+      "after": null,
+      "sourceContext": "Hearing no objection from the City Council/EMID Board, Mayor/President Kiesel\nadjourned the meeting. Meeting adjourned at 10:37 p.m.",
+      "verification": "Checked June 15 ADJOURNMENT: the mayor adjourned at 10:37 p.m. without objection; the housing agreement is a different section, resolution 2026-066. Remove the association, not the card."
+    },
+    {
+      "cardId": "116cdd25-f248-4091-9b81-1471558b83aa",
+      "cardTitle": "Adopt amended and restated City Manager employment agreement",
+      "meetingId": "62ab89d5-8d1e-470a-8d93-bf0d385d36e4",
+      "before": {
+        "id": "6958723d-dc9d-49f4-949c-fef6a2dc1868",
+        "summary_card_id": "116cdd25-f248-4091-9b81-1471558b83aa",
+        "meeting_id": "62ab89d5-8d1e-470a-8d93-bf0d385d36e4",
+        "jurisdiction_name": "Foster City",
+        "jurisdiction_slug": "foster-city",
+        "platform": "primegov",
+        "kind": "approved",
+        "headline": "Passed unanimously",
+        "summary": "The item “Adopt amended and restated City Manager employment agreement” passed unanimously (5–0–0).",
+        "decided_at": "2026-06-02T01:30:00+00:00",
+        "vote": "5–0–0",
+        "next_step": null,
+        "source_url": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "source_hash": "f668e70592fe0d2f4ae31567ef967135224ec7a7baa0c2bf1909c36274f4f8e6",
+        "source_text": "Motion by Vice Mayor/Vice President Niederhofer, seconded by Mayor/President Kiesel, and carried unanimously, 5-0-0, adopting Minute Order No",
+        "matched_item_key": "a7eabf35b2a2c81d5da4f1d0012fe032f8cb124d92a612e67310c89d115ae2b1",
+        "match_method": "title",
+        "match_score": 0.857142857142857,
+        "created_at": "2026-07-20T06:55:47.603805+00:00",
+        "updated_at": "2026-08-17T11:05:48.738069+00:00"
+      },
+      "after": {
+        "kind": "approved",
+        "headline": "Passed unanimously",
+        "summary": "The official minutes record this item as Motion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President Niderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A Resolution of the City Council of the City of Foster City Approving the Amended and Restated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution No. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Amended and Restated District Manager Stefan Chatwin’s Employment Agreement.",
+        "decided_at": "2026-06-02T01:30:00.000Z",
+        "vote": "5–0–0",
+        "next_step": null,
+        "source_url": "https://fostercity.primegov.com/Public/CompiledDocument?meetingTemplateId=7244&compileOutputType=1",
+        "source_hash": "f6f8fcf515ea71dc6e24426c823c0ce8b5c4b043914cd0e1e860306d4e467eb3",
+        "source_text": "Motion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President Niderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A Resolution of the City Council of the City of Foster City Approving the Amended and Restated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution No. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Amended and Restated District Manager Stefan Chatwin’s Employment Agreement",
+        "matched_item_key": "cb3548b801177a379a13a1dab85cfb9fee4e5f0c0c2bbeae3148e91b3a322fa7",
+        "match_method": "title",
+        "match_score": 0.8571428571428571
+      },
+      "sourceContext": "Official action/result:\n\nMotion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President Niderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A Resolution of the City Council of the City of Foster City Approving the Amended and Restated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution No. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement District Approving the Amended and Restated District Manager Stefan Chatwin’s Employment Agreement\n\nOfficial item context:\n\nAMENDED AND RESTATED CITY/DISTRICT MANAGER STEFAN CHATWIN’S\nEMPLOYMENT AGREEMENT. CITY RESOLUTION NO. 2026-057. EMID\nRESOLUTION NO. 3852.\n\nCity Attorney/District Legal Counsel Stock presented the staff report.\n\nDiscussion ensued.\n\nMotion by Councilmember/Director Jimenez, seconded by Vice Mayor/Vice President\nNiderhofer, and carried unanimously, 5-0-0, adopting City Resolution No. 2026-057, “A\nResolution of the City Council of the City of Foster City Approving the Amended and\nRestated City Manager Stefan Chatwin’s Employment Agreement,” and EMID Resolution\nNo. 3852, “A Resolution of the Board of Directors of the Estero Municipal Improvement\nDistrict Approving the Amended and Restated District Manager Stefan Chatwin’s\nEmployment Agreement.”",
+      "verification": "Checked June 1 minutes under EMPLOYMENT AGREEMENT, resolutions 2026-057/3852: Jimenez/Niderhofer, 5-0-0. Excludes the preceding budget motion 2079."
+    }
+  ]
+}

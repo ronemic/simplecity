@@ -111,6 +111,7 @@ const DIRECTION_RESULT_PATTERN =
 const MIN_FUZZY_MATCH_SCORE = 0.72;
 const MIN_FUZZY_MATCH_MARGIN = 0.15;
 const MIN_SHARED_IDENTITY_TOKENS = 3;
+export const DECISION_OUTCOME_PARSER_VERSION = "2026-10-05-bounded-item-results";
 const DECISION_OUTCOME_EXPLANATION_FINGERPRINT_VERSION =
   "decision-outcome-explanation-v1";
 
@@ -1202,6 +1203,7 @@ export function extractDecisionOutcome(
     .update(
       JSON.stringify({
         version: DECISION_OUTCOME_EXPLANATION_FINGERPRINT_VERSION,
+        parserVersion: DECISION_OUTCOME_PARSER_VERSION,
         cardId: card.id,
         cardTitle: cleanText(String(card.agenda_item || "")),
         jurisdictionSlug: meeting.jurisdictionSlug,

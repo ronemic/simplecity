@@ -2,6 +2,7 @@ import type { AgendaItem, PrimeGovMeeting } from "@/lib/types";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import {
   agendaItemSimilarity,
+  areLikelySameAgendaItem,
   canonicalAgendaNumber
 } from "@/lib/utils/agendaItemIdentity";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
@@ -11,10 +12,12 @@ const ITEM_START = new RegExp(
   `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)((?:[a-z]\\)\\s*)?[A-Z0-9][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)(?:[a-z]\\)\\s*)?[A-Z0-9])|$)`,
   "g"
 );
-const RECOMMENDATION = /\b(?:recommendation|recommended action|action requested)\s*:?\s*([\s\S]*)/i;
-const SUBJECT = /\bsubject\s*:?\s*([\s\S]{1,500}?)(?=\s+\b(?:recommendation|recommended action|background|analysis|public notice)\b)/gi;
+// Labels need a colon or their own line; prose such as "make a recommendation"
+// and "subject not listed on the agenda" is not report structure.
+const RECOMMENDATION = /(?:\b(?:recommendation|recommended action|action requested)[ \t]*:|^(?:recommendation|recommended action|action requested)[ \t]*$)\s*([\s\S]*)/im;
+const SUBJECT = /^(?:subject|regular business)[ \t]*:[ \t]*([\s\S]{1,800}?)(?=^recommendation[ \t]*:?)/im;
 const SECTION_TITLE = /^(?:call to order(?: and roll call)?|roll call|opening remarks?|approval of (?:the )?agenda|approval of (?:the )?minutes|approval of (?:the )?consent calendar|public comments?|consent calendar|study sessions?|special presentations?|presentations?|public hearings?|staff(?:\/(?:commission|committee))?(?: oral)? reports?|commission reports?|committee reports?|old business|new business|regular business|business items?|informational (?:items?|reports?)|discussion and action|written communications?|future (?:commission )?agenda item requests?|adjournment)\s*:?\s*$/i;
-const RECOMMENDATION_END = /\s+\b(?:background|analysis|discussion|fiscal impact|financial impact|public notice|attachments?|conclusion)\s*:?/i;
+const RECOMMENDATION_END = /(?:\b(?:background|analysis|discussion|policy issues|fiscal impact|financial impact|public notice|attachments?|conclusion)[ \t]*:|^(?:background|analysis|discussion|policy issues|fiscal impact|financial impact|public notice|attachments?|conclusion)[ \t]*$)/im;
 export const MEETING_WIDE_CONTEXT_HEADING =
   "Current agenda and meeting-wide participation context:";
 export const STRUCTURED_AGENDA_ITEMS_HEADING =
@@ -102,7 +105,7 @@ function cleanItemTitle(value: string) {
   return cleanText(
     value
       .split(/\n\s*\n/)[0]
-      .split(/\b(?:recommendation|recommended action|action requested)\s*:?/i)[0]
+      .split(RECOMMENDATION)[0]
       .replace(/\s*\(Staff Report\s*#[^)]+\)\s*$/i, "")
       .replace(/\s+Page\s+\d+.*$/i, "")
   ).slice(0, 800);
@@ -114,29 +117,37 @@ function extractRecommendation(value: string) {
 }
 
 function staffReportSections(text: string) {
-  const matches = Array.from(text.matchAll(SUBJECT));
-  return matches.map((match, index) => {
-    const start = match.index || 0;
-    const end = matches[index + 1]?.index || Math.min(text.length, start + 8000);
-    const rowText = cleanText(text.slice(start, end)).slice(0, 6000);
-    return {
-      title: cleanText(match[1]),
-      rowText,
-      action: extractRecommendation(rowText)
-    };
+  const normalized = text
+    .replace(/STA\s*FF\s+REPO\s*RT/g, "STAFF REPORT")
+    .replace(/Recom\s*mendation/g, "Recommendation");
+  const starts = Array.from(normalized.matchAll(/\bSTAFF REPORT\b/g));
+  return starts.flatMap((start, index) => {
+    const section = normalized.slice(start.index, starts[index + 1]?.index ?? normalized.length)
+      .split(/^(?:Attachments?\s*:?[ \t]*$|Report prepared by:)/im)[0];
+    const subject = section.match(SUBJECT);
+    if (!subject || !RECOMMENDATION.test(section)) return [];
+    return [{
+      title: cleanText(subject[1]),
+      agendaNumber: section.match(/AGENDA ITEM\s+([A-Z])-?(\d+)/)?.slice(1).join("") || null,
+      rowText: cleanText(section).slice(0, 6000),
+      action: extractRecommendation(section)
+    }];
   });
 }
 
 function bestStaffReport(
   title: string,
-  reports: ReturnType<typeof staffReportSections>
+  reports: ReturnType<typeof staffReportSections>,
+  agendaNumber?: string
 ) {
   return reports
     .map((candidate) => ({
       ...candidate,
       score: agendaItemSimilarity(title, candidate.title)
     }))
-    .filter((candidate) => candidate.score >= 0.6)
+    .filter((candidate) => candidate.score >= 0.8 &&
+      areLikelySameAgendaItem(title, candidate.title) &&
+      (!agendaNumber || !candidate.agendaNumber || candidate.agendaNumber === agendaNumber))
     .sort((left, right) => right.score - left.score)[0];
 }
 
@@ -244,6 +255,17 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
   const matches = Array.from(agendaText.matchAll(ITEM_START));
   const acceptedMatches: Array<{ match: RegExpMatchArray; rawBlock: string }> = [];
   for (const found of matches) {
+    const offset = (found.index || 0) + found[0].search(/\S/);
+    const linePrefix = agendaText.slice(agendaText.lastIndexOf("\n", offset - 1) + 1, offset);
+    // Multiline extracts retain layout evidence. A number after a field label,
+    // in prose, or in a property table cannot start a new item.
+    const followsPropertyValueLabel = /(?:lot unit factor|net lot area|average slope)\s*:\s*$/i.test(agendaText.slice(Math.max(0, offset - 80), offset));
+    if (followsPropertyValueLabel || ((agendaText.includes("\n") || !hasNumberedOpening) && linePrefix.trim() &&
+        !/^(?:Agenda\s+)?Item\s/i.test(found[0].trimStart()))) {
+      const previous = acceptedMatches.at(-1);
+      if (previous) previous.rawBlock += found[0];
+      continue;
+    }
     let match: RegExpMatchArray = found;
     let agendaNumber = match[1].toUpperCase();
     let rawTitle = match[2].trimStart();
@@ -345,8 +367,8 @@ export function extractAgendaItemsFromText(meeting: PrimeGovMeeting, text: strin
     const block = cleanText(rawBlock);
     const title = cleanItemTitle(rawBlock);
     if (!title || isSectionTitle(title)) continue;
-    const report = bestStaffReport(title, staffReports);
-    const action = extractRecommendation(block) || report?.action || null;
+    const report = bestStaffReport(title, staffReports, agendaNumber);
+    const action = extractRecommendation(rawBlock) || report?.action || null;
     const sectionTitle = sectionTitleAtOffset(agendaText, match.index || 0);
     items.push({
       externalId: `${meeting.externalId || slugify(meeting.title)}-item-${slugify(agendaNumber)}`,
@@ -376,6 +398,13 @@ export function mergeAgendaItems(existing: AgendaItem[] = [], extracted: AgendaI
     const prior = merged.get(key);
     if (!prior) {
       merged.set(key, item);
+      continue;
+    }
+    if (prior.title && item.title && !areLikelySameAgendaItem(prior.title, item.title)) {
+      merged.set(key, {
+        ...prior,
+        extractionError: `Conflicting agenda titles for ${key}: "${prior.title}" / "${item.title}"`
+      });
       continue;
     }
     const seenAttachmentUrls = new Set<string>();

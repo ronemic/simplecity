@@ -398,3 +398,44 @@ E. CONSENT CALENDAR
   assert.ok(items.some((item) => /Ross Recreation - Covington/.test(String(item.title))));
   assert.ok(items.some((item) => /Ross Recreation - Oak/.test(String(item.title))));
 });
+
+test("saved Menlo Park packet keeps rental assistance under D2 and minutes under D1", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const text = await readFile(new URL("./fixtures/menlo-park-2026-10-07-agenda.txt", import.meta.url), "utf8");
+  const items = extractAgendaItemsFromText(meeting, text);
+  const minutes = items.find((item) => item.agendaNumber === "D1")!;
+  const rental = items.find((item) => item.agendaNumber === "D2")!;
+  assert.match(minutes.title!, /September 2/);
+  assert.doesNotMatch(minutes.rowText, /rental|Linked staff report|August 5/i);
+  assert.match(rental.title!, /recommendation.*rental assistance/);
+  assert.match(rental.rowText, /Linked staff report context/);
+  assert.match(rental.action!, /recommend approval/);
+  assert.doesNotMatch(rental.rowText, /26-012-HC|subject not listed|August 5/);
+});
+
+test("saved Los Altos Hills lot factor does not create an agenda item", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const text = await readFile(new URL("./fixtures/los-altos-hills-2026-10-13-agenda.txt", import.meta.url), "utf8");
+  assert.deepEqual(extractAgendaItemsFromText(meeting, text), []);
+  const items = extractAgendaItemsFromText(meeting, "1. CALL TO ORDER\n2.1 Site development at Elena Road\nLot Unit Factor: 1.098\nFloor and Development Area: 6550\n2.2 Landscape screening\nRecommendation: Approve screening.");
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["2.1", "2.2"]);
+  assert.match(items[0].rowText, /Lot Unit Factor: 1.098.*Floor and Development Area/);
+});
+
+test("conflicting merged titles retain coherent original fields and flag the conflict", () => {
+  const first = { ...mergeItem("1", "original", "Arbor Day Proclamation", []), title: "Arbor Day Proclamation" };
+  const other = { ...mergeItem("1", "extracted", "Approve the April 8 meeting minutes as presented.", ["https://city.example/minutes.pdf"]), title: "Approval of meeting minutes" };
+  const [result] = mergeAgendaItems([first], [other]);
+  assert.equal(result.rowText, first.rowText);
+  assert.deepEqual(result.attachments, []);
+  assert.match(result.extractionError!, /Conflicting agenda titles/);
+});
+
+
+test("wrapped and flattened property labels never turn decimal values into headings", () => {
+  for (const separator of [" ", "\n"]) {
+    const items = extractAgendaItemsFromText(meeting, `1. CALL TO ORDER${separator}1.1 Site development${separator}Lot Unit Factor:${separator}1.098${separator}Floor and Development Area${separator}1.2 Landscape screening`);
+    assert.deepEqual(items.map((item) => item.agendaNumber), ["1.1", "1.2"]);
+    assert.match(items[0].rowText, /1.098/);
+  }
+});
