@@ -1374,7 +1374,11 @@ test("does not publish a structured result when two same-meeting items are equal
   assert.equal(result, null);
 });
 
-test("falls back to a guarded minutes window when another item populated the structured inventory", () => {
+test("does not publish a vote found only in an unheaded minutes text window", () => {
+  // The window fallback took the first vote near the title's words. In a
+  // 2026-10-05 sample most such votes belonged to a neighboring item, so a
+  // minutes-only result now needs the item's number, structured record or
+  // resolution heading.
   const result = extractDecisionOutcome(
     {
       id: "parks-card",
@@ -1411,10 +1415,7 @@ test("falls back to a guarded minutes window when another item populated the str
     })
   );
 
-  assert.ok(result);
-  assert.equal(result.headline, "Passed unanimously");
-  assert.equal(result.vote, "5–0");
-  assert.equal(result.sourceUrl, "https://example.com/minutes.pdf");
+  assert.equal(result, null);
 });
 
 test("matches a legacy card directly to a unique official result before broad minutes windows", () => {
@@ -2014,4 +2015,165 @@ test("each numbered consent section applies its own motion, including another bo
   const minutes = eastPaloAltoOutcome(september1, "3.10", "Adopt July 21, 2026 City Council Meeting Minutes");
   assert.equal(minutes?.kind, "approved");
   assert.match(minutes?.sourceText || "", /approve the Consent Calendar, excluding Item 3\.3 and 3\.4/);
+});
+
+test("a Santa Clara consent vote stays off Adjourn when every item records its own result", () => {
+  const minutes = [
+    "Opening",
+    "1. Call to Order/Roll Call.",
+    "2. Public Comment.",
+    "No public comments were received.",
+    "",
+    "3. Approve Consent Calendar and any changes to the Council Agenda.",
+    "3 RESULT: APPROVED [13 TO 0]",
+    "MOVER: Ben Madia, Councilmember",
+    "SECONDER: Andrew Cain, Councilmember",
+    "",
+    "Regular Agenda Items",
+    "4. Receive report from Council-funded agencies or other stakeholders.",
+    "",
+    "Consent Calendar",
+    "15. Approve minutes of the May 8, 2026 Regular Meeting.",
+    "15 RESULT: APPROVED [13 TO 0]",
+    "MOVER: Ben Madia, Councilmember",
+    "SECONDER: Andrew Cain, Councilmember",
+    "",
+    "Adjourn",
+    "16. Adjourn. The next regular meeting is scheduled for Friday, July 10, 2026 at 7:30",
+    "a.m. in the Board of Supervisors Chambers, 70 West Hedding Street, San Jose.",
+    "Chairperson Stewart adjourned the meeting at 9:08 a.m."
+  ].join("\n");
+  // The agenda parser files Adjourn under the calendar heading above it.
+  const capc = meeting("santa-clara-county", {
+    title: "Child Abuse Prevention Council - Regular Meeting",
+    dateText: "Jun 12, 2026",
+    items: [
+      agendaItem({
+        externalId: "capc-item-15",
+        agendaNumber: "15",
+        itemType: "Consent Calendar",
+        title: "Approve minutes of the May 8, 2026 Regular Meeting.",
+        action: null,
+        result: null,
+        rowText: "15. Approve minutes of the May 8, 2026 Regular Meeting."
+      }),
+      agendaItem({
+        externalId: "capc-item-16",
+        agendaNumber: "16",
+        itemType: "Consent Calendar",
+        title: "Adjourn. The next regular meeting is scheduled for Friday, July 10, 2026 at 7.30 a.m. in the Board of Supervisors Chambers, 70 West Hedding Street, San Jose.",
+        action: null,
+        result: null,
+        rowText: "16. Adjourn. The next regular meeting is scheduled for Friday, July 10, 2026."
+      })
+    ],
+    documents: [{
+      type: "Minutes",
+      label: "Minutes",
+      url: "https://example.com/capc-minutes.pdf",
+      extractedText: minutes
+    }]
+  });
+
+  const adjourn = extractDecisionOutcome(
+    { id: "adjourn", source_item_id: "capc-item-16", agenda_item: "Adjourn meeting", source_url: null },
+    capc
+  );
+  assert.equal(adjourn, null);
+
+  const priorMinutes = extractDecisionOutcome(
+    { id: "minutes", source_item_id: "capc-item-15", agenda_item: "Approve minutes of May 8, 2026 meeting", source_url: null },
+    capc
+  );
+  assert.equal(priorMinutes?.kind, "approved");
+  assert.match(priorMinutes?.sourceText || "", /APPROVED \[13 TO 0\]/);
+});
+
+test("a running 'Approved Minutes' page header is not an item's result", () => {
+  const pageBreak = [
+    "",
+    "Planning Commission Regular Meeting Approved Minutes",
+    "January 12, 2026",
+    "Page 2",
+    "",
+    "City of Menlo Park 701 Laurel St., Menlo Park, CA 94025 tel 650-330-6600 menlopark.gov"
+  ];
+  const withdrawn = [
+    "F1. Use Permit/Jessica Govea/108 Gilbert Ave:",
+    "Consider and adopt a resolution to approve a use permit for a change of use from retail to office.",
+    "(Withdrawn by the applicant)",
+    ...pageBreak
+  ].join("\n");
+  assert.equal(extractResultText(withdrawn), null);
+
+  const voted = extractResultText([
+    "F2. Use Permit/503 O'Keefe St.:",
+    "Consider and adopt a resolution to approve a use permit for a first-floor addition.",
+    ...pageBreak,
+    "",
+    "ACTION: Motion and second (Ferrick/Silin) to adopt a resolution approving the item as presented; passes 5-0 with Commissioners Ehrich and Silverstein absent."
+  ].join("\n"));
+  assert.match(voted || "", /^Motion and second \(Ferrick\/Silin\)/);
+  assert.equal(classifyDecisionOutcome(voted || ""), "approved");
+  assert.equal(extractVoteDetail(voted || ""), "5–0");
+});
+
+test("'passes' counts as a vote only before its tally", () => {
+  assert.equal(classifyDecisionOutcome("Motion and second (Lee/Chu) to approve the item; passes 6-1."), "approved");
+  assert.equal(
+    extractResultText("Staff will explore cost-effective options to provide transportation passes for seniors."),
+    null
+  );
+  // The subject sits in another sentence; "Passed" would read as accepting it.
+  assert.equal(
+    extractResultText("The Committee voted not to accept the fee schedule in its current form. The motion passes with 6 votes in favor."),
+    null
+  );
+});
+
+test("a motion to extend the meeting is never the item's result", () => {
+  const budgetHearing = [
+    "18. Fiscal Year 2026-27 Proposed Budget and 2026-31 Capital Improvement Program — Review",
+    "Finance Director Abby Veeser presented the first public hearing on the proposed budget.",
+    "No formal action was taken on the proposed budget. The budget is scheduled to return on June 15, 2026.",
+    "",
+    "A motion was to extend the meeting to 11:45 p.m.",
+    "",
+    "Moved: Cwirko-Godycki, Seconded: Newsom",
+    "Ayes: Newsom, Loraine, Fernandez, Cwirko-Godycki, and Diaz Nash",
+    "Noes: None",
+    "",
+    "Motion passed 5-0."
+  ].join("\n");
+  assert.equal(extractResultText(budgetHearing), null);
+
+  // Its "ACTION:" label must not claim the next paragraph either.
+  assert.equal(
+    extractResultText([
+      "Chair Silverstein conducted a straw poll (unofficial vote) for various study session items.",
+      "",
+      "ACTION: Motion and second (Silverstein/Ehrich) to extend the meeting to 11:15 p.m.; passes 6-0.",
+      "",
+      "(Straw poll continued)"
+    ].join("\n")),
+    null
+  );
+
+  const afterExtension = extractResultText([
+    "ACTION: Motion and second (Silverstein/Ehrich) to extend the meeting to 11:15 p.m.; passes 6-0.",
+    "",
+    "ACTION: Motion and second (Ehrich/Hedley) to adopt a resolution approving the item as submitted; passes 6-0."
+  ].join("\n"));
+  assert.match(afterExtension || "", /Ehrich\/Hedley/);
+});
+
+test("a recessed meeting is not a passed committee motion", () => {
+  const recessed = interpretOfficialAction(
+    "MEETING RECESSED",
+    "Pass",
+    meeting("san-francisco", { title: "Budget and Appropriations Committee" })
+  );
+  assert.equal(recessed.kind, "continued");
+  assert.equal(recessed.canonicalStatus, "continued");
+  assert.equal(recessed.headline, "Meeting recessed");
 });
