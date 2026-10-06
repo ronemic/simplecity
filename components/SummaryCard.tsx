@@ -331,7 +331,7 @@ export function SummaryCard({
     >
       <div
         className={cn(
-          "grid gap-4 p-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:p-5",
+          "grid gap-4 p-4 sm:p-5",
           isSharePresentation && "p-6 sm:p-8"
         )}
       >
