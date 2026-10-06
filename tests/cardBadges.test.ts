@@ -6,6 +6,7 @@ import {
   officialSourceFallbackInfo,
   statusSummary
 } from "../components/SummaryCard";
+import { t } from "../lib/i18n";
 import type { SummaryCardRow } from "../lib/types";
 
 test("official-source fallback cards are identified without affecting normal summaries", () => {
@@ -156,4 +157,28 @@ test("upcoming and non-decision cards are not marked as awaiting a result", () =
 
   assert.equal(statusSummary(upcomingCard, "en").label, "Vote scheduled Jul 29");
   assert.equal(statusSummary(informationalCard, "en").label, "Info only");
+});
+
+test("upcoming vote badges format the meeting date in the reader's language", () => {
+  const card = {
+    status: "Upcoming vote",
+    meetings: {
+      status: "Upcoming",
+      date_text: "October 14, 2026",
+      meeting_datetime: "2026-10-14T01:00:00.000Z"
+    }
+  } as SummaryCardRow;
+
+  assert.equal(statusSummary(card, "en").label, "Vote scheduled Oct 13");
+  assert.equal(statusSummary(card, "es").label, "Votación programada 13 oct");
+});
+
+test("upcoming vote badges without a meeting date fall back to the localized label", () => {
+  const card = {
+    status: "Upcoming vote",
+    meetings: { status: "Upcoming", date_text: null, meeting_datetime: null }
+  } as SummaryCardRow;
+
+  assert.equal(statusSummary(card, "es").label, t("es", "voteUpcoming"));
+  assert.equal(statusSummary(card, "en").label, t("en", "voteUpcoming"));
 });

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { ExternalLink } from "lucide-react";
 import { CookiePreferenceControls } from "@/components/CookiePreferenceControls";
+import { getPageLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -8,13 +9,14 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
-  const locale = seoLocale((await searchParams).lang);
+  const { lang } = await searchParams;
+  const locale = await getPageLocale(lang);
   const title = locale === "es" ? "Configuración de cookies | SimpleCity" : "Cookie Settings | SimpleCity";
   const description =
     locale === "es"
       ? "Información y controles para las cookies y preferencias de SimpleCity."
       : "Information and controls for SimpleCity cookies and saved preferences.";
-  const urls = localizedSeoUrls("/cookies", locale);
+  const urls = localizedSeoUrls("/cookies", seoLocale(lang));
 
   return {
     title,
@@ -28,7 +30,7 @@ export default async function CookiesPage({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }) {
-  const locale = seoLocale((await searchParams).lang);
+  const locale = await getPageLocale((await searchParams).lang);
   const es = locale === "es";
 
   return (

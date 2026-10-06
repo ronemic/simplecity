@@ -10,7 +10,7 @@ import {
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -18,13 +18,14 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
-  const locale = seoLocale((await searchParams).lang);
+  const { lang } = await searchParams;
+  const locale = await getPageLocale(lang);
   const title = locale === "es" ? "Temas del gobierno local | SimpleCity" : "Local government topics | SimpleCity";
   const description =
     locale === "es"
       ? "Explora decisiones locales sobre vivienda, transporte, seguridad pública, parques, presupuestos, desarrollo, escuelas y servicios municipales."
       : "Explore local decisions about housing, transportation, public safety, parks, budgets, development, schools, and city services.";
-  const urls = localizedSeoUrls("/topics", locale);
+  const urls = localizedSeoUrls("/topics", seoLocale(lang));
 
   return {
     title,

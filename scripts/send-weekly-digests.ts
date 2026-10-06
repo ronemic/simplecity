@@ -181,13 +181,13 @@ function translatedCard(
   if (!translation) return null;
   if (translation.source_fingerprint !== summaryCardTranslationFingerprint(card)) return null;
 
+  // status stays the source English enum, matching the site (lib/db/queries.ts).
   return {
     ...card,
     agenda_item: translation.agenda_item || card.agenda_item,
     what_is_happening: translation.what_is_happening || card.what_is_happening,
     why_it_matters: translation.why_it_matters || card.why_it_matters,
     who_it_affects: translation.who_it_affects || card.who_it_affects,
-    status: translation.status || card.status,
     comment_window_opens: translation.comment_window_opens || card.comment_window_opens,
     comment_window_closes: translation.comment_window_closes || card.comment_window_closes,
     how_to_act_attend: translation.how_to_act_attend || card.how_to_act_attend,

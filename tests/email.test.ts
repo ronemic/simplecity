@@ -167,7 +167,7 @@ test("builds a bilingual digest when Spanish translations are attached", () => {
   assert.match(email.subject, /Resumen semanal de SimpleCity/);
   assert.match(email.html, /En español/);
   assert.match(email.html, /Aprobar contrato de mantenimiento del parque/);
-  assert.match(email.html, /Parques y ambiente/);
+  assert.match(email.html, /Parques y medio ambiente/);
   assert.match(email.html, /Leer la tarjeta de SimpleCity/);
   assert.match(email.text, /El concejo considerará un contrato de mantenimiento/);
   assert.match(

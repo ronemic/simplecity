@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { normalizeLocale, t } from "@/lib/i18n";
 import { cn } from "@/lib/utils/cn";
 
 function shouldIgnoreClick(event: MouseEvent<HTMLAnchorElement>) {
@@ -21,6 +22,12 @@ function shouldIgnoreClick(event: MouseEvent<HTMLAnchorElement>) {
 function normalizeHref(href: string) {
   const url = new URL(href, "http://simplecity.local");
   return `${url.pathname}${url.search}`;
+}
+
+// The default label only renders after a click, so reading the document's
+// language here never differs between the server and client render.
+function defaultPendingLabel() {
+  return t(normalizeLocale(typeof document === "undefined" ? null : document.documentElement.lang), "loading");
 }
 
 type PendingLinkProps = {
@@ -100,7 +107,7 @@ export function PendingLink({
           {pending ? (
             <span className="absolute inset-0 flex items-center justify-center gap-2 rounded-[inherit] bg-white/80 text-sm font-semibold text-black/70 backdrop-blur-sm">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin text-civic" />
-              <span className="sr-only">{pendingLabel || "Loading"}</span>
+              <span className="sr-only">{pendingLabel || defaultPendingLabel()}</span>
             </span>
           ) : null}
         </>
@@ -112,7 +119,7 @@ export function PendingLink({
           {pending ? (
             <span className="absolute inset-0 flex items-center justify-center text-current">
               <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-              <span className="sr-only">{pendingLabel || "Loading"}</span>
+              <span className="sr-only">{pendingLabel || defaultPendingLabel()}</span>
             </span>
           ) : null}
         </>

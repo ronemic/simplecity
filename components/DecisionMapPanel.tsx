@@ -65,7 +65,17 @@ const DecisionMapCanvas = dynamic(
   () => import("@/components/DecisionMapCanvas").then((module) => module.DecisionMapCanvas),
   {
     ssr: false,
-    loading: () => <MapSkeleton label="Loading map" />
+    // The canvas only mounts after the points load in the browser, so the
+    // document language is available for this label.
+    loading: () => (
+      <MapSkeleton
+        label={
+          typeof document !== "undefined" && document.documentElement.lang === "es"
+            ? "Cargando mapa"
+            : "Loading map"
+        }
+      />
+    )
   }
 );
 

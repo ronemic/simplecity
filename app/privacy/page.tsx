@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { getPageLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 const CONTACT_EMAIL = "simplecityadmin@gmail.com";
@@ -9,13 +10,14 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
-  const locale = seoLocale((await searchParams).lang);
+  const { lang } = await searchParams;
+  const locale = await getPageLocale(lang);
   const title = locale === "es" ? "Política de privacidad | SimpleCity" : "Privacy Policy | SimpleCity";
   const description =
     locale === "es"
       ? "Cómo SimpleCity recopila, usa y protege información."
       : "How SimpleCity collects, uses, and protects information.";
-  const urls = localizedSeoUrls("/privacy", locale);
+  const urls = localizedSeoUrls("/privacy", seoLocale(lang));
 
   return {
     title,
@@ -29,7 +31,7 @@ export default async function PrivacyPage({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }) {
-  const locale = seoLocale((await searchParams).lang);
+  const locale = await getPageLocale((await searchParams).lang);
   const es = locale === "es";
 
   return (

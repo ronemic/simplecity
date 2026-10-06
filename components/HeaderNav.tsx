@@ -232,7 +232,7 @@ export function HeaderNav({
 
   return (
     <nav
-      aria-label="Primary navigation"
+      aria-label={t(selectedLocale, "primaryNavigation")}
       className="contents text-sm font-semibold text-ink md:flex md:min-w-0 md:flex-1"
     >
       <button
@@ -307,7 +307,7 @@ export function HeaderNav({
         </button>
         {isJurisdictionMenuOpen ? (
           <div className="menu-popover md:w-60">
-            <div role="listbox" aria-label="Jurisdiction" className="max-h-64 overflow-auto">
+            <div role="listbox" aria-label={t(selectedLocale, "jurisdiction")} className="max-h-64 overflow-auto">
               {jurisdictions.map((jurisdiction, index) => {
                 const isSelected = jurisdiction.slug === selected;
                 const startsSchoolDistricts =
@@ -437,20 +437,20 @@ export function HeaderNav({
   );
 }
 
-export function HeaderNavFallback() {
+export function HeaderNavFallback({ locale = "en" }: { locale?: Locale }) {
   return (
     <nav
-      aria-label="Primary navigation"
+      aria-label={t(locale, "primaryNavigation")}
       className="contents text-sm font-semibold text-ink md:flex md:min-w-0 md:flex-1"
     >
       <span className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-black/15 bg-white px-3 py-2 font-bold shadow-sm md:hidden">
         <Menu aria-hidden className="h-4 w-4 text-civic" />
-        Menu
+        {t(locale, "menu")}
       </span>
       <div className="hidden md:flex md:min-w-0 md:flex-1 md:items-center md:gap-1">
       <label className={cn("menu-trigger md:order-1 md:ml-2 md:max-w-[11rem] lg:ml-4 lg:max-w-[15rem]", desktopPickerTrigger)}>
         <MapPin aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
-        <span className="sr-only">Jurisdiction</span>
+        <span className="sr-only">{t(locale, "jurisdiction")}</span>
         <select
           defaultValue="san-mateo"
           className="w-full bg-transparent text-sm font-bold text-ink outline-none"
@@ -458,8 +458,8 @@ export function HeaderNavFallback() {
           {jurisdictions.map((jurisdiction) => (
             <option key={jurisdiction.slug} value={jurisdiction.slug}>
               {jurisdiction.isChild && !jurisdiction.isSchoolDistrict
-                  ? `  ${jurisdiction.label}`
-                  : jurisdiction.label}
+                  ? `  ${jurisdictionLabel(jurisdiction, locale)}`
+                  : jurisdictionLabel(jurisdiction, locale)}
             </option>
           ))}
         </select>
@@ -467,9 +467,9 @@ export function HeaderNavFallback() {
       <span className="relative md:order-1 md:ml-2 md:shrink-0">
       <label className={cn("menu-trigger", desktopPickerTrigger)}>
         <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
-        <span className="sr-only">Language</span>
+        <span className="sr-only">{t(locale, "language")}</span>
         <select
-          defaultValue="en"
+          defaultValue={locale}
           className="w-full bg-transparent text-sm font-bold text-ink outline-none"
         >
           {LANGUAGE_OPTIONS.map((option) => (
@@ -493,7 +493,7 @@ export function HeaderNavFallback() {
             <item.compactIcon aria-hidden className="hidden h-4 w-4 md:max-xl:block" />
           ) : null}
           <span className={cn("compactIcon" in item && "md:max-xl:sr-only")}>
-            {t("en", item.labelKey)}
+            {t(locale, item.labelKey)}
           </span>
         </Link>
       ))}

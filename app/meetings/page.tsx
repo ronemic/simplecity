@@ -10,7 +10,7 @@ import {
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
 import { t } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 import {
   MEETING_VIEW_PREFERENCE_COOKIE,
@@ -35,7 +35,7 @@ export async function generateMetadata({
   }>;
 }): Promise<Metadata> {
   const params = await searchParams;
-  const locale = seoLocale(params.lang);
+  const locale = await getPageLocale(params.lang);
   const jurisdiction = params.jurisdiction
     ? normalizeJurisdictionSelection(params.jurisdiction)
     : ALL_JURISDICTIONS_SLUG;
@@ -53,7 +53,7 @@ export async function generateMetadata({
   if (params.jurisdiction) {
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
-  const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, locale);
+  const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, seoLocale(params.lang));
   const isFiltered = Boolean(params.q || params.month || params.date || params.view || params.body);
 
   return {

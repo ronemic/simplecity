@@ -60,3 +60,20 @@ test("calendar links are available when an actual meeting time exists", () => {
 
   assert.ok(calendarUrl?.startsWith("https://calendar.google.com/calendar/render?"));
 });
+
+test("calendar event details follow the reader's language", () => {
+  const meeting = {
+    title: "City Council",
+    meeting_type: "Regular Meeting",
+    date_text: "June 13, 2026",
+    time_text: "10:00 AM",
+    meeting_datetime: "2026-06-13T17:00:00.000Z",
+    source_url: "https://city.example/meeting"
+  };
+
+  const english = new URL(buildGoogleCalendarUrl(meeting) || "").searchParams.get("details");
+  const spanish = new URL(buildGoogleCalendarUrl(meeting, "es") || "").searchParams.get("details");
+
+  assert.match(english || "", /^Meeting type: .+\nOfficial source: https:\/\/city\.example\/meeting$/);
+  assert.match(spanish || "", /^Tipo de reunión: .+\nFuente oficial: https:\/\/city\.example\/meeting$/);
+});

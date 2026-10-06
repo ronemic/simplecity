@@ -8,7 +8,7 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { latestCardEventRecordedAt } from "@/lib/cardEvents";
 import { getCardEvents, getPublishedCard } from "@/lib/db/queries";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import {
   cardShareDescription,
   cardShareTitle
@@ -25,13 +25,15 @@ export async function generateMetadata({
   searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
   const [{ id }, query] = await Promise.all([params, searchParams]);
-  const locale = seoLocale(query.lang);
+  const locale = await getPageLocale(query.lang);
   const card = await getPublishedCard(id, locale);
-  if (!card) return { title: "Card not found | SimpleCity" };
+  if (!card) {
+    return { title: locale === "es" ? "Decisión no encontrada | SimpleCity" : "Card not found | SimpleCity" };
+  }
 
   const title = `${cardShareTitle(card)} | SimpleCity`;
   const description = cardShareDescription(card, locale);
-  const urls = localizedSeoUrls(`/cards/${encodeURIComponent(id)}`, locale);
+  const urls = localizedSeoUrls(`/cards/${encodeURIComponent(id)}`, seoLocale(query.lang));
 
   return {
     title,

@@ -37,10 +37,10 @@ const outcomeKindLabels: Record<Locale, Record<string, string>> = {
     other: "Other action"
   },
   es: {
-    approved: "Aprobado",
-    rejected: "Rechazado",
-    continued: "Aplazado",
-    amended: "Modificado",
+    approved: "Aprobada",
+    rejected: "Rechazada",
+    continued: "Aplazada",
+    amended: "Modificada",
     other: "Otra acción"
   }
 };

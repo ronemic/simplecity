@@ -23,7 +23,7 @@ import {
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
-import { getRequestLocale } from "@/lib/i18n/server";
+import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
 export const revalidate = 300;
@@ -33,7 +33,8 @@ export async function generateMetadata({
 }: {
   searchParams: Promise<{ lang?: string }>;
 }): Promise<Metadata> {
-  const locale = seoLocale((await searchParams).lang);
+  const { lang } = await searchParams;
+  const locale = await getPageLocale(lang);
   const title =
     locale === "es"
       ? "SimpleCity | Decisiones locales fáciles de entender"
@@ -42,7 +43,7 @@ export async function generateMetadata({
     locale === "es"
       ? "Encuentra próximas decisiones del gobierno local, reuniones públicas, fuentes oficiales y formas de participar en comunidades del Área de la Bahía."
       : "Find upcoming local government decisions, public meetings, official sources, and ways to participate across Bay Area communities.";
-  const urls = localizedSeoUrls("/", locale);
+  const urls = localizedSeoUrls("/", seoLocale(lang));
 
   return {
     title,

@@ -33,7 +33,7 @@ export async function Header() {
           />
           <span className="md:hidden min-[980px]:inline">SimpleCity</span>
         </Link>
-        <Suspense fallback={<HeaderNavFallback />}>
+        <Suspense fallback={<HeaderNavFallback locale={locale} />}>
           <HeaderNav
             key={`${toPublicJurisdictionSlug(initialJurisdiction)}-${locale}`}
             initialJurisdiction={toPublicJurisdictionSlug(initialJurisdiction)}
