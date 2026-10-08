@@ -187,6 +187,15 @@ function meetingHref(meetingId: string, jurisdiction: string) {
   return `/meetings/${meetingId}?jurisdiction=${encodeURIComponent(jurisdiction)}`;
 }
 
+function sourceHost(sourceUrl: string | null) {
+  if (!sourceUrl) return null;
+  try {
+    return new URL(sourceUrl).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 export default async function MeetingDetailPage({
   params,
   searchParams
@@ -219,6 +228,8 @@ export default async function MeetingDetailPage({
     locale
   );
   const isAdvisoryPlanningMeeting = isSantaBarbaraPlanningMeeting(meeting);
+  const isCancelled = Boolean(meeting.status?.toLowerCase().includes("cancel"));
+  const officialSourceHost = sourceHost(meeting.source_url);
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
   const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
   canonicalUrl.searchParams.set("jurisdiction", publicJurisdiction);
@@ -229,7 +240,7 @@ export default async function MeetingDetailPage({
         name: displayMeetingTitle(meeting, meetingTitleFallback, locale),
         startDate: meeting.meeting_datetime,
         eventStatus:
-          meeting.status?.toLowerCase().includes("cancel")
+          isCancelled
             ? "https://schema.org/EventCancelled"
             : "https://schema.org/EventScheduled",
         eventAttendanceMode: "https://schema.org/MixedEventAttendanceMode",
@@ -344,6 +355,17 @@ export default async function MeetingDetailPage({
                 );
               })}
             </div>
+          ) : isCancelled ? (
+            <div className="quiet-card p-8">
+              <h3 className="text-xl font-bold text-ink">
+                {locale === "es" ? "Esta reunión fue cancelada" : "This meeting was cancelled"}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-black/70">
+                {locale === "es"
+                  ? "No hay decisiones que resumir porque la reunión no se llevó a cabo. Consulta la fuente oficial para conocer la próxima fecha de reunión."
+                  : "There are no decisions to summarize because the meeting did not take place. Check the official source for the next meeting date."}
+              </p>
+            </div>
           ) : (
             <div className="quiet-card p-8">
               <h3 className="text-xl font-bold text-ink">
@@ -383,6 +405,27 @@ export default async function MeetingDetailPage({
                     <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-black/40" />
                   </a>
                 ))
+              ) : isCancelled && meeting.source_url && officialSourceHost ? (
+                <>
+                  <a
+                    href={meeting.source_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="quiet-card interactive-card flex items-start gap-3 p-4 text-sm focus-visible:focus-ring"
+                  >
+                    <FileText aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-civic" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-semibold text-ink">{t(locale, "officialSource")}</span>
+                      <span className="block break-words text-black/70">{officialSourceHost}</span>
+                    </span>
+                    <ExternalLink aria-hidden className="h-4 w-4 shrink-0 text-black/40" />
+                  </a>
+                  <p className="text-sm leading-6 text-black/70">
+                    {locale === "es"
+                      ? `${jurisdictionLabel} no publicó una agenda ni otros documentos para esta reunión cancelada.`
+                      : `${jurisdictionLabel} did not post an agenda or other documents for this cancelled meeting.`}
+                  </p>
+                </>
               ) : (
                 <p className="text-sm leading-6 text-black/70">{t(locale, "noSourceDocuments")}</p>
               )}
