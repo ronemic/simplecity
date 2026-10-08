@@ -394,6 +394,13 @@ export function meetingDateParts(
       timeZone: CIVIC_TIME_ZONE,
       year: "numeric"
     }).format(parsed),
+    weekday: new Intl.DateTimeFormat(intlLocale, {
+      timeZone: CIVIC_TIME_ZONE,
+      weekday: "short"
+    })
+      .format(parsed)
+      .replace(".", ""),
+    dayKey: civicDayStamp(parsed),
     iso: parsed.toISOString()
   };
 }

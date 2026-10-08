@@ -1,8 +1,18 @@
 "use client";
 
-import { CalendarDays, ChevronDown, Clock, ExternalLink, FileText, Hourglass, Info, MessageSquare } from "lucide-react";
+import {
+  CalendarDays,
+  ChevronDown,
+  Clock,
+  ExternalLink,
+  FileText,
+  Hourglass,
+  Info,
+  MessageSquare
+} from "lucide-react";
 import { useState } from "react";
 import { CardShareActions } from "@/components/CardShareActions";
+import { DateStack, type DateStackTone } from "@/components/DateStack";
 import { DecisionOutcomePanel } from "@/components/DecisionOutcomePanel";
 import { FollowButton } from "@/components/FollowButton";
 import { PendingLink } from "@/components/PendingLink";
@@ -18,8 +28,10 @@ import {
   formatCompactDisplayDate,
   formatDisplayDate,
   formatPacificTimestamp,
-  isUpcomingMeetingDate
+  isUpcomingMeetingDate,
+  meetingDateParts
 } from "@/lib/utils/date";
+import { dateKeyFromDate } from "@/lib/utils/calendarGrid";
 import { cn } from "@/lib/utils/cn";
 import { categoryLabel, type Locale, statusLabel, t } from "@/lib/i18n";
 import { cardPreviewText, cardSummaryPoints } from "@/lib/utils/cardShare";
@@ -314,7 +326,6 @@ export function SummaryCard({
   const StatusIcon = status.icon;
   const cardJurisdictionLabel = jurisdictionLabel(card, locale);
   const meetingPageHref = meetingHref(card);
-  const primaryButtonClass = "action-primary-sm font-black";
   const noCommentLabel = t(locale, "noCommentOptionListed");
   const showSantaBarbaraInterest =
     (card.jurisdiction_slug || meeting?.jurisdiction_slug) ===
@@ -324,19 +335,32 @@ export function SummaryCard({
     outcome?.updated_at
   );
 
+  const dateParts = meetingDateParts(meeting?.date_text, meeting?.meeting_datetime, locale);
+  const dateTone: DateStackTone =
+    dateParts?.dayKey === dateKeyFromDate(new Date()) ? "today" : "default";
+  const visiblePreview = titlePreview && !officialSourceFallback ? titlePreview : null;
+
   return (
     <article
       className={cn("quiet-card overflow-hidden", isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)]")}
       data-card-id={card.id}
     >
-      <div
-        className={cn(
-          "grid gap-4 p-4 sm:p-5",
-          isSharePresentation && "p-6 sm:p-8"
-        )}
-      >
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
+      <div className={cn("flex gap-4 p-4 sm:gap-5 sm:p-5", isSharePresentation && "p-6 sm:gap-7 sm:p-8")}>
+        {dateParts ? (
+          <DateStack
+            month={dateParts.month}
+            day={dateParts.day}
+            weekday={dateParts.weekday}
+            tone={dateTone}
+            size={isSharePresentation ? "lg" : "md"}
+            dateTime={dateParts.iso}
+            title={meetingDate}
+            className="hidden pt-0.5 sm:flex"
+          />
+        ) : null}
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
             <span>
               <HighlightedText
                 text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
@@ -353,7 +377,7 @@ export function SummaryCard({
           </div>
           <TitleTag
             className={cn(
-              "mt-1 line-clamp-3 text-xl font-black leading-snug text-ink sm:line-clamp-2",
+              "mt-1 line-clamp-3 text-balance text-xl font-black leading-snug text-ink sm:line-clamp-2",
               isSharePresentation &&
                 (officialSourceFallback
                   ? "line-clamp-3 text-3xl sm:line-clamp-3 sm:text-4xl"
@@ -362,32 +386,24 @@ export function SummaryCard({
           >
             <HighlightedText text={agendaTitle} query={highlight} />
           </TitleTag>
-          {titlePreview && !officialSourceFallback ? (
+          {visiblePreview ? (
             <p
               className={cn(
-                "mt-2 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
-                isSharePresentation &&
-                  (officialSourceFallback
-                    ? "line-clamp-3 max-w-5xl text-base leading-7 sm:line-clamp-3"
-                    : "line-clamp-none max-w-5xl text-base leading-7 sm:line-clamp-none")
+                "mt-1.5 line-clamp-3 max-w-3xl text-[0.95rem] leading-6 text-black/[0.66] sm:line-clamp-2",
+                isSharePresentation && "line-clamp-none max-w-4xl text-lg leading-8 sm:line-clamp-none"
               )}
             >
-              <HighlightedText text={titlePreview} query={highlight} />
+              <HighlightedText text={visiblePreview} query={highlight} />
             </p>
           ) : null}
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm font-semibold text-black/[0.62]">
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-black/[0.62]">
             {fallbackInfo ? (
               <span className="status-chip border-[#d9a34b] bg-[#fff7e8] text-[#794707]">
                 <Info aria-hidden className="h-3.5 w-3.5" />
                 {fallbackInfo.label}
               </span>
             ) : null}
-            <span
-              className={cn(
-                "status-chip",
-                status.className
-              )}
-            >
+            <span className={cn("status-chip", status.className)}>
               {StatusIcon ? <StatusIcon aria-hidden className="h-3.5 w-3.5" /> : null}
               <HighlightedText text={status.label} query={highlight} />
             </span>
@@ -397,15 +413,13 @@ export function SummaryCard({
                 <HighlightedText text={comment.label} query={highlight} />
               </span>
             ) : null}
+            {/* Phones drop the date tile for width, so the date rides here. */}
+            <span className={cn("inline-flex items-center gap-1.5", dateParts && "sm:hidden")}>
+                <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
+                <HighlightedText text={compactMeetingDate} query={highlight} />
+              </span>
             <span className="inline-flex items-center gap-1.5">
-              <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
-              <HighlightedText text={compactMeetingDate} query={highlight} />
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className="icon-badge"
-              >
+              <span aria-hidden className="icon-badge">
                 <TopicIcon className="h-3.5 w-3.5" />
               </span>
               <HighlightedText text={topicLabel} query={highlight} />
@@ -418,8 +432,32 @@ export function SummaryCard({
             ) : null}
           </div>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 border-t border-black/[0.07] bg-[#fbfcfd] px-4 py-3 sm:px-5",
+          isSharePresentation && "px-6 sm:px-8",
+        )}
+      >
+        {!isSharePresentation ? (
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="action-primary-sm mr-auto font-black"
+            aria-expanded={open}
+          >
+            {officialSourceFallback
+              ? open
+                ? locale === "es" ? "Ocultar texto oficial" : "Hide official text"
+                : locale === "es" ? "Mostrar texto oficial" : "Show official text"
+              : open
+                ? t(locale, "hideSummary")
+                : t(locale, "readSummary")}
+            <ChevronDown aria-hidden className={cn("h-4 w-4 transition", open && "rotate-180")} />
+          </button>
+        ) : null}
+        <div className={cn("flex flex-wrap items-center gap-2", isSharePresentation && "ml-auto")}>
           {showSantaBarbaraInterest ? (
             <SantaBarbaraInterestButton
               activityAt={interestActivityAt}
@@ -431,31 +469,7 @@ export function SummaryCard({
             />
           ) : null}
           <FollowButton cardId={card.id} title={agendaTitle} locale={locale} />
-          <CardShareActions
-            cardId={card.id}
-            compact
-            locale={locale}
-          />
-          {!isSharePresentation ? (
-            <button
-              type="button"
-              onClick={() => setOpen((value) => !value)}
-              className={primaryButtonClass}
-              aria-expanded={open}
-            >
-              {officialSourceFallback
-                ? open
-                  ? locale === "es" ? "Ocultar texto oficial" : "Hide official text"
-                  : locale === "es" ? "Mostrar texto oficial" : "Show official text"
-                : open
-                  ? t(locale, "hideSummary")
-                  : t(locale, "readSummary")}
-              <ChevronDown
-                aria-hidden
-                className={`h-4 w-4 transition ${open ? "rotate-180" : ""}`}
-              />
-            </button>
-          ) : null}
+          <CardShareActions cardId={card.id} compact locale={locale} />
         </div>
       </div>
 
@@ -554,7 +568,7 @@ export function SummaryCard({
             </div>
           )}
 
-          <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-end sm:justify-between">
+          <div className="mt-5 flex flex-col gap-3 border-t border-black/10 pt-4 text-sm font-semibold text-black/[0.68] sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-3">
               <span><HighlightedText text={meetingDate} query={highlight} /></span>
               {meetingPageHref ? (

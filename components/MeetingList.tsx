@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, List, Search } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
+import { DateStack } from "@/components/DateStack";
 import { HighlightedText } from "@/components/HighlightedText";
 import { PendingLink } from "@/components/PendingLink";
 import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
@@ -363,35 +364,23 @@ function groupListMeetingsByDay(meetings: MeetingRow[]) {
   return groups;
 }
 
-function ListDateBadge({ dateKey, isToday, locale }: { dateKey: string; isToday: boolean; locale: Locale }) {
+function ListDateBadge({ dateKey, todayKey, locale }: { dateKey: string; todayKey: string; locale: Locale }) {
   if (dateKey === "date-not-listed") {
     return (
-      <div className="flex h-[4.25rem] w-16 items-center justify-center rounded-lg border border-dashed border-black/15 bg-[#f8fafb] px-1 text-center text-[10px] font-bold uppercase leading-tight text-black/45">
+      <div className="w-14 text-xs font-semibold leading-tight text-black/45">
         {t(locale, "dateNotListed")}
       </div>
     );
   }
 
   return (
-    <div
-      className={cn(
-        "flex w-16 flex-col items-center overflow-hidden rounded-lg border text-center shadow-[0_1px_2px_rgba(23,23,23,0.04)]",
-        isToday ? "border-civic bg-civic text-white" : "border-black/10 bg-white text-ink"
-      )}
-    >
-      <span
-        className={cn(
-          "w-full py-0.5 text-[10px] font-black uppercase tracking-[0.08em]",
-          isToday ? "bg-[#1d4d92] text-white" : "bg-[#eef3f6] text-[#12365f]"
-        )}
-      >
-        {formatDateKey(dateKey, { month: "short" }, locale).replace(".", "")}
-      </span>
-      <span className="pt-1 text-2xl font-black leading-none tabular-nums">{Number(dateKey.slice(-2))}</span>
-      <span className={cn("pb-1.5 pt-0.5 text-[10px] font-bold uppercase", isToday ? "text-white/80" : "text-black/50")}>
-        {formatDateKey(dateKey, { weekday: "short" }, locale).replace(".", "")}
-      </span>
-    </div>
+    <DateStack
+      month={formatDateKey(dateKey, { month: "short" }, locale).replace(".", "")}
+      day={Number(dateKey.slice(-2))}
+      weekday={formatDateKey(dateKey, { weekday: "short" }, locale).replace(".", "")}
+      tone={dateKey === todayKey ? "today" : "default"}
+      dateTime={dateKey}
+    />
   );
 }
 
@@ -983,7 +972,7 @@ export function MeetingList({
                   >
                     <div className="flex items-center gap-3 sm:block">
                       <div className="sm:sticky sm:top-24">
-                        <ListDateBadge dateKey={group.key} isToday={isToday} locale={locale} />
+                        <ListDateBadge dateKey={group.key} todayKey={todayKey} locale={locale} />
                       </div>
                       <p className="text-sm font-bold text-black/60 sm:hidden">
                         {group.key === "date-not-listed"
