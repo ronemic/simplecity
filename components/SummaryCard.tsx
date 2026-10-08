@@ -342,7 +342,13 @@ export function SummaryCard({
 
   return (
     <article
-      className={cn("quiet-card overflow-hidden", isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)]")}
+      // No overflow-hidden: it clipped the "I'm interested" popover, which opens
+      // below the action bar at the card's bottom edge. The last section is
+      // rounded instead, so its background still follows the card's corners.
+      className={cn(
+        "quiet-card [&>*:last-child]:rounded-b-lg",
+        isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)] [&>*:last-child]:rounded-b-xl"
+      )}
       data-card-id={card.id}
     >
       <div className={cn("flex gap-4 p-4 sm:gap-5 sm:p-5", isSharePresentation && "p-6 sm:gap-7 sm:p-8")}>
