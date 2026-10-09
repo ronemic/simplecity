@@ -16,6 +16,7 @@ import {
 import {
   addMonths,
   buildMonthDays,
+  capitalizeFirst,
   dateKeyFromDate,
   firstDateInMonth,
   formatDateKey,
@@ -605,10 +606,10 @@ export function MeetingList({
   const monthMeetingCount = monthDays
     .filter((day) => day.startsWith(activeMonth))
     .reduce((sum, day) => sum + (meetingsByDate.get(day)?.length || 0), 0);
-  const activeMonthLabel = formatDateKey(`${activeMonth}-01`, {
+  const activeMonthLabel = capitalizeFirst(formatDateKey(`${activeMonth}-01`, {
     month: "long",
     year: "numeric"
-  }, locale);
+  }, locale));
   const weekdayLabels = weekdays(locale);
   const viewingCurrentMonth = activeMonth === todayKey.slice(0, 7);
   const listDateGroups = groupListMeetingsByDay(visibleListMeetings);
@@ -665,7 +666,7 @@ export function MeetingList({
                 <div className="min-w-0">
                   <p className="label-eyebrow text-civic">{t(locale, "monthView")}</p>
                   <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <h2 className="text-2xl font-black capitalize text-ink">{activeMonthLabel}</h2>
+                    <h2 className="text-2xl font-black text-ink">{activeMonthLabel}</h2>
                     <span className="text-sm font-semibold text-black/55">
                       {monthMeetingCount === 1
                         ? locale === "es"
@@ -850,12 +851,12 @@ export function MeetingList({
                               )}
                             >
                               <div className="flex items-baseline justify-between gap-2 border-b border-black/10 px-3 py-2.5">
-                                <p className="text-sm font-black capitalize text-ink">
-                                  {formatDateKey(day, {
+                                <p className="text-sm font-black text-ink">
+                                  {capitalizeFirst(formatDateKey(day, {
                                     weekday: "long",
                                     month: "short",
                                     day: "numeric"
-                                  }, locale)}
+                                  }, locale))}
                                 </p>
                                 <p className="text-[11px] font-bold text-black/50">
                                   {locale === "es"
@@ -887,13 +888,13 @@ export function MeetingList({
             <aside className="quiet-card overflow-hidden lg:sticky lg:top-24">
               <div className="border-b border-black/10 bg-[#fbfcfd] p-4">
                 <p className="label-eyebrow text-civic">{t(locale, "dayView")}</p>
-                <h2 className="mt-1 text-xl font-black capitalize text-ink">
+                <h2 className="mt-1 text-xl font-black text-ink">
                   {activeDate
-                    ? formatDateKey(activeDate, {
+                    ? capitalizeFirst(formatDateKey(activeDate, {
                         weekday: "long",
                         month: "short",
                         day: "numeric"
-                      }, locale)
+                      }, locale))
                     : t(locale, "selectADay")}
                 </h2>
                 <p className="mt-1 text-sm font-semibold text-black/55">

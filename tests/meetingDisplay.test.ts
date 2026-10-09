@@ -15,6 +15,14 @@ test("meeting label helper falls back cleanly when the label is only noise", () 
   assert.equal(displayMeetingText("Not applicable Not applicable"), "Not listed");
 });
 
+test("translated Spanish meeting titles reduce to the body name like English ones", () => {
+  const title = (value: string) => displayMeetingTitle({ title: value, meeting_type: null }, "Reunión no indicada", "es");
+
+  assert.equal(title("Reunión Especial del Concejo Municipal"), "Concejo Municipal");
+  assert.equal(title("Reunión Regular de la Comisión de Planificación"), "Comisión de Planificación");
+  assert.equal(title("Comisión de Parques y Recreación"), "Comisión de Parques y Recreación");
+});
+
 test("meeting labels translate known civic bodies in Spanish", () => {
   assert.equal(
     displayMeetingTitle(

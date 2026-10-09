@@ -412,7 +412,7 @@ export function HeaderNav({
             href={hrefWithJurisdiction(item.href)}
             aria-current={isActive ? "page" : undefined}
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`${navItemClasses(item, index === 0)} relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
+            className={`${navItemClasses(item, index === 0)} relative inline-flex min-h-11 items-center justify-center rounded-md px-1 py-2 text-center text-xs transition md:whitespace-nowrap focus-visible:focus-ring md:px-2 md:text-sm lg:px-3.5 ${
               isActive
                 ? "text-civic after:absolute after:bottom-1 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-civic"
                 : "text-black/70 hover:bg-black/[0.04] hover:text-ink"
@@ -485,7 +485,7 @@ export function HeaderNavFallback({ locale = "en" }: { locale?: Locale }) {
           key={item.href}
           href={item.href}
           className={cn(
-            "inline-flex min-h-11 items-center justify-center rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5",
+            "inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-md px-2 py-2 text-center text-black/70 transition hover:bg-black/[0.04] hover:text-ink focus-visible:focus-ring lg:px-3.5",
             navItemClasses(item, index === 0)
           )}
         >

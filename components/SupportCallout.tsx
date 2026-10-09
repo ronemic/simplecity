@@ -1,9 +1,14 @@
+"use client";
+
 import { ArrowRight } from "lucide-react";
 import type { Locale } from "@/lib/i18n";
+import { useClientLocale } from "@/components/useClientLocale";
 
 const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
 
-export function SupportCallout({ locale }: { locale: Locale }) {
+export function SupportCallout({ locale: initialLocale }: { locale: Locale }) {
+  const locale = useClientLocale(initialLocale);
+
   return (
     <section className="section-shell py-8">
       <div className="flex flex-col gap-4 border-t border-black/10 pt-6 sm:flex-row sm:items-center sm:justify-between">

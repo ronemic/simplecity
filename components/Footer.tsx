@@ -2,26 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import {
-  LOCALE_CHANGE_EVENT,
-  LOCALE_COOKIE,
-  LOCALE_STORAGE_KEY,
-  normalizeLocale,
-  type Locale,
-  t
-} from "@/lib/i18n";
+import { type Locale, t } from "@/lib/i18n";
+import { useClientLocale } from "@/components/useClientLocale";
 
 const DONATION_URL = "https://hcb.hackclub.com/donations/start/simplecity";
-
-function readCookieLocale() {
-  const localeCookie = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${LOCALE_COOKIE}=`))
-    ?.split("=")[1];
-
-  return normalizeLocale(localeCookie ? decodeURIComponent(localeCookie) : null);
-}
 
 function footerDescription(locale: Locale) {
   return locale === "es"
@@ -52,38 +36,7 @@ function localizedHref(path: string, locale: Locale) {
 }
 
 export function Footer({ locale = "en" }: { locale?: Locale }) {
-  const [currentLocale, setCurrentLocale] = useState(locale);
-
-  useEffect(() => {
-    function syncLocale(nextLocale?: string | null) {
-      const normalized = normalizeLocale(nextLocale || readCookieLocale());
-      setCurrentLocale(normalized);
-      document.documentElement.lang = normalized;
-    }
-
-    try {
-      syncLocale(window.localStorage.getItem(LOCALE_STORAGE_KEY));
-    } catch {
-      syncLocale();
-    }
-
-    function handleLocaleChange(event: Event) {
-      syncLocale((event as CustomEvent<{ locale?: string }>).detail?.locale);
-    }
-
-    function handlePopState() {
-      const lang = new URL(window.location.href).searchParams.get("lang");
-      syncLocale(lang);
-    }
-
-    window.addEventListener(LOCALE_CHANGE_EVENT, handleLocaleChange);
-    window.addEventListener("popstate", handlePopState);
-
-    return () => {
-      window.removeEventListener(LOCALE_CHANGE_EVENT, handleLocaleChange);
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, []);
+  const currentLocale = useClientLocale(locale);
 
   return (
     <footer className="border-t border-black/10 bg-[#eef3f6]">

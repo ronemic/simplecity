@@ -98,7 +98,7 @@ export default async function CookiesPage({
                 : "You can block or delete cookies, including analytics cookies, from your browser’s privacy settings. Google also offers an add-on that prevents Google Analytics from measuring your visits. Blocking preference cookies may prevent SimpleCity from remembering your selections."}
             </p>
             <a
-              className="action-secondary mt-4 inline-flex"
+              className="action-secondary mt-4 inline-flex !whitespace-normal text-center"
               href="https://tools.google.com/dlpage/gaoptout"
               rel="noreferrer"
               target="_blank"

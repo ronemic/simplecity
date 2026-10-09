@@ -74,6 +74,15 @@ function extractBodyName(value: string) {
     return stripNoise(meetingOfThe[1]);
   }
 
+  // Translated titles ("Reunión Especial del Concejo Municipal") reduce to the
+  // body name the same way the English "Special Meeting of the ..." form does.
+  const spanishMeetingOf = value.match(
+    /\breuni[oó]n(?:\s+(?:especial|regular|ordinaria|extraordinaria|conjunta|aplazada))*\s+(?:del|de la|de los|de las)\s+(.+)$/i
+  );
+  if (spanishMeetingOf?.[1]) {
+    return stripNoise(spanishMeetingOf[1]);
+  }
+
   const bodyMatch = value.match(
     /\b(board of supervisors|city council|city commission|planning commission|housing authority|water district|school board|board of education)\b/i
   );

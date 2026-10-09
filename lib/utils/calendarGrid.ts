@@ -81,6 +81,12 @@ export function formatDateKey(key: string, options: Intl.DateTimeFormatOptions, 
   }).format(utcDateFromKey(key));
 }
 
+// Spanish month and weekday names come back lowercase ("octubre de 2026").
+// CSS `capitalize` would also uppercase "de", so only the first letter is raised.
+export function capitalizeFirst(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export function weekdays(locale: Locale) {
   const formatter = new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
     weekday: "short",
