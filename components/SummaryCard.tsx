@@ -395,7 +395,7 @@ export function SummaryCard({
           {visiblePreview ? (
             <p
               className={cn(
-                "mt-1.5 line-clamp-3 max-w-3xl text-[0.95rem] leading-6 text-black/[0.66] sm:line-clamp-2",
+                "mt-1.5 line-clamp-3 max-w-3xl text-[0.95rem] font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
                 isSharePresentation && "line-clamp-none max-w-4xl text-lg leading-8 sm:line-clamp-none"
               )}
             >
@@ -446,23 +446,6 @@ export function SummaryCard({
           isSharePresentation && "px-6 sm:px-8",
         )}
       >
-        {!isSharePresentation ? (
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            className="action-primary-sm mr-auto font-black"
-            aria-expanded={open}
-          >
-            {officialSourceFallback
-              ? open
-                ? locale === "es" ? "Ocultar texto oficial" : "Hide official text"
-                : locale === "es" ? "Mostrar texto oficial" : "Show official text"
-              : open
-                ? t(locale, "hideSummary")
-                : t(locale, "readSummary")}
-            <ChevronDown aria-hidden className={cn("h-4 w-4 transition", open && "rotate-180")} />
-          </button>
-        ) : null}
         <div className={cn("flex flex-wrap items-center gap-2", isSharePresentation && "ml-auto")}>
           {showSantaBarbaraInterest ? (
             <SantaBarbaraInterestButton
@@ -477,6 +460,23 @@ export function SummaryCard({
           <FollowButton cardId={card.id} title={agendaTitle} locale={locale} />
           <CardShareActions cardId={card.id} compact locale={locale} />
         </div>
+        {!isSharePresentation ? (
+          <button
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="action-primary-sm ml-auto font-black"
+            aria-expanded={open}
+          >
+            {officialSourceFallback
+              ? open
+                ? locale === "es" ? "Ocultar texto oficial" : "Hide official text"
+                : locale === "es" ? "Mostrar texto oficial" : "Show official text"
+              : open
+                ? t(locale, "hideSummary")
+                : t(locale, "readSummary")}
+            <ChevronDown aria-hidden className={cn("h-4 w-4 transition", open && "rotate-180")} />
+          </button>
+        ) : null}
       </div>
 
       {showDetails ? (
