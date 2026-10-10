@@ -139,8 +139,8 @@ export function SantaBarbaraInterestButton({
           aria-pressed={interested}
           className={cn(
             interested
-              ? "action-secondary-sm !rounded-r-none !border-civic/35 !bg-civic/10 !text-civic"
-              : "action-secondary-sm !rounded-r-none"
+              ? "action-secondary-sm decision-card-action !rounded-r-none !border-civic/35 !bg-civic/10 !text-civic"
+              : "action-secondary-sm decision-card-action !rounded-r-none"
           )}
           disabled={!loaded || busy}
           onClick={toggleInterest}
@@ -167,7 +167,7 @@ export function SantaBarbaraInterestButton({
             aria-expanded={disclosureOpen}
             aria-label={locale === "es" ? "Acerca del programa piloto de interés" : "About the interest pilot"}
             className={cn(
-              "action-secondary-sm !min-h-10 !w-10 !rounded-l-none !px-0 text-black/55",
+              "action-secondary-sm decision-card-action !w-10 !rounded-l-none !px-0 text-black/55 sm:!w-9",
               (interested || disclosureOpen) && "!border-civic/35 !bg-civic/10 !text-civic"
             )}
             onClick={() => setDisclosureOpen((value) => !value)}

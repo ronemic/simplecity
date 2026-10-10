@@ -395,7 +395,7 @@ export function SummaryCard({
           {visiblePreview ? (
             <p
               className={cn(
-                "mt-1.5 line-clamp-3 max-w-3xl text-[0.95rem] font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
+                "mt-1.5 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
                 isSharePresentation && "line-clamp-none max-w-4xl text-lg leading-8 sm:line-clamp-none"
               )}
             >
@@ -442,7 +442,7 @@ export function SummaryCard({
 
       <div
         className={cn(
-          "flex flex-wrap items-center gap-2 border-t border-black/[0.07] bg-[#fbfcfd] px-4 py-3 sm:px-5",
+          "flex flex-wrap items-center gap-2 border-t border-black/[0.07] bg-[#fbfcfd] px-4 py-2.5 sm:px-5",
           isSharePresentation && "px-6 sm:px-8",
         )}
       >
@@ -464,7 +464,7 @@ export function SummaryCard({
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="action-primary-sm ml-auto font-black"
+            className="action-primary-sm decision-card-action ml-auto font-black"
             aria-expanded={open}
           >
             {officialSourceFallback

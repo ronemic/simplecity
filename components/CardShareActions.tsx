@@ -62,7 +62,7 @@ export function CardShareActions({
       <button
         type="button"
         onClick={handleCopy}
-        className={compact ? "action-secondary-sm" : "action-primary"}
+        className={compact ? "action-secondary-sm decision-card-action" : "action-primary"}
         aria-live="polite"
       >
         {copied ? <Check aria-hidden className="h-4 w-4" /> : <Link2 aria-hidden className="h-4 w-4" />}

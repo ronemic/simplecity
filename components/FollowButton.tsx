@@ -66,7 +66,7 @@ export function FollowButton({
         disabled={!loaded}
         onClick={toggleFollow}
         className={cn(
-          "action-secondary-sm",
+          "action-secondary-sm decision-card-action",
           following && "!border-civic/35 !bg-civic/10 !text-civic"
         )}
         title={
