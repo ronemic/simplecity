@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+import { ArrowRight, Vote } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
 import { DecisionResultSelect } from "@/components/DecisionResultSelect";
 import {
@@ -26,6 +28,7 @@ import { CATEGORIES, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CAT
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 import { PendingLink } from "@/components/PendingLink";
 import { ResultsFreshnessMenu } from "@/components/ResultsFreshnessMenu";
+import { isElectionPromoActive } from "@/lib/elections/california2026";
 
 export const revalidate = 300;
 
@@ -321,6 +324,33 @@ export default async function DecisionsPage({
             {locale === "es" ? "Comisión de Planificación" : "Planning Commission"}
           </PendingLink>
         </nav>
+      ) : null}
+
+      {isElectionPromoActive() ? (
+        <Link
+          href={locale === "es" ? "/elections?lang=es" : "/elections"}
+          className="quiet-card group mb-4 flex items-center gap-4 p-4 transition-colors hover:border-civic/30 focus-visible:focus-ring sm:mb-5 sm:p-5"
+        >
+          <span className="icon-tile-sm">
+            <Vote aria-hidden className="h-5 w-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-black/[0.58]">
+              {locale === "es"
+                ? "Elección general de California · 3 de noviembre"
+                : "California General Election · November 3"}
+            </span>
+            <span className="mt-0.5 block text-lg font-black leading-snug text-ink">
+              {locale === "es"
+                ? "Entiende las 14 propuestas estatales en tu boleta"
+                : "Understand the 14 statewide propositions on your ballot"}
+            </span>
+          </span>
+          <ArrowRight
+            aria-hidden
+            className="h-5 w-5 shrink-0 text-civic transition-transform group-hover:translate-x-0.5"
+          />
+        </Link>
       ) : null}
 
       <DecisionBrowser

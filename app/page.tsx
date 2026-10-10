@@ -12,6 +12,7 @@ import {
   HomepageHeroStatusLoading
 } from "@/components/HomepageData";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
+import { isElectionPromoActive } from "@/lib/elections/california2026";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { getHomepageContent, type HomepageCardSelection } from "@/lib/db/queries";
 import {
@@ -142,6 +143,7 @@ export default async function Home({
     ? SCHOOL_CATEGORIES
     : CATEGORIES;
   const hasSearch = search.length > 0;
+  const showElectionPromo = isElectionPromoActive();
   const introLabel =
     jurisdiction === "all"
       ? locale === "es"
@@ -161,17 +163,32 @@ export default async function Home({
         >
           <div className="max-w-2xl">
             {!hasSearch ? (
-                    <Link
-                      href={locale === "es" ? "/about?lang=es#news" : "/about#news"}
-                      className="mb-6 inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#9fc4f4] underline-offset-4 hover:text-white hover:underline focus-visible:focus-ring"
-                    >
-                      <span>
-                        {locale === "es"
-                          ? "Lee sobre SimpleCity en las noticias"
-                          : "Read about SimpleCity in the news"}
-                      </span>
-                      <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
-                    </Link>
+              <div className="mb-6 flex flex-col items-start gap-2">
+                {showElectionPromo ? (
+                  <Link
+                    href={locale === "es" ? "/elections?lang=es" : "/elections"}
+                    className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#fffaf0] underline-offset-4 hover:underline focus-visible:focus-ring"
+                  >
+                    <span>
+                      {locale === "es"
+                        ? "Entiende las propuestas de California del 3 de noviembre"
+                        : "Understand California's November 3 propositions"}
+                    </span>
+                    <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
+                  </Link>
+                ) : null}
+                <Link
+                  href={locale === "es" ? "/about?lang=es#news" : "/about#news"}
+                  className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#9fc4f4] underline-offset-4 hover:text-white hover:underline focus-visible:focus-ring"
+                >
+                  <span>
+                    {locale === "es"
+                      ? "Lee sobre SimpleCity en las noticias"
+                      : "Read about SimpleCity in the news"}
+                  </span>
+                  <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
+                </Link>
+              </div>
             ) : null}
             <p className="text-sm font-black uppercase text-[#9fc4f4]">
               {introLabel}

@@ -46,6 +46,7 @@ export function buildSitemapEntries(appUrl: string): MetadataRoute.Sitemap {
   const routes: MetadataRoute.Sitemap = [
     { url: `${appUrl}/`, lastModified: now, changeFrequency: "daily", priority: 1 },
     { url: `${appUrl}/about`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${appUrl}/elections`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${appUrl}/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${appUrl}/cookies`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: `${appUrl}/decisions`, lastModified: now, changeFrequency: "daily", priority: 0.9 },

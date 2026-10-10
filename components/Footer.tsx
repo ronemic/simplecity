@@ -77,6 +77,11 @@ export function Footer({ locale = "en" }: { locale?: Locale }) {
                   {t(currentLocale, "topics")}
                 </Link>
               </li>
+              <li>
+                <Link className="transition hover:text-civic" href={localizedHref("/elections", currentLocale)}>
+                  {currentLocale === "es" ? "Propuestas de noviembre" : "November propositions"}
+                </Link>
+              </li>
             </ul>
           </nav>
 
