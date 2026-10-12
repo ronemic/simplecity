@@ -167,7 +167,7 @@ export default async function Home({
                 {showElectionPromo ? (
                   <Link
                     href={locale === "es" ? "/elections?lang=es" : "/elections"}
-                    className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#fffaf0] underline-offset-4 hover:underline focus-visible:focus-ring"
+                    className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#e9c77e] underline-offset-4 hover:underline focus-visible:focus-ring"
                   >
                     <span>
                       {locale === "es"

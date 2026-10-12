@@ -360,10 +360,7 @@ export function HeaderNav({
         >
           <span className="flex min-w-0 items-center gap-2">
             <Languages aria-hidden="true" className="h-4 w-4 shrink-0 text-civic" />
-            <span className="truncate md:hidden">{selectedLanguage.label}</span>
-            <span aria-hidden="true" className="hidden md:inline">
-              {selectedLanguage.shortLabel}
-            </span>
+            <span>{selectedLanguage.shortLabel}</span>
           </span>
           {isLanguagePending ? (
             <Loader2 aria-hidden="true" className="h-4 w-4 shrink-0 animate-spin text-civic" />
