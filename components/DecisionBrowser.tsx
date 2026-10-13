@@ -1,6 +1,6 @@
 "use client";
 
-import { List, Loader2, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, List, Loader2, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DecisionFilters } from "@/components/DecisionFilters";
@@ -337,14 +337,14 @@ export function DecisionBrowser({
           {decisionView === "list" && pageCount > 1 ? (
             <nav
               aria-label={locale === "es" ? "Paginación de decisiones" : "Decision pagination"}
-              className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-black/10 pt-5"
+              className="mt-6 flex items-center justify-between gap-3 border-t border-black/10 pt-5"
             >
               <button
                 type="button"
                 onClick={() => changePage(Math.max(1, currentPage - 1))}
                 disabled={currentPage <= 1}
                 aria-busy={isPending && pendingPage === currentPage - 1}
-                className={`min-w-24 ${currentPage <= 1 ? "action-disabled-sm" : "action-secondary-sm"}`}
+                className={`pl-2 ${currentPage <= 1 ? "action-disabled-sm" : "action-secondary-sm"}`}
               >
                 {isPending && pendingPage === currentPage - 1 ? (
                   <>
@@ -353,10 +353,12 @@ export function DecisionBrowser({
                       {locale === "es" ? "Cargando página anterior" : "Loading previous page"}
                     </span>
                   </>
-                ) : locale === "es" ? (
-                  "Anterior"
                 ) : (
-                  "Previous"
+                  <>
+                    <ChevronLeft aria-hidden className="h-4 w-4" />
+                    <span className="hidden sm:inline">{locale === "es" ? "Anterior" : "Previous"}</span>
+                    <span className="sr-only sm:hidden">{locale === "es" ? "Página anterior" : "Previous page"}</span>
+                  </>
                 )}
               </button>
               <PaginationJumpForm
@@ -371,7 +373,7 @@ export function DecisionBrowser({
                 onClick={() => changePage(Math.min(pageCount, currentPage + 1))}
                 disabled={currentPage >= pageCount}
                 aria-busy={isPending && pendingPage === currentPage + 1}
-                className={`min-w-24 ${currentPage >= pageCount ? "action-disabled-sm" : "action-secondary-sm"}`}
+                className={`pr-2 ${currentPage >= pageCount ? "action-disabled-sm" : "action-secondary-sm"}`}
               >
                 {isPending && pendingPage === currentPage + 1 ? (
                   <>
@@ -380,10 +382,12 @@ export function DecisionBrowser({
                       {locale === "es" ? "Cargando página siguiente" : "Loading next page"}
                     </span>
                   </>
-                ) : locale === "es" ? (
-                  "Siguiente"
                 ) : (
-                  "Next"
+                  <>
+                    <span className="hidden sm:inline">{locale === "es" ? "Siguiente" : "Next"}</span>
+                    <span className="sr-only sm:hidden">{locale === "es" ? "Página siguiente" : "Next page"}</span>
+                    <ChevronRight aria-hidden className="h-4 w-4" />
+                  </>
                 )}
               </button>
             </nav>

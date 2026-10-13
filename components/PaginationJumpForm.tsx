@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useId, useState } from "react";
 import type { Locale } from "@/lib/i18n";
 
 export function PaginationJumpForm({
@@ -14,6 +14,7 @@ export function PaginationJumpForm({
   locale: Locale;
   onPageChange: (page: number) => void;
 }) {
+  const inputId = useId();
   const [value, setValue] = useState(String(page));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -31,29 +32,34 @@ export function PaginationJumpForm({
 
   return (
     <form
-      className="flex flex-wrap items-center justify-center gap-2 text-sm font-bold text-black/60"
+      className="flex items-center gap-2 text-sm font-semibold text-black/70"
       onSubmit={handleSubmit}
     >
-      <label className="inline-flex items-center gap-2">
-        <span>{locale === "es" ? "Página" : "Page"}</span>
+      <label htmlFor={inputId} className="hidden sm:inline">
+        {locale === "es" ? "Página" : "Page"}
+      </label>
+      <div className="flex">
         <input
+          id={inputId}
           aria-label={locale === "es" ? "Número de página" : "Page number"}
-          className="h-9 w-16 rounded-lg border border-black/15 bg-white px-2 text-center text-sm font-black text-ink shadow-sm focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/20"
+          className="h-10 w-14 rounded-l-lg border border-black/20 bg-white px-2 text-center text-sm font-bold tabular-nums text-ink shadow-sm transition [appearance:textfield] hover:border-black/30 focus:relative focus:z-10 focus:border-civic focus:outline-none focus:ring-4 focus:ring-civic/20 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          enterKeyHint="go"
           inputMode="numeric"
           max={pageCount}
           min={1}
           onChange={(event) => setValue(event.target.value)}
+          onFocus={(event) => event.target.select()}
           type="number"
           value={value}
         />
-      </label>
-      <span>{locale === "es" ? `de ${pageCount}` : `of ${pageCount}`}</span>
-      <button
-        className="action-secondary-sm min-h-9 px-3 py-1.5"
-        type="submit"
-      >
-        {locale === "es" ? "Ir" : "Go"}
-      </button>
+        <button
+          type="submit"
+          className="-ml-px h-10 rounded-r-lg border border-black/20 bg-white px-3 text-sm font-semibold text-ink shadow-sm transition hover:border-civic/25 hover:bg-[#f7fbff] focus-visible:relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-civic"
+        >
+          {locale === "es" ? "Ir" : "Go"}
+        </button>
+      </div>
+      <span className="tabular-nums">{locale === "es" ? `de ${pageCount.toLocaleString("es")}` : `of ${pageCount.toLocaleString("en")}`}</span>
     </form>
   );
 }

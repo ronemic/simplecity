@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight, FileText, List, Search } from "lucide-react";
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, FileText, List } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
 import { DateStack } from "@/components/DateStack";
 import { HighlightedText } from "@/components/HighlightedText";
@@ -934,7 +934,7 @@ export function MeetingList({
               activeView !== "list" && "hidden"
             )}
           >
-            <div className="flex flex-col gap-2 border-b border-black/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div className="border-b border-black/10 px-4 py-4 sm:px-6">
               <div>
                 <p className="label-eyebrow text-civic">{t(locale, "allMatchingMeetings")}</p>
                 <h2 className="mt-1 text-2xl font-black text-ink">
@@ -947,12 +947,6 @@ export function MeetingList({
                       : `${meetings.length} meetings`}
                 </h2>
               </div>
-              <p className="inline-flex items-center gap-2 text-sm font-semibold text-black/55">
-                <Search aria-hidden className="h-4 w-4" />
-                {locale === "es"
-                  ? "La búsqueda se aplica a esta lista."
-                  : "Search applies to this list."}
-              </p>
             </div>
             <div className="divide-y divide-black/10">
               {listDateGroups.map((group) => {
@@ -1008,22 +1002,23 @@ export function MeetingList({
               })}
             </div>
             {hiddenListCount > 0 ? (
-              <div className="border-t border-black/10 bg-[#fbfcfd] p-5 text-center">
-                <button
-                  type="button"
-                  onClick={() => setListPaging({ search: highlight, pages: listPages + 1 })}
-                  className="action-secondary-sm"
-                >
+              <button
+                type="button"
+                onClick={() => setListPaging({ search: highlight, pages: listPages + 1 })}
+                className="group flex w-full flex-col items-center gap-0.5 border-t border-black/10 px-5 py-4 text-center transition hover:bg-[#f7fbff] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-civic"
+              >
+                <span className="inline-flex items-center gap-1.5 text-sm font-bold text-civic">
                   {locale === "es"
                     ? `Mostrar ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} reuniones más`
                     : `Show ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} more meetings`}
-                </button>
-                <p className="mt-2 text-sm font-semibold text-black/55">
+                  <ChevronDown aria-hidden className="h-4 w-4 transition group-hover:translate-y-0.5" />
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-black/55">
                   {locale === "es"
-                    ? `Mostrando ${visibleListMeetings.length} de ${sortedMeetings.length}.`
-                    : `Showing ${visibleListMeetings.length} of ${sortedMeetings.length}.`}
-                </p>
-              </div>
+                    ? `Mostrando ${visibleListMeetings.length.toLocaleString("es")} de ${sortedMeetings.length.toLocaleString("es")}`
+                    : `Showing ${visibleListMeetings.length.toLocaleString("en")} of ${sortedMeetings.length.toLocaleString("en")}`}
+                </span>
+              </button>
             ) : null}
           </section>
         </>
