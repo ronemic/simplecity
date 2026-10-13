@@ -18,7 +18,7 @@ export async function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-black/10 bg-[#f8fafb]/95 backdrop-blur-md">
-      <div className="mx-auto grid min-h-14 w-full max-w-[1440px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-4 py-2 sm:px-6 md:flex md:min-h-[70px] md:justify-between md:py-3 lg:px-8">
+      <div className="section-shell grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 py-2 md:flex md:min-h-[70px] md:justify-between md:py-3">
         <Link
           href="/"
           className="flex items-center gap-2.5 text-lg font-black leading-none text-ink focus-visible:focus-ring lg:gap-3 lg:text-[21px]"
