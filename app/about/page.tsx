@@ -96,8 +96,8 @@ export default async function AboutPage() {
             </p>
             <p className="mt-4 text-base leading-7 text-ink">
               {locale === "es"
-                ? "En octubre de 2026, SimpleCity cubre 13 jurisdicciones, ha analizado más de 10.300 puntos de agenda y ha llegado a más de 900 usuarios."
-                : "As of October 2026, SimpleCity covers 13 jurisdictions, has analyzed more than 10,300 agenda items, and has reached more than 900 users."}
+                ? "En octubre de 2026, SimpleCity cubre 13 jurisdicciones, ha analizado más de 10.300 puntos de agenda y ha llegado a más de 1,000 usuarios."
+                : "As of October 2026, SimpleCity covers 13 jurisdictions, has analyzed more than 10,300 agenda items, and has reached more than 1,000 users."}
             </p>
             <p className="mt-5 text-sm font-semibold text-black/70">
               {locale === "es"
