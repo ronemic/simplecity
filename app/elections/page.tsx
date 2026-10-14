@@ -214,7 +214,7 @@ export default async function ElectionsPage({
                         rel="noreferrer"
                         className="inline-flex items-center gap-1 font-semibold text-civic underline decoration-civic/30 underline-offset-4 hover:decoration-civic"
                       >
-                        {es ? "Candidatos" : "Candidates"}
+                        {es ? "Fuente oficial" : "Official source"}
                         <ExternalLink aria-hidden className="h-3.5 w-3.5" />
                       </a>
                     </li>

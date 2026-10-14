@@ -93,12 +93,12 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     threshold: "majority",
     placedBy: "body",
     title: {
-      en: "Updates Charter rules for city departments and commissions",
-      es: "Actualiza la Carta Municipal sobre departamentos y comisiones"
+      en: "Changes Charter rules for city departments and commissions",
+      es: "Modifica la Carta Municipal sobre departamentos y comisiones"
     },
     summary: {
       en: "Charter amendment that updates Charter language to match how some departments operate, changes some processes (for example, approving legal settlements by resolution instead of ordinance), and eliminates, combines or moves some commissions and advisory bodies from the Charter into the Municipal Code. It requires the Board of Supervisors to amend voter-approved laws to carry out some changes, and requires a task force to review commissions every ten years.",
-      es: "Enmienda a la Carta Municipal que actualiza su redacción para reflejar cómo operan algunos departamentos, modifica ciertos procesos (por ejemplo, aprobar acuerdos legales por resolución en lugar de por ordenanza) y elimina, fusiona o traslada algunas comisiones y órganos asesores de la Carta al Código Municipal. Exige que la Junta de Supervisores enmiende leyes aprobadas por el electorado para aplicar algunos cambios y que un grupo de trabajo revise las comisiones cada diez años."
+      es: "Enmienda a la Carta Municipal que actualiza su redacción para reflejar cómo operan algunos departamentos, modifica ciertos procesos (por ejemplo, aprobar acuerdos extrajudiciales por resolución en lugar de por ordenanza) y elimina, fusiona o traslada algunas comisiones y órganos asesores de la Carta al Código Municipal. Exige que la Junta de Supervisores enmiende leyes aprobadas por el electorado para aplicar algunos cambios y que un grupo de trabajo revise las comisiones cada diez años."
     },
     cost: {
       en: "The Controller estimates savings of $365,000 to $450,000 a year, mainly from eliminating some commissions; other costs or savings depend on future budget decisions.",
@@ -217,8 +217,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "Aumenta las firmas exigidas y cambia cómo se incorporan medidas a la boleta"
     },
     summary: {
-      en: "Charter amendment that raises the signatures needed for a citizen initiative from 2% to 8% of registered voters (about 10,600 to about 42,500 today) and for calling a special election to 10% of registered voters (about 53,100). It lets initiative proponents withdraw a measure up to 102 days before the election, and ends the ability of four or more supervisors, or the Mayor alone, to place measures on the ballot; the Board could still do so by majority vote.",
-      es: "Enmienda a la Carta Municipal que eleva las firmas necesarias para una iniciativa ciudadana del 2% al 8% de los electores inscritos (de unas 10,600 a unas 42,500 hoy) y para convocar una elección especial al 10% de los electores inscritos (unas 53,100). Permite retirar una iniciativa hasta 102 días antes de la elección y elimina la facultad de cuatro o más supervisores, o del alcalde por sí solo, de incorporar medidas a la boleta; la Junta podría seguir haciéndolo por mayoría de votos."
+      en: "Charter amendment that raises the signatures needed for a citizen initiative from 2% to 8% of registered voters (about 10,600 to about 42,500 today) and for calling a special election on an ordinance from 10% of votes cast for Mayor (about 39,000) to 10% of registered voters (about 53,100). It lets initiative proponents withdraw a measure up to 102 days before the election, and ends the ability of four or more supervisors, or the Mayor alone, to place measures on the ballot; the Board could still do so by majority vote.",
+      es: "Enmienda a la Carta Municipal que eleva las firmas necesarias para una iniciativa ciudadana del 2% al 8% de los electores inscritos (de unas 10,600 a unas 42,500 hoy) y para convocar una elección especial sobre una ordenanza, del 10% de los votos emitidos para la Alcaldía (unas 39,000) al 10% de los electores inscritos (unas 53,100). Permite retirar una iniciativa hasta 102 días antes de la elección y elimina la facultad de cuatro o más supervisores, o del alcalde por sí solo, de incorporar medidas a la boleta; la Junta podría seguir haciéndolo por mayoría de votos."
     },
     cost: {
       en: "The Controller estimates a minimal impact on the cost of government.",
@@ -234,7 +234,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     debate: {
       en: "Official argument for: Mayor Daniel Lurie, Board President Rafael Mandelman, Speaker Emerita Nancy Pelosi and others. Official argument against: San Francisco Labor Council, Senior & Disability Action, United Educators of San Francisco, tenant groups and others.",
-      es: "Argumento oficial a favor: el alcalde Daniel Lurie, el presidente de la Junta Rafael Mandelman, la presidenta emérita de la Cámara Nancy Pelosi y otros. Argumento oficial en contra: Consejo Laboral de San Francisco, Senior & Disability Action, United Educators of San Francisco, grupos de inquilinos y otros."
+      es: "Argumento oficial a favor: el alcalde Daniel Lurie, el presidente de la Junta Rafael Mandelman, la presidenta emérita de la Cámara Nancy Pelosi y otros. Argumento oficial en contra: Central Sindical (Labor Council) de San Francisco, Senior & Disability Action, United Educators of San Francisco, grupos de inquilinos y otros."
     },
     officialUrl: "https://www.sf.gov/qualified-ballot-measures"
   },
@@ -256,8 +256,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "Amplía las facultades del administrador municipal sobre la contratación"
     },
     summary: {
-      en: "Charter amendment that gives the City Administrator exclusive authority to propose purchasing and contracting ordinances (the Board and Mayor could approve or reject them within 60 days, but not amend them) and to set citywide purchasing and technology rules. It raises the amounts that need Board approval to $4.5 million for revenue contracts and leases and $25 million for spending contracts, adjusted for inflation from 2032, and extends the City Administrator's term from five to ten years.",
-      es: "Enmienda a la Carta Municipal que otorga al administrador municipal la facultad exclusiva de proponer ordenanzas sobre adquisiciones y contratación (la Junta y el alcalde podrían aprobarlas o rechazarlas en 60 días, pero no enmendarlas) y de fijar normas de adquisición y tecnología para toda la Ciudad. Eleva los montos que requieren aprobación de la Junta a $4.5 millones para contratos y arrendamientos que generan ingresos y a $25 millones para contratos de gasto, ajustados por inflación desde 2032, y amplía el mandato del administrador municipal de cinco a diez años."
+      en: "Charter amendment that gives the City Administrator exclusive authority to propose purchasing and contracting ordinances (the Board and Mayor could approve or reject them within 60 days, but not amend them; ordinances not acted on in 60 days take effect) and to set citywide purchasing and technology rules; the Board keeps its authority over purchasing rules mainly about wages, workplace safety, local business and labor agreements. It raises the amounts that need Board approval to $4.5 million for revenue contracts and leases and $25 million for spending contracts, adjusted for inflation from 2032, and extends the City Administrator's term from five to ten years.",
+      es: "Enmienda a la Carta Municipal que otorga al administrador municipal la facultad exclusiva de proponer ordenanzas sobre adquisiciones y contratación (la Junta y el alcalde podrían aprobarlas o rechazarlas en 60 días, pero no enmendarlas; si no actúan en 60 días, las ordenanzas quedan aprobadas) y de fijar normas de adquisición y tecnología para toda la Ciudad; la Junta conserva su facultad sobre normas de adquisición relativas principalmente a salarios, salud y seguridad laboral, empresas locales o convenios laborales. Eleva los montos que requieren aprobación de la Junta a $4.5 millones para contratos y arrendamientos que generan ingresos y a $25 millones para contratos de gasto, ajustados por inflación desde 2032, y amplía el mandato del administrador municipal de cinco a diez años."
     },
     cost: {
       en: "The Controller estimates a minimal impact on the cost of government, at a level that cannot be determined.",
@@ -335,7 +335,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     summary: {
       en: "Initiative ordinance that would close Sunset Dunes Park from Monday 4:00 a.m. to Friday 6:00 p.m. (except weekday holidays) and reopen the Upper Great Highway between Lincoln Way and Sloat Boulevard to private vehicles during those hours. The City would have to obtain all required approvals, including Coastal Act permits. The park would stay car-free on weekends and holidays.",
-      es: "Ordenanza de iniciativa que cerraría el parque Sunset Dunes desde el lunes a las 4:00 a.m. hasta el viernes a las 6:00 p.m. (salvo feriados entre semana) y reabriría a vehículos particulares la Gran Autopista Superior (Upper Great Highway) entre Lincoln Way y Sloat Boulevard en ese horario. La Ciudad tendría que obtener todas las aprobaciones necesarias, incluidos los permisos de la Ley Costera. El parque seguiría sin autos los fines de semana y feriados."
+      es: "Ordenanza de iniciativa que cerraría el parque Sunset Dunes desde el lunes a las 4:00 a.m. hasta el viernes a las 6:00 p.m. (salvo feriados entre semana) y reabriría a vehículos particulares la Gran Autopista Superior (Upper Great Highway) entre Lincoln Way y Sloat Boulevard en ese horario. La Ciudad tendría que obtener todas las aprobaciones necesarias, incluidos los permisos de la Ley de Costas de California. El parque seguiría sin autos los fines de semana y feriados."
     },
     cost: {
       en: "The Controller estimates about $9.8 million in one-time capital costs (including new traffic signals) and $500,000 to $1.9 million a year in added costs.",
@@ -350,8 +350,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "La Ciudad no haría estos cambios; la Gran Autopista Superior seguiría cerrada a vehículos particulares como parte del parque Sunset Dunes."
     },
     debate: {
-      en: "Official argument for: Richard Corriea, retired SFPD Commander. Official argument against: Senator Scott Wiener, several supervisors and the Sierra Club, among others.",
-      es: "Argumento oficial a favor: Richard Corriea, comandante retirado de la SFPD. Argumento oficial en contra: el senador Scott Wiener, varios supervisores y el Sierra Club, entre otros."
+      en: "Official argument for: Richard Corriea, retired SFPD Commander. Official argument against: Senator Scott Wiener, five supervisors and the Sierra Club.",
+      es: "Argumento oficial a favor: Richard Corriea, comandante retirado del Departamento de Policía de San Francisco (SFPD). Argumento oficial en contra: el senador Scott Wiener, cinco supervisores y el Sierra Club."
     },
     officialUrl: "https://www.sf.gov/qualified-ballot-measures"
   },
@@ -377,8 +377,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "Crea un impuesto anual por parcela del 1 de julio de 2027 al 30 de junio de 2042, destinado solo al servicio de Muni, con ingresos estimados de $177 millones al año. Las tasas dependen del tipo de propiedad y del tamaño del edificio y se ajustan por inflación: base de $129 para viviendas unifamiliares, $249 para multifamiliares (tope de $50,000), $799 para no residenciales y de uso mixto (tope de $400,000) y $392 para terrenos sin edificar de más de 2,000 pies cuadrados. La mayoría de los propietarios de 65 años o más que viven en su casa recibirían un descuento o no pagarían."
     },
     cost: {
-      en: "The Controller estimates about $177 million a year for Muni starting in 2027-28, with administration costs of $2-3 million to start and $4-6 million a year. Landlords could pass up to 50% of the tax to rent-controlled tenants, up to $65 per unit per year.",
-      es: "La Contraloría estima unos $177 millones al año para Muni desde 2027-28, con costos de administración de $2-3 millones al inicio y $4-6 millones al año. Los propietarios podrían trasladar hasta el 50% del impuesto a inquilinos con control de renta, hasta $65 por unidad al año."
+      en: "The Controller estimates about $177 million a year for Muni starting in 2027-28, with administration costs of $2-3 million to start and $4-6 million a year. Landlords could pass up to 50% of the tax to rent-controlled tenants, up to $65 per unit per year, for units whose rent was set before June 1, 2027.",
+      es: "La Contraloría estima unos $177 millones al año para Muni desde 2027-28, con costos de administración de $2-3 millones al inicio y $4-6 millones al año. Los propietarios podrían trasladar hasta el 50% del impuesto a inquilinos de unidades sujetas a control de renta, hasta $65 por unidad al año, en unidades cuya renta se fijó antes del 1 de junio de 2027."
     },
     yes: {
       en: "The City would fund Muni service through a new annual parcel tax on real estate ($129 up to $400,000 per parcel, about $177 million a year, for 15 years).",
@@ -408,12 +408,12 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     threshold: "majority",
     placedBy: "petition",
     title: {
-      en: "Dedicates part of large-property transfer tax to affordable housing",
-      es: "Destina parte del impuesto de transferencia de grandes inmuebles a vivienda asequible"
+      en: "Dedicates half of transfer tax on $10M+ property sales to affordable housing",
+      es: "Destina la mitad del impuesto de transferencia en ventas de más de $10 millones a vivienda asequible"
     },
     summary: {
-      en: "Splits the transfer tax on real estate sales of $10 million or more in half: the general tax drops (5.5% to 2.75% for $10-25 million; 6% to 3% for $25 million+) and an equal new tax is dedicated only to affordable housing, so total rates stay at 5.5%-6%. At least 60% would go to housing production (half to social housing), 25% to acquisition/rehabilitation and 10% to tenant stabilization and homelessness prevention. It exempts some first sales of new multifamily housing from the new tax and limits the Board's ability to cut the tax without voters.",
-      es: "Divide a la mitad el impuesto de transferencia sobre ventas de inmuebles de $10 millones o más: el impuesto general baja (del 5.5% al 2.75% entre $10 y $25 millones; del 6% al 3% desde $25 millones) y un nuevo impuesto igual se destina solo a vivienda asequible, por lo que la tasa total sigue entre 5.5% y 6%. Al menos el 60% iría a producción de vivienda (la mitad a vivienda social), el 25% a adquisición o rehabilitación y el 10% a estabilización de inquilinos y prevención de la falta de vivienda. Exime del nuevo impuesto algunas primeras ventas de vivienda multifamiliar nueva y limita la facultad de la Junta de reducir el impuesto sin el voto del electorado."
+      en: "Splits the transfer tax on real estate sales of $10 million or more in half: the general tax drops (5.5% to 2.75% for $10-25 million; 6% to 3% for $25 million+) and an equal new tax is dedicated only to affordable housing, so total rates stay at 5.5%-6%. At least 60% would go to housing production (at least half to social housing), 25% to acquisition/rehabilitation and 10% to tenant stabilization and homelessness prevention. It exempts some first sales of new multifamily housing from the new tax and limits the Board's ability to cut the tax without voters.",
+      es: "Divide a la mitad el impuesto de transferencia sobre ventas de inmuebles de $10 millones o más: el impuesto general baja (del 5.5% al 2.75% entre $10 y $25 millones; del 6% al 3% desde $25 millones) y un nuevo impuesto igual se destina solo a vivienda asequible, por lo que la tasa total sigue entre 5.5% y 6%. Al menos el 60% iría a producción de vivienda (al menos la mitad a vivienda social), el 25% a adquisición o rehabilitación y el 10% a estabilización de inquilinos y prevención de la falta de vivienda. Exime del nuevo impuesto algunas primeras ventas de vivienda multifamiliar nueva y limita la facultad de la Junta de reducir el impuesto sin el voto del electorado."
     },
     cost: {
       en: "The Controller estimates a revenue decrease of about $1 million a year, and that about $120 million a year would shift from the General Fund to the dedicated housing fund, increasing the projected General Fund deficit by that amount.",
@@ -428,8 +428,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "No se harían estos cambios."
     },
     debate: {
-      en: "Official argument for: Democratic Socialists of America - San Francisco, San Franciscans for Social Housing, SEIU 1021, tenant and housing groups. Official argument against: Quentin L. Kopp and the San Francisco Taxpayers Association.",
-      es: "Argumento oficial a favor: Democratic Socialists of America - San Francisco, San Franciscans for Social Housing, SEIU 1021 y grupos de inquilinos y vivienda. Argumento oficial en contra: Quentin L. Kopp y la Asociación de Contribuyentes de San Francisco."
+      en: "Official argument for: Affordable Housing Alliance, San Francisco Tenants Union, Small Business Forward, United Educators of San Francisco, SEIU 1021, Democratic Socialists of America – San Francisco and other tenant and housing groups. Official argument against: Quentin L. Kopp and the San Francisco Taxpayers Association.",
+      es: "Argumento oficial a favor: Affordable Housing Alliance, San Francisco Tenants Union, Small Business Forward, United Educators of San Francisco, SEIU 1021, Democratic Socialists of America – San Francisco y otros grupos de inquilinos y de vivienda. Argumento oficial en contra: Quentin L. Kopp y la Asociación de Contribuyentes de San Francisco."
     },
     officialUrl: "https://www.sf.gov/qualified-ballot-measures"
   },
@@ -447,8 +447,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     threshold: "majority",
     placedBy: "body",
     title: {
-      en: "Ends transfer-tax break for foreclosed large properties",
-      es: "Elimina la exención del impuesto de transferencia por ejecución hipotecaria"
+      en: "Ends foreclosure transfer-tax break except for homes and small buildings",
+      es: "Elimina la exención por ejecución hipotecaria del impuesto de transferencia, salvo para viviendas y edificios pequeños"
     },
     summary: {
       en: "Starting March 1, 2027, properties such as commercial, industrial and large residential buildings that are transferred to a lender through foreclosure (or to avoid it) would pay the transfer tax (0.5% to 6%) on their full market value, instead of the current partial exemption. Single-family homes, buildings with fewer than five units, and small mixed-use buildings keep the exemption.",
@@ -460,15 +460,15 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     yes: {
       en: "A transfer tax of 0.5% to 6% of fair market value would permanently apply to properties such as commercial, industrial and large residential buildings transferred to a lender because of foreclosure.",
-      es: "Se aplicaría permanentemente un impuesto de transferencia del 0.5% al 6% del valor de mercado a inmuebles comerciales, industriales y residenciales grandes transferidos a un acreedor por ejecución hipotecaria."
+      es: "Se aplicaría permanentemente un impuesto de transferencia del 0.5% al 6% del valor de mercado a inmuebles como los comerciales, industriales y residenciales grandes que se transfieran a un acreedor por ejecución hipotecaria."
     },
     no: {
       en: "These changes would not be made.",
       es: "No se harían estos cambios."
     },
     debate: {
-      en: "Official argument for: Supervisor Bilal Mahmood, Board President Rafael Mandelman, other supervisors, labor unions and the San Francisco Democratic Party. Official argument against: Quentin L. Kopp and the San Francisco Taxpayers Association.",
-      es: "Argumento oficial a favor: el supervisor Bilal Mahmood, el presidente de la Junta Rafael Mandelman, otros supervisores, sindicatos y el Partido Demócrata de San Francisco. Argumento oficial en contra: Quentin L. Kopp y la Asociación de Contribuyentes de San Francisco."
+      en: "Official argument for: Mayor Daniel Lurie, Supervisor Bilal Mahmood, Board President Rafael Mandelman, other supervisors, state legislators, labor unions and the San Francisco Democratic Party. Official argument against: Quentin L. Kopp and the San Francisco Taxpayers Association.",
+      es: "Argumento oficial a favor: el alcalde Daniel Lurie, el supervisor Bilal Mahmood, el presidente de la Junta Rafael Mandelman, otros supervisores, legisladores estatales, sindicatos y el Partido Demócrata de San Francisco. Argumento oficial en contra: Quentin L. Kopp y la Asociación de Contribuyentes de San Francisco."
     },
     officialUrl: "https://www.sf.gov/qualified-ballot-measures",
     placement: { cardId: "c3f6c106-23c2-4d71-991c-edebbc776920", date: "2026-07-28", body: { en: "Board of Supervisors", es: "Junta de Supervisores" } }
@@ -503,7 +503,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     debate: {
       en: "Official argument for (SF pamphlet): Mayor Daniel Lurie, Senator Scott Wiener, City Attorney David Chiu, San Francisco Democratic Party, League of Women Voters of the Bay Area and others. Official argument against: Quentin L. Kopp and the San Francisco Taxpayers Association.",
-      es: "Argumento oficial a favor (folleto de SF): el alcalde Daniel Lurie, el senador Scott Wiener, el fiscal municipal David Chiu, el Partido Demócrata de San Francisco, la Liga de Mujeres Votantes del Área de la Bahía y otros. Argumento oficial en contra: Quentin L. Kopp y la Asociación de Contribuyentes de San Francisco."
+      es: "Argumento oficial a favor (folleto de SF): el alcalde Daniel Lurie, el senador Scott Wiener, el abogado municipal David Chiu, el Partido Demócrata de San Francisco, la Liga de Mujeres Votantes del Área de la Bahía y otros. Argumento oficial en contra: Quentin L. Kopp y la Asociación de Contribuyentes de San Francisco."
     },
     officialUrl: "https://www.sf.gov/qualified-ballot-measures"
   },
@@ -558,7 +558,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     placedBy: "body",
     title: {
       en: "Adds a civil rights and equal protection statement to County Charter",
-      es: "Agrega a la Carta del Condado una declaración sobre derechos civiles e igualdad"
+      es: "Agrega a la Carta del Condado una declaración sobre derechos civiles e igualdad de protección"
     },
     summary: {
       en: "Adds a paragraph to the County Charter's preamble affirming the County's commitment to the dignity, civil rights and equal protection of all County residents, in a way that promotes equity, fairness, inclusion, belonging, accessibility and opportunity. It does not change any other part of the Charter.",
@@ -593,12 +593,12 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     threshold: "majority",
     placedBy: "body",
     title: {
-      en: "Gives supervisors 60 days to fill elected-office vacancies",
-      es: "Da a los supervisores 60 días para llenar vacantes en cargos electos"
+      en: "Gives supervisors 60 days, not 30, to fill vacancies in other elected County offices",
+      es: "Da a los supervisores 60 días, en lugar de 30, para llenar vacantes en otros cargos electos del Condado"
     },
     summary: {
-      en: "When an elected County office other than a supervisor seat becomes vacant, the Board of Supervisors would have 60 days instead of 30 to either appoint someone or call a special election. Before appointing someone, the Board would have to hold at least one public meeting to hear comments on the appointment and the candidates' qualifications. If the Board does not act within 60 days, the elections officer must still call a special election.",
-      es: "Cuando quede vacante un cargo electo del Condado que no sea de supervisor, la Junta de Supervisores tendría 60 días en lugar de 30 para nombrar a alguien o convocar una elección especial. Antes de hacer un nombramiento, la Junta tendría que realizar al menos una reunión pública para escuchar comentarios sobre el nombramiento y las calificaciones de los candidatos. Si la Junta no actúa en 60 días, el funcionario de elecciones aún debe convocar una elección especial."
+      en: "When an elected County office other than a supervisor seat becomes vacant, the Board of Supervisors would have 60 days instead of 30 to either appoint someone or call a special election. Before appointing someone, the Board would have to hold at least one noticed public meeting to hear comments on the appointment and potential candidates' qualifications. If the Board does not act within 60 days, the elections officer must still call a special election.",
+      es: "Cuando quede vacante un cargo electo del Condado que no sea de supervisor, la Junta de Supervisores tendría 60 días en lugar de 30 para nombrar a alguien o convocar una elección especial. Antes de hacer un nombramiento, la Junta tendría que realizar al menos una reunión pública con aviso previo para escuchar comentarios sobre el nombramiento y las calificaciones de los posibles candidatos. Si la Junta no actúa en 60 días, el funcionario de elecciones aún debe convocar una elección especial."
     },
     yes: {
       en: "The Board would have 60 days to fill such a vacancy and would have to hold a public meeting before any appointment.",
@@ -634,7 +634,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     summary: {
       en: "After each federal census, the five supervisor districts would be redrawn by an independent redistricting commission under state election law, not by the Board of Supervisors through an ordinance. Supervisors would still be elected by district, would have to live in their district, and would keep four-year terms with a limit of three consecutive terms.",
-      es: "Después de cada censo federal, una comisión independiente de redistribución, regida por la ley electoral estatal, volvería a trazar los cinco distritos de supervisores, en lugar de que lo haga la Junta de Supervisores por ordenanza. Los supervisores se seguirían eligiendo por distrito, tendrían que vivir en su distrito y mantendrían periodos de cuatro años con un límite de tres periodos consecutivos."
+      es: "Después de cada censo federal, una comisión independiente de redistribución, regida por la ley electoral estatal, volvería a trazar los cinco distritos de supervisores, en lugar de que lo haga la Junta de Supervisores por ordenanza. Los supervisores se seguirían eligiendo por distrito, tendrían que vivir en su distrito y mantendrían períodos de cuatro años con un límite de tres períodos consecutivos."
     },
     yes: {
       en: "An independent redistricting commission would draw supervisor district lines after each census.",
@@ -711,8 +711,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "El distrito (Cañada, College of San Mateo y Skyline) podría pedir prestado hasta $848 millones para reparar y modernizar edificios, servicios básicos, techos, sistemas de seguridad, tecnología, calles y estacionamientos, y para construir o adquirir instalaciones. El dinero no puede usarse para salarios de maestros ni de administradores. Se exigen un comité independiente de supervisión ciudadana y auditorías anuales."
     },
     cost: {
-      en: "The district's best estimate of the highest annual tax rate is $18 per $100,000 of assessed value. Total repayment, including interest, is estimated at about $1.35 billion, with the bonds expected to be paid off by June 2049.",
-      es: "La mejor estimación del distrito de la tasa anual más alta es de $18 por cada $100,000 de valor tasado. Se estima que el pago total, con intereses, sería de unos $1,350 millones, y se espera terminar de pagar los bonos para junio de 2049."
+      en: "The district's best estimate of the highest annual tax rate is $18 per $100,000 of assessed value. Total repayment, including interest, is estimated at about $1.35 billion, with the bonds expected to be paid off by June 2049. The average rate is estimated at $10.50 per $100,000, with the $18 peak expected from 2045-46 (about $75 million a year). The district expects the levy not to raise its current $18 per $100,000 bond tax rate, because older bonds are being paid off.",
+      es: "La mejor estimación del distrito de la tasa anual más alta es de $18 por cada $100,000 de valor tasado. Se estima que el pago total, con intereses, sería de unos $1,350 millones, y se espera terminar de pagar los bonos para junio de 2049. La tasa promedio se estima en $10.50 por cada $100,000, con el máximo de $18 previsto a partir de 2045-46 (unos $75 millones al año). El distrito prevé que el cobro no aumente su tasa actual de $18 por cada $100,000 para bonos, porque se están terminando de pagar bonos anteriores."
     },
     yes: {
       en: "The district could issue up to $848 million in bonds for the listed projects.",
@@ -782,19 +782,19 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     placedBy: "body",
     title: {
       en: "Raises San Mateo's local sales tax by a quarter cent",
-      es: "Aumenta un cuarto de centavo el impuesto local sobre las ventas de San Mateo"
+      es: "Aumenta 0.25% (un cuarto de punto) el impuesto local sobre las ventas de San Mateo"
     },
     summary: {
-      en: "San Mateo's local sales (transactions and use) tax would rise from 0.25% to 0.50%, adding 25 cents per $100 of purchases, until voters end it. It is a general tax, so the estimated $7 million a year could be spent on any City purpose. Groceries and prescription medicine are exempt under state law. An annual audit and a five-member public committee to review the revenue and spending are required.",
-      es: "El impuesto local sobre las ventas (transacciones y uso) de San Mateo subiría de 0.25% a 0.50%, es decir, 25 centavos más por cada $100 de compras, hasta que los votantes lo eliminen. Es un impuesto general, por lo que los aproximadamente $7 millones al año podrían usarse para cualquier fin de la Ciudad. Los alimentos y las medicinas con receta están exentos por ley estatal. Se exigen una auditoría anual y un comité público de cinco miembros que revise los ingresos y gastos."
+      en: "San Mateo's local sales (transactions and use) tax would rise from 0.25% to 0.50%, adding 25 cents per $100 of purchases; the added 0.25% has no end date (the existing 0.25% expires March 31, 2048). It is a general tax, so the estimated $7 million a year could be spent on any City purpose. Groceries and prescription medicine are exempt under state law. An annual audit and a five-member public committee to review the revenue and spending are required.",
+      es: "El impuesto local sobre las ventas (transacciones y uso) de San Mateo subiría de 0.25% a 0.50%, es decir, 25 centavos más por cada $100 de compras; el 0.25% adicional no tiene fecha de vencimiento (el 0.25% actual vence el 31 de marzo de 2048). Es un impuesto general, por lo que los aproximadamente $7 millones al año podrían usarse para cualquier fin de la Ciudad. Los alimentos y las medicinas con receta están exentos por ley estatal. Se exigen una auditoría anual y un comité público de cinco miembros que revise los ingresos y gastos."
     },
     cost: {
-      en: "An extra 0.25% sales tax, estimated to raise about $7 million a year, with no end date. Collection would start the first calendar quarter beginning 110 days after the Council certifies the result.",
-      es: "Un 0.25% adicional de impuesto sobre las ventas, que se estima recaudaría unos $7 millones al año, sin fecha de vencimiento. El cobro empezaría el primer trimestre calendario que inicie 110 días después de que el Concejo certifique el resultado."
+      en: "An extra 0.25% sales tax, estimated to raise about $7 million a year, with no end date. Collection would start the first calendar quarter that begins more than 110 days after the Council certifies the result.",
+      es: "Un 0.25% adicional de impuesto sobre las ventas, que se estima recaudaría unos $7 millones al año, sin fecha de vencimiento. El cobro empezaría el primer trimestre calendario que comience más de 110 días después de que el Concejo certifique el resultado."
     },
     yes: {
-      en: "The City's sales tax would rise from 0.25% to 0.50% until voters end it.",
-      es: "El impuesto sobre las ventas de la Ciudad subiría de 0.25% a 0.50% hasta que los votantes lo eliminen."
+      en: "A new 0.25% city sales tax with no end date would be added, bringing the City's rate to 0.50%. The existing 0.25% tax still expires March 31, 2048.",
+      es: "Se agregaría un nuevo impuesto municipal sobre las ventas de 0.25% sin fecha de vencimiento, con lo que la tasa de la Ciudad llegaría a 0.50%. El impuesto actual de 0.25% sigue venciendo el 31 de marzo de 2048."
     },
     no: {
       en: "The City's sales tax would stay at 0.25%.",
@@ -825,8 +825,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "Actualiza la Carta de San Mateo sobre elecciones por distrito y procedimientos"
     },
     summary: {
-      en: "Changes the City Charter to reflect the district elections San Mateo has used since 2022, including redrawing districts after each census. It gives the Council 60 days instead of 30 to fill a Council vacancy and lets a member be absent from the City for 60 days instead of 30 before forfeiting office. The Council would set its meeting schedule by resolution. It also removes outdated provisions, lets emergency ordinances be published as summaries, ends the low-bid rule for the legal-notice newspaper contract, and adds gender-neutral wording.",
-      es: "Cambia la Carta de la Ciudad para reflejar las elecciones por distrito que San Mateo usa desde 2022, incluido el nuevo trazado de distritos después de cada censo. Da al Concejo 60 días en lugar de 30 para llenar una vacante y permite que un miembro esté fuera de la Ciudad 60 días en lugar de 30 antes de perder su cargo. El Concejo fijaría su calendario de reuniones por resolución. También elimina disposiciones obsoletas, permite publicar un resumen de las ordenanzas de emergencia, elimina la regla de adjudicar al postor más bajo el contrato del periódico para avisos legales y agrega lenguaje de género neutro."
+      en: "Changes the City Charter to reflect the district elections San Mateo has used since 2022, including redrawing districts after each census. It gives the Council 60 days instead of 30 to fill a Council vacancy and lets a member be absent from the City for 60 days instead of 30 before forfeiting office. The Council would set its meeting schedule by resolution. It also lets emergency ordinances be published as summaries and ends their automatic expiration after 90 days, drops the detailed candidate-statement requirement and the sealed-bid/low-bid rule for the legal-notice newspaper contract, clarifies the Finance Director's title, removes outdated provisions, and adds gender-neutral wording.",
+      es: "Cambia la Carta de la Ciudad para reflejar las elecciones por distrito que San Mateo usa desde 2022, incluido el nuevo trazado de distritos después de cada censo. Da al Concejo 60 días en lugar de 30 para llenar una vacante y permite que un miembro esté fuera de la Ciudad 60 días en lugar de 30 antes de perder su cargo. El Concejo fijaría su calendario de reuniones por resolución. También permite publicar un resumen de las ordenanzas de emergencia y elimina su vencimiento automático a los 90 días, suprime el requisito de una declaración detallada de los candidatos y la regla de ofertas selladas y adjudicación al postor más bajo para el contrato del periódico de avisos legales, aclara el cargo de Director de Finanzas, elimina disposiciones obsoletas y agrega lenguaje neutral en cuanto al género."
     },
     yes: {
       en: "The City Charter would be amended with these changes.",
@@ -837,8 +837,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "La Carta de la Ciudad quedaría como está."
     },
     debate: {
-      en: "The Council authorized Deputy Mayor Nicole Fernandez and Council Member Cwirko-Godycki to write the argument in favor. The county's measure list shows no argument against.",
-      es: "El Concejo autorizó a la vicealcaldesa Nicole Fernandez y a la concejal Cwirko-Godycki a redactar el argumento a favor. La lista de medidas del condado no muestra un argumento en contra."
+      en: "Deputy Mayor Nicole Fernandez, Council Member Danielle Cwirko-Godycki and others signed the argument in favor. The county's measure list shows no argument against.",
+      es: "La vicealcaldesa Nicole Fernandez, la concejala Danielle Cwirko-Godycki y otras personas firmaron el argumento a favor. La lista de medidas del condado no muestra un argumento en contra."
     },
     officialUrl: "https://smcacre.gov/elections/november-3-2026-statewide-general-election",
     placement: { cardId: "a3fa2e85-b1bb-45e7-836b-8a2375361299", date: "2026-07-20", body: { en: "City Council", es: "Concejo Municipal" } }
@@ -858,11 +858,11 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     placedBy: "petition",
     title: {
       en: "Requires a citywide vote before reducing downtown parking plazas",
-      es: "Exige una votación antes de reducir los estacionamientos públicos del centro"
+      es: "Exige una votación de toda la ciudad antes de reducir los estacionamientos públicos del centro"
     },
     summary: {
-      en: "This citizen initiative adds a 'Downtown Parking Plazas Ordinance' covering eight City-owned downtown parking lots. The City could not sell, lease or otherwise transfer them, declare them surplus land, build on them in a way that permanently reduces parking, or change their use to reduce parking unless voters approve. Repairs that preserve or add parking, and temporary events of up to three days such as farmers' markets, are exempt. It reaches back to actions taken since May 15, 2025, and voter approval would also be needed before the Housing Element plan for at least 345 affordable homes on the lots goes ahead if it would reduce parking access or convenience.",
-      es: "Esta iniciativa ciudadana agrega una 'Ordenanza de Estacionamientos del Centro' que abarca ocho estacionamientos públicos de la Ciudad en el centro. La Ciudad no podría venderlos, arrendarlos ni transferirlos de otro modo, declararlos terrenos excedentes, construir en ellos de forma que reduzca permanentemente el estacionamiento, ni cambiar su uso para reducir el estacionamiento sin la aprobación de los votantes. Quedan exentas las reparaciones que mantengan o amplíen el estacionamiento y los eventos temporales de hasta tres días, como los mercados de agricultores. Es retroactiva a acciones tomadas desde el 15 de mayo de 2025, y también se necesitaría la aprobación de los votantes antes de llevar a cabo el plan del Elemento de Vivienda para al menos 345 viviendas asequibles en esos lotes si redujera el acceso o la comodidad del estacionamiento."
+      en: "This citizen initiative adds a 'Downtown Parking Plazas Ordinance' covering eight City-owned downtown parking lots. The City could not sell, lease or otherwise transfer them, declare them surplus land, build on them in a way that permanently reduces parking, or change their use to reduce parking unless voters approve. Repairs that preserve or add parking, and temporary events of up to three days such as farmers' markets, are exempt. Any such action taken since May 15, 2025 would be void unless voters approve it, and voter approval would also be needed before the Housing Element plan for at least 345 affordable homes on the lots goes ahead if it would reduce parking access or convenience.",
+      es: "Esta iniciativa ciudadana agrega una 'Ordenanza de Estacionamientos del Centro' que abarca ocho estacionamientos públicos de la Ciudad en el centro. La Ciudad no podría venderlos, arrendarlos ni transferirlos de otro modo, declararlos terrenos excedentes, construir en ellos de forma que reduzca permanentemente el estacionamiento, ni cambiar su uso para reducir el estacionamiento sin la aprobación de los votantes. Quedan exentas las reparaciones que mantengan o amplíen el estacionamiento y los eventos temporales de hasta tres días, como los mercados de agricultores. Toda acción de ese tipo tomada desde el 15 de mayo de 2025 quedaría anulada a menos que los votantes la aprueben, y también se necesitaría la aprobación de los votantes antes de llevar a cabo el plan del Elemento de Vivienda para al menos 345 viviendas asequibles en esos estacionamientos si redujera el acceso o la comodidad del estacionamiento."
     },
     yes: {
       en: "The City would need voter approval before taking any of these actions on the downtown parking plazas.",
@@ -897,7 +897,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     summary: {
       en: "East Palo Alto could borrow up to $125 million, repaid by property taxes. Projects: land for a civic center with a police station and emergency operations center (about 20,000 sq ft) and a building of about 100,000 sq ft for a library, City Hall and community facilities; water system upgrades; storm drain and flood protection work; and land for parks and recreation, including a track and field facility. Annual independent audits and yearly reports to the Council are required.",
-      es: "East Palo Alto podría pedir prestado hasta $125 millones, que se pagarían con impuestos a la propiedad. Proyectos: terreno para un centro cívico con una estación de policía y un centro de operaciones de emergencia (unos 20,000 pies cuadrados) y un edificio de unos 100,000 pies cuadrados para biblioteca, Ayuntamiento e instalaciones comunitarias; mejoras al sistema de agua; obras de drenaje pluvial y protección contra inundaciones; y terreno para parques y recreación, incluida una pista de atletismo. Se exigen auditorías independientes anuales e informes anuales al Concejo."
+      es: "East Palo Alto podría pedir prestado hasta $125 millones, que se pagarían con impuestos a la propiedad. Proyectos: terreno para un centro cívico con una estación de policía y un centro de operaciones de emergencia (unos 20,000 pies cuadrados) y un edificio de unos 100,000 pies cuadrados para biblioteca, oficinas municipales (City Hall) e instalaciones comunitarias; mejoras al sistema de agua; obras de drenaje pluvial y protección contra inundaciones; y terreno para parques y recreación, incluida una pista de atletismo. Se exigen auditorías independientes anuales e informes anuales al Concejo."
     },
     cost: {
       en: "The City estimates an average levy of $105.26 per $100,000 of assessed value (about $8.94 million a year), with a highest rate of about $114.41 per $100,000 starting around 2028-29. Total principal and interest are estimated at $268,205,658, with the last tax collected in fiscal year 2057-58.",
@@ -937,11 +937,11 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     summary: {
       en: "Council members could serve at most three consecutive four-year terms (12 years). A partial term of more than two years would count as a full term. Only terms starting after the measure takes effect (December 2026) would count, so earlier service would not count toward the limit.",
-      es: "Los concejales podrían servir como máximo tres periodos consecutivos de cuatro años (12 años). Un periodo parcial de más de dos años contaría como periodo completo. Solo contarían los periodos que empiecen después de que la medida entre en vigor (diciembre de 2026), por lo que el servicio anterior no contaría para el límite."
+      es: "Los concejales podrían ejercer el cargo como máximo tres períodos consecutivos de cuatro años (12 años). Un período parcial de más de dos años contaría como período completo. Solo contarían los períodos que empiecen después de que la medida entre en vigor (diciembre de 2026), por lo que el servicio anterior no contaría para el límite."
     },
     yes: {
       en: "City Council members would be limited to three consecutive full terms.",
-      es: "Los concejales quedarían limitados a tres periodos completos consecutivos."
+      es: "Los concejales quedarían limitados a tres períodos completos consecutivos."
     },
     no: {
       en: "City Council members would have no term limits.",
@@ -990,8 +990,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       en: "The county lists official arguments for and against this measure, plus rebuttals to both.",
       es: "El condado publica argumentos oficiales a favor y en contra de esta medida, además de refutaciones a ambos."
     },
-    officialUrl: "https://smcacre.gov/elections/november-3-2026-statewide-general-election",
-    placement: { cardId: "b0746bcf-a1b3-44dc-83a1-68a0947b35f6", date: "2026-07-07", body: { en: "City Council", es: "Concejo Municipal" } }
+    officialUrl: "https://smcacre.gov/elections/november-3-2026-statewide-general-election"
   },
   {
     id: "scc-regional-RTM",
@@ -1026,8 +1025,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "No se agregaría el impuesto regional sobre las ventas para el transporte público."
     },
     debate: {
-      en: "Arguments for and against, and rebuttals to both, were filed with the Santa Clara County Registrar of Voters. The argument in favor was signed by U.S. Rep. Sam Liccardo, Supervisor Margaret Abe-Koga, the Santa Clara County Firefighters (IAFF Local 1165), the League of Women Voters of the Bay Area and an ER nurse.",
-      es: "Se presentaron ante el Registro de Votantes del Condado de Santa Clara argumentos a favor y en contra, y refutaciones a ambos. El argumento a favor fue firmado por el representante federal Sam Liccardo, la supervisora Margaret Abe-Koga, los Bomberos del Condado de Santa Clara (IAFF Local 1165), la Liga de Mujeres Votantes del Área de la Bahía y un enfermero de urgencias."
+      en: "Arguments for and against, and rebuttals to both, were filed with the Santa Clara County Registrar of Voters.",
+      es: "Se presentaron ante el Registro de Votantes del Condado de Santa Clara argumentos a favor y en contra, y refutaciones a ambos."
     },
     officialUrl: "https://vote.santaclaracounty.gov/list-local-measures-4"
   },
@@ -1050,7 +1049,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     summary: {
       en: "This citizen initiative ordinance would bar the City from selling, leasing, conveying or declaring as surplus land its ten downtown parking plazas, or approving new uses or physical changes that would reduce protected trees or parking availability, access or convenience, unless a majority of voters approve. Two plazas could still be developed for affordable housing without a vote.",
-      es: "Esta ordenanza de iniciativa ciudadana prohibiría que la Ciudad venda, arriende, traspase o declare como terreno excedente sus diez estacionamientos públicos del centro, o que apruebe nuevos usos o cambios físicos que reduzcan árboles protegidos o la disponibilidad, el acceso o la conveniencia del estacionamiento, a menos que lo apruebe la mayoría de los votantes. Dos estacionamientos aún podrían usarse para vivienda asequible sin una votación."
+      es: "Esta ordenanza de iniciativa ciudadana prohibiría que la Ciudad venda, arriende, traspase o declare como terreno excedente los diez estacionamientos del centro que son propiedad de la Ciudad, o que apruebe nuevos usos o cambios físicos que afecten los árboles protegidos o reduzcan la disponibilidad, el acceso o la conveniencia del estacionamiento, a menos que lo apruebe la mayoría de los votantes. Dos estacionamientos aún podrían usarse para vivienda asequible sin una votación."
     },
     yes: {
       en: "The ordinance would be adopted: selling, leasing or changing the use of the ten downtown parking plazas would need voter approval, except affordable housing on two plazas.",
@@ -1086,7 +1085,7 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
     },
     summary: {
       en: "Amends the City Charter to use gender-neutral language, give the Council 60 days instead of 30 to act on filling a Council vacancy, end the requirement to read ordinances and resolutions in full, and let the Council set qualifications for boards, commissions and committees it creates. It also updates outdated terms and makes clarifying edits to match State law and current practice.",
-      es: "Enmienda la Carta Municipal para usar lenguaje de género neutro, dar al Concejo 60 días en lugar de 30 para actuar sobre una vacante en el Concejo, eliminar el requisito de leer las ordenanzas y resoluciones completas, y permitir que el Concejo fije los requisitos para las juntas, comisiones y comités que cree. También actualiza términos obsoletos y hace aclaraciones para alinearse con la ley estatal y la práctica actual."
+      es: "Enmienda la Carta Municipal para usar lenguaje neutral en cuanto al género, dar al Concejo 60 días en lugar de 30 para actuar sobre una vacante en el Concejo, eliminar el requisito de leer las ordenanzas y resoluciones completas, y permitir que el Concejo fije los requisitos para las juntas, comisiones y comités que cree. También actualiza términos obsoletos y hace aclaraciones para alinearse con la ley estatal y la práctica actual."
     },
     yes: {
       en: "The City Charter would be amended with these updates.",
@@ -1120,8 +1119,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "Aumenta la tasa máxima del impuesto hotelero al 15%"
     },
     summary: {
-      en: "Lets the City Council raise Mountain View's Transient Occupancy Tax, paid by hotel and short-term rental guests, from 10% up to 15%. It would raise up to $5.2 million a year for general city services, with independent audits, until ended by voters.",
-      es: "Permite que el Concejo Municipal aumente el Impuesto de Ocupación Transitoria de Mountain View, que pagan los huéspedes de hoteles y alquileres de corto plazo, del 10% hasta un 15%. Recaudaría hasta $5.2 millones al año para servicios municipales generales, con auditorías independientes, hasta que los votantes lo terminen."
+      en: "Lets the City Council raise Mountain View's Transient Occupancy Tax, paid by hotel and short-term rental guests, from 10% to as much as 15%; the Council would set the actual rate later. At the full rate it would bring in up to about $5.2 million more a year for general city services, with independent audits, until voters end it.",
+      es: "Permite que el Concejo Municipal aumente el Impuesto de Ocupación Transitoria de Mountain View, que pagan los huéspedes de hoteles y alquileres de corto plazo, del 10% hasta un máximo del 15%; el Concejo fijaría la tasa después. Con la tasa máxima recaudaría hasta unos $5.2 millones adicionales al año para servicios municipales generales, con auditorías independientes, hasta que los votantes lo eliminen."
     },
     cost: {
       en: "Up to $5,200,000 a year (ballot question), paid by hotel and short-term rental guests.",
@@ -1136,8 +1135,8 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "El impuesto hotelero se mantendría en 10%."
     },
     debate: {
-      en: "An argument in favor was filed; it asks voters to join the City Council and the League of Women Voters of the Los Altos–Mountain View Area in voting yes. No argument against was filed.",
-      es: "Se presentó un argumento a favor, que pide a los votantes unirse al Concejo Municipal y a la Liga de Mujeres Votantes del Área de Los Altos–Mountain View para votar sí. No se presentó ningún argumento en contra."
+      en: "An argument in favor was filed; no argument against was filed.",
+      es: "Se presentó un argumento a favor; no se presentó ningún argumento en contra."
     },
     officialUrl: "https://vote.santaclaracounty.gov/list-local-measures-4"
   },
@@ -1159,16 +1158,16 @@ export const LOCAL_MEASURES: LocalMeasure[] = [
       es: "Limita a cuatro períodos a los directores del distrito de salud"
     },
     summary: {
-      en: "Amends the El Camino Healthcare District's bylaws to limit its board directors to four four-year terms.",
-      es: "Enmienda los estatutos del Distrito de Atención Médica El Camino para limitar a sus directores a cuatro períodos de cuatro años."
+      en: "Amends the El Camino Healthcare District's bylaws so no one can serve more than four full four-year terms as a director, ever. Only full terms that begin on or after December 1, 2026 count. Past service and partial terms (such as appointments to fill a vacancy) do not count.",
+      es: "Enmienda los estatutos del Distrito de Atención Médica El Camino para que nadie pueda servir como director más de cuatro períodos completos de cuatro años en total. Solo cuentan los períodos completos que comiencen el 1 de diciembre de 2026 o después. No cuentan el servicio anterior ni los períodos parciales (como los nombramientos para cubrir una vacante)."
     },
     yes: {
-      en: "District directors would be limited to four four-year terms.",
-      es: "Los directores del distrito estarían limitados a cuatro períodos de cuatro años."
+      en: "Directors would be limited to four full four-year terms in total, counting only terms that begin on or after December 1, 2026.",
+      es: "Los directores estarían limitados a cuatro períodos completos de cuatro años en total, contando solo los períodos que comiencen a partir del 1 de diciembre de 2026."
     },
     no: {
-      en: "The bylaws would not add this term limit.",
-      es: "Los estatutos no agregarían este límite de períodos."
+      en: "District directors would still have no limit on how many terms they can serve.",
+      es: "Los directores del distrito seguirían sin límite en el número de períodos que pueden servir."
     },
     debate: {
       en: "An argument in favor was filed; no argument against was filed.",
@@ -1187,7 +1186,7 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     },
     seats: {
       en: "5 seats: Districts 2, 4, 6, 8 and 10 (one each; only voters in those districts vote)",
-      es: "5 escaños: Distritos 2, 4, 6, 8 y 10 (uno por distrito; solo votan los electores de esos distritos)"
+      es: "5 puestos: Distritos 2, 4, 6, 8 y 10 (uno por distrito; solo votan los electores de esos distritos)"
     },
     officialUrl: "https://www.sf.gov/candidates-november-3-2026-general-election"
   },
@@ -1195,11 +1194,11 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     jurisdiction: "san-francisco",
     office: {
       en: "Board of Education (SFUSD)",
-      es: "Junta de Educación (SFUSD)"
+      es: "Consejo de Educación (SFUSD)"
     },
     seats: {
       en: "3 seats, citywide",
-      es: "3 escaños, en toda la ciudad"
+      es: "3 puestos, en toda la ciudad"
     },
     officialUrl: "https://www.sf.gov/candidates-november-3-2026-general-election"
   },
@@ -1207,11 +1206,11 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     jurisdiction: "san-francisco",
     office: {
       en: "Community College Board",
-      es: "Junta del Colegio Comunitario"
+      es: "Consejo del Colegio Comunitario"
     },
     seats: {
       en: "3 seats (4-year terms) plus 1 seat for the remainder of a term ending January 8, 2029, citywide",
-      es: "3 escaños (mandatos de 4 años) más 1 escaño por el resto de un mandato que termina el 8 de enero de 2029, en toda la ciudad"
+      es: "3 puestos (mandatos de 4 años) más 1 puesto por el resto de un mandato que termina el 8 de enero de 2029, en toda la ciudad"
     },
     officialUrl: "https://www.sf.gov/candidates-november-3-2026-general-election"
   },
@@ -1219,7 +1218,7 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     jurisdiction: "san-francisco",
     office: {
       en: "Assessor-Recorder",
-      es: "Asesor-Registrador"
+      es: "Tasador-Registrador"
     },
     seats: {
       en: "1 seat, citywide",
@@ -1231,7 +1230,7 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     jurisdiction: "san-francisco",
     office: {
       en: "Public Defender",
-      es: "Defensor Público"
+      es: "Defensor público"
     },
     seats: {
       en: "1 seat, citywide",
@@ -1243,11 +1242,11 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     jurisdiction: "san-francisco",
     office: {
       en: "BART Board of Directors, District 8",
-      es: "Junta Directiva de BART, Distrito 8"
+      es: "Director del BART, Distrito 8"
     },
     seats: {
       en: "1 seat; only voters in BART District 8 (voters in BART Districts 7 and 9 do not have this contest)",
-      es: "1 escaño; solo votan los electores del Distrito 8 de BART (los de los Distritos 7 y 9 no tienen esta contienda)"
+      es: "1 puesto; solo votan los electores del Distrito 8 de BART (los de los Distritos 7 y 9 no tienen esta contienda)"
     },
     officialUrl: "https://www.sf.gov/candidates-november-3-2026-general-election"
   },
@@ -1259,7 +1258,7 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     },
     seats: {
       en: "1 seat: District 5 (only District 5 voters)",
-      es: "1 escaño: Distrito 5 (solo votan los electores del Distrito 5)"
+      es: "1 puesto: Distrito 5 (solo votan los electores del Distrito 5)"
     },
     officialUrl: "https://www.countyofsb.org/asset/99d7370f-5348-499d-8427-5fc01b995b7d"
   },
@@ -1327,25 +1326,49 @@ export const LOCAL_CONTESTS: LocalContest[] = [
     jurisdiction: "san-mateo-county",
     office: {
       en: "Board of Supervisors, District 5 (short term)",
-      es: "Junta de Supervisores, Distrito 5 (periodo corto)"
+      es: "Junta de Supervisores, Distrito 5 (período corto)"
     },
     seats: {
       en: "1 seat (short term); District 5 voters only",
-      es: "1 puesto (periodo corto); solo votantes del Distrito 5"
+      es: "1 puesto (período corto); solo votantes del Distrito 5"
     },
     officialUrl: "https://smcacre.gov/system/files/2026-09/52_candidateroster0903.pdf"
   },
   {
     jurisdiction: "mountain-view",
     office: {
-      en: "Mountain View City Council (at-large)",
-      es: "Concejo Municipal de Mountain View (en general)"
+      en: "Mountain View City Council (citywide)",
+      es: "Concejo Municipal de Mountain View (en toda la ciudad)"
     },
     seats: {
-      en: "3 seats (four-year terms); no eligible incumbents running",
-      es: "3 puestos (períodos de cuatro años); ningún titular elegible se postula"
+      en: "3 seats (four-year terms)",
+      es: "3 puestos (períodos de cuatro años)"
     },
-    officialUrl: "https://www.mountainview.gov/home/showpublisheddocument/13616/639213782869200000"
+    officialUrl: "https://legistar1.granicus.com/mountainview/attachments/629fa81b-377b-446e-9c27-f5c90e23e32a.pdf"
+  },
+  {
+    jurisdiction: "los-altos",
+    office: {
+      en: "Los Altos City Council",
+      es: "Concejo Municipal de Los Altos"
+    },
+    seats: {
+      en: "2 seats: District 2 and District 4 (1 each; only voters in those districts vote)",
+      es: "2 puestos: Distrito 2 y Distrito 4 (1 cada uno; solo votan los electores de esos distritos)"
+    },
+    officialUrl: "https://losaltosca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=8860,plainText=false)"
+  },
+  {
+    jurisdiction: "los-altos-hills",
+    office: {
+      en: "Los Altos Hills Town Council",
+      es: "Concejo Municipal de Los Altos Hills"
+    },
+    seats: {
+      en: "2 seats, townwide (four-year terms; vote for 2)",
+      es: "2 puestos, en todo el pueblo (períodos de cuatro años; vote por 2)"
+    },
+    officialUrl: "https://losaltoshillsca.api.civicclerk.com/v1/Meetings/GetMeetingFileStream(fileId=8994,plainText=false)"
   }
 ];
 
