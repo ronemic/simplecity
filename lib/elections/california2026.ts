@@ -4,6 +4,11 @@
 // and "what your vote means"); Spanish titles are the official ones from the
 // Spanish edition of the guide. Campaign claims are labeled as such.
 
+import {
+  toPublicJurisdictionSlug,
+  type JurisdictionSelection
+} from "@/lib/config/jurisdictions";
+
 export type Localized = { en: string; es: string };
 
 export type Proposition = {
@@ -47,6 +52,13 @@ const ELECTION_PROMO_ENDS_AT = Date.parse("2026-11-04T04:00:00Z");
 
 export function isElectionPromoActive(now = Date.now()) {
   return now < ELECTION_PROMO_ENDS_AT;
+}
+
+/** Promos carry the reader's place so /elections opens on their ballot. */
+export function electionsPromoHref(jurisdiction: JurisdictionSelection, locale: "en" | "es") {
+  const params = new URLSearchParams({ jurisdiction: toPublicJurisdictionSlug(jurisdiction) });
+  if (locale === "es") params.set("lang", "es");
+  return `/elections?${params.toString()}`;
 }
 
 export const PROPOSITION_GROUPS: PropositionGroup[] = [

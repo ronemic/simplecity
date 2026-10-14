@@ -12,7 +12,7 @@ import {
   HomepageHeroStatusLoading
 } from "@/components/HomepageData";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
-import { isElectionPromoActive } from "@/lib/elections/california2026";
+import { electionsPromoHref, isElectionPromoActive } from "@/lib/elections/california2026";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { getHomepageContent, type HomepageCardSelection } from "@/lib/db/queries";
 import {
@@ -166,13 +166,13 @@ export default async function Home({
               <div className="mb-6 flex flex-col items-start gap-2">
                 {showElectionPromo ? (
                   <Link
-                    href={locale === "es" ? "/elections?lang=es" : "/elections"}
+                    href={electionsPromoHref(jurisdiction, locale)}
                     className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#e9c77e] underline-offset-4 hover:underline focus-visible:focus-ring"
                   >
                     <span>
                       {locale === "es"
-                        ? "Entiende las propuestas de California del 3 de noviembre"
-                        : "Understand California's November 3 propositions"}
+                        ? "Mira lo que hay en tu boleta del 3 de noviembre"
+                        : "See what's on your November 3 ballot"}
                     </span>
                     <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
                   </Link>

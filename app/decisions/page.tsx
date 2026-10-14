@@ -28,7 +28,7 @@ import { CATEGORIES, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CAT
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 import { PendingLink } from "@/components/PendingLink";
 import { ResultsFreshnessMenu } from "@/components/ResultsFreshnessMenu";
-import { isElectionPromoActive } from "@/lib/elections/california2026";
+import { electionsPromoHref, isElectionPromoActive } from "@/lib/elections/california2026";
 
 export const revalidate = 300;
 
@@ -328,7 +328,7 @@ export default async function DecisionsPage({
 
       {isElectionPromoActive() ? (
         <Link
-          href={locale === "es" ? "/elections?lang=es" : "/elections"}
+          href={electionsPromoHref(jurisdiction, locale)}
           className="quiet-card group mb-4 flex items-center gap-4 p-4 transition-colors hover:border-civic/30 focus-visible:focus-ring sm:mb-5 sm:p-5"
         >
           <span className="icon-tile-sm">
@@ -342,8 +342,8 @@ export default async function DecisionsPage({
             </span>
             <span className="mt-0.5 block text-lg font-black leading-snug text-ink">
               {locale === "es"
-                ? "Entiende las 14 propuestas estatales en tu boleta"
-                : "Understand the 14 statewide propositions on your ballot"}
+                ? "Mira las medidas locales y estatales en tu boleta"
+                : "See the local and statewide measures on your ballot"}
             </span>
           </span>
           <ArrowRight
