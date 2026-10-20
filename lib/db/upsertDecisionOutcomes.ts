@@ -16,8 +16,8 @@ import { hasTranslationProvider } from "@/lib/llm/translate";
 import { findGuardedAgendaItemMatch } from "@/lib/outcomes/extractDecisionOutcome";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
-const OUTCOME_CARD_COLUMNS = "id,source_item_id,agenda_item,source_url,created_at";
-const LEGACY_OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at";
+const OUTCOME_CARD_COLUMNS = "id,source_item_id,agenda_item,source_url,created_at,is_published";
+const LEGACY_OUTCOME_CARD_COLUMNS = "id,agenda_item,source_url,created_at,is_published";
 const CACHED_OUTCOME_EXPLANATION_COLUMNS =
   "summary_card_id,source_hash,summary,next_step";
 
@@ -312,9 +312,12 @@ export async function reconcileDecisionOutcomesForMeeting(
     throw new Error(`Failed to load cards for decision outcomes: ${cardError.message}`);
   }
 
-  const cardRows = (Array.isArray(cards) ? cards : []) as Array<
-    Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url" | "created_at">
-  >;
+  // Unpublished cards are absent from the public meeting and decisions views.
+  // They must not compete with visible cards for an official result or count
+  // toward the public results-coverage gate.
+  const cardRows = ((Array.isArray(cards) ? cards : []) as Array<
+    Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url" | "created_at" | "is_published">
+  >).filter((card) => card.is_published === true);
   const inventory = extractMeetingOutcomeItems(meeting);
   const proposals = cardRows.flatMap((card) => {
     const outcome = extractDecisionOutcome(card, meeting);

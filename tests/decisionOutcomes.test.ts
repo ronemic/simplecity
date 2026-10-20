@@ -740,8 +740,8 @@ test("reconciliation withholds both cards when they resolve to the same official
             async eq() {
               return {
                 data: [
-                  { ...card, id: "card-1" },
-                  { ...card, id: "card-2" }
+                  { ...card, id: "card-1", is_published: true },
+                  { ...card, id: "card-2", is_published: true }
                 ],
                 error: null
               };
@@ -777,6 +777,47 @@ test("reconciliation withholds both cards when they resolve to the same official
     complete: false,
     outcomesUpserted: 0
   });
+});
+
+test("unpublished cards cannot make a published result assignment ambiguous", async () => {
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "summary_cards");
+      return {
+        select(columns: string) {
+          assert.match(columns, /\bis_published\b/);
+          return {
+            async eq() {
+              return {
+                data: [
+                  { ...card, id: "visible", is_published: true },
+                  { ...card, id: "hidden", is_published: false },
+                  { ...card, id: "unpublished-null", is_published: null }
+                ],
+                error: null
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const result = await reconcileDecisionOutcomesForMeeting(
+    supabase as never,
+    "meeting-1",
+    meeting("san-francisco", {
+      items: [agendaItem({ sourceUrl: card.source_url || "" })]
+    }),
+    null,
+    { persist: false }
+  );
+
+  assert.equal(result.cardsChecked, 1);
+  assert.equal(result.resultCardsFound, 1);
+  assert.equal(result.resultCardsMatched, 1);
+  assert.equal(result.outcomesRejectedAmbiguous, 0);
+  assert.equal(result.complete, true);
 });
 
 test("uses structured Legistar results for all supported Legistar jurisdictions", () => {
@@ -1193,6 +1234,7 @@ test("reconciles all ten May 12 outcomes to their existing agenda cards", async 
       id: `may12-card-${agendaNumber}`,
       agenda_item: agendaTitles.get(agendaNumber),
       source_url: meetingRecord.sourceUrl,
+      is_published: true,
       created_at: `2026-05-${String(index + 1).padStart(2, "0")}T12:00:00.000Z`
     })
   );
