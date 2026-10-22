@@ -379,6 +379,15 @@ export function shouldReconcileMinutesWithoutGeneratingCards(
   );
 }
 
+export function shouldCheckpointDecisionOutcomeSource(
+  meeting: Pick<LlmReadyMeeting, "status">,
+  complete: boolean
+) {
+  // A future meeting's apparent results may be prefilled; it must be checked
+  // again after the meeting becomes Past, even if its source text is unchanged.
+  return complete && meeting.status === "Past";
+}
+
 export function shouldSkipUnchangedSummary(
   sourceHash: string | null,
   summarizedSourceHash: string | null,
@@ -900,7 +909,7 @@ async function runSimpleCityPipelineInternal(
           errors.push(coverageError);
           log(coverageError);
         }
-        if (reconciliation.complete && item.sourceHash) {
+        if (shouldCheckpointDecisionOutcomeSource(item.meeting, reconciliation.complete) && item.sourceHash) {
           await setMeetingSummarizedSourceHash(supabase, item.id, item.sourceHash);
         }
         return reconciliation.complete ? "complete" as const : "incomplete" as const;

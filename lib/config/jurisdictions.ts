@@ -103,7 +103,7 @@ const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
 export const DEFAULT_EAST_PALO_ALTO_AGENDA_URL =
-  "https://www.cityofepa.org/agenda";
+  "https://cityofepa.granicus.com/ViewPublisher.php?view_id=1";
 export const DEFAULT_EAST_PALO_ALTO_MEETINGS_URL =
   "https://www.cityofepa.org/meetings";
 const DEFAULT_REDWOOD_CITY_AGENDA_ONLINE_URL =

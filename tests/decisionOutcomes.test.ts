@@ -212,6 +212,61 @@ test("Santa Barbara Planning Commission actions remain advisory recommendations"
   });
 });
 
+test("upcoming Planning Commission marked agendas do not trigger the result-card coverage gate", async () => {
+  const cards = ["airport-plan", "coastal-plan"].map((source_item_id) => ({
+    id: `card-${source_item_id}`,
+    source_item_id,
+    agenda_item: `${source_item_id} amendments`,
+    source_url: "https://example.com/planning-agenda.pdf",
+    is_published: true
+  }));
+  const supabase = {
+    from(table: string) {
+      assert.equal(table, "summary_cards");
+      return {
+        select() {
+          return { async eq() { return { data: cards, error: null }; } };
+        }
+      };
+    }
+  };
+  const planningMeeting = meeting("santa-barbara-county", {
+    title: "County Planning Commission",
+    meetingType: "County Planning Commission",
+    dateText: "October 28, 2026",
+    status: "Upcoming",
+    items: cards.map((card) => agendaItem({
+      externalId: card.source_item_id,
+      title: card.agenda_item,
+      action: `Carried a motion on the ${card.agenda_item}.`,
+      result: `Carried a motion on the ${card.agenda_item}. Vote: 4-0.`,
+      sourceUrl: "https://example.com/marked-agenda.pdf"
+    }))
+  });
+
+  const report = await reconcileDecisionOutcomesForMeeting(
+    supabase as never,
+    planningMeeting.id,
+    planningMeeting,
+    undefined,
+    { persist: false }
+  );
+  assert.equal(report.resultCardsFound, 0);
+  assert.equal(report.resultCardsMatched, 0);
+  assert.equal(report.complete, true);
+
+  const afterMeeting = await reconcileDecisionOutcomesForMeeting(
+    supabase as never,
+    planningMeeting.id,
+    { ...planningMeeting, status: "Past" },
+    undefined,
+    { persist: false }
+  );
+  assert.equal(afterMeeting.resultCardsFound, 2);
+  assert.equal(afterMeeting.resultCardsMatched, 2);
+  assert.equal(afterMeeting.complete, true);
+});
+
 test("treats explicitly failed procedural actions as rejected", () => {
   const board = meeting("san-francisco", { title: "Board of Supervisors" });
 

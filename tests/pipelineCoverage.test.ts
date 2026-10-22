@@ -9,9 +9,16 @@ import {
   getPipelineLlmBudgetLimits,
   minutesIngestionErrors,
   minutesIngestionWarnings,
+  shouldCheckpointDecisionOutcomeSource,
   shouldReconcileMinutesWithoutGeneratingCards,
   shouldSkipUnchangedSummary
 } from "@/lib/pipeline";
+
+test("upcoming meetings remain eligible for official outcome reconciliation", () => {
+  assert.equal(shouldCheckpointDecisionOutcomeSource({ status: "Upcoming" }, true), false);
+  assert.equal(shouldCheckpointDecisionOutcomeSource({ status: "Past" }, false), false);
+  assert.equal(shouldCheckpointDecisionOutcomeSource({ status: "Past" }, true), true);
+});
 
 test("LLM safety ceilings account for source volume and extended lookbacks", () => {
   assert.deepEqual(getPipelineLlmBudgetLimits("foster-city", 1), {

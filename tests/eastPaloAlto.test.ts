@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getJurisdictionBySlug } from "../lib/config/jurisdictions";
+import { DEFAULT_EAST_PALO_ALTO_AGENDA_URL, getJurisdictionBySlug } from "../lib/config/jurisdictions";
 import {
   attachCouncilMinutesFromAgendaPackets,
   canonicalEastPaloAltoDateTime,
@@ -8,6 +8,14 @@ import {
   eastPaloAltoMeetingExternalId,
   normalizeEastPaloAltoRows
 } from "../lib/sources/east-palo-alto";
+
+test("East Palo Alto loads the official Granicus table directly", () => {
+  assert.equal(
+    DEFAULT_EAST_PALO_ALTO_AGENDA_URL,
+    "https://cityofepa.granicus.com/ViewPublisher.php?view_id=1"
+  );
+  assert.equal(getJurisdictionBySlug("east-palo-alto")?.officialSiteUrl, DEFAULT_EAST_PALO_ALTO_AGENDA_URL);
+});
 
 test("classifies East Palo Alto table links by label and column", () => {
   assert.equal(classifyEastPaloAltoLink("Agenda", "Agenda", "", "https://example.test/a.pdf"), "Agenda");

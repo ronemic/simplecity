@@ -103,7 +103,7 @@ test("unchanged agenda-summary sources reconcile before any new summary request"
   assert.ok(summaryRequest > summaryHashCheck);
   assert.match(
     pipeline,
-    /reconciliation\.complete && item\.sourceHash[\s\S]*setMeetingSummarizedSourceHash/
+    /shouldCheckpointDecisionOutcomeSource\(item\.meeting, reconciliation\.complete\) && item\.sourceHash[\s\S]*setMeetingSummarizedSourceHash/
   );
 });
 

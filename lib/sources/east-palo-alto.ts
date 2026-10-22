@@ -493,23 +493,29 @@ export async function scrapeEastPaloAltoMeetings(options: ScrapeEastPaloAltoOpti
     log(`Starting East Palo Alto official-site scraper for ${portalUrl}.`);
     log(`Database target: ${jurisdiction.regionSlug}; platform: ${jurisdiction.platform}.`);
     const page = await context.newPage();
-    try {
-      await page.goto(portalUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
-    } catch (navigationError) {
-      log(`Browser navigation failed; retrying the server-rendered agenda through the request client: ${navigationError instanceof Error ? navigationError.message : String(navigationError)}`);
-      const html = await fetchOfficialPage(portalUrl).catch(() => { throw navigationError; });
-      await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 });
-    }
-    await page.getByText("Agenda and Minutes", { exact: false }).first().waitFor({ timeout: 60000 });
-    const embeddedUrl = await page.locator('iframe[src*="granicus.com"]').first().getAttribute("src");
     let tableUrl = portalUrl;
-    if (embeddedUrl) {
-      tableUrl = new URL(embeddedUrl, portalUrl).toString();
-      log(`Loading the official Upcoming Events table embedded by ${portalUrl}.`);
-      await page.setContent(await fetchOfficialPage(tableUrl), {
-        waitUntil: "domcontentloaded",
-        timeout: 60000
-      });
+    if (/^https:\/\/cityofepa\.granicus\.com\/ViewPublisher\.php\?/i.test(portalUrl)) {
+      // The former city landing page (/agenda) now returns 404. Granicus is
+      // the official table it embedded; load its server-rendered HTML directly.
+      await page.setContent(await fetchOfficialPage(tableUrl), { waitUntil: "domcontentloaded" });
+    } else {
+      try {
+        await page.goto(portalUrl, { waitUntil: "domcontentloaded", timeout: 60000 });
+      } catch (navigationError) {
+        log(`Browser navigation failed; retrying the server-rendered agenda through the request client: ${navigationError instanceof Error ? navigationError.message : String(navigationError)}`);
+        const html = await fetchOfficialPage(portalUrl).catch(() => { throw navigationError; });
+        await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 60000 });
+      }
+      await page.getByText("Agenda and Minutes", { exact: false }).first().waitFor({ timeout: 60000 });
+      const embeddedUrl = await page.locator('iframe[src*="granicus.com"]').first().getAttribute("src");
+      if (embeddedUrl) {
+        tableUrl = new URL(embeddedUrl, portalUrl).toString();
+        log(`Loading the official Upcoming Events table embedded by ${portalUrl}.`);
+        await page.setContent(await fetchOfficialPage(tableUrl), {
+          waitUntil: "domcontentloaded",
+          timeout: 60000
+        });
+      }
     }
     await page.getByText("Upcoming Events", { exact: false }).first().waitFor({ timeout: 60000 });
     const extracted = await extractRows(page, tableUrl);
