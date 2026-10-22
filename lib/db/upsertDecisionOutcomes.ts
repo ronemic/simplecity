@@ -318,6 +318,27 @@ export async function reconcileDecisionOutcomesForMeeting(
   const cardRows = ((Array.isArray(cards) ? cards : []) as Array<
     Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url" | "created_at" | "is_published">
   >).filter((card) => card.is_published === true);
+  // An upcoming meeting cannot have an official decision yet. A prefilled or
+  // misdated marked agenda may contain action-like text, but the outcome parser
+  // deliberately withholds it until the meeting is Past; coverage must agree.
+  if (meeting.status !== "Past") {
+    return {
+      cardsChecked: cardRows.length,
+      outcomesFound: 0,
+      outcomesUpserted: 0,
+      outcomesRejectedAmbiguous: 0,
+      resultItemsFound: 0,
+      resultItemsMatched: 0,
+      resultItemsUnmatched: 0,
+      resultCardsFound: 0,
+      resultCardsMatched: 0,
+      resultCardsUnmatched: 0,
+      informationalItemsFound: 0,
+      duplicateCardsDetected: 0,
+      duplicateCardsResolved: 0,
+      complete: true
+    };
+  }
   const inventory = extractMeetingOutcomeItems(meeting);
   const proposals = cardRows.flatMap((card) => {
     const outcome = extractDecisionOutcome(card, meeting);

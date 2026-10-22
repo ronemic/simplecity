@@ -70,7 +70,7 @@ env:
   SAN_FRANCISCO_LEGISTAR_URL: https://sfgov.legistar.com/Calendar.aspx
   LOS_ALTOS_CIVICCLERK_URL: https://losaltosca.portal.civicclerk.com/
   LOS_ALTOS_HILLS_CIVICCLERK_URL: https://losaltoshillsca.portal.civicclerk.com/
-  EAST_PALO_ALTO_AGENDA_URL: https://www.cityofepa.org/agenda
+  EAST_PALO_ALTO_AGENDA_URL: https://cityofepa.granicus.com/ViewPublisher.php?view_id=1
   EAST_PALO_ALTO_MEETINGS_URL: https://www.cityofepa.org/meetings
   OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
   OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-oss-120b' }}
