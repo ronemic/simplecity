@@ -84,9 +84,6 @@ export function SearchAndFilters({
         >
           <MapIcon aria-hidden className="h-4 w-4" />
           {locale === "es" ? "Explorar mapa" : "Explore map"}
-          <span className="inline-flex rounded-full bg-[#dcecff]/15 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-wide text-[#dcecff]">
-            {locale === "es" ? "Nuevo" : "New"}
-          </span>
         </Link>
       </div>
     </div>
