@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { DEFAULT_EAST_PALO_ALTO_AGENDA_URL, getJurisdictionBySlug } from "../lib/config/jurisdictions";
 import {
@@ -15,6 +16,8 @@ test("East Palo Alto loads the official Granicus table directly", () => {
     "https://cityofepa.granicus.com/ViewPublisher.php?view_id=1"
   );
   assert.equal(getJurisdictionBySlug("east-palo-alto")?.officialSiteUrl, DEFAULT_EAST_PALO_ALTO_AGENDA_URL);
+  const workflow = readFileSync(new URL("../.github/workflows/nightly-scrapers.yml", import.meta.url), "utf8");
+  assert.match(workflow, /EAST_PALO_ALTO_AGENDA_URL: https:\/\/cityofepa\.granicus\.com\/ViewPublisher\.php\?view_id=1/);
 });
 
 test("classifies East Palo Alto table links by label and column", () => {
