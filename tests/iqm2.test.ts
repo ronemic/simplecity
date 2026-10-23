@@ -5,7 +5,8 @@ import {
   shouldIgnoreIqm2Link,
   extractIqm2AgendaItemAttachments,
   shouldDownloadIqm2DocumentForWindow,
-  extractVisibleIqm2MeetingsWithRetry
+  extractVisibleIqm2MeetingsWithRetry,
+  waitForIqm2Portal
 } from "@/lib/sources/iqm2";
 import type { Page } from "playwright";
 import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
@@ -14,6 +15,25 @@ import type { DocumentType } from "@/lib/types";
 function document(type: DocumentType) {
   return { type, label: type, url: `https://example.test/${type}` };
 }
+
+test("IQM2 portal waits for meeting sections without requiring network idle", async () => {
+  const navigationOptions: unknown[] = [];
+  const selectors: string[] = [];
+  const page = {
+    goto: async (_url: string, options: unknown) => {
+      navigationOptions.push(options);
+    },
+    waitForTimeout: async () => undefined,
+    waitForSelector: async (selector: string) => {
+      selectors.push(selector);
+    }
+  } as unknown as Page;
+
+  await waitForIqm2Portal(page, "https://sccgov.iqm2.com/Citizens/Default.aspx?frame=no", () => undefined);
+
+  assert.deepEqual(navigationOptions, [{ waitUntil: "domcontentloaded", timeout: 60000 }]);
+  assert.deepEqual(selectors, ["text=Upcoming Meetings", "text=Past Meetings"]);
+});
 
 test("deep IQM2 refreshes skip packets when a standalone agenda is available", () => {
   assert.equal(shouldDownloadIqm2DocumentForWindow(document("Agenda"), 3), true);

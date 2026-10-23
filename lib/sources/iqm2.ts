@@ -171,14 +171,16 @@ export function shouldDownloadIqm2DocumentForWindow(
     isRequiredAgendaPacket(document, meetingDocuments);
 }
 
-async function waitForIqm2Portal(
+export async function waitForIqm2Portal(
   page: Page,
   portalUrl: string,
   log: (message: string) => void
 ) {
   await retryInitialNavigation(async () => {
     await page.goto(portalUrl, {
-      waitUntil: "networkidle",
+      // IQM2 can keep background requests open after its meeting list is ready.
+      // The visible section below is the readiness signal we actually need.
+      waitUntil: "domcontentloaded",
       timeout: 60000
     });
 
