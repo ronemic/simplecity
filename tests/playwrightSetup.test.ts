@@ -17,6 +17,7 @@ test("Playwright setup tolerates transient dependency mirrors but verifies Chrom
 
 test("Playwright workflows use an Ubuntu release supported by Chromium", () => {
   for (const workflow of [
+    "ci.yml",
     "nightly-scrapers.yml",
     "menlo-park-pipeline.yml",
     "los-altos-school-district-pipeline.yml"
