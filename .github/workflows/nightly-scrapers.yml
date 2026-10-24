@@ -88,7 +88,7 @@ permissions:
 jobs:
   san-mateo-city:
     name: San Mateo scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -120,7 +120,7 @@ jobs:
 
   san-mateo-county:
     name: San Mateo County scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -152,7 +152,7 @@ jobs:
 
   foster-city:
     name: Foster City scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -184,7 +184,7 @@ jobs:
 
   santa-clara-county:
     name: Santa Clara County scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -216,7 +216,7 @@ jobs:
 
   mountain-view:
     name: Mountain View scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -248,7 +248,7 @@ jobs:
 
   san-francisco:
     name: San Francisco scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -280,7 +280,7 @@ jobs:
 
   los-altos:
     name: Los Altos scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -312,7 +312,7 @@ jobs:
 
   redwood-city:
     name: Redwood City scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -346,7 +346,7 @@ jobs:
 
   los-altos-hills:
     name: Los Altos Hills scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     if: >
       (github.event_name == 'workflow_dispatch' &&
@@ -378,7 +378,7 @@ jobs:
 
   east-palo-alto:
     name: East Palo Alto scraper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     if: >
       (github.event_name == 'workflow_dispatch' &&

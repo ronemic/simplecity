@@ -14,3 +14,21 @@ test("Playwright setup tolerates transient dependency mirrors but verifies Chrom
   assert.match(action, /chromium\.launch\(\{ headless: true \}\)/);
   assert.match(action, /Chromium could not be installed and launched after three attempts/);
 });
+
+test("Playwright workflows use an Ubuntu release supported by Chromium", () => {
+  for (const workflow of [
+    "nightly-scrapers.yml",
+    "menlo-park-pipeline.yml",
+    "los-altos-school-district-pipeline.yml"
+  ]) {
+    const contents = readFileSync(
+      new URL(`../.github/workflows/${workflow}`, import.meta.url),
+      "utf8"
+    );
+    const runners = [...contents.matchAll(/^\s+runs-on:\s*(\S+)/gm)].map((match) => match[1]);
+
+    assert.ok(runners.length > 0, `${workflow} should have a runner`);
+    assert.ok(runners.every((runner) => runner === "ubuntu-24.04"),
+      `${workflow} must pin Playwright jobs to Ubuntu 24.04`);
+  }
+});
