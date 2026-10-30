@@ -413,6 +413,26 @@ test("saved Menlo Park packet keeps rental assistance under D2 and minutes under
   assert.doesNotMatch(rental.rowText, /26-012-HC|subject not listed|August 5/);
 });
 
+test("reordered letter-number items do not turn prose references into headings", () => {
+  const items = extractAgendaItemsFromText(meeting, `
+A. Call To Order
+D. Regular Business
+D1. Approve the commission meeting minutes
+ACTION: Motion to approve the minutes passed unanimously.
+The commission reordered the agenda, moving item D3 before item D2.
+D3. Select a presenter for the annual report
+ACTION: Motion to select a presenter passed unanimously.
+D2. Recommend a housing in-lieu fee
+ACTION: Motion to recommend the fee passed unanimously.
+E. Reports and Announcements
+`);
+
+  assert.deepEqual(items.map((item) => item.agendaNumber), ["D1", "D3", "D2"]);
+  assert.match(items[1].title!, /^Select a presenter/);
+  assert.match(items[2].title!, /^Recommend a housing in-lieu fee/);
+  assert.doesNotMatch(items[1].rowText, /housing in-lieu fee/i);
+});
+
 test("saved Los Altos Hills lot factor does not create an agenda item", async () => {
   const { readFile } = await import("node:fs/promises");
   const text = await readFile(new URL("./fixtures/los-altos-hills-2026-10-13-agenda.txt", import.meta.url), "utf8");

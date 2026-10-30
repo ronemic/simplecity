@@ -351,6 +351,7 @@ export async function reconcileDecisionOutcomesForMeeting(
         matchScore: outcome.matchScore,
         cardCreatedAt: card.created_at,
         cardSourceUrl: card.source_url,
+        cardSourceItemId: card.source_item_id,
         cardId: card.id,
         cardTitle: String(card.agenda_item || ""),
         outcome,
@@ -382,6 +383,22 @@ export async function reconcileDecisionOutcomesForMeeting(
       .map((document) => document.url)
   );
   const resolved = resolveCanonicalOutcomeAssignments(proposals, minutesSourceUrls);
+  if (resolved.rejectedAmbiguous > 0) {
+    const selectedKeys = new Set(resolved.selected.map((proposal) => proposal.matchedItemKey));
+    const rejected = proposals.filter((proposal) => !selectedKeys.has(proposal.matchedItemKey));
+    options.log?.(`Ambiguous decision outcome cards for ${meeting.title}: ${JSON.stringify(
+      rejected.map((proposal) => ({
+        cardId: proposal.cardId,
+        title: proposal.cardTitle,
+        sourceItemId: proposal.cardSourceItemId,
+        matchedItemKey: proposal.matchedItemKey,
+        matchMethod: proposal.matchMethod,
+        matchScore: proposal.matchScore,
+        sourceUrl: proposal.cardSourceUrl,
+        createdAt: proposal.cardCreatedAt
+      }))
+    )}`);
+  }
   const resultCardIds = new Set(
     cardRows
       .filter((card) => cardHasOfficialResult(card, meeting, inventory.items))
