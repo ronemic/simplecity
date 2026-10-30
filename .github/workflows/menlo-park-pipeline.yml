@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: "10 13 * * *"
   workflow_dispatch:
+    inputs:
+      months_back:
+        description: "Meeting lookback window"
+        required: true
+        default: automatic
+        type: choice
+        options:
+          - automatic
+          - "1"
+          - "3"
 
 env:
   CI: true
@@ -54,5 +64,21 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Select meeting lookback
+        id: lookback
+        env:
+          REQUESTED_MONTHS_BACK: ${{ inputs.months_back || 'automatic' }}
+        run: |
+          if [ "$REQUESTED_MONTHS_BACK" = "automatic" ]; then
+            if [ "$(date -u +%u)" = "1" ]; then
+              months_back=3
+            else
+              months_back=1
+            fi
+          else
+            months_back="$REQUESTED_MONTHS_BACK"
+          fi
+          echo "months_back=$months_back" >> "$GITHUB_OUTPUT"
+
       - name: Run Menlo Park pipeline
-        run: npm run pipeline:menlo-park -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage
+        run: npm run pipeline:menlo-park -- --months-back=${{ steps.lookback.outputs.months_back }} --max-runtime-minutes=75 --require-results-coverage
