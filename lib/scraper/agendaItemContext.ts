@@ -8,8 +8,14 @@ import {
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
 const AGENDA_NUMBER_SOURCE = "[A-Za-z]?\\d{1,2}(?:\\.\\d{1,3})?";
+const ITEM_LABEL = "(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?";
+// Letter-number agenda headings (D1, D2, D3) must begin a line. Minutes may
+// mention them in prose, such as "moving item D3 before item D2"; treating
+// that reference as a heading merges the real D3 vote into a phantom D2 item.
+const ITEM_BOUNDARY =
+  `(?:(?:^|\\n)[ \\t]*(?=${ITEM_LABEL}[A-Za-z]\\d)|(?:^|\\s)(?=${ITEM_LABEL}\\d))`;
 const ITEM_START = new RegExp(
-  `(?:^|\\s)(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)((?:[a-z]\\)\\s*)?[A-Z0-9][\\s\\S]*?)(?=(?:\\s(?:(?:[Aa]genda\\s+)?[Ii]tem\\s+)?${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)(?:[a-z]\\)\\s*)?[A-Z0-9])|$)`,
+  `${ITEM_BOUNDARY}${ITEM_LABEL}(${AGENDA_NUMBER_SOURCE})\\s*(?:[.):-]\\s*|\\s+)((?:[a-z]\\)\\s*)?[A-Z0-9][\\s\\S]*?)(?=(?:${ITEM_BOUNDARY}${ITEM_LABEL}${AGENDA_NUMBER_SOURCE}\\s*(?:[.):-]\\s*|\\s+)(?:[a-z]\\)\\s*)?[A-Z0-9])|$)`,
   "g"
 );
 // Labels need a colon or their own line; prose such as "make a recommendation"

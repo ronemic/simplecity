@@ -1425,6 +1425,50 @@ test("resolves duplicate cards with the same exact official source-item identity
   assert.equal(resolved.rejectedAmbiguous, 0);
 });
 
+test("reordered Menlo minutes assign presenter and housing votes to distinct cards", () => {
+  const minutes = `
+A. Call To Order
+D. Regular Business
+D1. Approve the commission meeting minutes
+ACTION: Motion to approve the minutes passed unanimously.
+The commission reordered the agenda, moving item D3 before item D2.
+D3. Select a presenter for the Housing Commission annual report to City Council
+ACTION: Motion to select a presenter for the annual report passed unanimously.
+D2. Recommendation of a below-market housing in-lieu fee for a new development
+ACTION: Motion to recommend the housing in-lieu fee passed unanimously.
+E. Reports and Announcements
+`;
+  const record = meeting("menlo-park", {
+    title: "Housing Commission - Aug. 5, 2026",
+    dateText: "Aug. 5, 2026",
+    items: [],
+    documents: [{
+      type: "Minutes",
+      label: "Approved minutes",
+      url: "https://example.com/20260805-minutes.pdf",
+      extractedText: minutes
+    }]
+  });
+  const presenter = extractDecisionOutcome({
+    id: "presenter",
+    source_item_id: null,
+    agenda_item: "Select presenter for Housing Commission annual report to City Council",
+    source_url: "https://example.com/20260805-agenda.pdf"
+  }, record);
+  const housing = extractDecisionOutcome({
+    id: "housing",
+    source_item_id: null,
+    agenda_item: "Recommend below-market housing in-lieu fee for new development",
+    source_url: "https://example.com/20260805-agenda.pdf"
+  }, record);
+
+  assert.ok(presenter);
+  assert.ok(housing);
+  assert.equal(presenter.matchedAgendaNumber, "D3");
+  assert.equal(housing.matchedAgendaNumber, "D2");
+  assert.notEqual(presenter.matchedItemKey, housing.matchedItemKey);
+});
+
 test("late official minutes reconcile outcomes without generating another card set", () => {
   const meetingRecord = menloParkMay12Meeting();
   assert.equal(
