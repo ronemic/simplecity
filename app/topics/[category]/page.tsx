@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SummaryCard } from "@/components/SummaryCard";
-import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
 import { ALL_CATEGORIES, CATEGORY_DEFINITIONS, MAX_DECISION_CARD_PAGE } from "@/lib/constants";
 import { getDecisionCardPage } from "@/lib/db/queries";
@@ -126,14 +125,13 @@ export default async function CategoryDetailPage({
   return (
     <div className="section-shell py-10">
       <div className="mb-8 max-w-3xl">
-        <span className="icon-tile-lg">
-          <Icon aria-hidden className="h-6 w-6" />
-        </span>
-        <h1 className="page-title mt-4">{categoryLabel(locale, category)}</h1>
-        <p className="page-copy mt-3 text-base">{categoryDescription(locale, category)}</p>
-        <div className="mt-4">
-          <CategoryPill category={category} locale={locale} />
+        <div className="flex items-center gap-4">
+          <span className="icon-tile-lg" aria-hidden="true">
+            <Icon className="h-6 w-6" />
+          </span>
+          <h1 className="page-title">{categoryLabel(locale, category)}</h1>
         </div>
+        <p className="page-copy mt-3 text-base">{categoryDescription(locale, category)}</p>
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
