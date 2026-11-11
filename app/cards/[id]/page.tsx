@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { ArrowLeft } from "lucide-react";
 import { notFound } from "next/navigation";
 import { CardTimeline } from "@/components/CardTimeline";
@@ -82,7 +82,7 @@ export default async function SharedCardPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: serializeJsonLd(articleJsonLd) }}
       />
-      <div className="mx-auto max-w-[1120px]">
+      <div className="rd-reading mx-auto max-w-[1120px]">
         <Link href="/decisions" className="action-link -ml-2">
           <ArrowLeft aria-hidden className="h-4 w-4" />
           {locale === "es" ? "Todas las decisiones" : "All decisions"}
@@ -93,7 +93,7 @@ export default async function SharedCardPage({
         </div>
 
         {events.length > 0 ? (
-          <div className="quiet-card mt-4 px-6 py-5 sm:px-8">
+          <div className="rd-rule-panel quiet-card mt-4 px-6 py-5 sm:px-8">
             <CardTimeline events={events} locale={locale} />
           </div>
         ) : null}

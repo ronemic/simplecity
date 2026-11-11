@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { getPageLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 
@@ -35,7 +35,7 @@ export default async function PrivacyPage({
   const es = locale === "es";
 
   return (
-    <div className="section-shell py-8 sm:py-10">
+    <div className="rd-utility-page section-shell py-8 sm:py-10">
       <div className="max-w-4xl">
         <p className="label-eyebrow !text-civic">
           {es ? "Privacidad en SimpleCity" : "Privacy at SimpleCity"}
@@ -148,9 +148,9 @@ export default async function PrivacyPage({
 
 function PolicySection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="quiet-card p-5 sm:p-6">
+    <section className="rd-rule-panel quiet-card p-5 sm:p-6">
       <h2 className="text-xl font-black text-ink">{title}</h2>
-      <div className="mt-3 text-sm font-semibold leading-7 text-black/70 sm:text-base">{children}</div>
+      <div className="rd-policy-copy mt-3 text-sm font-semibold leading-7 text-black/70 sm:text-base">{children}</div>
     </section>
   );
 }

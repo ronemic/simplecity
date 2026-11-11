@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import { isBetaRequest } from "@/lib/localRedesign";
+import { PreviewMeetings, PreviewPageTitle } from "@/components/local-redesign/PreviewPages";
+import { previewHref, PreviewLink } from "@/components/local-redesign/PreviewContent";
 import { MeetingsBrowser } from "@/components/MeetingsBrowser";
 import { getMeetings } from "@/lib/db/queries";
 import { cookies } from "next/headers";
@@ -80,6 +83,7 @@ export default async function MeetingsPage({
   searchParams: Promise<{
     q?: string;
     month?: string;
+    page?: string;
     date?: string;
     view?: string;
     body?: string;
@@ -92,8 +96,9 @@ export default async function MeetingsPage({
     getRequestLocale(),
     cookies()
   ]);
+  const redesign = await isBetaRequest();
   const jurisdiction = normalizeJurisdictionSelection(
-    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    params.jurisdiction || (redesign ? "all" : cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value)
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const isSantaBarbara = jurisdiction === "santa-barbara-county";
@@ -102,18 +107,31 @@ export default async function MeetingsPage({
   const view = normalizeMeetingView(
     params.view || cookieStore.get(MEETING_VIEW_PREFERENCE_COOKIE)?.value
   );
+  const usePreview = redesign && !params.month && !params.date && !params.view && !params.body;
   const meetings = await getMeetings({
     jurisdiction,
     locale,
+    search: usePreview ? search : undefined,
     body:
       isSantaBarbara && santaBarbaraBody !== "all"
         ? santaBarbaraBody
         : undefined
   });
+  if (usePreview) return <PreviewMeetings locale={locale} jurisdiction={jurisdiction} search={search} meetings={meetings} page={Math.max(1, Number.parseInt(params.page || "", 10) || 1)} />;
 
   return (
-    <div className="section-shell py-10">
-      <div className="mb-6 max-w-3xl">
+    <div className={redesign ? "redesign-shell redesign-section" : "section-shell py-10"}>
+      {redesign && !isSantaBarbara ? (
+        <div className="rd-advanced-heading">
+          <PreviewPageTitle
+            title={view === "calendar" ? (locale === "es" ? "Calendario de reuniones" : "Meeting calendar") : meetingsTitle(locale, jurisdiction, jurisdictionLabel)}
+            description={t(locale, "meetingsDescription")}
+          />
+          <PreviewLink href={previewHref("/meetings", { q: search, jurisdiction: toPublicJurisdictionSlug(jurisdiction) })}>
+            {locale === "es" ? "Ver lista de reuniones" : "Browse meeting list"}
+          </PreviewLink>
+        </div>
+      ) : <div className="mb-6 max-w-3xl">
         <p className="label-eyebrow text-civic">{t(locale, "meetings")}</p>
         {isSantaBarbara ? (
           <SantaBarbaraBodyHeading activeBody={santaBarbaraBody} locale={locale} page="meetings" />
@@ -129,7 +147,7 @@ export default async function MeetingsPage({
               : "The Planning Commission is an advisory body; its actions are not final county decisions."
             : t(locale, "meetingsDescription")}
         </p>
-      </div>
+      </div>}
 
       <MeetingsBrowser
         meetings={meetings}

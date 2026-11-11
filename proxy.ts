@@ -1,12 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { LOCALE_COOKIE, LOCALES, type Locale } from "@/lib/i18n";
+import { BETA_REQUEST_HEADER, isBetaPath, withoutBetaPrefix } from "@/lib/betaRoutes";
 
 function queryLocale(value: string | null): Locale | null {
   return LOCALES.includes(value as Locale) ? (value as Locale) : null;
 }
 
 export function proxy(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+  const beta = isBetaPath(request.nextUrl.pathname);
+  const pathname = withoutBetaPrefix(request.nextUrl.pathname);
   if (
     pathname === "/admin" ||
     pathname.startsWith("/admin/") ||
@@ -41,17 +43,22 @@ export function proxy(request: NextRequest) {
     return response;
   }
 
-  if (!locale) return NextResponse.next();
-
-  request.cookies.set(LOCALE_COOKIE, locale);
   const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("cookie", request.cookies.toString());
+  // Derive the theme from the URL, never from a browser-supplied header or cookie.
+  requestHeaders.set(BETA_REQUEST_HEADER, beta ? "1" : "0");
+  if (locale) {
+    request.cookies.set(LOCALE_COOKIE, locale);
+    requestHeaders.set("cookie", request.cookies.toString());
+  }
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  response.cookies.set(LOCALE_COOKIE, locale, {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 365,
-    sameSite: "lax"
-  });
+  if (locale) {
+    response.cookies.set(LOCALE_COOKIE, locale, {
+      path: "/",
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: "lax"
+    });
+  }
+  if (beta) response.headers.set("X-Robots-Tag", "noindex, nofollow");
   return response;
 }
 
@@ -60,13 +67,6 @@ export const config = {
     "/admin/:path*",
     "/api/admin/:path*",
     "/api/summarize",
-    {
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
-      has: [{ type: "query", key: "lang" }]
-    },
-    {
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
-      has: [{ type: "query", key: "jurisdiction" }]
-    }
+    "/((?!api|_next|favicon.ico|robots.txt|sitemap.xml|manifest.webmanifest).*)"
   ]
 };

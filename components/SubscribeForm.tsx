@@ -36,20 +36,23 @@ function subscribeErrorMessage(locale: Locale, error: string | undefined) {
 export function SubscribeForm({
   jurisdictions,
   initialJurisdiction,
-  locale
+  locale,
+  compact = false
 }: {
   jurisdictions: JurisdictionOption[];
   initialJurisdiction?: string;
   locale: Locale;
+  compact?: boolean;
 }) {
   const initialSelections = useMemo(() => {
+    if (compact) return jurisdictions.map((jurisdiction) => jurisdiction.value);
     const fallback = jurisdictions[0]?.value;
     const initial = jurisdictions.some((jurisdiction) => jurisdiction.value === initialJurisdiction)
       ? initialJurisdiction
       : fallback;
 
     return initial ? [initial] : [];
-  }, [initialJurisdiction, jurisdictions]);
+  }, [compact, initialJurisdiction, jurisdictions]);
   const [email, setEmail] = useState("");
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>(initialSelections);
   const [status, setStatus] = useState<SubscribeStatus>("idle");
@@ -140,13 +143,29 @@ export function SubscribeForm({
           ? t(locale, "subscribeFormUnsubscribeSuccess")
           : t(locale, "subscribeFormSuccess")
       );
+    } catch {
+      setStatus("error");
+      setMessage(t(locale, "subscribeFormFallbackError"));
     } finally {
       setIsSubmitting(false);
     }
   }
 
+  if (compact) {
+    return (
+      <form className="redesign-briefing-form" onSubmit={handleSubmit}>
+        <label className="sr-only" htmlFor="redesign-briefing-email">{t(locale, "subscribeEmailAddress")}</label>
+        <input id="redesign-briefing-email" name="email" type="email" autoComplete="email" required
+          value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+        <input aria-hidden="true" autoComplete="off" className="hidden" name="company" tabIndex={-1} type="text" />
+        <button className="redesign-button" disabled={isSubmitting || !selectedJurisdictions.length} type="submit">{t(locale, "subscribe")}</button>
+        {message ? <p className="redesign-briefing-message" role="status">{message}</p> : null}
+      </form>
+    );
+  }
+
   return (
-    <form className="quiet-card grid gap-5 p-5 sm:p-6" onSubmit={handleSubmit}>
+    <form className="rd-subscribe-form rd-rule-panel quiet-card grid gap-5 p-5 sm:p-6" onSubmit={handleSubmit}>
       <div className="grid gap-2.5">
         <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
           <div className="grid gap-2">

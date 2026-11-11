@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { isBetaRequest } from "@/lib/localRedesign";
+import { PreviewDecisions, PreviewPageTitle } from "@/components/local-redesign/PreviewPages";
+import { previewHref, PreviewLink } from "@/components/local-redesign/PreviewContent";
+import Link from "@/components/SiteNavigation";
 import { ArrowRight, Vote } from "lucide-react";
 import { DecisionBrowser } from "@/components/DecisionBrowser";
 import { DecisionResultSelect } from "@/components/DecisionResultSelect";
@@ -24,7 +27,7 @@ import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
-import { CATEGORIES, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, CATEGORY_DEFINITIONS, DECISION_CARD_PAGE_SIZE, MAX_DECISION_CARD_PAGE, SCHOOL_CATEGORIES } from "@/lib/constants";
 import { normalizeSantaBarbaraBodyView } from "@/lib/utils/santaBarbaraBody";
 import { PendingLink } from "@/components/PendingLink";
 import { ResultsFreshnessMenu } from "@/components/ResultsFreshnessMenu";
@@ -205,6 +208,7 @@ export default async function DecisionsPage({
   searchParams: Promise<{
     q?: string;
     category?: string;
+    topic?: string;
     result?: string;
     body?: string;
     jurisdiction?: string;
@@ -218,8 +222,9 @@ export default async function DecisionsPage({
     getRequestLocale(),
     cookies()
   ]);
+  const redesign = await isBetaRequest();
   const jurisdiction = normalizeJurisdictionSelection(
-    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    params.jurisdiction || (redesign ? "all" : cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value)
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const isAllJurisdictions = jurisdiction === ALL_JURISDICTIONS_SLUG;
@@ -228,12 +233,18 @@ export default async function DecisionsPage({
   const santaBarbaraBody = normalizeSantaBarbaraBodyView(params.body);
   const topicCategories = isSchoolDistrict ? SCHOOL_CATEGORIES : CATEGORIES;
   const search = (params.q || "").trim();
-  const selectedCategory = categoryFromSlug(params.category, topicCategories);
+  const previewTopic = { budget: "budget-taxes", business: "business-development", schools: "schools-youth", "public-services": "city-services" };
+  const alias = params.topic && Object.hasOwn(previewTopic, params.topic) ? previewTopic[params.topic as keyof typeof previewTopic] : params.topic;
+  const selectedCategory = categoryFromSlug(params.category || (redesign ? alias : undefined), topicCategories);
   const selectedResult =
     isSantaBarbara && santaBarbaraBody === "planning"
       ? undefined
       : decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
+  if (redesign && params.view !== "map" && params.view !== "full" && !params.result && !params.body) {
+    const result = await getDecisionCardPage({ jurisdiction, locale, search, category: selectedCategory, page: currentPage });
+    return <PreviewDecisions locale={locale} jurisdiction={jurisdiction} search={search} result={result} categories={topicCategories} category={selectedCategory} />;
+  }
   const [result, decisionResultFreshness] = await Promise.all([
     params.view === "map" ? Promise.resolve({
       cards: [], page: currentPage, pageCount: 0, pageSize: DECISION_CARD_PAGE_SIZE, totalCount: 0
@@ -256,8 +267,18 @@ export default async function DecisionsPage({
   ]);
 
   return (
-    <div className="section-shell py-5 sm:py-8">
-      <div className="mb-3 max-w-4xl sm:mb-5">
+    <div className={redesign ? "redesign-shell redesign-section" : "section-shell py-5 sm:py-8"}>
+      {redesign ? (
+        <div className="rd-advanced-heading">
+          <PreviewPageTitle
+            title={params.view === "map" ? (locale === "es" ? "Mapa de decisiones" : "Decision map") : decisionsTitle(locale, jurisdiction, jurisdictionLabel)}
+            description={t(locale, "decisionsDescription")}
+          />
+          <PreviewLink href={previewHref("/decisions", { q: search, jurisdiction: toPublicJurisdictionSlug(jurisdiction), category: selectedCategory ? CATEGORY_DEFINITIONS[selectedCategory].slug : undefined })}>
+            {locale === "es" ? "Ver lista de decisiones" : "Browse decision list"}
+          </PreviewLink>
+        </div>
+      ) : <div className="mb-3 max-w-4xl sm:mb-5">
         <p className="label-eyebrow text-civic">
           {isSantaBarbara ? jurisdictionLabel : t(locale, "decisions")}
         </p>
@@ -277,12 +298,12 @@ export default async function DecisionsPage({
               : "Understand what county leaders are considering—and what they decided."
             : t(locale, "decisionsDescription")}
         </p>
-      </div>
+      </div>}
 
       {isSantaBarbara ? (
         <nav
           aria-label={locale === "es" ? "Órgano del condado" : "County body"}
-          className="mb-4 flex items-end gap-x-4 overflow-x-auto border-b border-black/10 sm:mb-5 sm:gap-x-7"
+          className="rd-body-tabs mb-4 flex items-end gap-x-4 overflow-x-auto border-b border-black/10 sm:mb-5 sm:gap-x-7"
         >
           <PendingLink
             href={santaBarbaraBodyHref(params, "all")}

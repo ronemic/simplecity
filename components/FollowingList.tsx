@@ -1,7 +1,7 @@
 "use client";
 
-import { Bell, Loader2 } from "lucide-react";
-import Link from "next/link";
+import { ArrowRight, Bell, Loader2 } from "lucide-react";
+import Link from "@/components/SiteNavigation";
 import { useEffect, useState } from "react";
 import { CardTimeline } from "@/components/CardTimeline";
 import { SummaryCard } from "@/components/SummaryCard";
@@ -19,7 +19,7 @@ import {
 import type { Locale } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
 
-export function FollowingList({ locale }: { locale: Locale }) {
+export function FollowingList({ locale, redesign = false }: { locale: Locale; redesign?: boolean }) {
   const [follows, setFollows] = useState<FollowedCard[]>([]);
   // Results are tagged with the ID set they answer, so "loading" is simply
   // "the latest results are for a different set of follows".
@@ -122,6 +122,16 @@ export function FollowingList({ locale }: { locale: Locale }) {
   }
 
   if (follows.length === 0) {
+    if (redesign) {
+      return (
+        <div className="redesign-empty">
+          <p>{locale === "es" ? "Aún no sigues ninguna decisión." : "You’re not following any decisions yet."}</p>
+          <Link className="redesign-link" href="/decisions">
+            {locale === "es" ? "Ver decisiones" : "Browse decisions"}<ArrowRight aria-hidden size={15} />
+          </Link>
+        </div>
+      );
+    }
     return (
       <div className="quiet-card px-5 py-8 text-center">
         <Bell aria-hidden className="mx-auto h-5 w-5 text-black/35" />

@@ -12,6 +12,8 @@ import {
 import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
+import { isBetaRequest } from "@/lib/localRedesign";
+import { PreviewTopics } from "@/components/local-redesign/PreviewContent";
 
 export async function generateMetadata({
   searchParams
@@ -46,12 +48,14 @@ export default async function TopicsPage({
     getRequestLocale(),
     cookies()
   ]);
+  const redesign = await isBetaRequest();
   const jurisdiction = normalizeJurisdictionSelection(
-    query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    query.jurisdiction || (redesign ? "all" : cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value)
   );
   const categories = isSchoolDistrictJurisdiction(jurisdiction)
     ? SCHOOL_CATEGORIES
     : CATEGORIES;
+  if (redesign) return <PreviewTopics categories={categories} jurisdiction={jurisdiction} locale={locale} />;
   const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
 
   return (

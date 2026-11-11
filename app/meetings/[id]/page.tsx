@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { notFound } from "next/navigation";
 import { ChevronLeft, ChevronRight, ExternalLink, FileText } from "lucide-react";
 import { AddToGoogleCalendarLink } from "@/components/AddToGoogleCalendarLink";
@@ -335,7 +335,7 @@ export default async function MeetingDetailPage({
         <section className="space-y-4">
           <MeetingVideoEmbed documents={videoDocuments} locale={locale} />
 
-          <div>
+          <div className="rd-rule-panel pt-3">
             <p className="label-eyebrow text-civic">{t(locale, "summaryCards")}</p>
             <h2 className="section-title mt-1">
               {locale === "es" ? "Puntos de agenda en lenguaje claro" : "Easy-to-understand decision summaries"}
@@ -382,8 +382,8 @@ export default async function MeetingDetailPage({
           )}
         </section>
 
-        <aside className="space-y-4">
-          <section className="quiet-card p-5 sm:p-6">
+        <aside className="rd-detail-sources space-y-4">
+          <section className="rd-rule-panel quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">{t(locale, "officialDocuments")}</h2>
             <div className="mt-4 space-y-2">
               {documents.length > 0 ? (
@@ -432,7 +432,7 @@ export default async function MeetingDetailPage({
             </div>
           </section>
 
-          <section className="quiet-card p-5 sm:p-6">
+          <section className="rd-rule-panel quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-bold text-ink">{t(locale, "sourceNote")}</h2>
             <p className="mt-2 text-sm leading-6 text-black/75">
               {locale === "es"

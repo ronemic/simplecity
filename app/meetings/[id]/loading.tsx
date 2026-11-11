@@ -1,4 +1,8 @@
-export default function MeetingDetailLoading() {
+import { PreviewLoading } from "@/components/local-redesign/PreviewLoading";
+import { isBetaRequest } from "@/lib/localRedesign";
+
+export default async function MeetingDetailLoading() {
+  if (await isBetaRequest()) return <PreviewLoading />;
   return (
     <div className="section-shell py-10">
       <div className="max-w-4xl space-y-4">

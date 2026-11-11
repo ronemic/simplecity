@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Loader2, Star, Trash2 } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { SummaryCard } from "@/components/SummaryCard";
 import {

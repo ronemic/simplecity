@@ -1,7 +1,7 @@
 "use client";
 
 import { CalendarDays, ChevronDown, ExternalLink, type LucideIcon } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { useState } from "react";
 import { DateStack } from "@/components/DateStack";
 import { cn } from "@/lib/utils/cn";

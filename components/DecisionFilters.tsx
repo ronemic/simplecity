@@ -1,7 +1,8 @@
 "use client";
 
 import { Layers3 } from "lucide-react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useSitePathname as usePathname } from "@/components/SiteNavigation";
 import { CategoryPill } from "@/components/CategoryPill";
 import { PendingLink } from "@/components/PendingLink";
 import { CATEGORIES, CATEGORY_DEFINITIONS, type CategoryName } from "@/lib/constants";

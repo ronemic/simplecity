@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { FollowingList } from "@/components/FollowingList";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
+import { isBetaRequest } from "@/lib/localRedesign";
+import { PreviewFollowing } from "@/components/local-redesign/PreviewPages";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
@@ -19,6 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function FollowingPage() {
   const locale = await getRequestLocale();
+  if (await isBetaRequest()) return <PreviewFollowing locale={locale} />;
 
   return (
     <div className="section-shell py-8 sm:py-12">

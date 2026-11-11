@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { CalendarDays, ExternalLink, Users } from "lucide-react";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
@@ -114,7 +114,7 @@ export default async function ElectionsPage({
   const singlePlace = !isAll && sections.length === 1 && sections[0].county !== selection;
 
   return (
-    <div className="section-shell py-10">
+    <div className="rd-utility-page section-shell py-10">
       <p className="label-eyebrow !text-civic">
         {es ? "Elección general de California" : "California General Election"}
       </p>

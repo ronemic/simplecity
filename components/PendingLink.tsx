@@ -2,8 +2,9 @@
 
 import type { AnchorHTMLAttributes, MouseEvent, ReactNode } from "react";
 import { Loader2 } from "lucide-react";
-import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import Link from "@/components/SiteNavigation";
+import { useSearchParams } from "next/navigation";
+import { useSitePathname as usePathname, useSiteRouter as useRouter } from "@/components/SiteNavigation";
 import { useEffect, useState } from "react";
 import { normalizeLocale, t } from "@/lib/i18n";
 import { cn } from "@/lib/utils/cn";

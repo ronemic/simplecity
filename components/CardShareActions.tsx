@@ -2,6 +2,8 @@
 
 import { Check, Link2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useBeta } from "@/components/SiteNavigation";
+import { siteHref } from "@/lib/betaRoutes";
 
 export function CardShareActions({
   cardId,
@@ -12,6 +14,7 @@ export function CardShareActions({
   compact?: boolean;
   locale?: "en" | "es";
 }) {
+  const beta = useBeta();
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -48,7 +51,7 @@ export function CardShareActions({
   // browser, and its behaviour changed with it. Copying is one predictable
   // outcome, and the label can now be written with confidence.
   async function handleCopy() {
-    const url = `${window.location.origin}/cards/${encodeURIComponent(cardId)}`;
+    const url = `${window.location.origin}${siteHref(`/cards/${encodeURIComponent(cardId)}`, beta)}`;
     try {
       if (await copyLink(url)) setCopied(true);
     } catch {}

@@ -17,6 +17,7 @@ import { categoryDescription, categoryLabel, t } from "@/lib/i18n";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { getConfiguredAppUrl } from "@/lib/appUrl";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
+import { isBetaRequest } from "@/lib/localRedesign";
 
 export const revalidate = 300;
 
@@ -95,9 +96,10 @@ export default async function CategoryDetailPage({
   ]);
   const category = categoryFromSlug(slug);
   if (!category) notFound();
+  const redesign = await isBetaRequest();
 
   const jurisdiction = normalizeJurisdictionSelection(
-    query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    query.jurisdiction || (redesign ? ALL_JURISDICTIONS_SLUG : cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value)
   );
   const jurisdictionParam = query.jurisdiction
     ? `jurisdiction=${encodeURIComponent(toPublicJurisdictionSlug(jurisdiction))}`
@@ -123,7 +125,7 @@ export default async function CategoryDetailPage({
   const Icon = definition.icon;
 
   return (
-    <div className="section-shell py-10">
+    <div className={redesign ? "redesign-shell redesign-section rd-topic-detail" : "section-shell py-10"}>
       <div className="mb-8 max-w-3xl">
         <div className="flex items-center gap-4">
           <span className="icon-tile-lg" aria-hidden="true">
@@ -170,7 +172,7 @@ export default async function CategoryDetailPage({
         ))}
       </div>
 
-      <div className="grid gap-4">
+      <div className="rd-reading grid gap-4">
         {filtered.map((card) => (
           <SummaryCard key={card.id} card={card} locale={locale} />
         ))}

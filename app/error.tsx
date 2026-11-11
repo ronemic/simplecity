@@ -14,8 +14,8 @@ export default function ErrorPage({
 
   return (
     <div className="section-shell py-10">
-      <div className="quiet-card mx-auto max-w-xl p-6 text-center">
-        <h1 className="text-2xl font-bold text-ink">
+      <div className="rd-state-panel rd-rule-panel quiet-card mx-auto max-w-xl p-6 text-center">
+        <h1 className="rd-state-title text-2xl font-bold text-ink">
           {locale === "es" ? "Algo salió mal" : "Something went wrong"}
         </h1>
         <p className="mt-2 text-sm leading-6 text-black/75">

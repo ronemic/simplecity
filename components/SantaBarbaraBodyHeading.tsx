@@ -1,7 +1,8 @@
 "use client";
 
 import { Check, ChevronDown } from "lucide-react";
-import { usePathname, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useSitePathname as usePathname } from "@/components/SiteNavigation";
 import { useEffect, useRef, useState } from "react";
 import { PendingLink } from "@/components/PendingLink";
 import type { Locale } from "@/lib/i18n";
@@ -78,7 +79,7 @@ export function SantaBarbaraBodyHeading({
   }
 
   return (
-    <div ref={containerRef} className="relative mt-2 w-fit max-w-full">
+    <div ref={containerRef} className="rd-committee-heading relative mt-2 w-fit max-w-full">
       <h1>
         <button
           type="button"

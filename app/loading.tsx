@@ -1,4 +1,8 @@
-export default function Loading() {
+import { PreviewLoading } from "@/components/local-redesign/PreviewLoading";
+import { isBetaRequest } from "@/lib/localRedesign";
+
+export default async function Loading() {
+  if (await isBetaRequest()) return <PreviewLoading />;
   return (
     <div className="section-shell py-10">
       <div className="animate-pulse space-y-5">

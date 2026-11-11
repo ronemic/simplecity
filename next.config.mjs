@@ -58,6 +58,9 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...(process.env.NODE_ENV === "development" && process.env.SIMPLECITY_LOCAL_REDESIGN === "1"
+    ? { devIndicators: false }
+    : {}),
   outputFileTracingRoot: path.dirname(fileURLToPath(import.meta.url)),
   images: {
     qualities: [75, 90],

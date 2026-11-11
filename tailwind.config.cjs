@@ -3,10 +3,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        ink: "#171717",
+        ink: "rgb(var(--sc-ink, 23 23 23) / <alpha-value>)",
         paper: "#f4f6f8",
         newsprint: "#fbfcfd",
-        civic: "#2457a6",
+        civic: "rgb(var(--sc-civic, 36 87 166) / <alpha-value>)",
         harbor: "#1d766f",
         moss: "#597d35",
         clay: "#b75f44",

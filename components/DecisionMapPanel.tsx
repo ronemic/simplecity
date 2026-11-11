@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import { Loader2, MapPin } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useSitePathname as usePathname, useSiteRouter as useRouter } from "@/components/SiteNavigation";
 import { useEffect, useState, type ReactNode } from "react";
 import type { DecisionMapPoint } from "@/lib/types";
 import { normalizeDecisionMapTimeframe, type DecisionMapTimeframe } from "@/lib/maps/timeframe";

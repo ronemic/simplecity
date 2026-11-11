@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
+import { isBetaRequest } from "@/lib/localRedesign";
+import { PreviewAboutIntro } from "@/components/local-redesign/PreviewPages";
 
 export async function generateMetadata({
   searchParams
@@ -51,10 +53,11 @@ const CONTACT_EMAIL = "simplecityadmin@gmail.com";
 
 export default async function AboutPage() {
   const locale = await getRequestLocale();
+  const redesign = await isBetaRequest();
 
   return (
-    <div className="section-shell py-10">
-      <div>
+    <div className={redesign ? "rd-utility-page redesign-shell redesign-section" : "section-shell py-10"}>
+      {redesign ? <PreviewAboutIntro locale={locale} /> : <div>
           <p className="label-eyebrow !text-civic">
             {locale === "es" ? "Acerca de SimpleCity" : "About SimpleCity"}
           </p>
@@ -111,7 +114,7 @@ export default async function AboutPage() {
               </a>
             </p>
           </section>
-      </div>
+      </div>}
 
       <section id="news" className="mt-10 scroll-mt-24">
         <p className="label-eyebrow !text-civic">

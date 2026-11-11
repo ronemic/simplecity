@@ -1,6 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
+import { useBeta } from "@/components/SiteNavigation";
 import { ExternalLink, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -48,6 +49,7 @@ export function DecisionPreviewModal({
   locale: "en" | "es";
   onClose: () => void;
 }) {
+  const beta = useBeta();
   const modalRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [card, setCard] = useState<SummaryCardRow | null>(() => cachedCard(point.id, locale));
@@ -118,9 +120,9 @@ export function DecisionPreviewModal({
           first.focus();
         }
       }}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-[#071426]/60 p-3 backdrop-blur-sm sm:p-6"
+      className={`${beta ? "local-redesign rd-overlay " : ""}fixed inset-0 z-[100] flex items-center justify-center bg-[#071426]/60 p-3 backdrop-blur-sm sm:p-6`}
     >
-      <div className="max-h-[92dvh] w-full max-w-[70rem] overflow-hidden rounded-2xl bg-[#f6f7f8] text-left shadow-2xl">
+      <div className="rd-map-dialog max-h-[92dvh] w-full max-w-[70rem] overflow-hidden rounded-2xl bg-[#f6f7f8] text-left shadow-2xl">
         <div className="flex items-center justify-between gap-3 border-b border-black/10 bg-white px-4 py-3 sm:px-5">
           <p className="truncate text-sm font-black text-ink">
             {locale === "es" ? "Vista previa de la decisión" : "Decision preview"}

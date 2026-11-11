@@ -1,7 +1,7 @@
 "use client";
 
 import { Info, Loader2, Star } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { useEffect, useRef, useState } from "react";
 import {
   getOrCreateSantaBarbaraInterestDeviceToken,

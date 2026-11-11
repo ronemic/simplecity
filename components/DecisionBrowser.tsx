@@ -1,7 +1,8 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, List, Loader2, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useSitePathname as usePathname, useSiteRouter as useRouter } from "@/components/SiteNavigation";
 import { useCallback, useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { DecisionFilters } from "@/components/DecisionFilters";
 import { DecisionSearchForm } from "@/components/DecisionSearchForm";

@@ -346,12 +346,12 @@ export function SummaryCard({
       // below the action bar at the card's bottom edge. The last section is
       // rounded instead, so its background still follows the card's corners.
       className={cn(
-        "quiet-card [&>*:last-child]:rounded-b-lg",
-        isSharePresentation && "rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)] [&>*:last-child]:rounded-b-xl"
+        "quiet-card rd-summary-card [&>*:last-child]:rounded-b-lg",
+        isSharePresentation && "rd-summary-detail rounded-xl shadow-[0_24px_70px_rgba(23,23,23,0.08)] [&>*:last-child]:rounded-b-xl"
       )}
       data-card-id={card.id}
     >
-      <div className={cn("flex gap-4 p-4 sm:gap-5 sm:p-5", isSharePresentation && "p-6 sm:gap-7 sm:p-8")}>
+      <div className={cn("rd-card-header flex gap-4 p-4 sm:gap-5 sm:p-5", isSharePresentation && "p-6 sm:gap-7 sm:p-8")}>
         {dateParts ? (
           <DateStack
             month={dateParts.month}
@@ -361,12 +361,13 @@ export function SummaryCard({
             size={isSharePresentation ? "lg" : "md"}
             dateTime={dateParts.iso}
             title={meetingDate}
-            className="hidden pt-0.5 sm:flex"
+            className="rd-card-date-tile hidden pt-0.5 sm:flex"
           />
         ) : null}
 
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
+        <div className="rd-card-heading min-w-0 flex-1">
+          <span className="rd-card-eyebrow hidden">{topicLabel}</span>
+          <div className="rd-card-byline flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-semibold leading-5 text-black/[0.58]">
             <span>
               <HighlightedText
                 text={meeting ? displayMeetingType(meeting, t(locale, "meetingTypeNotListed"), locale) : t(locale, "meetingTypeNotListed")}
@@ -383,7 +384,7 @@ export function SummaryCard({
           </div>
           <TitleTag
             className={cn(
-              "mt-1 line-clamp-3 text-balance text-xl font-black leading-snug text-ink sm:line-clamp-2",
+              "rd-card-title mt-1 line-clamp-3 text-balance text-xl font-black leading-snug text-ink sm:line-clamp-2",
               isSharePresentation &&
                 (officialSourceFallback
                   ? "line-clamp-3 text-3xl sm:line-clamp-3 sm:text-4xl"
@@ -395,14 +396,14 @@ export function SummaryCard({
           {visiblePreview ? (
             <p
               className={cn(
-                "mt-1.5 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
+                "rd-card-intro mt-1.5 line-clamp-3 max-w-4xl text-sm font-semibold leading-6 text-black/[0.62] sm:line-clamp-2",
                 isSharePresentation && "line-clamp-none max-w-4xl text-lg leading-8 sm:line-clamp-none"
               )}
             >
               <HighlightedText text={visiblePreview} query={highlight} />
             </p>
           ) : null}
-          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-black/[0.62]">
+          <div className="rd-card-meta mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm font-semibold text-black/[0.62]">
             {fallbackInfo ? (
               <span className="status-chip border-[#d9a34b] bg-[#fff7e8] text-[#794707]">
                 <Info aria-hidden className="h-3.5 w-3.5" />
@@ -420,11 +421,11 @@ export function SummaryCard({
               </span>
             ) : null}
             {/* Phones drop the date tile for width, so the date rides here. */}
-            <span className={cn("inline-flex items-center gap-1.5", dateParts && "sm:hidden")}>
+            <span className={cn("rd-card-date inline-flex items-center gap-1.5", dateParts && "sm:hidden")}>
                 <CalendarDays aria-hidden className="h-4 w-4 text-[#42677f]" />
                 <HighlightedText text={compactMeetingDate} query={highlight} />
               </span>
-            <span className="inline-flex items-center gap-1.5">
+            <span className="rd-card-topic inline-flex items-center gap-1.5">
               <span aria-hidden className="icon-badge">
                 <TopicIcon className="h-3.5 w-3.5" />
               </span>
@@ -442,7 +443,7 @@ export function SummaryCard({
 
       <div
         className={cn(
-          "flex flex-wrap items-center gap-2 border-t border-black/[0.07] bg-[#fbfcfd] px-4 py-2.5 sm:px-5",
+          "rd-card-actions flex flex-wrap items-center gap-2 border-t border-black/[0.07] bg-[#fbfcfd] px-4 py-2.5 sm:px-5",
           isSharePresentation && "px-6 sm:px-8",
         )}
       >
@@ -464,7 +465,7 @@ export function SummaryCard({
           <button
             type="button"
             onClick={() => setOpen((value) => !value)}
-            className="action-primary-sm decision-card-action ml-auto font-black"
+            className="rd-card-toggle action-primary-sm decision-card-action ml-auto font-black"
             aria-expanded={open}
           >
             {officialSourceFallback
@@ -482,7 +483,7 @@ export function SummaryCard({
       {showDetails ? (
         <div
           className={cn(
-            "border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6",
+            "rd-card-content border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6",
             isSharePresentation && "px-6 py-7 sm:px-8 sm:py-8"
           )}
         >

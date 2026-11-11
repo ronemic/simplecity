@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { t } from "@/lib/i18n";
 import { getRequestLocale } from "@/lib/i18n/server";
 
@@ -7,8 +7,8 @@ export default async function NotFound() {
 
   return (
     <div className="section-shell py-10">
-      <div className="quiet-card mx-auto max-w-xl p-6 text-center">
-        <h1 className="text-2xl font-bold text-ink">{t(locale, "pageNotFound")}</h1>
+      <div className="rd-state-panel rd-rule-panel quiet-card mx-auto max-w-xl p-6 text-center">
+        <h1 className="rd-state-title text-2xl font-bold text-ink">{t(locale, "pageNotFound")}</h1>
         <p className="mt-2 text-sm leading-6 text-black/75">
           {locale === "es"
             ? "Es posible que esta página no exista, haya cambiado de ubicación o ya no esté disponible."

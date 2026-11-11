@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/SiteNavigation";
 import { Home, Newspaper, WifiOff } from "lucide-react";
 import type { Metadata } from "next";
 import { getRequestLocale } from "@/lib/i18n/server";
@@ -19,7 +19,7 @@ export default async function OfflinePage() {
 
   return (
     <div className="section-shell py-10 sm:py-14">
-      <section className="quiet-card mx-auto max-w-2xl p-6 sm:p-8">
+      <section className="rd-state-panel rd-rule-panel quiet-card mx-auto max-w-2xl p-6 sm:p-8">
         <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-civic text-white">
           <WifiOff aria-hidden="true" className="h-6 w-6" />
         </div>

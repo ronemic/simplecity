@@ -39,7 +39,7 @@ export function CookiePreferenceControls({ locale }: { locale: Locale }) {
   }
 
   return (
-    <div className="quiet-card p-5 sm:p-6">
+    <div className="rd-rule-panel quiet-card p-5 sm:p-6">
       <h2 className="text-xl font-black text-ink">
         {locale === "es" ? "Preferencias de SimpleCity" : "SimpleCity preferences"}
       </h2>

@@ -34,7 +34,7 @@ export default async function CookiesPage({
   const es = locale === "es";
 
   return (
-    <div className="section-shell py-8 sm:py-10">
+    <div className="rd-utility-page section-shell py-8 sm:py-10">
       <div className="max-w-4xl">
         <p className="label-eyebrow !text-civic">{es ? "Controles del navegador" : "Browser controls"}</p>
         <h1 className="page-title mt-2">{es ? "Configuración de cookies" : "Cookie Settings"}</h1>
@@ -88,7 +88,7 @@ export default async function CookiesPage({
             </div>
           </section>
 
-          <section className="quiet-card p-5 sm:p-6">
+          <section className="rd-rule-panel quiet-card p-5 sm:p-6">
             <h2 className="text-xl font-black text-ink">
               {es ? "Administrar cookies de analítica" : "Managing analytics cookies"}
             </h2>

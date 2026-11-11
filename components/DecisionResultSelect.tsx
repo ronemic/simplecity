@@ -1,7 +1,8 @@
 "use client";
 
 import { Loader2 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useSitePathname as usePathname, useSiteRouter as useRouter } from "@/components/SiteNavigation";
 import { useTransition } from "react";
 import { ListboxSelect } from "@/components/ListboxSelect";
 import type { Locale } from "@/lib/i18n";

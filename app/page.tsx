@@ -26,6 +26,8 @@ import {
 import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
+import { isBetaRequest } from "@/lib/localRedesign";
+import { PreviewHome } from "@/components/local-redesign/PreviewPages";
 
 export const revalidate = 300;
 
@@ -135,13 +137,15 @@ export default async function Home({
     cookies()
   ]);
   const search = (params.q || "").trim();
+  const redesign = await isBetaRequest();
   const jurisdiction = normalizeJurisdictionSelection(
-    params.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
+    params.jurisdiction || (redesign ? "all" : cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value)
   );
   const jurisdictionLabel = getJurisdictionLabel(jurisdiction, locale);
   const topicCategories = isSchoolDistrictJurisdiction(jurisdiction)
     ? SCHOOL_CATEGORIES
     : CATEGORIES;
+  if (redesign) return <PreviewHome locale={locale} jurisdiction={jurisdiction} categories={topicCategories} search={search} />;
   const hasSearch = search.length > 0;
   const showElectionPromo = isElectionPromoActive();
   const introLabel =
