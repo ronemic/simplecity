@@ -483,7 +483,7 @@ export function SummaryCard({
       {showDetails ? (
         <div
           className={cn(
-            "rd-card-content border-t border-black/10 bg-[#f8fafb] px-5 py-5 sm:px-6",
+            "rd-card-content border-t border-black/10 bg-[#f8fafb] px-5 py-5 [container-type:inline-size] sm:px-6",
             isSharePresentation && "px-6 py-7 sm:px-8 sm:py-8"
           )}
         >
@@ -508,7 +508,10 @@ export function SummaryCard({
           ) : (
             <div
               className={cn(
-                "grid gap-6 text-sm leading-6 text-black/75 lg:grid-cols-[1fr_1fr_1.15fr]",
+                // Columns follow the card's width, not the screen's: the same card
+                // sits full-width on the decisions tab and in a narrower column
+                // on the homepage.
+                "summary-detail-grid grid gap-6 text-sm leading-6 text-black/75",
                 isSharePresentation && "text-base leading-7 lg:gap-10"
               )}
             >

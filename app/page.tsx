@@ -9,12 +9,23 @@ import {
   HomepageContentUnavailable,
   HomepageDataContent,
   HomepageHeroStatus,
-  HomepageHeroStatusLoading
+  HomepageHeroStatusLoading,
+  homepageSortFromParam,
+  newestHomepageMeetings,
+  upcomingHomepageMeetings,
+  type HomepageSort
 } from "@/components/HomepageData";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { electionsPromoHref, isElectionPromoActive } from "@/lib/elections/california2026";
 import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
-import { getHomepageContent, type HomepageCardSelection } from "@/lib/db/queries";
+import {
+  HOMEPAGE_LIST_CARD_COUNT,
+  getDecisionCardPage,
+  getHomepageContent,
+  getMeetings,
+  type HomepageCardSelection
+} from "@/lib/db/queries";
+import type { MeetingRow } from "@/lib/types";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionLabel,
@@ -64,22 +75,40 @@ export async function generateMetadata({
  * primitives rather than the options object the query itself takes.
  */
 const homepageContent = cache(
-  (jurisdiction: JurisdictionSelection, locale: Locale, search: string) =>
-    getHomepageContent({ jurisdiction, locale, search })
+  async (
+    jurisdiction: JurisdictionSelection,
+    locale: Locale,
+    search: string,
+    sort: HomepageSort
+  ): Promise<HomepageCardSelection> => {
+    // A search in the default order keeps the existing relevance ranking.
+    if (search && sort === "upcoming") return getHomepageContent({ jurisdiction, locale, search });
+    // Otherwise the same query and order as the decisions tab's first page.
+    const { cards, totalCount } = await getDecisionCardPage({
+      jurisdiction,
+      locale,
+      search,
+      sort,
+      pageSize: HOMEPAGE_LIST_CARD_COUNT
+    });
+    return { cards, meetingCards: cards, totalCount };
+  }
 );
 
 async function HeroStatus({
   jurisdiction,
   locale,
-  search
+  search,
+  sort
 }: {
   jurisdiction: JurisdictionSelection;
   locale: Locale;
   search: string;
+  sort: HomepageSort;
 }) {
   let totalCount: number | null = null;
   try {
-    ({ totalCount } = await homepageContent(jurisdiction, locale, search));
+    ({ totalCount } = await homepageContent(jurisdiction, locale, search, sort));
   } catch {
     // A missing count is not worth a visible failure in the hero, and the
     // decisions section below already reports the error and logs it once.
@@ -94,20 +123,32 @@ async function HomepageDecisions({
   jurisdiction,
   jurisdictionLabel,
   locale,
-  search
+  search,
+  sort,
+  sortLinkParams
 }: {
   hasSearch: boolean;
   jurisdiction: JurisdictionSelection;
   jurisdictionLabel: string;
   locale: Locale;
   search: string;
+  sort: HomepageSort;
+  sortLinkParams: Record<string, string>;
 }) {
   let content: HomepageCardSelection | null = null;
-  try {
-    content = await homepageContent(jurisdiction, locale, search);
-  } catch (error) {
-    console.error("Failed to load homepage decisions", error);
+  let meetings: MeetingRow[] | null = null;
+  const [contentResult, meetingsResult] = await Promise.allSettled([
+    homepageContent(jurisdiction, locale, search, sort),
+    getMeetings({ jurisdiction, locale })
+  ]);
+  if (contentResult.status === "fulfilled") content = contentResult.value;
+  else console.error("Failed to load homepage decisions", contentResult.reason);
+  if (meetingsResult.status === "fulfilled") {
+    meetings = sort === "newest"
+      ? newestHomepageMeetings(meetingsResult.value)
+      : upcomingHomepageMeetings(meetingsResult.value);
   }
+  else console.error("Failed to load homepage meetings", meetingsResult.reason);
 
   if (!content) return <HomepageContentUnavailable locale={locale} />;
 
@@ -117,7 +158,10 @@ async function HomepageDecisions({
       hasSearch={hasSearch}
       jurisdictionLabel={jurisdictionLabel}
       locale={locale}
+      meetings={meetings}
       search={search}
+      sort={sort}
+      sortLinkParams={sortLinkParams}
     />
   );
 }
@@ -129,6 +173,7 @@ export default async function Home({
     q?: string;
     jurisdiction?: string;
     lang?: string;
+    sort?: string;
   }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([
@@ -137,6 +182,7 @@ export default async function Home({
     cookies()
   ]);
   const search = (params.q || "").trim();
+  const sort = homepageSortFromParam(params.sort);
   const redesign = await isBetaRequest();
   const jurisdiction = normalizeJurisdictionSelection(
     params.jurisdiction || (redesign ? "all" : cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value)
@@ -208,7 +254,7 @@ export default async function Home({
                 : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
             </p>
             <Suspense fallback={<HomepageHeroStatusLoading />}>
-              <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} />
+              <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} sort={sort} />
             </Suspense>
           </div>
 
@@ -234,8 +280,17 @@ export default async function Home({
           jurisdictionLabel={jurisdictionLabel}
           locale={locale}
           search={search}
+          sort={sort}
+          sortLinkParams={Object.fromEntries(
+            Object.entries({ q: search, jurisdiction: params.jurisdiction, lang: params.lang }).filter(
+              (entry): entry is [string, string] => Boolean(entry[1])
+            )
+          )}
         />
       </Suspense>
+      <div aria-hidden className="section-shell">
+        <div className="border-t border-black/10" />
+      </div>
       <section className="section-shell pb-16 pt-8">
         <div className="mb-5 max-w-2xl">
           <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>

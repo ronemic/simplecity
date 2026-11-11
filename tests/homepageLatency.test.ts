@@ -15,7 +15,7 @@ test("homepage renders its decisions on the server, not through a client fetch",
   assert.doesNotMatch(homepageData, /useEffect|useState|createContext/);
   assert.ok(!existsSync(new URL("../app/homepage-data", import.meta.url)));
 
-  assert.match(homepage, /getHomepageContent/);
+  assert.match(homepage, /getDecisionCardPage/);
   assert.match(homepage, /<HomepageDecisions/);
 });
 
@@ -70,6 +70,7 @@ test("a failed decisions read degrades one section, not the whole homepage", () 
   // Server rendering routes an unhandled read error to the route error
   // boundary, which would replace the hero and topics too.
   assert.match(homepage, /console\.error\("Failed to load homepage decisions"/);
+  assert.match(homepage, /console\.error\("Failed to load homepage meetings"/);
   assert.match(homepage, /if \(!content\) return <HomepageContentUnavailable locale=\{locale\} \/>;/);
   assert.match(homepageData, /export function HomepageContentUnavailable/);
 });

@@ -9,8 +9,14 @@ import { DecisionResultSelect } from "@/components/DecisionResultSelect";
 import {
   getDecisionCardPage,
   getDecisionResultFreshness,
+  getMeetings,
   type DecisionResultFreshness
 } from "@/lib/db/queries";
+import {
+  MeetingsCalendarSidebar,
+  newestHomepageMeetings,
+  upcomingHomepageMeetings
+} from "@/components/HomepageData";
 import { cookies } from "next/headers";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -22,7 +28,7 @@ import {
   toInternalJurisdictionSlug,
   toPublicJurisdictionSlug
 } from "@/lib/config/jurisdictions";
-import { categoryFromSlug } from "@/lib/utils/decisionFilters";
+import { categoryFromSlug, decisionSortFromParam } from "@/lib/utils/decisionFilters";
 import { decisionResultFilterFromSlug } from "@/lib/utils/decisionResultFilter";
 import { t } from "@/lib/i18n";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
@@ -38,7 +44,7 @@ export const revalidate = 300;
 export async function generateMetadata({
   searchParams
 }: {
-  searchParams: Promise<{ q?: string; category?: string; result?: string; body?: string; jurisdiction?: string; page?: string; lang?: string }>;
+  searchParams: Promise<{ q?: string; category?: string; result?: string; body?: string; jurisdiction?: string; page?: string; lang?: string; sort?: string }>;
 }): Promise<Metadata> {
   const params = await searchParams;
   const locale = await getPageLocale(params.lang);
@@ -60,7 +66,7 @@ export async function generateMetadata({
     canonicalUrl.searchParams.set("jurisdiction", toPublicJurisdictionSlug(jurisdiction));
   }
   const urls = localizedSeoUrls(`${canonicalUrl.pathname}${canonicalUrl.search}`, seoLocale(params.lang));
-  const isFiltered = Boolean(params.q || params.category || params.result || params.body || params.page);
+  const isFiltered = Boolean(params.q || params.category || params.result || params.body || params.page || params.sort);
 
   return {
     title,
@@ -215,6 +221,7 @@ export default async function DecisionsPage({
     page?: string;
     lang?: string;
     view?: string;
+    sort?: string;
   }>;
 }) {
   const [params, locale, cookieStore] = await Promise.all([
@@ -241,11 +248,13 @@ export default async function DecisionsPage({
       ? undefined
       : decisionResultFilterFromSlug(params.result);
   const currentPage = parsePage(params.page);
+  // The decisions tab defaults to newest first; the homepage defaults to upcoming.
+  const sort = decisionSortFromParam(params.sort) ?? "newest";
   if (redesign && params.view !== "map" && params.view !== "full" && !params.result && !params.body) {
     const result = await getDecisionCardPage({ jurisdiction, locale, search, category: selectedCategory, page: currentPage });
     return <PreviewDecisions locale={locale} jurisdiction={jurisdiction} search={search} result={result} categories={topicCategories} category={selectedCategory} />;
   }
-  const [result, decisionResultFreshness] = await Promise.all([
+  const [result, decisionResultFreshness, upcomingMeetings] = await Promise.all([
     params.view === "map" ? Promise.resolve({
       cards: [], page: currentPage, pageCount: 0, pageSize: DECISION_CARD_PAGE_SIZE, totalCount: 0
     }) : getDecisionCardPage({
@@ -258,11 +267,21 @@ export default async function DecisionsPage({
         isSantaBarbara && santaBarbaraBody !== "all"
           ? santaBarbaraBody
           : undefined,
+      sort,
       page: currentPage
     }),
     getDecisionResultFreshness(
       isSantaBarbara && santaBarbaraBody !== "all" ? santaBarbaraBody : "",
       jurisdiction
+    ),
+    // The sidebar is secondary: a failed read shows its own message instead
+    // of taking down the decision list.
+    getMeetings({ jurisdiction, locale }).then(
+      sort === "newest" ? newestHomepageMeetings : upcomingHomepageMeetings,
+      (error) => {
+        console.error("Failed to load decisions sidebar meetings", error);
+        return null;
+      }
     )
   ]);
 
@@ -420,6 +439,19 @@ export default async function DecisionsPage({
         }
         showSantaBarbaraInterestPilot={jurisdiction === "santa-barbara-county"}
         mapJurisdiction={jurisdiction}
+        sort={sort}
+        listSidebar={
+          <MeetingsCalendarSidebar
+            cards={result.cards}
+            locale={locale}
+            meetings={upcomingMeetings}
+            sort={sort}
+            variant="compact"
+            className="hidden lg:contents"
+            headerClassName="lg:col-start-2 lg:row-start-1 lg:self-end"
+            bodyClassName="pt-5 lg:col-start-2 lg:row-start-2"
+          />
+        }
       />
     </div>
   );

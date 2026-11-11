@@ -53,12 +53,13 @@ import {
   decisionMeetingSearchFilters,
   matchesDecisionFilters,
   matchesDecisionPeriod,
-  type DecisionPeriod
+  type DecisionPeriod,
+  type DecisionSort
 } from "@/lib/utils/decisionFilters";
 import { getMeetingVideoDocuments } from "@/lib/utils/videoEmbed";
 import { civicDayBounds, withEffectiveMeetingStatus } from "@/lib/utils/meetingStatus";
 import { matchesMeetingFilters } from "@/lib/utils/meetingFilters";
-import { compareCardsByDecisionOrder } from "@/lib/utils/decisionOrder";
+import { compareCardsByDecisionOrder, compareCardsUpcomingFirst } from "@/lib/utils/decisionOrder";
 import {
   compareCardsByPublicInterest,
   isPublicInterestCard,
@@ -207,6 +208,11 @@ type DecisionCardPageFilters = {
   result?: DecisionResultFilter;
   body?: SantaBarbaraBodyView;
   period?: DecisionPeriod;
+  /**
+   * Internal to "upcoming first" paging: reads only cards at effectively
+   * upcoming meetings (soonest first) or only every other card (newest first).
+   */
+  segment?: "upcoming" | "rest";
   page: number;
   pageSize: number;
 };
@@ -988,6 +994,8 @@ async function loadPublishedCardsForSelection(
 }
 
 export const HOMEPAGE_DECISION_CARD_COUNT = 4;
+/** Cards in the homepage's date-ordered decision list. */
+export const HOMEPAGE_LIST_CARD_COUNT = 8;
 const HOMEPAGE_MEETING_CARD_COUNT = 5;
 
 export type HomepageCardSelection = {
@@ -1451,10 +1459,14 @@ async function loadDecisionCardCandidatesForJurisdiction(
   if (bodyMeetingIds && bodyMeetingIds.length === 0) {
     return { cards: [] as SummaryCardRow[], count: 0, paginationSupported: true };
   }
-  const upcomingMeetingIds = filters.period
+  const needsUpcomingIds = Boolean(filters.period || filters.segment);
+  const upcomingMeetingIds = needsUpcomingIds
     ? await getEffectivelyUpcomingMeetingIds(supabase, jurisdiction)
     : null;
-  if (filters.period && !upcomingMeetingIds) {
+  if (needsUpcomingIds && !upcomingMeetingIds) {
+    return { cards: [] as SummaryCardRow[], count: 0, paginationSupported: true };
+  }
+  if (filters.segment === "upcoming" && upcomingMeetingIds?.length === 0) {
     return { cards: [] as SummaryCardRow[], count: 0, paginationSupported: true };
   }
   let query = supabase
@@ -1482,6 +1494,15 @@ async function loadDecisionCardCandidatesForJurisdiction(
     }
   }
 
+  // Keyed on the meeting alone, unlike `period`: a card status left at
+  // "Upcoming vote" after its meeting passed would otherwise lead the list.
+  if (filters.segment === "upcoming" && upcomingMeetingIds) {
+    query = query.in("meeting_id", upcomingMeetingIds);
+  }
+  if (filters.segment === "rest" && upcomingMeetingIds && upcomingMeetingIds.length > 0) {
+    query = query.or(`meeting_id.is.null,meeting_id.not.in.(${upcomingMeetingIds.join(",")})`);
+  }
+
   if (filters.category) {
     query = query.contains("category_tags", [filters.category]);
   }
@@ -1494,9 +1515,15 @@ async function loadDecisionCardCandidatesForJurisdiction(
     query = query.or(decisionCardSearchFilters(pattern, meetingIds));
   }
 
-  const { data, error, count } = await query
-    .order("is_featured", { ascending: false })
-    .order("decision_sort_at", { ascending: false, nullsFirst: false })
+  const ordered = filters.segment
+    ? query.order("decision_sort_at", {
+        ascending: filters.segment === "upcoming",
+        nullsFirst: false
+      })
+    : query
+        .order("is_featured", { ascending: false })
+        .order("decision_sort_at", { ascending: false, nullsFirst: false });
+  const { data, error, count } = await ordered
     .order("created_at", { ascending: false })
     .order("id", { ascending: false })
     .range(range.from, range.to);
@@ -1554,7 +1581,8 @@ async function loadLegacyDecisionCardPage(
   body: SantaBarbaraBodyView | "",
   period: DecisionPeriod | "",
   page: number,
-  pageSize: number
+  pageSize: number,
+  sort: DecisionSort = "newest"
 ): Promise<DecisionCardPageResult> {
   const offset = (page - 1) * pageSize;
   // Search uses rendered text, so translate before matching. Outcomes are not
@@ -1582,7 +1610,8 @@ async function loadLegacyDecisionCardPage(
         .filter((card) => matchesDecisionResultFilter(card, result));
     })
   );
-  const matchingCards = sortCards(groups.flat());
+  const matchingCards =
+    sort === "upcoming" ? groups.flat().sort(compareCardsUpcomingFirst) : sortCards(groups.flat());
   const totalCount = matchingCards.length;
 
   return {
@@ -1606,7 +1635,8 @@ const getCachedDecisionCardPage = unstable_cache(
     body: SantaBarbaraBodyView | "",
     period: DecisionPeriod | "",
     page: number,
-    pageSize: number
+    pageSize: number,
+    sort: DecisionSort
   ): Promise<DecisionCardPageResult> => {
     const normalizedPage = normalizeDecisionPage(page);
     const normalizedPageSize = normalizeDecisionPageSize(pageSize);
@@ -1623,7 +1653,8 @@ const getCachedDecisionCardPage = unstable_cache(
         body,
         period,
         normalizedPage,
-        normalizedPageSize
+        normalizedPageSize,
+        sort
       );
     }
 
@@ -1640,6 +1671,74 @@ const getCachedDecisionCardPage = unstable_cache(
     }
 
     const isAggregatePage = selection === ALL_JURISDICTIONS_SLUG && clients.length > 1;
+    const legacyPage = () =>
+      loadLegacyDecisionCardPage(
+        selection,
+        locale,
+        "",
+        category,
+        "",
+        body,
+        period,
+        normalizedPage,
+        normalizedPageSize,
+        sort
+      );
+
+    if (sort === "upcoming" && !period) {
+      // Two ordered segments read back to back: cards at upcoming meetings
+      // (soonest first), then the rest (newest first). The page window falls
+      // in the first, the second, or across the boundary.
+      const loadSegment = async (segment: "upcoming" | "rest", skip: number, take: number) => {
+        const segmentRange = take === 0
+          ? { from: 0, to: 0 }
+          : isAggregatePage
+            ? { from: 0, to: skip + take - 1 }
+            : { from: skip, to: skip + take - 1 };
+        const segmentResults = await Promise.all(
+          clients.map((client) =>
+            loadDecisionCardCandidatesForJurisdiction(
+              client,
+              {
+                search: "",
+                category: category || undefined,
+                body: body || undefined,
+                segment,
+                page: normalizedPage,
+                pageSize: normalizedPageSize
+              },
+              segmentRange
+            )
+          )
+        );
+        const merged = segmentResults
+          .flatMap((segmentResult) => segmentResult.cards)
+          .sort(compareCardsUpcomingFirst);
+        return {
+          supported: segmentResults.every((segmentResult) => segmentResult.paginationSupported),
+          count: segmentResults.reduce((sum, segmentResult) => sum + segmentResult.count, 0),
+          cards: take === 0 ? [] : isAggregatePage ? merged.slice(skip, skip + take) : merged
+        };
+      };
+
+      const upcoming = await loadSegment("upcoming", offset, normalizedPageSize);
+      const rest = await loadSegment(
+        "rest",
+        Math.max(0, offset - upcoming.count),
+        normalizedPageSize - upcoming.cards.length
+      );
+      if (!upcoming.supported || !rest.supported) return legacyPage();
+
+      const segmentTotal = upcoming.count + rest.count;
+      return {
+        cards: await enrichDecisionPage(selection, [...upcoming.cards, ...rest.cards], locale),
+        totalCount: segmentTotal,
+        page: normalizedPage,
+        pageSize: normalizedPageSize,
+        pageCount: segmentTotal > 0 ? Math.ceil(segmentTotal / normalizedPageSize) : 0
+      };
+    }
+
     const candidateCount = isAggregatePage
       ? normalizedPage * normalizedPageSize
       : normalizedPageSize;
@@ -1662,19 +1761,7 @@ const getCachedDecisionCardPage = unstable_cache(
         )
       )
     );
-    if (results.some((result) => !result.paginationSupported)) {
-      return loadLegacyDecisionCardPage(
-        selection,
-        locale,
-        "",
-        category,
-        "",
-        body,
-        period,
-        normalizedPage,
-        normalizedPageSize
-      );
-    }
+    if (results.some((result) => !result.paginationSupported)) return legacyPage();
     const totalCount = results.reduce((sum, result) => sum + result.count, 0);
     const candidates = results.flatMap((result) => result.cards);
     const sortedCards = sortCards(candidates);
@@ -1690,7 +1777,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v10"],
+  ["decision-card-page-rendered-search-v11"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
@@ -2267,6 +2354,7 @@ export async function getDecisionCardPage({
   result,
   body,
   period,
+  sort = "newest",
   page = 1,
   pageSize = DECISION_CARD_PAGE_SIZE
 }: {
@@ -2277,6 +2365,7 @@ export async function getDecisionCardPage({
   result?: DecisionResultFilter;
   body?: SantaBarbaraBodyView;
   period?: DecisionPeriod;
+  sort?: DecisionSort;
   page?: number;
   pageSize?: number;
 }) {
@@ -2289,7 +2378,8 @@ export async function getDecisionCardPage({
     body || "",
     period || "",
     normalizeDecisionPage(page),
-    normalizeDecisionPageSize(pageSize)
+    normalizeDecisionPageSize(pageSize),
+    sort
   );
 }
 

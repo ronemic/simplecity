@@ -12,6 +12,7 @@ import { type Locale, t } from "@/lib/i18n";
 import type { SummaryCardRow } from "@/lib/types";
 import { type CategoryName } from "@/lib/constants";
 import { cn } from "@/lib/utils/cn";
+import { DECISION_SORTS, type DecisionSort } from "@/lib/utils/decisionFilters";
 import type { DecisionResultFilter as ResultFilter } from "@/lib/utils/decisionResultFilter";
 import {
   SantaBarbaraInterestHub,
@@ -43,7 +44,9 @@ export function DecisionBrowser({
   resultsCoverageInline,
   showTopicFilters = true,
   showSantaBarbaraInterestPilot = false,
-  mapJurisdiction
+  mapJurisdiction,
+  sort = "newest",
+  listSidebar
 }: {
   cards: SummaryCardRow[];
   initialSearch: string;
@@ -61,6 +64,9 @@ export function DecisionBrowser({
   showTopicFilters?: boolean;
   showSantaBarbaraInterestPilot?: boolean;
   mapJurisdiction: string;
+  sort?: DecisionSort;
+  /** Shown beside the list view only, so the map keeps the full width. */
+  listSidebar?: ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -130,6 +136,20 @@ export function DecisionBrowser({
     setPendingPage(page);
     startTransition(() => {
       router.push(pageUrl(page));
+    });
+  }
+
+  const withSidebar = decisionView === "list" && Boolean(listSidebar);
+
+  function changeSort(nextSort: DecisionSort) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextSort === "newest") params.delete("sort");
+    else params.set("sort", nextSort);
+    params.delete("page");
+    const nextUrl = `${pathname}${params.size > 0 ? `?${params.toString()}` : ""}`;
+
+    startTransition(() => {
+      router.replace(nextUrl, { scroll: false });
     });
   }
 
@@ -208,9 +228,20 @@ export function DecisionBrowser({
       ) : null}
 
       {santaBarbaraView === "all" ? (
-        <>
-          <div className="mb-5">
-            <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-2 border-b border-black/10 py-2.5 sm:py-3">
+        <div
+          className={cn(
+            withSidebar && "grid gap-x-10 lg:grid-cols-[minmax(0,2.1fr)_minmax(0,1fr)]"
+          )}
+        >
+            {/* With the sidebar, row 1 holds this toolbar and the sidebar's
+                heading (bottom-aligned so their divider lines meet) and row 2
+                starts the list and the meeting calendar together. */}
+            <div
+              className={cn(
+                "flex min-w-0 flex-wrap items-end justify-between gap-x-5 gap-y-2 border-b border-black/10 py-2.5 sm:py-3",
+                withSidebar && "lg:col-start-1 lg:row-start-1 lg:self-end"
+              )}
+            >
               <div>
                 <h2 className="text-base font-black text-ink sm:text-lg">
                   {locale === "es" ? "Decisiones recientes" : "Latest decisions"}
@@ -281,10 +312,35 @@ export function DecisionBrowser({
                   />
                 ) : null}
               </div>
+            {decisionView === "list" ? (
+              <div
+                role="group"
+                aria-label={locale === "es" ? "Ordenar decisiones" : "Sort decisions"}
+                className="flex w-full flex-wrap items-center gap-2.5 pb-1 pt-1"
+              >
+                <span className="text-sm font-bold text-ink">{locale === "es" ? "Ordenar:" : "Sort:"}</span>
+                {DECISION_SORTS.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-pressed={sort === option}
+                    onClick={() => changeSort(option)}
+                    className={cn("chip chip-action", sort === option && "chip-selected")}
+                  >
+                    {option === "newest"
+                      ? locale === "es" ? "Más recientes primero" : "Newest first"
+                      : locale === "es" ? "Próximas primero" : "Upcoming first"}
+                  </button>
+                ))}
+              </div>
+            ) : null}
             </div>
 
+        <div className={cn("min-w-0", withSidebar && "lg:col-start-1 lg:row-start-2")}>
+          <div className="mb-5">
             {searchPanel}
             {filterPanel}
+
           </div>
 
           {decisionView === "map" ? (
@@ -383,7 +439,9 @@ export function DecisionBrowser({
               </button>
             </nav>
           ) : null}
-        </>
+        </div>
+        {withSidebar ? listSidebar : null}
+        </div>
       ) : null}
     </>
   );

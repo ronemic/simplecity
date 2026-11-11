@@ -22,6 +22,17 @@ export function decisionPeriodFromParam(value: string | null | undefined): Decis
 }
 
 /**
+ * "upcoming" is calendar order; "newest" is the latest meeting date first.
+ * Also the order the sort buttons appear in on every page.
+ */
+export const DECISION_SORTS = ["upcoming", "newest"] as const;
+export type DecisionSort = (typeof DECISION_SORTS)[number];
+
+export function decisionSortFromParam(value: string | null | undefined): DecisionSort | undefined {
+  return DECISION_SORTS.find((sort) => sort === value);
+}
+
+/**
  * Expects `card.meetings.status` to already be the effective status (see
  * withEffectiveMeetingStatus). The paged database query mirrors this rule.
  */

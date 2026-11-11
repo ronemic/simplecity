@@ -1,6 +1,6 @@
 import type { SummaryCardRow } from "@/lib/types";
 
-function decisionSortTime(card: SummaryCardRow) {
+export function decisionSortTime(card: SummaryCardRow) {
   const value =
     card.decision_sort_at ||
     card.meetings?.meeting_datetime ||
@@ -18,6 +18,36 @@ export function compareCardsByDecisionOrder(left: SummaryCardRow, right: Summary
 
   const dateDelta = decisionSortTime(right) - decisionSortTime(left);
   if (dateDelta !== 0) return dateDelta;
+
+  const createdDelta = String(right.created_at || "").localeCompare(String(left.created_at || ""));
+  if (createdDelta !== 0) return createdDelta;
+  return right.id.localeCompare(left.id);
+}
+
+/** Effective meeting status: cards carry withEffectiveMeetingStatus meetings. */
+export function isUpcomingDecision(card: SummaryCardRow) {
+  return card.meetings?.status === "Upcoming";
+}
+
+/**
+ * "Upcoming first": decisions at upcoming meetings soonest-first, then every
+ * other decision newest-first. Featured cards get no special placement here,
+ * since this order is meant to be read as a calendar.
+ */
+export function compareCardsUpcomingFirst(left: SummaryCardRow, right: SummaryCardRow) {
+  const leftUpcoming = isUpcomingDecision(left);
+  const rightUpcoming = isUpcomingDecision(right);
+  if (leftUpcoming !== rightUpcoming) return leftUpcoming ? -1 : 1;
+
+  if (leftUpcoming) {
+    // Undated upcoming items go after dated ones.
+    const leftTime = decisionSortTime(left) || Number.POSITIVE_INFINITY;
+    const rightTime = decisionSortTime(right) || Number.POSITIVE_INFINITY;
+    if (leftTime !== rightTime) return leftTime < rightTime ? -1 : 1;
+  } else {
+    const dateDelta = decisionSortTime(right) - decisionSortTime(left);
+    if (dateDelta !== 0) return dateDelta;
+  }
 
   const createdDelta = String(right.created_at || "").localeCompare(String(left.created_at || ""));
   if (createdDelta !== 0) return createdDelta;
