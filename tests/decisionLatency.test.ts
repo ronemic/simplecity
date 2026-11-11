@@ -102,8 +102,10 @@ test("search with a category limits database rows before matching", async () => 
   assert.equal(result.totalCount, 10);
   assert.equal(result.cards.length, 2);
   assert.ok(result.cards.every((card) => card.category_tags?.includes("Transportation")));
-  assert.deepEqual(calls.filter((call) => call.table === "summary_cards").map((call) => call.categories),
-    [["Transportation"], ["Transportation"]]);
+  const cardQueries = calls.filter((call) => call.table === "summary_cards");
+  assert.ok(cardQueries.length >= 2);
+  assert.ok(cardQueries.every((call) =>
+    JSON.stringify(call.categories) === JSON.stringify(["Transportation"])));
 });
 
 test("single-city freshness never queries unrelated jurisdictions", async () => {

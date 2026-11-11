@@ -79,6 +79,7 @@ import {
   type SantaBarbaraBodyView
 } from "@/lib/utils/santaBarbaraBody";
 import { decisionMapCutoff, type DecisionMapTimeframe } from "@/lib/maps/timeframe";
+import { readAllPages } from "@/lib/db/readAllPages";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,updated_at";
@@ -733,7 +734,7 @@ async function loadPublishedCardRowsForJurisdiction(
     jurisdiction: JurisdictionConfig;
     supabase: SupabaseClient;
   },
-  options: { limit?: number; splitUpcoming?: boolean; category?: CategoryName } = {}
+  options: { limit?: number; splitUpcoming?: boolean; category?: CategoryName; allPages?: boolean } = {}
 ) {
   // Ordered by decision date, not row-creation date.
   //
@@ -799,6 +800,28 @@ async function loadPublishedCardRowsForJurisdiction(
   }
 
   const limit = options.limit;
+
+  if (options.allPages) {
+    // The default PostgREST response stops at 1,000 rows. Search needs the
+    // complete set before it can match rendered (and translated) card text.
+    const fetchAll = (orderByDecisionDate: boolean) =>
+      readAllPages<SummaryCardRow>(async (from, to) => {
+        const { data, error } = await buildQuery(orderByDecisionDate)
+          .order("id", { ascending: false })
+          .range(from, to);
+        return { data: data as unknown as SummaryCardRow[] | null, error };
+      });
+
+    let rows: SummaryCardRow[];
+    try {
+      rows = await fetchAll(true);
+    } catch (error) {
+      if (!isMissingDecisionSortColumn(error)) throw error;
+      rows = await fetchAll(false);
+    }
+
+    return rows.map((row) => withCardJurisdictionFallback(row, jurisdiction));
+  }
 
   if (options.splitUpcoming && limit) {
     const cutoff = new Date().toISOString();
@@ -1542,7 +1565,7 @@ async function loadLegacyDecisionCardPage(
         project.jurisdictions.map((jurisdiction) =>
           loadPublishedCardRowsForJurisdiction(
             { jurisdiction, supabase: project.supabase },
-            { category: category || undefined }
+            { category: category || undefined, allPages: true }
           )
         )
       );
@@ -1667,7 +1690,7 @@ const getCachedDecisionCardPage = unstable_cache(
       pageCount: totalCount > 0 ? Math.ceil(totalCount / normalizedPageSize) : 0
     };
   },
-  ["decision-card-page-rendered-search-v9"],
+  ["decision-card-page-rendered-search-v10"],
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
