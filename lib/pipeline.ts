@@ -64,6 +64,9 @@ import {
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
 import { scrapeSantaBarbaraCityMeetings } from "@/lib/sources/santa-barbara-city";
 import { enrichLompocAgendaItems, scrapeLompocMeetings } from "@/lib/sources/lompoc";
+import { enrichGuadalupeMeetings, scrapeGuadalupeMeetings } from "@/lib/sources/guadalupe";
+import { enrichSolvangMeetings } from "@/lib/sources/solvang";
+import { enrichCivicClerkItemsFromApi } from "@/lib/sources/civicclerk-agenda-api";
 import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAltoMinutes";
 import { reconcileEastPaloAltoMeetingIds } from "@/lib/db/eastPaloAltoMeetings";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
@@ -684,6 +687,7 @@ async function runSimpleCityPipelineInternal(
                   options.portalUrl || jurisdiction.civicClerkUrl || jurisdiction.sourceUrl,
                 documentOutputDir,
                 downloadDocuments: options.downloadDocuments ?? true,
+                skipItemAttachmentDownloads: jurisdiction.slug === "carpinteria",
                 shouldStop: deadlineExceeded,
                 log
               })
@@ -726,6 +730,16 @@ async function runSimpleCityPipelineInternal(
                   shouldStop: deadlineExceeded,
                   log
                 })
+              : jurisdiction.slug === "guadalupe"
+              ? await scrapeGuadalupeMeetings({
+                  ...options,
+                  jurisdiction,
+                  portalUrl: options.portalUrl || jurisdiction.officialSiteUrl || jurisdiction.sourceUrl,
+                  documentOutputDir,
+                  downloadDocuments: options.downloadDocuments ?? true,
+                  shouldStop: deadlineExceeded,
+                  log
+                })
               : jurisdiction.slug === "east-palo-alto"
               ? await scrapeEastPaloAltoMeetings({
                   ...options,
@@ -760,6 +774,31 @@ async function runSimpleCityPipelineInternal(
       log(scrapeError);
     }
 
+    if (jurisdiction.slug === "carpinteria" && !recordDeadline("CivicClerk agenda API")) {
+      // Carpinteria's files page can omit item groups entirely; the portal's own
+      // agenda API always carries the numbered items and their staff reports.
+      await enrichCivicClerkItemsFromApi(scrapeResult.meetings, {
+        portalUrl: jurisdiction.civicClerkUrl || jurisdiction.sourceUrl,
+        jurisdictionSlug: jurisdiction.slug,
+        documentOutputDir,
+        downloadDocuments: options.downloadDocuments ?? true,
+        shouldStop: deadlineExceeded,
+        log
+      });
+    }
+
+    if (jurisdiction.slug === "solvang" && !recordDeadline("Solvang agenda rows")) {
+      // PrimeGov's generic item discovery only sees Solvang's numbered section
+      // headings; read the lettered agenda rows and their staff reports first so
+      // their PDFs are extracted below.
+      await enrichSolvangMeetings(scrapeResult.meetings, {
+        documentOutputDir,
+        downloadDocuments: options.downloadDocuments ?? true,
+        shouldStop: deadlineExceeded,
+        log
+      });
+    }
+
     meetingsFound = scrapeResult.totalMeetingCount;
     documentsDownloaded = scrapeResult.meetings
       .flatMap((meeting) => meeting.documents)
@@ -769,6 +808,11 @@ async function runSimpleCityPipelineInternal(
       log("Extracting PDF text.");
       const pdfNotes = await extractPdfTextForMeetings(scrapeResult.meetings);
       for (const note of pdfNotes) log(note);
+
+      if (jurisdiction.slug === "guadalupe") {
+        const itemCount = enrichGuadalupeMeetings(scrapeResult.meetings, log);
+        log(`Parsed ${itemCount} Guadalupe agenda item(s).`);
+      }
 
       if (jurisdiction.slug === "lompoc") {
         const itemCount = enrichLompocAgendaItems(scrapeResult.meetings);

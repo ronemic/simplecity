@@ -61,6 +61,8 @@ export type ScrapeCivicClerkOptions = ScrapePortalOptions & {
   monthsForward?: number;
   allVisible?: boolean;
   body?: string;
+  /** Item attachments come from the agenda API instead (see civicclerk-agenda-api.ts). */
+  skipItemAttachmentDownloads?: boolean;
 };
 
 function normalizedPortalUrl(value: string) {
@@ -594,6 +596,7 @@ export async function scrapeCivicClerkMeetings(
         shouldStop: options.shouldStop,
         timeoutMs: DEFAULT_DOCUMENT_TIMEOUT_MS,
         documentFilter: (document) =>
+          !(options.skipItemAttachmentDownloads && document.isAgendaItemAttachment) &&
           isOfficialCivicClerkUrl(document.url, portalUrl) &&
           document.url.includes("/Meetings/GetMeetingFileStream"),
         validateFinalUrl: (url) => isOfficialCivicClerkUrl(url, portalUrl),

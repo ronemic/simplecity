@@ -43,6 +43,14 @@ export function getMeetingTemplateId(url: string) {
   }
 }
 
+/**
+ * Clerks rehearse in the live portal: Solvang's lists "TEST 123", "Test Regular
+ * Meeting" and "Test City Council Special". They are not public meetings.
+ */
+export function isPrimeGovTestMeeting(meeting: Pick<PrimeGovMeeting, "title">) {
+  return /^\s*test\b/i.test(meeting.title || "");
+}
+
 export function dedupeMeetings(meetings: PrimeGovMeeting[]) {
   const seen = new Set<string>();
   const result: PrimeGovMeeting[] = [];
@@ -723,6 +731,11 @@ export async function scrapePortal(options: ScrapePortalOptions = {}): Promise<S
     log(`Found ${archivedMeetings.length} archived meetings.`);
 
     let meetings = dedupeMeetings([...currentMeetings, ...archivedMeetings]);
+    const testMeetings = meetings.filter(isPrimeGovTestMeeting);
+    if (testMeetings.length > 0) {
+      log(`Skipped ${testMeetings.length} PrimeGov test meeting(s): ${testMeetings.map((meeting) => meeting.title).join(", ")}.`);
+      meetings = meetings.filter((meeting) => !isPrimeGovTestMeeting(meeting));
+    }
     if (!options.allVisible && !options.allYears) {
       meetings = filterMeetingsToWindow(meetings, options);
       log(

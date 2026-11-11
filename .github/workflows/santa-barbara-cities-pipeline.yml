@@ -28,12 +28,13 @@ permissions:
 jobs:
   cities:
     name: ${{ matrix.city }} pipeline
-    runs-on: ubuntu-latest
+    # Playwright scrapers are pinned to the image the shared setup action is verified on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        city: [santa-maria, santa-barbara-city, lompoc, goleta]
+        city: [santa-maria, santa-barbara-city, lompoc, goleta, carpinteria, guadalupe, solvang]
     concurrency:
       group: santa-barbara-city-${{ matrix.city }}-pipeline
       cancel-in-progress: false
@@ -49,6 +50,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Set up Playwright
+        # eSCRIBE (Santa Maria), CivicClerk (Carpinteria) and PrimeGov (Solvang) scrape with Chromium.
+        if: contains(fromJSON('["santa-maria", "carpinteria", "solvang"]'), matrix.city)
+        uses: ./.github/actions/setup-playwright
       - name: Install Lompoc official-site fetcher
         if: matrix.city == 'lompoc'
         run: |

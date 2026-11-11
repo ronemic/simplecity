@@ -17,6 +17,9 @@ export type JurisdictionSlug =
   | "santa-barbara-city"
   | "lompoc"
   | "goleta"
+  | "carpinteria"
+  | "guadalupe"
+  | "solvang"
   | "san-francisco"
   | "menlo-park"
   | "east-palo-alto"
@@ -35,6 +38,9 @@ export type PublicJurisdictionSlug =
   | "santa-barbara-city"
   | "lompoc"
   | "goleta"
+  | "carpinteria"
+  | "guadalupe"
+  | "solvang"
   | "san-francisco"
   | "menlo-park"
   | "east-palo-alto"
@@ -111,6 +117,10 @@ const DEFAULT_GOLETA_LEGISTAR_URL = "https://goleta.legistar.com/Calendar.aspx";
 const DEFAULT_SANTA_MARIA_ESCRIBE_URL = "https://pub-santamaria.escribemeetings.com/";
 const DEFAULT_SANTA_BARBARA_CITY_ONBASE_URL = "https://records.santabarbaraca.gov/OnBaseAgendaOnline/";
 const DEFAULT_LOMPOC_MEETINGS_URL = "https://www.cityoflompoc.com/government/committees-boards/city-council";
+const DEFAULT_CARPINTERIA_CIVICCLERK_URL = "https://carpinteriaca.portal.civicclerk.com/";
+// The City lists 2025 and earlier meetings in its CivicPlus Agenda Center; 2026 onward is on PrimeGov.
+const DEFAULT_SOLVANG_PRIMEGOV_URL = "https://cityofsolvang.primegov.com/public/portal";
+const DEFAULT_GUADALUPE_AGENDAS_URL = "https://cityofguadalupe.org/council-agendas/";
 const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
@@ -178,7 +188,10 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "santa-maria",
   "santa-barbara-city",
   "lompoc",
-  "goleta"
+  "goleta",
+  "carpinteria",
+  "guadalupe",
+  "solvang"
 ];
 
 export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
@@ -199,6 +212,9 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "Santa Barbara", slug: "santa-barbara-city", parentCountySlug: "santa-barbara-county" },
   { name: "Lompoc", slug: "lompoc", parentCountySlug: "santa-barbara-county" },
   { name: "Goleta", slug: "goleta", parentCountySlug: "santa-barbara-county" },
+  { name: "Carpinteria", slug: "carpinteria", parentCountySlug: "santa-barbara-county" },
+  { name: "Guadalupe", slug: "guadalupe", parentCountySlug: "santa-barbara-county" },
+  { name: "Solvang", slug: "solvang", parentCountySlug: "santa-barbara-county" },
   {
     name: "Los Altos School District",
     slug: "los-altos-school-district",
@@ -566,6 +582,27 @@ export function getJurisdictions(): JurisdictionConfig[] {
       sourceUrl: DEFAULT_GOLETA_LEGISTAR_URL, legistarUrl: DEFAULT_GOLETA_LEGISTAR_URL,
       legistarClient: "goleta", supabaseUrl: santaBarbara?.url,
       supabaseAnonKey: santaBarbara?.anonKey, supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Carpinteria", officialName: "City of Carpinteria", slug: "carpinteria",
+      regionSlug: "santa-barbara", platform: "civicclerk", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_CARPINTERIA_CIVICCLERK_URL, civicClerkUrl: DEFAULT_CARPINTERIA_CIVICCLERK_URL,
+      supabaseUrl: santaBarbara?.url, supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Guadalupe", officialName: "City of Guadalupe", slug: "guadalupe",
+      regionSlug: "santa-barbara", platform: "official-site", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_GUADALUPE_AGENDAS_URL, officialSiteUrl: DEFAULT_GUADALUPE_AGENDAS_URL,
+      supabaseUrl: santaBarbara?.url, supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Solvang", officialName: "City of Solvang", slug: "solvang",
+      regionSlug: "santa-barbara", platform: "primegov", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_SOLVANG_PRIMEGOV_URL, primegovUrl: DEFAULT_SOLVANG_PRIMEGOV_URL,
+      supabaseUrl: santaBarbara?.url, supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
     }
   ];
 }
@@ -666,6 +703,9 @@ export function requireValidJurisdictionSlug(
     slug === "santa-barbara-city" ||
     slug === "lompoc" ||
     slug === "goleta" ||
+    slug === "carpinteria" ||
+    slug === "guadalupe" ||
+    slug === "solvang" ||
     slug === "san-francisco" ||
     slug === "menlo-park" ||
     slug === "east-palo-alto" ||
@@ -934,7 +974,7 @@ export type JurisdictionProject = {
 };
 
 /**
- * Seventeen public jurisdictions share five Supabase projects -- the Santa Clara region
+ * Twenty public jurisdictions share five Supabase projects -- the Santa Clara region
  * alone holds five of them. Fanning a query out per jurisdiction therefore sends
  * one database five separate round trips to answer one question, and a single
  * "all jurisdictions" homepage render was measured at 109 round trips. Grouping
