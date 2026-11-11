@@ -52,7 +52,7 @@ function itemLabel(item: AgendaItem) {
 export function isRoutineAgendaItem(item: AgendaItem) {
   const label = itemLabel(item);
   const section = String(item.itemType || "").trim();
-  return isStructuralAgendaHeading(item) ||
+  return section === "Section Heading" || isStructuralAgendaHeading(item) ||
     ROUTINE_ITEM.test(label) ||
     (ROUTINE_ITEM.test(section) && label === section);
 }

@@ -1,0 +1,58 @@
+name: Santa Barbara Cities Pipeline
+
+on:
+  schedule:
+    - cron: "15 16 * * *"
+  workflow_dispatch:
+
+env:
+  CI: true
+  NEXT_PUBLIC_APP_URL: https://simplecity.app
+  OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+  OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL || 'openai/gpt-oss-120b' }}
+  GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+  GROQ_API_KEY_2: ${{ secrets.GROQ_API_KEY_2 }}
+  GROQ_API_KEY_3: ${{ secrets.GROQ_API_KEY_3 }}
+  GROQ_API_KEY_4: ${{ secrets.GROQ_API_KEY_4 }}
+  GROQ_API_KEY_5: ${{ secrets.GROQ_API_KEY_5 }}
+  GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'openai/gpt-oss-120b' }}
+  MAPTILER_GEOCODING_API_KEY: ${{ secrets.MAPTILER_GEOCODING_API_KEY }}
+  LOMPOC_PYTHON: ${{ github.workspace }}/.venv-lompoc/bin/python
+  NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL }}
+  NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY }}
+  SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY }}
+
+permissions:
+  contents: read
+
+jobs:
+  cities:
+    name: ${{ matrix.city }} pipeline
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        city: [santa-maria, santa-barbara-city, lompoc, goleta]
+    concurrency:
+      group: santa-barbara-city-${{ matrix.city }}-pipeline
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Lompoc official-site fetcher
+        if: matrix.city == 'lompoc'
+        run: |
+          python3 -m venv .venv-lompoc
+          .venv-lompoc/bin/python -m pip install curl_cffi==0.13.0
+      - name: Run city pipeline
+        run: npm run pipeline:${{ matrix.city }} -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 100 || echo 75) --require-results-coverage

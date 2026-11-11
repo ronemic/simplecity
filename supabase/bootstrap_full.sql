@@ -1907,4 +1907,16 @@ on table public.card_events
 to anon, authenticated;
 grant all privileges on table public.card_events to service_role;
 
+-- Source: supabase/migrations/20261111000000_add_santa_barbara_cities.sql
+insert into public.jurisdictions (slug, name, region_slug)
+values
+  ('santa-maria', 'Santa Maria', 'santa-barbara'),
+  ('santa-barbara-city', 'Santa Barbara', 'santa-barbara'),
+  ('lompoc', 'Lompoc', 'santa-barbara'),
+  ('goleta', 'Goleta', 'santa-barbara')
+on conflict (slug) do update
+set name = excluded.name,
+    region_slug = excluded.region_slug,
+    updated_at = now();
+
 commit;

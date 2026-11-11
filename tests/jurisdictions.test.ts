@@ -152,7 +152,7 @@ test("Santa Barbara County is an API-backed Legistar jurisdiction", () => {
   const santaBarbaraIndex = options.findIndex(
     (option) => option.slug === "santa-barbara-county"
   );
-  assert.equal(options[santaBarbaraIndex + 1]?.slug, "los-altos-school-district");
+  assert.equal(options[santaBarbaraIndex + 1]?.slug, "santa-maria");
 });
 
 test("Los Altos is a valid CivicClerk jurisdiction in the Santa Clara region", () => {
@@ -213,7 +213,7 @@ test("Los Altos School District is a distinct Simbli jurisdiction in the Santa C
   assert.equal(toPublicJurisdictionSlug("los-altos-school-district"), "los-altos-school-district");
   assert.equal(options[optionIndex]?.parentCountySlug, "santa-clara-county");
   assert.equal(options[optionIndex]?.kind, "school-district");
-  assert.equal(options[optionIndex - 1]?.slug, "santa-barbara-county");
+  assert.equal(options[optionIndex - 1]?.slug, "goleta");
   assert.equal(options.at(-1)?.slug, "los-altos-school-district");
   assert.equal(isSchoolDistrictJurisdiction("los-altos-school-district"), true);
   assert.equal(isSchoolDistrictJurisdiction("los-altos"), false);

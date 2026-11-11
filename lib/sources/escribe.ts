@@ -272,6 +272,12 @@ function classifyItemAttachment(label: string): DocumentType {
     : "Attachment";
 }
 
+const SANTA_MARIA_SECTION_HEADING = /^(?:RECESS[- ]CLOSED SESSION|RECONVENE TO REGULAR SESSION|REPORT BY THE CITY ATTORNEY FROM CLOSED SESSION|PRESENTATIONS|ORDINANCES AND RESOLUTIONS|[A-Z][A-Z &/]+ DEPARTMENT|REPORT BY CITY MANAGER|ORAL REPORTS OF COUNCILMEMBERS AND OFFICERS(?: \(INCLUDING AB 1234 REPORTS\))?)$/i;
+
+export function isSantaMariaSectionHeading(title: string) {
+  return SANTA_MARIA_SECTION_HEADING.test(title.trim());
+}
+
 async function enrichHtmlAgenda(
   context: BrowserContext,
   meeting: PrimeGovMeeting,
@@ -462,6 +468,11 @@ export async function scrapeEscribeMeetings(
       for (const meeting of meetings) {
         if (options.shouldStop?.()) break;
         await enrichHtmlAgenda(context, meeting, portalUrl);
+        if (options.jurisdiction.slug === "santa-maria") {
+          for (const item of meeting.items || []) {
+            if (isSantaMariaSectionHeading(item.title || "")) item.itemType = "Section Heading";
+          }
+        }
       }
     }
 

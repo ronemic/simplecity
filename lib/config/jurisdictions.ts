@@ -13,6 +13,10 @@ export type JurisdictionSlug =
   | "los-altos-hills"
   | "los-altos-school-district"
   | "santa-barbara-county"
+  | "santa-maria"
+  | "santa-barbara-city"
+  | "lompoc"
+  | "goleta"
   | "san-francisco"
   | "menlo-park"
   | "east-palo-alto"
@@ -27,6 +31,10 @@ export type PublicJurisdictionSlug =
   | "los-altos-hills"
   | "los-altos-school-district"
   | "santa-barbara-county"
+  | "santa-maria"
+  | "santa-barbara-city"
+  | "lompoc"
+  | "goleta"
   | "san-francisco"
   | "menlo-park"
   | "east-palo-alto"
@@ -99,6 +107,10 @@ const DEFAULT_SAN_FRANCISCO_LEGISTAR_URL =
 export const DEFAULT_SANTA_BARBARA_COUNTY_LEGISTAR_URL =
   process.env.SANTA_BARBARA_COUNTY_LEGISTAR_URL ||
   "https://santabarbara.legistar.com/Calendar.aspx";
+const DEFAULT_GOLETA_LEGISTAR_URL = "https://goleta.legistar.com/Calendar.aspx";
+const DEFAULT_SANTA_MARIA_ESCRIBE_URL = "https://pub-santamaria.escribemeetings.com/";
+const DEFAULT_SANTA_BARBARA_CITY_ONBASE_URL = "https://records.santabarbaraca.gov/OnBaseAgendaOnline/";
+const DEFAULT_LOMPOC_MEETINGS_URL = "https://www.cityoflompoc.com/government/committees-boards/city-council";
 const DEFAULT_MENLO_PARK_AGENDAS_URL =
   process.env.MENLO_PARK_AGENDAS_URL ||
   "https://www.menlopark.gov/Agendas-and-minutes";
@@ -162,7 +174,11 @@ export const KNOWN_JURISDICTION_SLUGS: JurisdictionSlug[] = [
   "menlo-park",
   "east-palo-alto",
   "redwood-city",
-  "santa-barbara-county"
+  "santa-barbara-county",
+  "santa-maria",
+  "santa-barbara-city",
+  "lompoc",
+  "goleta"
 ];
 
 export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
@@ -179,6 +195,10 @@ export const PUBLIC_JURISDICTION_OPTIONS: JurisdictionPublicOption[] = [
   { name: "Los Altos Hills", slug: "los-altos-hills", parentCountySlug: "santa-clara-county" },
   { name: "Mountain View", slug: "mountain-view", parentCountySlug: "santa-clara-county" },
   { name: "Santa Barbara County", slug: "santa-barbara-county" },
+  { name: "Santa Maria", slug: "santa-maria", parentCountySlug: "santa-barbara-county" },
+  { name: "Santa Barbara", slug: "santa-barbara-city", parentCountySlug: "santa-barbara-county" },
+  { name: "Lompoc", slug: "lompoc", parentCountySlug: "santa-barbara-county" },
+  { name: "Goleta", slug: "goleta", parentCountySlug: "santa-barbara-county" },
   {
     name: "Los Altos School District",
     slug: "los-altos-school-district",
@@ -518,6 +538,34 @@ export function getJurisdictions(): JurisdictionConfig[] {
       supabaseUrl: santaBarbara?.url,
       supabaseAnonKey: santaBarbara?.anonKey,
       supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Santa Maria", officialName: "City of Santa Maria", slug: "santa-maria",
+      regionSlug: "santa-barbara", platform: "escribe", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_SANTA_MARIA_ESCRIBE_URL, escribeUrl: DEFAULT_SANTA_MARIA_ESCRIBE_URL,
+      supabaseUrl: santaBarbara?.url, supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Santa Barbara", officialName: "City of Santa Barbara", slug: "santa-barbara-city",
+      regionSlug: "santa-barbara", platform: "official-site", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_SANTA_BARBARA_CITY_ONBASE_URL, officialSiteUrl: DEFAULT_SANTA_BARBARA_CITY_ONBASE_URL,
+      supabaseUrl: santaBarbara?.url, supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Lompoc", officialName: "City of Lompoc", slug: "lompoc",
+      regionSlug: "santa-barbara", platform: "official-site", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_LOMPOC_MEETINGS_URL, officialSiteUrl: DEFAULT_LOMPOC_MEETINGS_URL,
+      supabaseUrl: santaBarbara?.url, supabaseAnonKey: santaBarbara?.anonKey,
+      supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
+    },
+    {
+      name: "Goleta", officialName: "City of Goleta", slug: "goleta",
+      regionSlug: "santa-barbara", platform: "legistar", timezone: "America/Los_Angeles",
+      sourceUrl: DEFAULT_GOLETA_LEGISTAR_URL, legistarUrl: DEFAULT_GOLETA_LEGISTAR_URL,
+      legistarClient: "goleta", supabaseUrl: santaBarbara?.url,
+      supabaseAnonKey: santaBarbara?.anonKey, supabaseServiceRoleKey: santaBarbara?.serviceRoleKey
     }
   ];
 }
@@ -614,6 +662,10 @@ export function requireValidJurisdictionSlug(
     slug === "los-altos-hills" ||
     slug === "los-altos-school-district" ||
     slug === "santa-barbara-county" ||
+    slug === "santa-maria" ||
+    slug === "santa-barbara-city" ||
+    slug === "lompoc" ||
+    slug === "goleta" ||
     slug === "san-francisco" ||
     slug === "menlo-park" ||
     slug === "east-palo-alto" ||
@@ -683,7 +735,7 @@ function missingConfigMessage(jurisdiction: JurisdictionConfig, scope: "public" 
     return SANTA_CLARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 
-  if (jurisdiction.slug === "santa-barbara-county") {
+  if (jurisdiction.regionSlug === "santa-barbara") {
     return SANTA_BARBARA_REGION_MISSING_SUPABASE_CONFIG_MESSAGE;
   }
 
@@ -818,7 +870,10 @@ export function getServiceSupabaseClientForJurisdiction(slug: string | null | un
 }
 
 export function getAllPublicSupabaseClients() {
-  return getJurisdictions().flatMap((jurisdiction) => {
+  const visibleSlugs = new Set(PUBLIC_JURISDICTION_OPTIONS.map((option) => option.slug));
+  return getJurisdictions().filter((jurisdiction) =>
+    visibleSlugs.has(toPublicJurisdictionSlug(jurisdiction.slug))
+  ).flatMap((jurisdiction) => {
     try {
       return [
         {
@@ -833,7 +888,10 @@ export function getAllPublicSupabaseClients() {
 }
 
 export function getAllServiceSupabaseClients() {
-  return getJurisdictions().flatMap((jurisdiction) => {
+  const visibleSlugs = new Set(PUBLIC_JURISDICTION_OPTIONS.map((option) => option.slug));
+  return getJurisdictions().filter((jurisdiction) =>
+    visibleSlugs.has(toPublicJurisdictionSlug(jurisdiction.slug))
+  ).flatMap((jurisdiction) => {
     try {
       return [
         {
@@ -876,7 +934,7 @@ export type JurisdictionProject = {
 };
 
 /**
- * Thirteen jurisdictions share five Supabase projects -- the Santa Clara region
+ * Seventeen public jurisdictions share five Supabase projects -- the Santa Clara region
  * alone holds five of them. Fanning a query out per jurisdiction therefore sends
  * one database five separate round trips to answer one question, and a single
  * "all jurisdictions" homepage render was measured at 109 round trips. Grouping

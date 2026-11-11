@@ -78,7 +78,7 @@ async function main() {
   const sharedOptions = {
     headful: process.argv.includes("--headful"),
     scrapeHtmlAgendas: true,
-    downloadDocuments: true,
+    downloadDocuments: !process.argv.includes("--no-download"),
     enrichAgendaAttachments: !process.argv.includes("--no-agenda-attachments"),
     enrichDetails: !process.argv.includes("--no-enrich"),
     clickSeeMore: process.argv.includes("--see-more"),

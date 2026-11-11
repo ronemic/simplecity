@@ -62,6 +62,8 @@ import {
   scrapeMenloParkMeetings
 } from "@/lib/sources/menlo-park";
 import { scrapeEastPaloAltoMeetings } from "@/lib/sources/east-palo-alto";
+import { scrapeSantaBarbaraCityMeetings } from "@/lib/sources/santa-barbara-city";
+import { enrichLompocAgendaItems, scrapeLompocMeetings } from "@/lib/sources/lompoc";
 import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAltoMinutes";
 import { reconcileEastPaloAltoMeetingIds } from "@/lib/db/eastPaloAltoMeetings";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
@@ -706,7 +708,25 @@ async function runSimpleCityPipelineInternal(
                 log
               })
           : jurisdiction.platform === "official-site"
-            ? jurisdiction.slug === "east-palo-alto"
+            ? jurisdiction.slug === "santa-barbara-city"
+              ? await scrapeSantaBarbaraCityMeetings({
+                  ...options,
+                  jurisdiction,
+                  portalUrl: options.portalUrl || jurisdiction.sourceUrl,
+                  shouldStop: deadlineExceeded,
+                  log
+                })
+              : jurisdiction.slug === "lompoc"
+              ? await scrapeLompocMeetings({
+                  ...options,
+                  jurisdiction,
+                  portalUrl: options.portalUrl || jurisdiction.sourceUrl,
+                  documentOutputDir,
+                  downloadDocuments: options.downloadDocuments ?? true,
+                  shouldStop: deadlineExceeded,
+                  log
+                })
+              : jurisdiction.slug === "east-palo-alto"
               ? await scrapeEastPaloAltoMeetings({
                   ...options,
                   jurisdiction,
@@ -749,6 +769,11 @@ async function runSimpleCityPipelineInternal(
       log("Extracting PDF text.");
       const pdfNotes = await extractPdfTextForMeetings(scrapeResult.meetings);
       for (const note of pdfNotes) log(note);
+
+      if (jurisdiction.slug === "lompoc") {
+        const itemCount = enrichLompocAgendaItems(scrapeResult.meetings);
+        log(`Parsed ${itemCount} Lompoc numbered agenda item(s).`);
+      }
 
       if (jurisdiction.slug === "santa-barbara-county") {
         const itemCount = enrichSantaBarbaraPlanningCommissionItems(scrapeResult.meetings);

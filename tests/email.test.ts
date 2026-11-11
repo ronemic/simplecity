@@ -415,7 +415,7 @@ test("normalizes subscription emails and concrete jurisdictions", () => {
   );
   assert.equal(
     jurisdictionOptions[santaBarbaraIndex + 1]?.value,
-    "los-altos-school-district"
+    "santa-maria"
   );
   assert.equal(jurisdictionOptions.at(-1)?.value, "los-altos-school-district");
 });

@@ -1631,16 +1631,22 @@ export async function scrapeLegistarApiMeetings(
   const end = new Date(window.end).toISOString().slice(0, 10);
   const filter = [
     `EventDate ge datetime'${start}T00:00:00'`,
-    `EventDate lt datetime'${end}T00:00:00'`,
-    "EventBodyId eq 1"
-  ].join(" and ");
+    `EventDate lt datetime'${end}T00:00:00'`
+  ];
+  // The county's Board of Supervisors is body 1. Goleta uses different body
+  // IDs, so include its council and commissions rather than filtering them out.
+  if (jurisdiction.slug === "santa-barbara-county") filter.push("EventBodyId eq 1");
   const eventsUrl = new URL(`https://webapi.legistar.com/v1/${client}/events`);
-  eventsUrl.searchParams.set("$filter", filter);
+  eventsUrl.searchParams.set("$filter", filter.join(" and "));
   eventsUrl.searchParams.set("$orderby", "EventDate desc");
   eventsUrl.searchParams.set("$top", "1000");
 
   log(`Fetching ${jurisdiction.name} meetings from the official Legistar API.`);
   let events = await fetchLegistarApiJson<LegistarApiEvent[]>(eventsUrl.toString());
+  if (jurisdiction.slug === "goleta") {
+    // The Spanish council agenda is a translation of the same city meeting.
+    events = events.filter((event) => !/^Agenda del Concejo Municipal$/i.test(event.EventBodyName.trim()));
+  }
   if (typeof options.limit === "number" && options.limit > 0) {
     events = events.slice(0, options.limit);
   }
