@@ -3,7 +3,7 @@
 import { Bell, Check, ChevronDown, Languages, Loader2, MapPin, Menu, School, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, useTransition } from "react";
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionDisplayLabel,
@@ -66,6 +66,21 @@ function normalizeJurisdiction(value: string | null | undefined): string {
   return "san-mateo";
 }
 
+function readJurisdictionPreference(): string | null {
+  const prefix = `${JURISDICTION_PREFERENCE_COOKIE}=`;
+  const entry = document.cookie.split("; ").find((part) => part.startsWith(prefix));
+  if (!entry) return null;
+  try {
+    return decodeURIComponent(entry.slice(prefix.length));
+  } catch {
+    return null;
+  }
+}
+
+// The cookie only changes through this component or a full reload, and every
+// in-app navigation re-renders the header, so there is nothing to subscribe to.
+const subscribeToJurisdictionPreference = () => () => {};
+
 function writeJurisdictionPreference(value: string) {
   const encoded = encodeURIComponent(value);
   document.cookie = `${JURISDICTION_PREFERENCE_COOKIE}=${encoded}; path=/; max-age=31536000; samesite=lax`;
@@ -100,8 +115,13 @@ export function HeaderNav({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const routeJurisdiction = searchParams.get("jurisdiction");
-  const [storedJurisdiction, setStoredJurisdiction] = useState(() =>
-    normalizeJurisdiction(initialJurisdiction)
+  // Pages without ?jurisdiction= render for the saved cookie, so the picker
+  // reads that cookie too. The prop alone goes stale: the header can come from
+  // a render made before the reader picked a different area.
+  const storedJurisdiction = useSyncExternalStore(
+    subscribeToJurisdictionPreference,
+    readJurisdictionPreference,
+    () => initialJurisdiction
   );
   const routeSelectedJurisdiction = normalizeJurisdiction(
     routeJurisdiction || storedJurisdiction || initialJurisdiction
@@ -200,7 +220,6 @@ export function HeaderNav({
     setIsJurisdictionMenuOpen(false);
     setIsMobileMenuOpen(false);
     setOptimisticJurisdiction(value);
-    setStoredJurisdiction(value);
     setPendingSelector("jurisdiction");
     try {
       window.localStorage.setItem(JURISDICTION_STORAGE_KEY, value);
