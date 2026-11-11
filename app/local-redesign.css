@@ -185,13 +185,9 @@ body:has(.local-redesign) { background: white; }
 .local-redesign main :is(h2, h3, h4).font-black { font-weight: 700; }
 .local-redesign .rd-utility-page :is(.quiet-card > h2, .quiet-card > h3) { font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
 .local-redesign .rd-utility-page :is(.quiet-card > p, .rd-policy-copy) { color: var(--rd-muted); font-weight: 400; }
-.local-redesign .rd-subscribe-heading { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .local-redesign .rd-subscribe-form input[type="checkbox"] { accent-color: var(--rd-blue); }
 .local-redesign .rd-subscribe-form fieldset label { box-shadow: none; border: 1px solid var(--rd-line); font-weight: 550; }
 .local-redesign .rd-subscribe-form fieldset label:has(:checked) { border-color: var(--rd-blue); background: var(--rd-wash); color: var(--rd-blue); }
-.local-redesign .rd-subscribe-page .rd-subscribe-heading { align-items: center; gap: 24px; }
-.local-redesign .rd-subscribe-page .page-title { max-width: 430px; }
-.local-redesign .rd-subscribe-page .page-copy { line-height: 1.8; }
 .local-redesign .rd-subscribe-page .rd-subscribe-form {
   padding: clamp(20px, 3vw, 28px);
   border: 1px solid var(--rd-line);
@@ -206,7 +202,6 @@ body:has(.local-redesign) { background: white; }
 .local-redesign .rd-subscribe-page .rd-subscribe-groups { gap: 22px; }
 
 @media (min-width: 1024px) {
-  .local-redesign .rd-subscribe-page .rd-subscribe-heading { grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 48px; }
   .local-redesign .rd-subscribe-page .rd-subscribe-groups { grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.1fr); }
 }
 .local-redesign .rd-topic-detail .icon-tile-lg { width: 40px; height: 40px; border-radius: 10px; }
