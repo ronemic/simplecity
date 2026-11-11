@@ -995,7 +995,7 @@ async function loadPublishedCardsForSelection(
 
 export const HOMEPAGE_DECISION_CARD_COUNT = 4;
 /** Cards in the homepage's date-ordered decision list. */
-export const HOMEPAGE_LIST_CARD_COUNT = 8;
+export const HOMEPAGE_LIST_CARD_COUNT = 4;
 const HOMEPAGE_MEETING_CARD_COUNT = 5;
 
 export type HomepageCardSelection = {
