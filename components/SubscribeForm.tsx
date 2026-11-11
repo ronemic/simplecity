@@ -229,11 +229,11 @@ export function SubscribeForm({
         <legend className="text-sm font-black text-ink">
           {t(locale, "subscribeWeeklyDigestAreas")}
         </legend>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[0.78fr_1.3fr_0.92fr_1fr]">
+        <div className="rd-subscribe-groups grid gap-3 md:grid-cols-2 xl:grid-cols-[0.78fr_1.3fr_0.92fr_1fr]">
           {jurisdictionGroups.map((group) => (
             <div
               aria-labelledby={`${group.id}-label`}
-              className="rounded-lg p-3.5"
+              className="rd-subscribe-group rounded-lg p-3.5"
               key={group.id}
               role="group"
             >

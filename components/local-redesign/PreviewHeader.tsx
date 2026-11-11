@@ -37,7 +37,7 @@ export function PreviewHeader({ locale }: { locale: Locale }) {
               <button key={language} type="button" lang={language} aria-pressed={locale === language} onClick={() => switchLanguage(language)}>{language.toUpperCase()}</button>
             ))}
           </div>
-          <Link className="redesign-button" href="/#subscribe">{t(locale, "subscribe")}</Link>
+          <Link className="redesign-button" href="/subscribe" aria-current={pathname === "/subscribe" ? "page" : undefined}>{t(locale, "subscribe")}</Link>
         </div>
       </div>
     </header>

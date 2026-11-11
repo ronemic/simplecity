@@ -76,7 +76,7 @@ export default async function SubscribePage({
   const message = statusMessage(params.status, locale);
 
   return (
-    <div className="rd-utility-page section-shell py-8 sm:py-10">
+    <div className="rd-subscribe-page rd-utility-page section-shell py-8 sm:py-10">
       <div className="rd-subscribe-heading grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-end lg:gap-12">
         <div className="max-w-2xl">
           <p className="label-eyebrow text-civic">{t(locale, "subscribeEyebrow")}</p>
