@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Vote } from "lucide-react";
 import { cookies } from "next/headers";
 import { cache, Suspense } from "react";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@/components/HomepageData";
 import { SearchAndFilters } from "@/components/SearchAndFilters";
 import { electionsPromoHref, isElectionPromoActive } from "@/lib/elections/california2026";
-import { CATEGORIES, CATEGORY_DEFINITIONS, SCHOOL_CATEGORIES } from "@/lib/constants";
+import { CATEGORIES, SCHOOL_CATEGORIES } from "@/lib/constants";
 import {
   HOMEPAGE_LIST_CARD_COUNT,
   getDecisionCardPage,
@@ -34,7 +34,7 @@ import {
   toPublicJurisdictionSlug,
   type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
-import { categoryShortLabel, t, type Locale } from "@/lib/i18n";
+import { t, type Locale } from "@/lib/i18n";
 import { getPageLocale, getRequestLocale } from "@/lib/i18n/server";
 import { localizedSeoUrls, seoLocale } from "@/lib/seo";
 import { isBetaRequest } from "@/lib/localRedesign";
@@ -194,84 +194,101 @@ export default async function Home({
   if (redesign) return <PreviewHome locale={locale} jurisdiction={jurisdiction} categories={topicCategories} search={search} />;
   const hasSearch = search.length > 0;
   const showElectionPromo = isElectionPromoActive();
-  const introLabel =
+  const langQuery: Record<string, string> = params.lang ? { lang: params.lang } : {};
+  const withQuery = (path: string, query: Record<string, string> = {}) => {
+    const qs = new URLSearchParams({ ...query, ...langQuery }).toString();
+    return qs ? `${path}${path.includes("?") ? "&" : "?"}${qs}` : path;
+  };
+  const areaLabel =
     jurisdiction === "all"
       ? locale === "es"
-        ? "Reuniones públicas de varias jurisdicciones"
-        : "Public meetings across jurisdictions"
+        ? "Mostrando todas las ciudades, condados y distritos escolares"
+        : "Showing all cities, counties, and school districts"
       : locale === "es"
-        ? `Reuniones públicas de ${jurisdictionLabel}`
-        : `${jurisdictionLabel} public meetings`;
+        ? `Mostrando ${jurisdictionLabel}`
+        : `Showing ${jurisdictionLabel}`;
 
   return (
     <div className="overflow-hidden">
+      {showElectionPromo && !hasSearch ? (
+        <div className="border-b border-[#e7d5a6] bg-[#fdf6e3]">
+          <div className="section-shell py-2.5">
+            <Link
+              href={electionsPromoHref(jurisdiction, locale)}
+              className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#6b4e12] underline-offset-4 hover:underline focus-visible:focus-ring"
+            >
+              <Vote aria-hidden className="h-4 w-4 shrink-0" />
+              <span>
+                {locale === "es"
+                  ? "Mira lo que hay en tu boleta del 3 de noviembre"
+                  : "See what's on your November 3 ballot"}
+              </span>
+              <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       <section className="civic-hero">
-        <div
-          className={`section-shell relative z-10 grid gap-7 ${
-            hasSearch ? "py-7 sm:py-8" : "py-8 sm:py-12 lg:grid-cols-[minmax(0,1fr)_520px] lg:items-center lg:py-14"
-          }`}
-        >
-          <div className="max-w-2xl">
+        <div className={`section-shell relative z-10 ${hasSearch ? "py-6 sm:py-8" : "py-8 sm:py-12"}`}>
+          <div className="max-w-3xl">
             {!hasSearch ? (
-              <div className="mb-6 flex flex-col items-start gap-2">
-                {showElectionPromo ? (
-                  <Link
-                    href={electionsPromoHref(jurisdiction, locale)}
-                    className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#e9c77e] underline-offset-4 hover:underline focus-visible:focus-ring"
-                  >
-                    <span>
-                      {locale === "es"
-                        ? "Mira lo que hay en tu boleta del 3 de noviembre"
-                        : "See what's on your November 3 ballot"}
-                    </span>
-                    <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
-                  </Link>
-                ) : null}
-                <Link
-                  href={locale === "es" ? "/about?lang=es#news" : "/about#news"}
-                  className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#9fc4f4] underline-offset-4 hover:text-white hover:underline focus-visible:focus-ring"
-                >
-                  <span>
-                    {locale === "es"
-                      ? "Lee sobre SimpleCity en las noticias"
-                      : "Read about SimpleCity in the news"}
-                  </span>
-                  <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
-                </Link>
-              </div>
+              <Link
+                href={locale === "es" ? "/about?lang=es#news" : "/about#news"}
+                className="mb-5 inline-flex items-center gap-2 rounded-sm text-sm font-bold text-[#9fc4f4] underline-offset-4 hover:text-white hover:underline focus-visible:focus-ring"
+              >
+                <span>
+                  {locale === "es"
+                    ? "Lee sobre SimpleCity en las noticias"
+                    : "Read about SimpleCity in the news"}
+                </span>
+                <ArrowRight aria-hidden className="h-4 w-4 shrink-0" />
+              </Link>
             ) : null}
-            <p className="text-sm font-black uppercase text-[#9fc4f4]">
-              {introLabel}
-            </p>
-            <h1 className="mt-4 text-balance text-[36px] font-black leading-[1.02] text-[#fffaf0] sm:text-[52px] lg:text-[56px]">
+            <h1 className="text-balance text-[30px] font-black leading-[1.1] text-[#fffaf0] sm:text-[40px]">
               {locale === "es"
                 ? "Mira qué está decidiendo tu gobierno local."
                 : "See what your local government is deciding."}
             </h1>
-            <p className="mt-4 max-w-2xl text-balance text-base font-medium leading-7 text-[#d9e2ec] sm:mt-5 sm:text-xl sm:leading-8">
-              {locale === "es"
-                ? "Lee resúmenes en lenguaje claro, revisa próximas reuniones y votaciones, y encuentra formas de compartir tu opinión."
-                : "Get easy-to-understand, source-linked summaries, check upcoming meetings and votes, and find ways to share your input."}
-            </p>
-            <Suspense fallback={<HomepageHeroStatusLoading />}>
-              <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} sort={sort} />
-            </Suspense>
-          </div>
-
-          <div className="space-y-5 lg:justify-self-stretch">
-            <div>
-              <p className="mb-4 text-xs font-black uppercase tracking-wide text-[#9fc4f4]">
-                {locale === "es" ? "Buscar resúmenes oficiales" : "Search official summaries"}
+            {!hasSearch ? (
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[#d9e2ec] sm:text-lg sm:leading-8">
+                {locale === "es"
+                  ? "Resúmenes en lenguaje claro de las reuniones públicas, con enlaces a los documentos oficiales."
+                  : "Plain-language summaries of public meetings, with links to the official documents."}
               </p>
+            ) : null}
+            <div className="mt-7 text-sm font-semibold leading-6 text-[#c9d6e3]">
+              <p className="text-inherit">
+                {areaLabel}
+                <Suspense fallback={<HomepageHeroStatusLoading />}>
+                  <HeroStatus jurisdiction={jurisdiction} locale={locale} search={search} sort={sort} />
+                </Suspense>
+              </p>
+            </div>
+            <div className="mt-3">
               <SearchAndFilters
                 action={`/decisions?jurisdiction=${toPublicJurisdictionSlug(jurisdiction)}`}
                 search={search}
                 locale={locale}
               />
             </div>
+            <p className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[15px] font-semibold text-[#9fb2c6]">
+              <span>{locale === "es" ? "O consulta:" : "Or go to:"}</span>
+              <Link href={withQuery("/decisions")} className="rounded-sm text-[#cfe1f7] underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff]">
+                {locale === "es" ? "Ver decisiones actuales" : "See current decisions"}
+              </Link>
+              <Link href={withQuery("/meetings")} className="rounded-sm text-[#cfe1f7] underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff]">
+                {t(locale, "viewMeetingCalendar")}
+              </Link>
+              <Link href={withQuery("/decisions", { view: "map" })} className="rounded-sm text-[#cfe1f7] underline decoration-white/30 underline-offset-4 hover:text-white hover:decoration-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff]">
+                {locale === "es" ? "Explorar mapa" : "Explore map"}
+              </Link>
+            </p>
           </div>
+
         </div>
       </section>
+
 
       <Suspense fallback={<HomepageContentLoading locale={locale} />}>
         <HomepageDecisions
@@ -288,80 +305,53 @@ export default async function Home({
           )}
         />
       </Suspense>
-      <div aria-hidden className="section-shell">
-        <div className="border-t border-black/10" />
-      </div>
-      <section className="section-shell pb-16 pt-8">
-        <div className="mb-5 max-w-2xl">
-          <p className="label-eyebrow text-civic">{t(locale, "browseByTopic")}</p>
-          <h2 className="mt-2 text-2xl font-black text-ink sm:text-3xl">{t(locale, "everydayImpactTitle")}</h2>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {topicCategories.map((category) => {
-            const definition = CATEGORY_DEFINITIONS[category];
-            const Icon = definition.icon;
-            return (
-              <Link
-                key={category}
-                href={`/topics/${definition.slug}?${new URLSearchParams({
-                  jurisdiction: toPublicJurisdictionSlug(jurisdiction),
-                  ...(params.lang ? { lang: params.lang } : {})
-                }).toString()}`}
-                className="quiet-card topic-card group grid min-h-[88px] grid-cols-[2.75rem_1fr] items-center gap-3 px-4 py-4 focus-visible:focus-ring"
-              >
-                <span className="icon-tile transition-colors duration-150 group-hover:bg-[#e6f0ff] group-hover:text-civic">
-                  <Icon aria-hidden className="h-5 w-5" />
-                </span>
-                <span className="text-base font-black leading-5 text-ink">
-                  {categoryShortLabel(locale, category)}
-                </span>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+
       {!hasSearch ? (
-              <section aria-labelledby="team-heading" className="section-shell pb-16">
-                <div className="quiet-card grid items-center gap-6 p-5 sm:p-6 md:grid-cols-[320px_minmax(0,1fr)] md:gap-8">
-                <div className="overflow-hidden rounded-lg">
-                  <Image
-                    src="/images/simplecity-team.webp"
-                    width={1442}
-                    height={1118}
-                    sizes="(max-width: 767px) calc(100vw - 5rem), 320px"
-                    alt={locale === "es"
-                      ? "Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity"
-                      : "Ruiwen, Patrick, and Samuel, the team behind SimpleCity"}
-                    className="aspect-[16/9] w-full object-cover object-[50%_65%]"
-                  />
-                </div>
-                <div>
-                  <p className="label-eyebrow !text-civic">{locale === "es" ? "Conoce al equipo" : "Meet the team"}</p>
-                  <h2 id="team-heading" className="mt-2 text-xl font-bold leading-snug text-ink sm:text-2xl">
-                    {locale === "es"
-                      ? "Creado por tres estudiantes del Área de la Bahía"
-                      : "Built by three Bay Area students"}
-                  </h2>
-                  <p className="mt-3 text-base leading-7 text-black/65">
-                    {locale === "es"
-                      ? "Somos Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity."
-                      : "We’re Ruiwen, Patrick, and Samuel—the team behind SimpleCity."}
-                  </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
-                    <Link
-                      href={locale === "es" ? "/about?lang=es" : "/about"}
-                      className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
-                    >
-                      {locale === "es" ? "Nuestra historia" : "Our story"}
-                      <ArrowRight aria-hidden className="h-4 w-4" />
-                    </Link>
-
-                  </div>
-                </div>
-                </div>
-              </section>
+        <section aria-labelledby="team-heading" className="section-shell pb-16 pt-8">
+          <div className="quiet-card grid items-center gap-5 p-5 sm:p-6 md:grid-cols-[240px_minmax(0,1fr)] md:gap-8">
+            <div className="overflow-hidden rounded-lg">
+              <Image
+                src="/images/simplecity-team.webp"
+                width={1442}
+                height={1118}
+                sizes="(max-width: 767px) calc(100vw - 5rem), 240px"
+                alt={locale === "es"
+                  ? "Ruiwen, Patrick y Samuel, el equipo detrás de SimpleCity"
+                  : "Ruiwen, Patrick, and Samuel, the team behind SimpleCity"}
+                className="aspect-[16/9] w-full object-cover object-[50%_65%]"
+              />
+            </div>
+            <div>
+              <h2 id="team-heading" className="text-xl font-black leading-snug text-ink">
+                {locale === "es"
+                  ? "Creado por tres estudiantes del Área de la Bahía"
+                  : "Built by three Bay Area students"}
+              </h2>
+              <p className="mt-2 text-base leading-7 text-black/65">
+                {locale === "es"
+                  ? "Somos Ruiwen, Patrick y Samuel. Hicimos SimpleCity para que cualquiera pueda seguir lo que decide su gobierno local, sin tener que leer cientos de páginas de agenda."
+                  : "We’re Ruiwen, Patrick, and Samuel. We built SimpleCity so anyone can keep up with local decisions without reading hundreds of pages of agendas."}
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <Link
+                  href={locale === "es" ? "/about?lang=es" : "/about"}
+                  className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
+                >
+                  {locale === "es" ? "Nuestra historia" : "Our story"}
+                  <ArrowRight aria-hidden className="h-4 w-4" />
+                </Link>
+                <Link
+                  href={locale === "es" ? "/about?lang=es#news" : "/about#news"}
+                  className="inline-flex items-center gap-2 rounded-sm text-sm font-bold text-civic underline-offset-4 hover:underline focus-visible:focus-ring"
+                >
+                  {locale === "es" ? "SimpleCity en las noticias" : "SimpleCity in the news"}
+                  <ArrowRight aria-hidden className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
       ) : null}
-
     </div>
   );
 }

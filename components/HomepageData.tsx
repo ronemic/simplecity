@@ -18,10 +18,6 @@ import {
 } from "@/lib/utils/date";
 import { displayMeetingTitle } from "@/lib/utils/meetingDisplay";
 
-function pluralize(count: number, singular: string, plural: string) {
-  return count === 1 ? `1 ${singular}` : `${count} ${plural}`;
-}
-
 export function HomepageHeroStatus({
   locale,
   totalCount
@@ -29,17 +25,23 @@ export function HomepageHeroStatus({
   locale: Locale;
   totalCount: number;
 }) {
+  const count = totalCount.toLocaleString(locale === "es" ? "es-US" : "en-US");
   const summarySentence =
     locale === "es"
-      ? `${pluralize(totalCount, "decisión publicada", "decisiones publicadas")} disponibles`
-      : `${pluralize(totalCount, "published decision", "published decisions")} available`;
+      ? totalCount === 1 ? "1 decisión resumida" : `${count} decisiones resumidas`
+      : totalCount === 1 ? "1 decision summarized" : `${count} decisions summarized`;
 
-  return <p className="mt-5 text-sm font-semibold text-[#aebdcc]">{summarySentence}</p>;
+  return (
+    <span className="block text-[#9fb2c6] sm:inline">
+      <span aria-hidden className="mx-2 hidden sm:inline">·</span>
+      {summarySentence}
+    </span>
+  );
 }
 
 /** Holds the status line's height while the count streams in. */
 export function HomepageHeroStatusLoading() {
-  return <div className="mt-5 h-5 w-64 animate-pulse rounded bg-white/10" aria-hidden />;
+  return <span className="ml-2 inline-block h-4 w-40 animate-pulse rounded bg-white/10 align-middle" aria-hidden />;
 }
 
 export function HomepageContentLoading({ locale }: { locale: Locale }) {
@@ -197,14 +199,11 @@ export function MeetingsCalendarSidebar({
           <p className="mt-0.5 text-xs font-semibold text-black/50">{sortNote}</p>
         </div>
       ) : (
-        <div className={cn("mb-5 border-b border-black/10 pb-5", headerClassName)}>
-          <p className="label-eyebrow text-civic">
+        <div className={cn("mb-4 border-b border-black/10 pb-4", headerClassName)}>
+          <h2 id="home-meetings-heading" className="text-2xl font-black leading-tight text-ink">
             {sort === "newest" ? t(locale, "meetings") : t(locale, "upcomingMeetings")}
-          </p>
-          <h2 id="home-meetings-heading" className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">
-            {locale === "es" ? "Calendario de reuniones" : "Meeting calendar"}
           </h2>
-          <p className="mt-2 text-base leading-7 text-black/[0.68]">{sortNote}</p>
+          <p className="mt-1 text-sm leading-6 text-black/60">{sortNote}</p>
         </div>
       )}
       <div className={cn("min-w-0", bodyClassName)}>
@@ -317,20 +316,20 @@ export function HomepageDataContent({
     ? locale === "es"
       ? `Resultados para "${search}"`
       : `Results for "${search}"`
-    : locale === "es"
-      ? "Decisiones que pueden afectar la vida diaria"
-      : "Decisions that may affect daily life";
+    : sort === "newest"
+      ? locale === "es" ? "Decisiones más recientes" : "Latest decisions"
+      : locale === "es" ? "Votaciones próximas y decisiones recientes" : "Upcoming votes and recent decisions";
   const decisionSectionDescription = sort === "newest"
     ? locale === "es"
-      ? "Las fechas de reunión más recientes primero, igual que en la pestaña de decisiones."
-      : "Latest meeting dates first, the same order as the decisions tab."
+      ? "Ordenadas por fecha de reunión, la más reciente primero."
+      : "Sorted by meeting date, most recent first."
     : hasSearch
     ? locale === "es"
       ? "Decisiones coincidentes de la jurisdicción seleccionada, con elementos más recientes y de mayor impacto primero."
       : "Matching decisions from the currently selected jurisdiction, with newer, higher-impact items ranked first."
     : locale === "es"
-      ? "Primero las próximas votaciones, de la más cercana a la más lejana, y luego las decisiones más recientes."
-      : "Upcoming votes first, soonest first, followed by the most recent decisions.";
+      ? "Lo que se votará pronto aparece primero. Toca una decisión para leer el resumen."
+      : "What’s being voted on soon comes first. Tap any decision to read the summary.";
 
   return (
     <section
@@ -339,9 +338,9 @@ export function HomepageDataContent({
     >
       <nav
         aria-label={locale === "es" ? "Ordenar decisiones y reuniones" : "Sort decisions and meetings"}
-        className="mb-6 flex flex-wrap items-center gap-2.5 lg:col-span-2"
+        className="mb-5 flex flex-wrap items-center gap-2 lg:col-span-2"
       >
-        <span className="text-sm font-bold text-ink">{locale === "es" ? "Ordenar:" : "Sort:"}</span>
+        <span className="text-sm font-bold text-black/60">{locale === "es" ? "Mostrar:" : "Show:"}</span>
         {DECISION_SORTS.map((option) => {
           const params = new URLSearchParams(sortLinkParams);
           if (option !== "upcoming") params.set("sort", option);
@@ -352,11 +351,11 @@ export function HomepageDataContent({
               href={`/${query ? `?${query}` : ""}#decisions`}
               scroll={false}
               aria-current={sort === option ? "true" : undefined}
-              className={`chip chip-action ${sort === option ? "chip-selected" : ""}`}
+              className={`chip chip-action chip-lg ${sort === option ? "chip-selected" : ""}`}
             >
               {option === "newest"
-                ? locale === "es" ? "Más recientes primero" : "Newest first"
-                : locale === "es" ? "Próximas primero" : "Upcoming first"}
+                ? locale === "es" ? "Más recientes primero" : "Most recent first"
+                : locale === "es" ? "Próximas votaciones primero" : "Upcoming votes first"}
             </Link>
           );
         })}
@@ -365,14 +364,11 @@ export function HomepageDataContent({
           lines meet; row 3 starts the cards and the meeting list together. */}
       <div
         id="search-results"
-        className="mb-5 flex min-w-0 scroll-mt-24 flex-col gap-4 border-b border-black/10 pb-5 sm:flex-row sm:items-end sm:justify-between lg:col-start-1 lg:row-start-2 lg:self-end"
+        className="mb-4 flex min-w-0 scroll-mt-24 flex-col gap-4 border-b border-black/10 pb-4 sm:flex-row sm:items-end sm:justify-between lg:col-start-1 lg:row-start-2 lg:self-end"
       >
           <div className="max-w-2xl">
-            <p className="label-eyebrow text-civic">
-              {hasSearch ? t(locale, "searchResults") : t(locale, "topPublicDecisions")}
-            </p>
-            <h2 className="mt-2 text-3xl font-black leading-tight text-ink sm:text-4xl">{decisionSectionTitle}</h2>
-            <p className="mt-2 text-base leading-7 text-black/[0.68]">{decisionSectionDescription}</p>
+            <h2 className="text-2xl font-black leading-tight text-ink">{decisionSectionTitle}</h2>
+            <p className="mt-1 text-sm leading-6 text-black/60">{decisionSectionDescription}</p>
           </div>
           {hasSearch ? (
             <p className="count-badge">

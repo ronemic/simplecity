@@ -1,4 +1,4 @@
-import { CalendarDays, Map as MapIcon, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { type Locale, t } from "@/lib/i18n";
 
@@ -24,27 +24,32 @@ export function SearchAndFilters({
         : `${resultCount ?? 0} results`;
 
   return (
-    <div className="w-full max-w-[740px]">
+    <div className="w-full">
       <form
-        className="flex w-full rounded-lg border border-white/20 bg-white/10 p-1.5 shadow-[0_18px_60px_rgba(0,0,0,0.22)] backdrop-blur"
+        className="flex w-full gap-2"
         action={action}
         role="search"
       >
-        <label className="flex flex-1">
+        <label className="relative flex flex-1">
           <span className="sr-only">{t(locale, "searchDecisionsMeetingsTopics")}</span>
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-black/40"
+          />
           <input
             name="q"
             defaultValue={search}
-            placeholder={t(locale, "searchDecisions")}
-            className="min-h-14 w-full rounded-lg rounded-r-none border border-transparent bg-white px-4 py-3 text-base font-semibold text-ink shadow-sm transition placeholder:text-black/[0.48] focus:border-[#89b8f7] focus:outline-none focus:ring-4 focus:ring-[#8fbfff]/25"
+            placeholder={
+              locale === "es"
+                ? "Prueba “vivienda”, “parque” o el nombre de una calle"
+                : "Try “housing”, “bike lanes”, or a street name"
+            }
+            className="min-h-[52px] w-full rounded-md border-2 border-transparent bg-white py-2.5 pl-11 pr-3 text-base font-semibold text-ink placeholder:font-medium placeholder:text-black/50 focus:border-[#9fc4f4] focus:outline-none"
           />
         </label>
-        <button
-          aria-label={t(locale, "search")}
-          className="-ml-px inline-flex min-h-14 w-16 shrink-0 items-center justify-center rounded-lg rounded-l-none bg-[#dcecff] px-4 py-3 text-base font-black text-[#102134] shadow-sm transition hover:bg-white focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#8fbfff]/30"
-        >
-          <Search aria-hidden className="h-5 w-5" />
-          <span className="sr-only">{t(locale, "search")}</span>
+        <button className="inline-flex min-h-[52px] shrink-0 items-center justify-center gap-2 rounded-md bg-civic px-4 text-base font-black text-white transition hover:bg-[#1d4a8f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:px-6">
+          <Search aria-hidden className="h-5 w-5 sm:hidden" />
+          <span className="sr-only sm:not-sr-only">{t(locale, "search")}</span>
         </button>
       </form>
 
@@ -58,34 +63,14 @@ export function SearchAndFilters({
               ? `Mostrando ${resultLabel} para "${search.trim()}".`
               : `Showing ${resultLabel} for "${search.trim()}".`}
           </span>
-          <Link href="#search-results" className="rounded-md py-1 text-[#b9d7ff] underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:px-2">
+          <Link
+            href="#search-results"
+            className="rounded-md py-1 text-[#b9d7ff] underline-offset-4 hover:underline focus-visible:focus-ring sm:px-2"
+          >
             {t(locale, "viewResults")}
           </Link>
         </div>
       ) : null}
-
-      <div className="mt-3 flex flex-wrap gap-2 text-sm font-bold sm:mt-4 sm:items-center">
-        <Link
-          href="/decisions"
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-white/[0.16] px-4 py-2 text-[#e7f0fb] transition hover:border-white/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
-        >
-          {locale === "es" ? "Ver decisiones actuales" : "See current decisions"}
-        </Link>
-        <Link
-          href="/meetings"
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[#b9d7ff] transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
-        >
-          <CalendarDays aria-hidden className="h-4 w-4" />
-          {t(locale, "viewMeetingCalendar")}
-        </Link>
-        <Link
-          href="/decisions?view=map"
-          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-[#b9d7ff] transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b9d7ff] focus-visible:ring-offset-2 focus-visible:ring-offset-[#142234] sm:justify-start"
-        >
-          <MapIcon aria-hidden className="h-4 w-4" />
-          {locale === "es" ? "Explorar mapa" : "Explore map"}
-        </Link>
-      </div>
     </div>
   );
 }
