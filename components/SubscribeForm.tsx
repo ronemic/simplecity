@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Loader2, Mail, Send, XCircle } from "lucide-react";
+import { CheckCircle2, ChevronDown, Loader2, Mail, Search, Send, X, XCircle } from "lucide-react";
 import { FormEvent, useMemo, useState } from "react";
 import { t, type Locale } from "@/lib/i18n";
 
@@ -27,6 +27,84 @@ const spanishSubscribeErrors: Record<string, string> = {
   "We could not start that subscription. Please try again in a moment.":
     "No pudimos iniciar la suscripción. Inténtalo de nuevo en un momento."
 };
+
+function normalizeSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
+type CountyGroup = {
+  county: JurisdictionOption;
+  cities: JurisdictionOption[];
+  districts: JurisdictionOption[];
+};
+
+/**
+ * Builds the picker from the jurisdiction config so new cities, counties and
+ * districts show up without touching this form: anything with children is a
+ * county card, everything else without a parent is a standalone option.
+ */
+function groupJurisdictions(jurisdictions: JurisdictionOption[]) {
+  const values = new Set(jurisdictions.map((jurisdiction) => jurisdiction.value));
+  const parentValues = new Set(
+    jurisdictions.map((jurisdiction) => jurisdiction.parentCountyValue).filter(Boolean)
+  );
+  const counties: CountyGroup[] = jurisdictions
+    .filter((jurisdiction) => !jurisdiction.parentCountyValue && parentValues.has(jurisdiction.value))
+    .map((county) => {
+      const children = jurisdictions.filter(
+        (jurisdiction) => jurisdiction.parentCountyValue === county.value
+      );
+      return {
+        county,
+        cities: children.filter((child) => child.kind !== "school-district"),
+        districts: children.filter((child) => child.kind === "school-district")
+      };
+    });
+  const standalone = jurisdictions.filter(
+    (jurisdiction) =>
+      (!jurisdiction.parentCountyValue && !parentValues.has(jurisdiction.value)) ||
+      (jurisdiction.parentCountyValue && !values.has(jurisdiction.parentCountyValue))
+  );
+
+  return { counties, standalone };
+}
+
+function AreaOption({
+  checked,
+  label,
+  hint,
+  onToggle
+}: {
+  checked: boolean;
+  label: string;
+  hint?: string;
+  onToggle: () => void;
+}) {
+  return (
+    <label
+      className={`flex min-h-10 cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-bold ring-1 transition ${
+        checked
+          ? "bg-civic/10 text-civic ring-civic/35"
+          : "bg-white text-ink ring-black/[0.08] hover:bg-[#f8fbff] hover:ring-civic/25"
+      }`}
+    >
+      <input
+        checked={checked}
+        className="h-4 w-4 shrink-0 accent-[#2457a6]"
+        onChange={onToggle}
+        type="checkbox"
+      />
+      <span className="grid">
+        <span>{label}</span>
+        {hint ? <span className="text-xs font-semibold text-black/55">{hint}</span> : null}
+      </span>
+    </label>
+  );
+}
 
 function subscribeErrorMessage(locale: Locale, error: string | undefined) {
   if (locale === "en") return error || t(locale, "subscribeFormFallbackError");
@@ -58,55 +136,63 @@ export function SubscribeForm({
   const [status, setStatus] = useState<SubscribeStatus>("idle");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const jurisdictionGroups = [
-    {
-      id: "regional",
-      label: t(locale, "subscribeRegionalCoverage"),
-      jurisdictions: jurisdictions.filter((jurisdiction) => !jurisdiction.parentCountyValue),
-      columns: "sm:grid-cols-3 md:grid-cols-1",
-      span: ""
-    },
-    {
-      id: "san-mateo-cities",
-      label: t(locale, "subscribeSanMateoCountyCities"),
-      jurisdictions: jurisdictions.filter(
-        (jurisdiction) => jurisdiction.parentCountyValue === "san-mateo-county"
-      ),
-      columns: "sm:grid-cols-2",
-      span: ""
-    },
-    {
-      id: "santa-clara-cities",
-      label: t(locale, "subscribeSantaClaraCountyCities"),
-      jurisdictions: jurisdictions.filter(
-        (jurisdiction) =>
-          jurisdiction.parentCountyValue === "santa-clara-county" &&
-          jurisdiction.kind !== "school-district"
-      ),
-      columns: "sm:grid-cols-2 md:grid-cols-1",
-      span: ""
-    },
-    {
-      id: "santa-barbara-cities",
-      label: t(locale, "subscribeSantaBarbaraCountyCities"),
-      jurisdictions: jurisdictions.filter(
-        (jurisdiction) =>
-          jurisdiction.parentCountyValue === "santa-barbara-county" &&
-          jurisdiction.kind !== "school-district"
-      ),
-      columns: "sm:grid-cols-2 lg:grid-cols-3",
-      span: "lg:col-span-2"
-    },
-    {
-      id: "school-districts",
-      label: t(locale, "subscribeSchoolDistricts"),
-      jurisdictions: jurisdictions.filter(
-        (jurisdiction) => jurisdiction.kind === "school-district"
-      ),
-      columns: "sm:grid-cols-2 md:grid-cols-1",
-      span: ""
-    }
-  ].filter((group) => group.jurisdictions.length > 0);
+  const [query, setQuery] = useState("");
+  const [expandedCounties, setExpandedCounties] = useState<Set<string>>(
+    () =>
+      new Set(
+        jurisdictions
+          .filter((jurisdiction) => initialSelections.includes(jurisdiction.value))
+          .map((jurisdiction) => jurisdiction.parentCountyValue || jurisdiction.value)
+      )
+  );
+  const { counties, standalone } = useMemo(
+    () => groupJurisdictions(jurisdictions),
+    [jurisdictions]
+  );
+  const labelByValue = useMemo(
+    () => new Map(jurisdictions.map((jurisdiction) => [jurisdiction.value, jurisdiction.label])),
+    [jurisdictions]
+  );
+  const normalizedQuery = normalizeSearch(query);
+  const searching = normalizedQuery.length > 0;
+  const matches = (option: JurisdictionOption) =>
+    !searching || normalizeSearch(option.label).includes(normalizedQuery);
+  const visibleStandalone = standalone.filter(matches);
+  const visibleCounties = counties
+    .map((group) => {
+      // A county name match shows everything in that county.
+      const countyMatches = matches(group.county);
+      const pick = (options: JurisdictionOption[]) =>
+        countyMatches ? options : options.filter(matches);
+      return {
+        ...group,
+        showCounty: countyMatches,
+        visibleCities: pick(group.cities),
+        visibleDistricts: pick(group.districts)
+      };
+    })
+    .filter(
+      (group) =>
+        group.showCounty || group.visibleCities.length > 0 || group.visibleDistricts.length > 0
+    );
+  const nothingMatches = searching && visibleStandalone.length === 0 && visibleCounties.length === 0;
+
+  function setMany(values: string[], selected: boolean) {
+    setSelectedJurisdictions((current) =>
+      selected
+        ? [...current, ...values.filter((value) => !current.includes(value))]
+        : current.filter((value) => !values.includes(value))
+    );
+  }
+
+  function toggleCountyOpen(value: string) {
+    setExpandedCounties((current) => {
+      const next = new Set(current);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
 
   function toggleJurisdiction(value: string) {
     setSelectedJurisdictions((current) => {
@@ -240,52 +326,197 @@ export function SubscribeForm({
         type="text"
       />
 
-      <fieldset className="grid gap-3">
-        <legend className="text-sm font-black text-ink">
-          {t(locale, "subscribeWeeklyDigestAreas")}
-        </legend>
-        <div className="rd-subscribe-groups grid gap-3 md:grid-cols-2 lg:grid-cols-[0.78fr_1.3fr_0.92fr]">
-          {jurisdictionGroups.map((group) => (
-            <div
-              aria-labelledby={`${group.id}-label`}
-              className={`rd-subscribe-group rounded-lg p-3.5 ${group.span}`}
-              key={group.id}
-              role="group"
-            >
-              <h2
-                className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-[0.05em] text-black/60"
-                id={`${group.id}-label`}
-              >
-                <span aria-hidden className="h-4 w-1 rounded-full bg-civic" />
-                {group.label}
-              </h2>
-              <div className={`grid gap-2 ${group.columns}`}>
-                {group.jurisdictions.map((jurisdiction) => {
-                  const checked = selectedJurisdictions.includes(jurisdiction.value);
-
-                  return (
-                    <label
-                      key={jurisdiction.value}
-                      className={`flex min-h-9 cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm font-bold shadow-[0_1px_2px_rgba(23,23,23,0.04)] ring-1 transition ${
-                        checked
-                          ? "bg-civic/10 text-civic ring-civic/35"
-                          : "bg-white text-ink ring-black/[0.08] hover:bg-[#f8fbff] hover:ring-civic/25"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 shrink-0 accent-[#2457a6]"
-                        checked={checked}
-                        onChange={() => toggleJurisdiction(jurisdiction.value)}
-                      />
-                      <span>{jurisdiction.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+      <fieldset className="grid gap-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <legend className="float-left text-sm font-black text-ink">
+            {t(locale, "subscribeWeeklyDigestAreas")}
+          </legend>
+          <span className="text-sm font-bold text-black/60" aria-live="polite">
+            {selectedJurisdictions.length} {t(locale, "subscribeSelected")}
+          </span>
         </div>
+
+        <div className="rd-subscribe-selected flex min-h-11 flex-wrap items-center gap-2 rounded-lg bg-[#f6f8fa] px-3 py-2">
+          <span className="sr-only">{t(locale, "subscribeYourAreas")}</span>
+          {selectedJurisdictions.length === 0 ? (
+            <span className="text-sm font-semibold text-black/60">
+              {t(locale, "subscribeNoneSelected")}
+            </span>
+          ) : (
+            <>
+              {selectedJurisdictions.map((value) => (
+                <button
+                  className="rd-subscribe-chip inline-flex items-center gap-1.5 rounded-full bg-white py-1 pl-3 pr-2 text-sm font-bold text-civic ring-1 ring-civic/30 transition hover:bg-civic/10"
+                  key={value}
+                  onClick={() => toggleJurisdiction(value)}
+                  type="button"
+                >
+                  {labelByValue.get(value) || value}
+                  <X aria-hidden className="h-3.5 w-3.5" />
+                  <span className="sr-only">{t(locale, "subscribeRemoveArea")}</span>
+                </button>
+              ))}
+              <button
+                className="ml-auto text-sm font-bold text-black/60 underline-offset-2 hover:text-ink hover:underline"
+                onClick={() => setSelectedJurisdictions([])}
+                type="button"
+              >
+                {t(locale, "subscribeClearAll")}
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="relative">
+          <label className="sr-only" htmlFor="subscribe-area-search">
+            {t(locale, "subscribeSearchAreas")}
+          </label>
+          <Search
+            aria-hidden
+            className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-black/45"
+          />
+          <input
+            autoComplete="off"
+            className="input-control input-control--with-icon"
+            id="subscribe-area-search"
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              // Enter in the search box should not submit the subscription.
+              if (event.key === "Enter") event.preventDefault();
+            }}
+            placeholder={t(locale, "subscribeSearchPlaceholder")}
+            type="search"
+            value={query}
+          />
+        </div>
+
+        {nothingMatches ? (
+          <p className="rounded-lg border border-dashed border-black/15 px-4 py-6 text-center text-sm font-semibold text-black/60">
+            {t(locale, "subscribeNoMatches")}
+          </p>
+        ) : (
+          <div className="rd-subscribe-list grid gap-2.5">
+            {visibleStandalone.length > 0 ? (
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                {visibleStandalone.map((option) => (
+                  <AreaOption
+                    checked={selectedJurisdictions.includes(option.value)}
+                    key={option.value}
+                    label={option.label}
+                    onToggle={() => toggleJurisdiction(option.value)}
+                  />
+                ))}
+              </div>
+            ) : null}
+
+            {visibleCounties.map((group) => {
+              const allValues = [
+                group.county.value,
+                ...group.cities.map((option) => option.value),
+                ...group.districts.map((option) => option.value)
+              ];
+              const selectedCount = allValues.filter((value) =>
+                selectedJurisdictions.includes(value)
+              ).length;
+              const allSelected = selectedCount === allValues.length;
+              const open = searching || expandedCounties.has(group.county.value);
+              const panelId = `subscribe-county-${group.county.value}`;
+
+              return (
+                <section
+                  className={`rd-subscribe-county rounded-lg border bg-white ${
+                    selectedCount > 0 ? "border-civic/35" : "border-black/[0.09]"
+                  }`}
+                  key={group.county.value}
+                >
+                  <div className="flex items-center gap-2 pr-2.5">
+                    <button
+                      aria-controls={panelId}
+                      aria-expanded={open}
+                      className="flex min-h-12 flex-1 items-center gap-2.5 rounded-lg px-3.5 py-2.5 text-left"
+                      disabled={searching}
+                      onClick={() => toggleCountyOpen(group.county.value)}
+                      type="button"
+                    >
+                      <ChevronDown
+                        aria-hidden
+                        className={`h-4 w-4 shrink-0 text-black/50 transition-transform ${
+                          open ? "" : "-rotate-90"
+                        }`}
+                      />
+                      <span className="text-[15px] font-black text-ink">{group.county.label}</span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+                          selectedCount > 0 ? "bg-civic/10 text-civic" : "bg-black/[0.05] text-black/55"
+                        }`}
+                      >
+                        {selectedCount > 0
+                          ? `${selectedCount}/${allValues.length} ${t(locale, "subscribeSelected")}`
+                          : `${allValues.length} ${t(locale, "subscribeAreas")}`}
+                      </span>
+                    </button>
+                    <button
+                      className="shrink-0 rounded-md px-2.5 py-1.5 text-sm font-bold text-civic hover:bg-civic/10"
+                      onClick={() => setMany(allValues, !allSelected)}
+                      type="button"
+                    >
+                      {allSelected ? t(locale, "subscribeClear") : t(locale, "subscribeSelectAll")}
+                    </button>
+                  </div>
+
+                  {open ? (
+                    <div className="grid gap-4 border-t border-black/[0.07] px-3.5 pb-4 pt-3.5" id={panelId}>
+                      {group.showCounty ? (
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                          <AreaOption
+                            checked={selectedJurisdictions.includes(group.county.value)}
+                            hint={t(locale, "subscribeCountyGovernment")}
+                            label={group.county.label}
+                            onToggle={() => toggleJurisdiction(group.county.value)}
+                          />
+                        </div>
+                      ) : null}
+                      {[
+                        { key: "cities", label: t(locale, "subscribeCities"), options: group.visibleCities },
+                        {
+                          key: "districts",
+                          label: t(locale, "subscribeSchoolDistricts"),
+                          options: group.visibleDistricts
+                        }
+                      ]
+                        .filter((section) => section.options.length > 0)
+                        .map((section) => (
+                          <div
+                            aria-labelledby={`${panelId}-${section.key}`}
+                            className="grid gap-2"
+                            key={section.key}
+                            role="group"
+                          >
+                            <h3
+                              className="text-xs font-black uppercase tracking-[0.05em] text-black/55"
+                              id={`${panelId}-${section.key}`}
+                            >
+                              {section.label}
+                            </h3>
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                              {section.options.map((option) => (
+                                <AreaOption
+                                  checked={selectedJurisdictions.includes(option.value)}
+                                  key={option.value}
+                                  label={option.label}
+                                  onToggle={() => toggleJurisdiction(option.value)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ) : null}
+                </section>
+              );
+            })}
+          </div>
+        )}
       </fieldset>
 
       {message ? (

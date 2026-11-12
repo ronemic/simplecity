@@ -88,11 +88,20 @@ type TranslationKey =
   | "subscribeAlreadySubscribedHelp"
   | "subscribeConfirmedBody"
   | "subscribeConfirmedTitle"
-  | "subscribeRegionalCoverage"
   | "subscribeSchoolDistricts"
-  | "subscribeSanMateoCountyCities"
-  | "subscribeSantaClaraCountyCities"
-  | "subscribeSantaBarbaraCountyCities"
+  | "subscribeCities"
+  | "subscribeCountyGovernment"
+  | "subscribeSearchAreas"
+  | "subscribeSearchPlaceholder"
+  | "subscribeNoMatches"
+  | "subscribeSelected"
+  | "subscribeAreas"
+  | "subscribeNoneSelected"
+  | "subscribeYourAreas"
+  | "subscribeSelectAll"
+  | "subscribeClearAll"
+  | "subscribeClear"
+  | "subscribeRemoveArea"
   | "subscribeEmailAddress"
   | "subscribeEmailPlaceholder"
   | "subscribeErrorBody"
@@ -212,11 +221,20 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeConfirmedBody:
       "Weekly digests will use your latest selected areas when new SimpleCity cards are published.",
     subscribeConfirmedTitle: "Your email updates are confirmed",
-    subscribeRegionalCoverage: "Regional coverage",
     subscribeSchoolDistricts: "School districts",
-    subscribeSanMateoCountyCities: "Cities in San Mateo County",
-    subscribeSantaClaraCountyCities: "Cities in Santa Clara County",
-    subscribeSantaBarbaraCountyCities: "Cities in Santa Barbara County",
+    subscribeCities: "Cities",
+    subscribeCountyGovernment: "County government meetings",
+    subscribeSearchAreas: "Search areas",
+    subscribeSearchPlaceholder: "Search cities, counties, schools",
+    subscribeNoMatches: "No areas match that search.",
+    subscribeSelected: "selected",
+    subscribeAreas: "areas",
+    subscribeNoneSelected: "Pick at least one area below.",
+    subscribeYourAreas: "Your areas",
+    subscribeSelectAll: "Select all",
+    subscribeClearAll: "Clear all",
+    subscribeClear: "Clear",
+    subscribeRemoveArea: "Remove",
     subscribeEmailAddress: "Email address",
     subscribeEmailPlaceholder: "you@example.com",
     subscribeErrorBody: "Please try again in a moment.",
@@ -340,11 +358,20 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeConfirmedBody:
       "Los resúmenes semanales usarán las áreas que elegiste más recientemente cuando se publiquen nuevas tarjetas de SimpleCity.",
     subscribeConfirmedTitle: "Tus actualizaciones por correo electrónico están confirmadas",
-    subscribeRegionalCoverage: "Cobertura regional",
     subscribeSchoolDistricts: "Distritos escolares",
-    subscribeSanMateoCountyCities: "Ciudades del condado de San Mateo",
-    subscribeSantaClaraCountyCities: "Ciudades del condado de Santa Clara",
-    subscribeSantaBarbaraCountyCities: "Ciudades del condado de Santa Bárbara",
+    subscribeCities: "Ciudades",
+    subscribeCountyGovernment: "Reuniones del gobierno del condado",
+    subscribeSearchAreas: "Buscar áreas",
+    subscribeSearchPlaceholder: "Busca ciudades, condados, escuelas",
+    subscribeNoMatches: "Ningún área coincide con esa búsqueda.",
+    subscribeSelected: "seleccionadas",
+    subscribeAreas: "áreas",
+    subscribeNoneSelected: "Elige al menos un área abajo.",
+    subscribeYourAreas: "Tus áreas",
+    subscribeSelectAll: "Seleccionar todo",
+    subscribeClearAll: "Borrar todo",
+    subscribeClear: "Borrar",
+    subscribeRemoveArea: "Quitar",
     subscribeEmailAddress: "Correo electrónico",
     subscribeEmailPlaceholder: "tu@ejemplo.com",
     subscribeErrorBody: "Inténtalo de nuevo en un momento.",
