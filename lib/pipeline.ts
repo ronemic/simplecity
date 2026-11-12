@@ -71,11 +71,13 @@ import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAlt
 import { reconcileEastPaloAltoMeetingIds } from "@/lib/db/eastPaloAltoMeetings";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
+import { parseMeetingDate } from "@/lib/utils/date";
 import {
   formatLlmProcessRunSummary,
   getLlmProcessBudgetUsage,
   isLlmProcessBudgetExceededError,
   isLlmProcessBudgetExhausted,
+  llmMaxConcurrentRequests,
   runWithLlmProcessBudget
 } from "@/lib/llm/provider";
 
@@ -368,6 +370,44 @@ function getMaxConsecutiveRateLimitFailures() {
 
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 2;
+}
+
+/**
+ * Order the summary queue so a budget or deadline stop costs the least.
+ *
+ * The queue used to run in scrape order, so when the OpenRouter budget ran out
+ * the meetings left with official-source fallback cards were whichever the
+ * source happened to list last -- on Santa Clara County that was an upcoming
+ * Board of Supervisors agenda. Meetings people can still act on now go first,
+ * soonest first; then past meetings, most recent first; undated meetings last.
+ * Ties keep scrape order, and every meeting is still processed.
+ */
+export function orderSummaryTargets<
+  T extends { meeting: Pick<LlmReadyMeeting, "dateText" | "timeText"> }
+>(targets: readonly T[], now = Date.now()): T[] {
+  const timeOf = ({ meeting }: T) => {
+    const dateText = meeting.dateText || "";
+    const timeText = meeting.timeText || "";
+    const text = !timeText || dateText.toLowerCase().includes(timeText.toLowerCase())
+      ? dateText
+      : `${dateText} ${timeText}`;
+    const iso = parseMeetingDate(text.trim());
+    const time = iso ? Date.parse(iso) : Number.NaN;
+    return Number.isFinite(time) ? time : null;
+  };
+  const rank = (time: number | null) => (time === null ? 2 : time >= now ? 0 : 1);
+
+  return targets
+    .map((target, index) => ({ target, index, time: timeOf(target) }))
+    .sort((a, b) => {
+      const rankDifference = rank(a.time) - rank(b.time);
+      if (rankDifference !== 0) return rankDifference;
+      if (a.time !== null && b.time !== null && a.time !== b.time) {
+        return rank(a.time) === 0 ? a.time - b.time : b.time - a.time;
+      }
+      return a.index - b.index;
+    })
+    .map(({ target }) => target);
 }
 
 export function shouldReconcileMinutesWithoutGeneratingCards(
@@ -1000,7 +1040,7 @@ async function runSimpleCityPipelineInternal(
         errors.push(message);
         log(message);
       } else {
-        const summaryTargets = persistSummaries
+        const scrapedSummaryTargets = persistSummaries
           ? upserted
           : llmReadyMeetings.map((meeting) => ({
               externalId: meeting.id,
@@ -1014,9 +1054,17 @@ async function runSimpleCityPipelineInternal(
               summarizedSummarySourceHash: null,
               existingCardCount: 0
             }));
+        const summaryTargets =
+          orderSummaryTargets<(typeof scrapedSummaryTargets)[number]>(scrapedSummaryTargets);
         let consecutiveRateLimitFailures = 0;
         const maxConsecutiveRateLimitFailures = getMaxConsecutiveRateLimitFailures();
-        const summaryConcurrency = Math.min(2, Math.max(1, summaryTargets.length));
+        // One worker per OpenRouter slot. A meeting's batches run one after
+        // another, so fewer workers would leave OpenRouter slots idle. Groq work
+        // is still held to its own two-request ceiling by the request limiter.
+        const summaryConcurrency = Math.min(
+          llmMaxConcurrentRequests("OpenRouter"),
+          Math.max(1, summaryTargets.length)
+        );
         const summaryProgress = {
           completed: 0,
           generated: 0,

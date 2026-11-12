@@ -14,6 +14,7 @@ import {
   getLlmProcessBudgetUsage,
   getLlmProcessRunSummary,
   LLM_REQUEST_TIMEOUT_MS,
+  llmMaxConcurrentRequests,
   LlmProcessBudgetExceededError,
   resetLlmProcessBudgetForTests,
   runWithLlmProcessBudget
@@ -360,7 +361,7 @@ test("does not retry a Groq key while its rate-limit cooldown is active", async 
   );
 });
 
-test("never runs more than two LLM requests at once", async (t) => {
+test("never runs more than two Groq requests at once", async (t) => {
   const originalFetch = globalThis.fetch;
   let active = 0;
   let maximumActive = 0;
@@ -380,7 +381,7 @@ test("never runs more than two LLM requests at once", async (t) => {
 
   const requests = Array.from({ length: 4 }, (_, index) =>
     fetchLlmResponse(
-      "https://openrouter.ai/test",
+      "https://api.groq.com/test",
       { method: "POST" },
       1000,
       { label: `Concurrent request ${index + 1}` }
@@ -399,7 +400,7 @@ test("never runs more than two LLM requests at once", async (t) => {
   assert.equal(maximumActive, 2);
 });
 
-test("request timeout starts after waiting behind the two-request ceiling", async (t) => {
+test("request timeout starts after waiting behind the two-request Groq ceiling", async (t) => {
   const originalFetch = globalThis.fetch;
   const releases: Array<() => void> = [];
   let fetchCalls = 0;
@@ -414,12 +415,12 @@ test("request timeout starts after waiting behind the two-request ceiling", asyn
     return new Response('{"ok":true}', { status: 200 });
   }) as typeof fetch;
 
-  const first = fetchLlmResponse("https://openrouter.ai/test", {}, 1000, { label: "First" });
-  const second = fetchLlmResponse("https://openrouter.ai/test", {}, 1000, { label: "Second" });
+  const first = fetchLlmResponse("https://api.groq.com/test", {}, 1000, { label: "First" });
+  const second = fetchLlmResponse("https://api.groq.com/test", {}, 1000, { label: "Second" });
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   const queued = fetchLlmResponse(
-    "https://openrouter.ai/test",
+    "https://api.groq.com/test",
     {},
     20,
     { label: "Queued" }
@@ -450,17 +451,17 @@ test("removes an aborted request from the LLM slot queue", async (t) => {
     return new Response('{"ok":true}', { status: 200 });
   }) as typeof fetch;
 
-  const first = fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "first" } });
-  const second = fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "second" } });
+  const first = fetchLlmResponse("https://api.groq.com/test", { headers: { "x-label": "first" } });
+  const second = fetchLlmResponse("https://api.groq.com/test", { headers: { "x-label": "second" } });
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   const controller = new AbortController();
   const aborted = fetchLlmResponse(
-    "https://openrouter.ai/test",
+    "https://api.groq.com/test",
     { headers: { "x-label": "aborted" }, signal: controller.signal }
   );
   const survivor = fetchLlmResponse(
-    "https://openrouter.ai/test",
+    "https://api.groq.com/test",
     { headers: { "x-label": "survivor" } }
   );
   controller.abort();
@@ -495,10 +496,10 @@ test("gives another LLM request group the next available slot", async (t) => {
   }) as typeof fetch;
 
   const requests = [
-    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "a1" } }, 1000, { label: "a1", group: "a" }),
-    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "a2" } }, 1000, { label: "a2", group: "a" }),
-    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "a3" } }, 1000, { label: "a3", group: "a" }),
-    fetchLlmResponse("https://openrouter.ai/test", { headers: { "x-label": "b1" } }, 1000, { label: "b1", group: "b" })
+    fetchLlmResponse("https://api.groq.com/test", { headers: { "x-label": "a1" } }, 1000, { label: "a1", group: "a" }),
+    fetchLlmResponse("https://api.groq.com/test", { headers: { "x-label": "a2" } }, 1000, { label: "a2", group: "a" }),
+    fetchLlmResponse("https://api.groq.com/test", { headers: { "x-label": "a3" } }, 1000, { label: "a3", group: "a" }),
+    fetchLlmResponse("https://api.groq.com/test", { headers: { "x-label": "b1" } }, 1000, { label: "b1", group: "b" })
   ];
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.deepEqual(started, ["a1", "a2"]);
@@ -512,6 +513,68 @@ test("gives another LLM request group the next available slot", async (t) => {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   await Promise.all(requests);
+});
+
+test("runs four OpenRouter requests at once, independent of Groq's ceiling", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const active = { groq: 0, openRouter: 0 };
+  const maximum = { groq: 0, openRouter: 0 };
+  const releases: Array<() => void> = [];
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  globalThis.fetch = (async (url) => {
+    const key = String(url).includes("openrouter.ai") ? "openRouter" : "groq";
+    active[key] += 1;
+    maximum[key] = Math.max(maximum[key], active[key]);
+    await new Promise<void>((resolve) => releases.push(resolve));
+    active[key] -= 1;
+    return new Response('{"ok":true}', { status: 200 });
+  }) as typeof fetch;
+
+  const requests = [
+    ...Array.from({ length: 6 }, (_, index) =>
+      fetchLlmResponse("https://openrouter.ai/test", { method: "POST" }, 1000, {
+        label: `OpenRouter request ${index + 1}`
+      })
+    ),
+    ...Array.from({ length: 3 }, (_, index) =>
+      fetchLlmResponse("https://api.groq.com/test", { method: "POST" }, 1000, {
+        label: `Groq request ${index + 1}`
+      })
+    )
+  ];
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.deepEqual(active, { groq: 2, openRouter: 4 });
+
+  while (releases.length > 0) {
+    releases.shift()?.();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  await Promise.all(requests);
+  assert.deepEqual(maximum, { groq: 2, openRouter: 4 });
+  assert.deepEqual(active, { groq: 0, openRouter: 0 });
+});
+
+test("OPENROUTER_MAX_CONCURRENT_REQUESTS overrides the OpenRouter ceiling", (t) => {
+  const original = process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS;
+  t.after(() => {
+    if (original === undefined) delete process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS;
+    else process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS = original;
+  });
+
+  delete process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS;
+  assert.equal(llmMaxConcurrentRequests("OpenRouter"), 4);
+  process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS = "2";
+  assert.equal(llmMaxConcurrentRequests("OpenRouter"), 2);
+  assert.equal(llmMaxConcurrentRequests("Groq"), 2);
+  for (const invalid of ["0", "9", "2.5", "many"]) {
+    process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS = invalid;
+    assert.equal(llmMaxConcurrentRequests("OpenRouter"), 4);
+  }
 });
 
 test("stops outbound LLM requests at the process request budget", async (t) => {

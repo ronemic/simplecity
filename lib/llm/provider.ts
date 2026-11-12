@@ -11,7 +11,21 @@ export type LlmProvider = {
 
 export const LLM_REQUEST_TIMEOUT_MS = 300_000;
 export const LLM_OPTIONAL_REQUEST_TIMEOUT_MS = 300_000;
-export const LLM_MAX_CONCURRENT_REQUESTS = 2;
+// Groq answers bursts with 429s, so it stays at two in flight.
+// OpenRouter is a paid account with no request-rate limit; its requests are
+// slow (median ~17s), so more of them run side by side. Token spend is the
+// same either way, and the process budget below still caps it.
+export const GROQ_MAX_CONCURRENT_REQUESTS = 2;
+export const OPENROUTER_MAX_CONCURRENT_REQUESTS = 4;
+
+/** OPENROUTER_MAX_CONCURRENT_REQUESTS (1-8) overrides the default without a code change. */
+export function llmMaxConcurrentRequests(provider: LlmProvider["name"]) {
+  if (provider === "Groq") return GROQ_MAX_CONCURRENT_REQUESTS;
+  const configured = Number(process.env.OPENROUTER_MAX_CONCURRENT_REQUESTS);
+  return Number.isInteger(configured) && configured >= 1 && configured <= 8
+    ? configured
+    : OPENROUTER_MAX_CONCURRENT_REQUESTS;
+}
 export const LLM_MAX_PROCESS_REQUESTS = 40;
 export const LLM_MAX_PROCESS_TOKENS = 200_000;
 export const LLM_MAX_COMPLETION_TOKENS = 8_000;
@@ -261,24 +275,31 @@ export function resetLlmProcessBudgetForTests(limits?: LlmProcessBudgetLimits) {
   defaultLlmProcessBudgetState = resetState;
 }
 
-let activeLlmRequests = 0;
+// Each provider has its own slots, so slow OpenRouter requests never hold up
+// Groq and Groq's tighter ceiling never throttles OpenRouter.
+const activeLlmRequests: Record<LlmProvider["name"], number> = { Groq: 0, OpenRouter: 0 };
 const pendingLlmRequests: Array<{
+  provider: LlmProvider["name"];
   group: string;
   start: () => void;
   cancel: (reason: unknown) => void;
 }> = [];
-let lastStartedLlmGroup: string | null = null;
+const lastStartedLlmGroup: Record<LlmProvider["name"], string | null> = {
+  Groq: null,
+  OpenRouter: null
+};
 
 async function acquireLlmRequestSlot(
+  provider: LlmProvider["name"],
   group: string,
   signal?: AbortSignal | null
 ) {
   if (signal?.aborted) {
     throw signal.reason ?? new DOMException("The operation was aborted.", "AbortError");
   }
-  if (activeLlmRequests < LLM_MAX_CONCURRENT_REQUESTS) {
-    activeLlmRequests += 1;
-    lastStartedLlmGroup = group;
+  if (activeLlmRequests[provider] < llmMaxConcurrentRequests(provider)) {
+    activeLlmRequests[provider] += 1;
+    lastStartedLlmGroup[provider] = group;
     return;
   }
 
@@ -289,13 +310,14 @@ async function acquireLlmRequestSlot(
       signal?.reason ?? new DOMException("The operation was aborted.", "AbortError")
     );
     const pending = {
+      provider,
       group,
       start: () => {
         if (settled) return;
         settled = true;
         cleanup();
-        activeLlmRequests += 1;
-        lastStartedLlmGroup = group;
+        activeLlmRequests[provider] += 1;
+        lastStartedLlmGroup[provider] = group;
         resolve();
       },
       cancel: (reason: unknown) => {
@@ -312,20 +334,20 @@ async function acquireLlmRequestSlot(
   });
 }
 
-function releaseLlmRequestSlot() {
-  activeLlmRequests = Math.max(0, activeLlmRequests - 1);
-  while (pendingLlmRequests.length > 0) {
-    const differentGroupIndex = pendingLlmRequests.findIndex(
-      (pending) => pending.group !== lastStartedLlmGroup
-    );
-    const nextIndex = differentGroupIndex >= 0
-      ? differentGroupIndex
-      : 0;
-    const [pending] = pendingLlmRequests.splice(nextIndex, 1);
-    if (!pending) continue;
-    pending.start();
-    break;
-  }
+function releaseLlmRequestSlot(provider: LlmProvider["name"]) {
+  activeLlmRequests[provider] = Math.max(0, activeLlmRequests[provider] - 1);
+  // Only a request for the same provider can use the slot that just opened.
+  // Among those, prefer a different request group so one meeting cannot
+  // monopolise the queue; otherwise take the oldest.
+  const differentGroupIndex = pendingLlmRequests.findIndex(
+    (pending) => pending.provider === provider && pending.group !== lastStartedLlmGroup[provider]
+  );
+  const nextIndex = differentGroupIndex >= 0
+    ? differentGroupIndex
+    : pendingLlmRequests.findIndex((pending) => pending.provider === provider);
+  if (nextIndex < 0) return;
+  const [pending] = pendingLlmRequests.splice(nextIndex, 1);
+  pending?.start();
 }
 
 type LlmRequestTelemetry = {
@@ -407,6 +429,8 @@ export async function fetchLlmResponse(
   const abortFromUpstream = () => controller.abort(upstreamSignal?.reason);
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let acquiredSlot = false;
+  const providerName = telemetry?.provider ||
+    (url.includes("openrouter.ai") ? "OpenRouter" : "Groq");
   let reservedInputTokens = 0;
   let requestDispatched = false;
   let timedOut = false;
@@ -418,6 +442,7 @@ export async function fetchLlmResponse(
 
   try {
     await acquireLlmRequestSlot(
+      providerName,
       telemetry?.group || telemetry?.label || "llm",
       upstreamSignal
     );
@@ -433,8 +458,6 @@ export async function fetchLlmResponse(
     }
     upstreamSignal?.addEventListener("abort", abortFromUpstream, { once: true });
     const boundedInit = bodyWithCompletionLimit(init);
-    const providerName = telemetry?.provider ||
-      (url.includes("openrouter.ai") ? "OpenRouter" : "Groq");
     const consumesBudget = providerName === "OpenRouter";
     if (consumesBudget) {
       reservedInputTokens = reserveProcessBudget(
@@ -520,7 +543,7 @@ export async function fetchLlmResponse(
   } finally {
     if (timeout) clearTimeout(timeout);
     upstreamSignal?.removeEventListener("abort", abortFromUpstream);
-    if (acquiredSlot) releaseLlmRequestSlot();
+    if (acquiredSlot) releaseLlmRequestSlot(providerName);
   }
 }
 
