@@ -196,14 +196,9 @@ body:has(.local-redesign) { background: white; }
   gap: 28px;
 }
 .local-redesign .rd-subscribe-page .rd-subscribe-form > div > p { font-weight: 400; }
-.local-redesign .rd-subscribe-page .rd-subscribe-group { padding: 0; }
-.local-redesign .rd-subscribe-page .rd-subscribe-group h2 { min-height: 32px; font-size: 11px; line-height: 1.5; }
-.local-redesign .rd-subscribe-page .rd-subscribe-group label { min-height: 38px; padding: 8px 10px; line-height: 1.4; }
-.local-redesign .rd-subscribe-page .rd-subscribe-groups { gap: 22px; }
-
-@media (min-width: 1024px) {
-  .local-redesign .rd-subscribe-page .rd-subscribe-groups { grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr) minmax(0, 1fr); }
-}
+.local-redesign .rd-subscribe-page .rd-subscribe-county { border-color: var(--rd-line); }
+.local-redesign .rd-subscribe-page .rd-subscribe-county:has(:checked) { border-color: color-mix(in oklch, var(--rd-blue) 40%, white); }
+.local-redesign .rd-subscribe-page .rd-subscribe-county > div:first-child button:first-child:disabled { cursor: default; opacity: 1; }
 .local-redesign .rd-topic-detail .icon-tile-lg { width: 40px; height: 40px; border-radius: 10px; }
 .local-redesign .rd-topic-detail .rd-reading { gap: 0; border-top: 2px solid var(--rd-ink); }
 .local-redesign :is(.input-control, .menu-trigger, .select-trigger, .select-trigger-compact) {
