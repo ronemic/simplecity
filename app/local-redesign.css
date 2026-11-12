@@ -202,7 +202,7 @@ body:has(.local-redesign) { background: white; }
 .local-redesign .rd-subscribe-page .rd-subscribe-groups { gap: 22px; }
 
 @media (min-width: 1024px) {
-  .local-redesign .rd-subscribe-page .rd-subscribe-groups { grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.1fr); }
+  .local-redesign .rd-subscribe-page .rd-subscribe-groups { grid-template-columns: minmax(0, .85fr) minmax(0, 1.4fr) minmax(0, 1fr); }
 }
 .local-redesign .rd-topic-detail .icon-tile-lg { width: 40px; height: 40px; border-radius: 10px; }
 .local-redesign .rd-topic-detail .rd-reading { gap: 0; border-top: 2px solid var(--rd-ink); }

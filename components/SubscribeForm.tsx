@@ -63,7 +63,8 @@ export function SubscribeForm({
       id: "regional",
       label: t(locale, "subscribeRegionalCoverage"),
       jurisdictions: jurisdictions.filter((jurisdiction) => !jurisdiction.parentCountyValue),
-      columns: "sm:grid-cols-3 md:grid-cols-1"
+      columns: "sm:grid-cols-3 md:grid-cols-1",
+      span: ""
     },
     {
       id: "san-mateo-cities",
@@ -71,7 +72,8 @@ export function SubscribeForm({
       jurisdictions: jurisdictions.filter(
         (jurisdiction) => jurisdiction.parentCountyValue === "san-mateo-county"
       ),
-      columns: "sm:grid-cols-2"
+      columns: "sm:grid-cols-2",
+      span: ""
     },
     {
       id: "santa-clara-cities",
@@ -81,7 +83,19 @@ export function SubscribeForm({
           jurisdiction.parentCountyValue === "santa-clara-county" &&
           jurisdiction.kind !== "school-district"
       ),
-      columns: "sm:grid-cols-2 md:grid-cols-1"
+      columns: "sm:grid-cols-2 md:grid-cols-1",
+      span: ""
+    },
+    {
+      id: "santa-barbara-cities",
+      label: t(locale, "subscribeSantaBarbaraCountyCities"),
+      jurisdictions: jurisdictions.filter(
+        (jurisdiction) =>
+          jurisdiction.parentCountyValue === "santa-barbara-county" &&
+          jurisdiction.kind !== "school-district"
+      ),
+      columns: "sm:grid-cols-2 lg:grid-cols-3",
+      span: "lg:col-span-2"
     },
     {
       id: "school-districts",
@@ -89,7 +103,8 @@ export function SubscribeForm({
       jurisdictions: jurisdictions.filter(
         (jurisdiction) => jurisdiction.kind === "school-district"
       ),
-      columns: "sm:grid-cols-2 md:grid-cols-1"
+      columns: "sm:grid-cols-2 md:grid-cols-1",
+      span: ""
     }
   ].filter((group) => group.jurisdictions.length > 0);
 
@@ -229,11 +244,11 @@ export function SubscribeForm({
         <legend className="text-sm font-black text-ink">
           {t(locale, "subscribeWeeklyDigestAreas")}
         </legend>
-        <div className="rd-subscribe-groups grid gap-3 md:grid-cols-2 xl:grid-cols-[0.78fr_1.3fr_0.92fr_1fr]">
+        <div className="rd-subscribe-groups grid gap-3 md:grid-cols-2 lg:grid-cols-[0.78fr_1.3fr_0.92fr]">
           {jurisdictionGroups.map((group) => (
             <div
               aria-labelledby={`${group.id}-label`}
-              className="rd-subscribe-group rounded-lg p-3.5"
+              className={`rd-subscribe-group rounded-lg p-3.5 ${group.span}`}
               key={group.id}
               role="group"
             >

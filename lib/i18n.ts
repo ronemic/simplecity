@@ -92,6 +92,7 @@ type TranslationKey =
   | "subscribeSchoolDistricts"
   | "subscribeSanMateoCountyCities"
   | "subscribeSantaClaraCountyCities"
+  | "subscribeSantaBarbaraCountyCities"
   | "subscribeEmailAddress"
   | "subscribeEmailPlaceholder"
   | "subscribeErrorBody"
@@ -215,6 +216,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeSchoolDistricts: "School districts",
     subscribeSanMateoCountyCities: "Cities in San Mateo County",
     subscribeSantaClaraCountyCities: "Cities in Santa Clara County",
+    subscribeSantaBarbaraCountyCities: "Cities in Santa Barbara County",
     subscribeEmailAddress: "Email address",
     subscribeEmailPlaceholder: "you@example.com",
     subscribeErrorBody: "Please try again in a moment.",
@@ -342,6 +344,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeSchoolDistricts: "Distritos escolares",
     subscribeSanMateoCountyCities: "Ciudades del condado de San Mateo",
     subscribeSantaClaraCountyCities: "Ciudades del condado de Santa Clara",
+    subscribeSantaBarbaraCountyCities: "Ciudades del condado de Santa Bárbara",
     subscribeEmailAddress: "Correo electrónico",
     subscribeEmailPlaceholder: "tu@ejemplo.com",
     subscribeErrorBody: "Inténtalo de nuevo en un momento.",
