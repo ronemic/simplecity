@@ -80,13 +80,37 @@ test("aggregate pagination enriches only the displayed rows, once per database",
     [["foster-city-1", "los-altos-1"]]);
 });
 
-test("search preserves matches and loads outcomes only for its displayed page", async () => {
+test("search preserves matches and loads full outcomes only for its displayed page", async () => {
   const { queries, calls } = await queryHarness();
   const result = await queries.getDecisionCardPage({ jurisdiction: "all", search: "park", pageSize: 1 });
   assert.equal(result.totalCount, 2);
   assert.equal(result.cards[0].id, "foster-city-2");
   assert.equal(result.cards[0].outcome?.kind, "approved");
-  assert.deepEqual(calls.filter((call) => call.table === "decision_outcomes").map((call) => call.ids), [["foster-city-2"]]);
+  // The search index reads which cards have a result once; the displayed page
+  // is the only thing enriched with full outcomes, and it is the last read.
+  assert.deepEqual(calls.filter((call) => call.table === "decision_outcomes").at(-1)?.ids, ["foster-city-2"]);
+});
+
+test("a second search reuses the in-memory cards instead of downloading them again", async () => {
+  const { queries, calls } = await queryHarness();
+  await queries.getDecisionCardPage({ jurisdiction: "all", search: "park", pageSize: 1 });
+  const cardReads = calls.filter((call) => call.table === "summary_cards").length;
+  assert.ok(cardReads > 0);
+  calls.length = 0;
+
+  const road = await queries.getDecisionCardPage({ jurisdiction: "all", search: "road", pageSize: 2 });
+  assert.equal(road.totalCount, 10);
+  const approved = await queries.getDecisionCardPage({ jurisdiction: "all", result: "approved", pageSize: 2 });
+  assert.equal(approved.totalCount, 12);
+  const single = await queries.getDecisionCardPage({ jurisdiction: "los-altos", search: "road", pageSize: 2 });
+  assert.equal(single.totalCount, 5);
+
+  assert.deepEqual(calls.filter((call) => call.table === "summary_cards"), []);
+  // One outcome read per search, for the two displayed cards only.
+  assert.deepEqual(
+    calls.filter((call) => call.table === "decision_outcomes").map((call) => call.ids.length),
+    [2, 2, 2]
+  );
 });
 
 test("result filtering retains outcomes and correct counts", async () => {
@@ -96,16 +120,20 @@ test("result filtering retains outcomes and correct counts", async () => {
   assert.equal(result.cards[0].outcome?.kind, "approved");
 });
 
-test("search with a category limits database rows before matching", async () => {
+test("search with a category returns only that category's matches", async () => {
   const { queries, calls } = await queryHarness();
   const result = await queries.getDecisionCardPage({ jurisdiction: "all", search: "road", category: "Transportation", pageSize: 2 });
   assert.equal(result.totalCount, 10);
   assert.equal(result.cards.length, 2);
   assert.ok(result.cards.every((card) => card.category_tags?.includes("Transportation")));
-  const cardQueries = calls.filter((call) => call.table === "summary_cards");
-  assert.ok(cardQueries.length >= 2);
-  assert.ok(cardQueries.every((call) =>
-    JSON.stringify(call.categories) === JSON.stringify(["Transportation"])));
+  calls.length = 0;
+
+  // Categories are filtered in memory, so switching category costs no card reads.
+  const none = await queries.getDecisionCardPage({ jurisdiction: "all", search: "park", category: "Transportation", pageSize: 2 });
+  assert.equal(none.totalCount, 0);
+  const housing = await queries.getDecisionCardPage({ jurisdiction: "all", search: "road", category: "Housing", pageSize: 2 });
+  assert.equal(housing.totalCount, 0);
+  assert.deepEqual(calls.filter((call) => call.table === "summary_cards"), []);
 });
 
 test("single-city freshness never queries unrelated jurisdictions", async () => {

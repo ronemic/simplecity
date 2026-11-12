@@ -81,6 +81,7 @@ import {
 } from "@/lib/utils/santaBarbaraBody";
 import { decisionMapCutoff, type DecisionMapTimeframe } from "@/lib/maps/timeframe";
 import { readAllPages } from "@/lib/db/readAllPages";
+import { VersionedCache } from "@/lib/db/versionedCache";
 
 const PUBLIC_CARD_MEETING_COLUMNS =
   "id,jurisdiction_name,jurisdiction_slug,platform,title,meeting_type,date_text,time_text,meeting_datetime,status,updated_at";
@@ -740,7 +741,14 @@ async function loadPublishedCardRowsForJurisdiction(
     jurisdiction: JurisdictionConfig;
     supabase: SupabaseClient;
   },
-  options: { limit?: number; splitUpcoming?: boolean; category?: CategoryName; allPages?: boolean } = {}
+  options: {
+    limit?: number;
+    splitUpcoming?: boolean;
+    category?: CategoryName;
+    allPages?: boolean;
+    /** With allPages: return rows as stored, without the time-dependent meeting status. */
+    asStored?: boolean;
+  } = {}
 ) {
   // Ordered by decision date, not row-creation date.
   //
@@ -826,6 +834,7 @@ async function loadPublishedCardRowsForJurisdiction(
       rows = await fetchAll(false);
     }
 
+    if (options.asStored) return rows;
     return rows.map((row) => withCardJurisdictionFallback(row, jurisdiction));
   }
 
@@ -1572,6 +1581,159 @@ async function enrichDecisionPage(
   return cards.map((card) => enrichedByRow.get(card) || card);
 }
 
+/**
+ * Everything decision search needs for one jurisdiction in one language: the
+ * published cards as stored (translated for the locale) and which cards have a
+ * recorded result.
+ *
+ * Search matches rendered text, so it needs every card. Downloading them for
+ * each new search term took 19-21s in production (47 requests, ~26MB). They are
+ * now kept in memory and reused; a small version query, run at most once per
+ * cache window, rebuilds a jurisdiction only when its data actually changed.
+ */
+type DecisionSearchIndexEntry = {
+  rows: SummaryCardRow[];
+  outcomeKinds: Map<string, DecisionOutcome["kind"]>;
+};
+
+const DECISION_SEARCH_INDEX_MAX_AGE_MS = 60 * 60 * 1000;
+const decisionSearchIndex = new VersionedCache<DecisionSearchIndexEntry>({
+  checkIntervalMs: PUBLIC_CACHE_REVALIDATE_SECONDS * 1000,
+  maxAgeMs: DECISION_SEARCH_INDEX_MAX_AGE_MS,
+  log: (message) => console.warn(`[SimpleCity] Decision search index: ${message}`)
+});
+
+function isMissingTableError(error: unknown) {
+  if (!error) return false;
+  if (typeof error === "object" && "code" in error && (error as { code?: string }).code === "PGRST205") {
+    return true;
+  }
+  const message = error instanceof Error ? error.message : JSON.stringify(error);
+  return message.includes("Could not find the table");
+}
+
+/** Row count plus latest change: differs after any insert, update or delete. */
+async function tableVersion(
+  label: string,
+  query: PromiseLike<{
+    data: unknown;
+    count: number | null;
+    error: unknown;
+  }>
+) {
+  const { data, count, error } = await query;
+  if (error) {
+    if (isMissingTableError(error)) return `${label}:absent`;
+    throw new Error(`Failed to read ${label} version`);
+  }
+  const latest = Array.isArray(data) ? (data[0] as { updated_at?: string | null } | undefined) : undefined;
+  return `${label}:${count ?? "?"}@${latest?.updated_at ?? ""}`;
+}
+
+async function decisionSearchIndexVersion(
+  supabase: SupabaseClient,
+  jurisdiction: JurisdictionConfig,
+  locale: Locale
+) {
+  const latest = (table: string) =>
+    supabase.from(table).select("updated_at", { count: "exact" });
+  const newestFirst = { ascending: false, nullsFirst: false } as const;
+  const parts = await Promise.all([
+    tableVersion(
+      "cards",
+      latest("summary_cards")
+        .eq("jurisdiction_slug", jurisdiction.slug)
+        .eq("is_published", true)
+        .order("updated_at", newestFirst)
+        .limit(1)
+    ),
+    // Cards embed their meeting's title, date and status.
+    tableVersion(
+      "meetings",
+      latest("meetings")
+        .eq("jurisdiction_slug", jurisdiction.slug)
+        .order("updated_at", newestFirst)
+        .limit(1)
+    ),
+    // Outcomes and translations are read by card id, so they are versioned for
+    // the whole database rather than trusting a jurisdiction column on them.
+    tableVersion("outcomes", latest("decision_outcomes").order("updated_at", newestFirst).limit(1)),
+    // The public role cannot read updated_at on the translation tables, so they
+    // are versioned by row count. That catches new and removed translations. A
+    // translation rewritten in place is missed until the hourly refresh, which
+    // only delays matching on its new wording: the displayed page re-applies
+    // current translations every time.
+    ...(locale === "en"
+      ? []
+      : [
+          tableVersion(
+            "card-translations",
+            supabase
+              .from("summary_card_translations")
+              .select("locale", { count: "exact" })
+              .eq("locale", locale)
+              .limit(1)
+          ),
+          tableVersion(
+            "meeting-translations",
+            supabase
+              .from("meeting_translations")
+              .select("locale", { count: "exact" })
+              .eq("locale", locale)
+              .limit(1)
+          )
+        ])
+  ]);
+  return parts.join("|");
+}
+
+async function loadDecisionOutcomeKinds(supabase: SupabaseClient, rows: SummaryCardRow[]) {
+  const kinds = new Map<string, DecisionOutcome["kind"]>();
+  const results = await Promise.all(
+    chunkValues(
+      rows.map((row) => row.id),
+      TRANSLATION_LOOKUP_BATCH_SIZE
+    ).map((cardIds) =>
+      supabase.from("decision_outcomes").select("summary_card_id,kind").in("summary_card_id", cardIds)
+    )
+  );
+  for (const { data, error } of results) {
+    if (error) {
+      if (isMissingTableError(error)) continue;
+      // Unlike a single page view, this result is kept. Never keep a partial one.
+      throw new Error("Failed to load decision outcomes for the search index");
+    }
+    for (const outcome of (data || []) as Array<Pick<DecisionOutcome, "summary_card_id" | "kind">>) {
+      if (outcome.summary_card_id) kinds.set(outcome.summary_card_id, outcome.kind);
+    }
+  }
+  return kinds;
+}
+
+function loadDecisionSearchIndexEntry(
+  supabase: SupabaseClient,
+  jurisdiction: JurisdictionConfig,
+  locale: Locale
+) {
+  return decisionSearchIndex.get(
+    `${jurisdiction.supabaseUrl || ""}|${jurisdiction.slug}|${locale}`,
+    {
+      version: () => decisionSearchIndexVersion(supabase, jurisdiction, locale),
+      load: async () => {
+        const stored = await loadPublishedCardRowsForJurisdiction(
+          { jurisdiction, supabase },
+          { allPages: true, asStored: true }
+        );
+        const [rows, outcomeKinds] = await Promise.all([
+          applyCardTranslations(supabase, stored, locale),
+          loadDecisionOutcomeKinds(supabase, stored)
+        ]);
+        return { rows, outcomeKinds };
+      }
+    }
+  );
+}
+
 async function loadLegacyDecisionCardPage(
   selection: JurisdictionSelection,
   locale: Locale,
@@ -1585,29 +1747,35 @@ async function loadLegacyDecisionCardPage(
   sort: DecisionSort = "newest"
 ): Promise<DecisionCardPageResult> {
   const offset = (page - 1) * pageSize;
-  // Search uses rendered text, so translate before matching. Outcomes are not
-  // searchable: only load them before pagination when a result filter needs them.
+  // Search uses rendered text, so the index holds translated rows. The meeting
+  // status that period filters and ordering read depends on the current time,
+  // so it is applied here, per request, not stored in the index.
   const groups = await Promise.all(
     getSafePublicProjects(selection).map(async (project) => {
-      const rowGroups = await Promise.all(
-        project.jurisdictions.map((jurisdiction) =>
-          loadPublishedCardRowsForJurisdiction(
-            { jurisdiction, supabase: project.supabase },
-            { category: category || undefined, allPages: true }
-          )
-        )
+      const entries = await Promise.all(
+        project.jurisdictions.map(async (jurisdiction) => ({
+          jurisdiction,
+          entry: await loadDecisionSearchIndexEntry(project.supabase, jurisdiction, locale)
+        }))
       );
-      const rows = await applyCardTranslations(project.supabase, rowGroups.flat(), locale);
-      const matching = rows.filter((card) =>
-        matchesDecisionFilters(card, search, category || undefined) &&
-        matchesDecisionPeriod(card, period || undefined) &&
-        (!body || Boolean(card.meetings && matchesSantaBarbaraBody(card.meetings, body)))
-      );
-      if (!result) return matching;
-      const outcomes = await loadDecisionOutcomes(project.supabase, matching, locale);
-      return matching
-        .map((card) => ({ ...card, outcome: outcomes.get(card.id) || null }))
-        .filter((card) => matchesDecisionResultFilter(card, result));
+      return entries.flatMap(({ jurisdiction, entry }) => {
+        const matching = entry.rows
+          .map((row) => withCardJurisdictionFallback(row, jurisdiction))
+          .filter((card) =>
+            matchesDecisionFilters(card, search, category || undefined) &&
+            matchesDecisionPeriod(card, period || undefined) &&
+            (!body || Boolean(card.meetings && matchesSantaBarbaraBody(card.meetings, body)))
+          );
+        if (!result) return matching;
+        // Only the kind decides membership; the displayed page gets its full,
+        // translated outcomes from enrichDecisionPage below.
+        return matching
+          .map((card) => {
+            const kind = entry.outcomeKinds.get(card.id);
+            return { ...card, outcome: kind ? ({ kind } as DecisionOutcome) : null };
+          })
+          .filter((card) => matchesDecisionResultFilter(card, result));
+      });
     })
   );
   const matchingCards =
@@ -1615,9 +1783,7 @@ async function loadLegacyDecisionCardPage(
   const totalCount = matchingCards.length;
 
   return {
-    cards: result
-      ? matchingCards.slice(offset, offset + pageSize)
-      : await enrichDecisionPage(selection, matchingCards.slice(offset, offset + pageSize), locale),
+    cards: await enrichDecisionPage(selection, matchingCards.slice(offset, offset + pageSize), locale),
     totalCount,
     page,
     pageSize,
