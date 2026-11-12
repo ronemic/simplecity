@@ -54,11 +54,27 @@ export function normalizeDecisionSearchText(value: string) {
     .trim();
 }
 
-export function matchesNormalizedDecisionSearchText(value: string, search: string) {
-  const haystackTokens = normalizeDecisionSearchText(value).split(" ").filter(Boolean);
-  const searchTokens = normalizeDecisionSearchText(search).split(" ").filter(Boolean);
+/** The words of a search (or of any text), normalized the way search compares them. */
+export function decisionSearchTokens(value: string) {
+  return normalizeDecisionSearchText(value).split(" ").filter(Boolean);
+}
 
+/**
+ * Whether already-normalized text contains the search words as consecutive
+ * words. `normalizedValue` must come from normalizeDecisionSearchText and
+ * `searchTokens` from decisionSearchTokens.
+ */
+export function normalizedTextMatchesSearchTokens(
+  normalizedValue: string,
+  searchTokens: readonly string[]
+) {
   if (searchTokens.length === 0) return true;
+  // Every search word has to appear inside some word of the text, so a text
+  // that lacks one of them as a plain substring cannot match. This skips the
+  // word-by-word scan for almost every card.
+  if (!searchTokens.every((searchToken) => normalizedValue.includes(searchToken))) return false;
+
+  const haystackTokens = normalizedValue.split(" ").filter(Boolean);
   if (haystackTokens.length < searchTokens.length) return false;
 
   return haystackTokens.some((_, startIndex) =>
@@ -70,6 +86,13 @@ export function matchesNormalizedDecisionSearchText(value: string, search: strin
       if (/^\d+$/u.test(searchToken)) return haystackToken === searchToken;
       return haystackToken.includes(searchToken);
     })
+  );
+}
+
+export function matchesNormalizedDecisionSearchText(value: string, search: string) {
+  return normalizedTextMatchesSearchTokens(
+    normalizeDecisionSearchText(value),
+    decisionSearchTokens(search)
   );
 }
 
@@ -94,6 +117,22 @@ export function decisionCardSearchFilters(pattern: string, meetingIds: string[])
   return filters.join(",");
 }
 
+/**
+ * The text a reader can see on a card, normalized for search. Normalizing is
+ * the expensive part of matching, so the search index computes this once per
+ * card and reuses it for every search.
+ */
+export function normalizedDecisionSearchFields(card: SummaryCardRow) {
+  return [
+    publicAgendaTitle(card),
+    ...normalizeSummaryPoints(card.what_is_happening),
+    card.why_it_matters,
+    ...(card.who_it_affects || [])
+  ]
+    .filter(Boolean)
+    .map((field) => normalizeDecisionSearchText(String(field)));
+}
+
 export function matchesDecisionFilters(
   card: SummaryCardRow,
   search: string,
@@ -104,12 +143,8 @@ export function matchesDecisionFilters(
   if (!matchesDecisionResultFilter(card, result)) return false;
   if (!search) return true;
 
-  const visibleFields = [
-    publicAgendaTitle(card),
-    ...normalizeSummaryPoints(card.what_is_happening),
-    card.why_it_matters,
-    ...(card.who_it_affects || [])
-  ].filter(Boolean);
-
-  return visibleFields.some((field) => matchesNormalizedDecisionSearchText(String(field), search));
+  const searchTokens = decisionSearchTokens(search);
+  return normalizedDecisionSearchFields(card).some((field) =>
+    normalizedTextMatchesSearchTokens(field, searchTokens)
+  );
 }

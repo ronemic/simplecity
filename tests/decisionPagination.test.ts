@@ -87,7 +87,8 @@ test("decisions use bounded server pagination with a database sort key", () => {
   assert.match(queries, /\.order\("decision_sort_at"/);
   assert.match(queries, /\.range\(range\.from, range\.to\)/);
   assert.match(queries, /normalizedSearch \|\| result/);
-  assert.match(queries, /matchesDecisionFilters\(card, search, category \|\| undefined\)/);
+  assert.match(queries, /normalizedTextMatchesSearchTokens\(field, searchTokens\)/);
+  assert.match(queries, /matchesDecisionFilters\(card, "", category \|\| undefined\)/);
   assert.match(queries, /matchesDecisionResultFilter\(card, result\)/);
   assert.match(migration, /summary_cards_decision_page_idx/);
   assert.match(migration, /sync_meeting_decision_sort_at/);

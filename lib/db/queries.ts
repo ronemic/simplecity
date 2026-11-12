@@ -51,8 +51,11 @@ import { isUpcomingMeetingDate, meetingDateParts } from "@/lib/utils/date";
 import {
   decisionCardSearchFilters,
   decisionMeetingSearchFilters,
+  decisionSearchTokens,
   matchesDecisionFilters,
   matchesDecisionPeriod,
+  normalizedDecisionSearchFields,
+  normalizedTextMatchesSearchTokens,
   type DecisionPeriod,
   type DecisionSort
 } from "@/lib/utils/decisionFilters";
@@ -1593,6 +1596,8 @@ async function enrichDecisionPage(
  */
 type DecisionSearchIndexEntry = {
   rows: SummaryCardRow[];
+  /** rows[i]'s visible text, already normalized for matching. */
+  searchFields: string[][];
   outcomeKinds: Map<string, DecisionOutcome["kind"]>;
 };
 
@@ -1728,7 +1733,7 @@ function loadDecisionSearchIndexEntry(
           applyCardTranslations(supabase, stored, locale),
           loadDecisionOutcomeKinds(supabase, stored)
         ]);
-        return { rows, outcomeKinds };
+        return { rows, searchFields: rows.map(normalizedDecisionSearchFields), outcomeKinds };
       }
     }
   );
@@ -1747,6 +1752,7 @@ async function loadLegacyDecisionCardPage(
   sort: DecisionSort = "newest"
 ): Promise<DecisionCardPageResult> {
   const offset = (page - 1) * pageSize;
+  const searchTokens = search ? decisionSearchTokens(search) : null;
   // Search uses rendered text, so the index holds translated rows. The meeting
   // status that period filters and ordering read depends on the current time,
   // so it is applied here, per request, not stored in the index.
@@ -1759,13 +1765,23 @@ async function loadLegacyDecisionCardPage(
         }))
       );
       return entries.flatMap(({ jurisdiction, entry }) => {
-        const matching = entry.rows
-          .map((row) => withCardJurisdictionFallback(row, jurisdiction))
-          .filter((card) =>
-            matchesDecisionFilters(card, search, category || undefined) &&
+        const matching = entry.rows.flatMap((row, index) => {
+          // Text first: it rejects most cards and reads the prepared fields.
+          if (
+            searchTokens &&
+            !entry.searchFields[index].some((field) =>
+              normalizedTextMatchesSearchTokens(field, searchTokens)
+            )
+          ) {
+            return [];
+          }
+          const card = withCardJurisdictionFallback(row, jurisdiction);
+          return matchesDecisionFilters(card, "", category || undefined) &&
             matchesDecisionPeriod(card, period || undefined) &&
             (!body || Boolean(card.meetings && matchesSantaBarbaraBody(card.meetings, body)))
-          );
+            ? [card]
+            : [];
+        });
         if (!result) return matching;
         // Only the kind decides membership; the displayed page gets its full,
         // translated outcomes from enrichDecisionPage below.
