@@ -1,9 +1,18 @@
 "use client";
 
-import { Bell, Check, ChevronDown, Languages, Loader2, MapPin, Menu, School, X } from "lucide-react";
+import { Bell, Check, ChevronDown, Languages, Loader2, MapPin, Menu, School, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Fragment, useEffect, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import {
+  Fragment,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type KeyboardEvent as ReactKeyboardEvent
+} from "react";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionDisplayLabel,
@@ -52,6 +61,7 @@ function navItemClasses(item: (typeof nav)[number], isFirstLink: boolean) {
 const jurisdictions = getPublicJurisdictionOptions().map((jurisdiction) => ({
   slug: jurisdiction.slug,
   label: jurisdiction.name,
+  parentSlug: jurisdiction.parentCountySlug,
   isChild: Boolean(jurisdiction.parentCountySlug),
   isSchoolDistrict: jurisdiction.kind === "school-district"
 }));
@@ -325,46 +335,11 @@ export function HeaderNav({
           )}
         </button>
         {isJurisdictionMenuOpen ? (
-          <div className="menu-popover md:w-60">
-            <div role="listbox" aria-label={t(selectedLocale, "jurisdiction")} className="max-h-64 overflow-auto">
-              {jurisdictions.map((jurisdiction, index) => {
-                const isSelected = jurisdiction.slug === selected;
-                const startsSchoolDistricts =
-                  jurisdiction.isSchoolDistrict && !jurisdictions[index - 1]?.isSchoolDistrict;
-
-                return (
-                  <Fragment key={jurisdiction.slug}>
-                    {startsSchoolDistricts ? (
-                      <div className="menu-section-label">
-                        {selectedLocale === "es" ? "Distrito escolar" : "School district"}
-                      </div>
-                    ) : null}
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isSelected}
-                      className={cn(
-                        "menu-option",
-                        jurisdiction.isChild && !jurisdiction.isSchoolDistrict && "menu-option-child",
-                        isSelected && "menu-option-selected"
-                      )}
-                      onClick={() => changeJurisdiction(jurisdiction.slug)}
-                    >
-                      <Check
-                        aria-hidden="true"
-                        className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
-                      />
-                      <span
-                        className="truncate"
-                      >
-                        {jurisdictionLabel(jurisdiction, selectedLocale)}
-                      </span>
-                    </button>
-                  </Fragment>
-                );
-              })}
-            </div>
-          </div>
+          <JurisdictionMenu
+            locale={selectedLocale}
+            onSelect={changeJurisdiction}
+            selected={selected}
+          />
         ) : null}
       </div>
       <div ref={languageMenuRef} className="relative col-span-5 md:order-1 md:ml-2 md:shrink-0">
@@ -453,6 +428,177 @@ export function HeaderNav({
       })}
       </div>
     </nav>
+  );
+}
+
+function foldForSearch(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+// The picker lists every city, county and school district we cover, which is
+// too many to scan, so it opens with a search box. A query matches an area's
+// own name or its county's, so "santa clara" keeps the county and its cities.
+function JurisdictionMenu({
+  locale,
+  onSelect,
+  selected
+}: {
+  locale: Locale;
+  onSelect: (slug: string) => void;
+  selected: string;
+}) {
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const listId = useId();
+  const folded = foldForSearch(query.trim());
+  const isFiltering = folded.length > 0;
+  const options = isFiltering
+    ? jurisdictions.filter((jurisdiction) => {
+        const own = foldForSearch(jurisdictionLabel(jurisdiction, locale));
+        const parent = jurisdiction.parentSlug
+          ? foldForSearch(getJurisdictionDisplayLabel(jurisdiction.parentSlug, locale))
+          : "";
+        return own.includes(folded) || parent.includes(folded);
+      })
+    : jurisdictions;
+  const selectedIndex = options.findIndex((jurisdiction) => jurisdiction.slug === selected);
+  // With no query the highlight starts on the current area; once the reader
+  // types, it starts on the first match so Enter picks it.
+  const highlighted = Math.min(
+    activeIndex ?? (isFiltering ? 0 : Math.max(selectedIndex, 0)),
+    options.length - 1
+  );
+  const optionId = (index: number) => `${listId}-option-${index}`;
+
+  useEffect(() => {
+    if (highlighted < 0) return;
+    document.getElementById(optionId(highlighted))?.scrollIntoView({ block: "nearest" });
+    // optionId only depends on listId, which is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlighted]);
+
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (options.length === 0) return;
+      const step = event.key === "ArrowDown" ? 1 : -1;
+      setActiveIndex((highlighted + step + options.length) % options.length);
+    } else if (event.key === "Home" && options.length > 0 && !query) {
+      event.preventDefault();
+      setActiveIndex(0);
+    } else if (event.key === "End" && options.length > 0 && !query) {
+      event.preventDefault();
+      setActiveIndex(options.length - 1);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const option = options[highlighted];
+      if (option) onSelect(option.slug);
+    }
+  }
+
+  return (
+    <div className="menu-popover md:w-72">
+      <div className="border-b border-black/10 px-2 pb-2 pt-1">
+        <label className="flex min-h-10 items-center gap-2 rounded-md border border-black/15 bg-[#f7f9fb] px-2.5 focus-within:border-civic focus-within:bg-white">
+          <Search aria-hidden="true" className="h-4 w-4 shrink-0 text-black/45" />
+          <span className="sr-only">
+            {locale === "es" ? "Buscar un área" : "Search areas"}
+          </span>
+          <input
+            // The menu only mounts when the reader opens it, so focusing the
+            // search box straight away is what they asked for.
+            autoFocus
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="true"
+            aria-controls={listId}
+            aria-activedescendant={highlighted >= 0 ? optionId(highlighted) : undefined}
+            className="w-full bg-transparent text-sm font-semibold text-ink outline-none placeholder:font-medium placeholder:text-black/40"
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setActiveIndex(null);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder={locale === "es" ? "Buscar ciudad o condado" : "Search city or county"}
+            type="text"
+            value={query}
+          />
+        </label>
+      </div>
+      <div
+        id={listId}
+        role="listbox"
+        aria-label={t(locale, "jurisdiction")}
+        className="max-h-[min(26rem,60vh)] overflow-auto py-1"
+      >
+        {options.length === 0 ? (
+          <p className="px-4 py-3 text-sm font-medium text-black/55">
+            {locale === "es" ? "Ningún área coincide." : "No matching areas."}
+          </p>
+        ) : null}
+        {options.map((jurisdiction, index) => {
+          const isSelected = jurisdiction.slug === selected;
+          const isHighlighted = index === highlighted;
+          const startsSchoolDistricts =
+            jurisdiction.isSchoolDistrict && !options[index - 1]?.isSchoolDistrict;
+          // Without a query the list is long, so a rule above each county
+          // separates one county's cities from the next.
+          const startsCounty =
+            !isFiltering &&
+            index > 0 &&
+            !jurisdiction.isChild &&
+            !jurisdiction.isSchoolDistrict;
+
+          return (
+            <Fragment key={jurisdiction.slug}>
+              {startsSchoolDistricts ? (
+                <div className="menu-section-label">
+                  {locale === "es" ? "Distrito escolar" : "School district"}
+                </div>
+              ) : null}
+              <button
+                id={optionId(index)}
+                type="button"
+                role="option"
+                tabIndex={-1}
+                aria-selected={isSelected}
+                className={cn(
+                  "menu-option",
+                  !isFiltering &&
+                    jurisdiction.isChild &&
+                    !jurisdiction.isSchoolDistrict &&
+                    "menu-option-child",
+                  startsCounty && "mt-1 border-t border-black/10 pt-3",
+                  isHighlighted && !isSelected && "bg-[#eef4f8]",
+                  isSelected && "menu-option-selected",
+                  isHighlighted && isSelected && "ring-2 ring-inset ring-[#7fb0e6]"
+                )}
+                onClick={() => onSelect(jurisdiction.slug)}
+                onMouseMove={() => {
+                  if (index !== highlighted) setActiveIndex(index);
+                }}
+              >
+                <Check
+                  aria-hidden="true"
+                  className={`h-4 w-4 ${isSelected ? "opacity-100" : "opacity-0"}`}
+                />
+                <span className="truncate">{jurisdictionLabel(jurisdiction, locale)}</span>
+                {isFiltering && jurisdiction.parentSlug && !jurisdiction.isSchoolDistrict ? (
+                  <span
+                    className={cn(
+                      "col-start-2 -mt-1 truncate text-xs font-medium",
+                      isSelected ? "text-white/70" : "text-black/50"
+                    )}
+                  >
+                    {getJurisdictionDisplayLabel(jurisdiction.parentSlug, locale)}
+                  </span>
+                ) : null}
+              </button>
+            </Fragment>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
