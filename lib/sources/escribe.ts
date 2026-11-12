@@ -20,6 +20,7 @@ import { parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { retryInitialNavigation } from "@/lib/scraper/navigation";
 import { createBrowserDocumentFetch } from "@/lib/scraper/browserDocumentFetch";
+import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 
 export type EscribeMeetingLink = {
   Title?: string | null;
@@ -372,6 +373,42 @@ async function enrichHtmlAgenda(
   }
 }
 
+async function enrichHtmlMinutes(context: BrowserContext, meeting: PrimeGovMeeting) {
+  const htmlMinutes = meeting.documents.find((document) => {
+    if (document.type !== "Minutes") return false;
+    try {
+      const url = new URL(document.url);
+      return /\/Meeting\.aspx$/i.test(url.pathname) &&
+        url.searchParams.get("Agenda")?.toLowerCase() === "postminutes";
+    } catch {
+      return false;
+    }
+  });
+  if (!htmlMinutes) return;
+
+  const page = await context.newPage();
+  try {
+    await page.route("**/*", async (route) => {
+      if (route.request().resourceType() === "document") await route.continue();
+      else await route.abort();
+    });
+    await page.goto(htmlMinutes.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    await page.waitForSelector(".Agenda", { timeout: 30_000 });
+    const text = normalizePrimeGovHtmlAgendaText(await page.locator(".Agenda").innerText());
+    if (/\bminutes\b/i.test(text) && isUsableOfficialSourceText(text, 300)) {
+      htmlMinutes.extractedText = text;
+      htmlMinutes.extractionCharacterCount = text.length;
+    }
+  } catch (error) {
+    meeting.extractionNotes = [
+      ...(meeting.extractionNotes || []),
+      `eSCRIBE HTML minutes enrichment failed: ${error instanceof Error ? error.message : String(error)}`
+    ];
+  } finally {
+    await page.close();
+  }
+}
+
 function isOfficialEscribeUrl(value: string, portalUrl: string) {
   try {
     const url = new URL(value);
@@ -472,6 +509,7 @@ export async function scrapeEscribeMeetings(
           for (const item of meeting.items || []) {
             if (isSantaMariaSectionHeading(item.title || "")) item.itemType = "Section Heading";
           }
+          await enrichHtmlMinutes(context, meeting);
         }
       }
     }
