@@ -1,4 +1,7 @@
-import { selectAgendaItemsForGeneration } from "@/lib/llm/agendaItemReuse";
+import {
+  MAX_FALLBACK_SUMMARY_ATTEMPTS,
+  selectAgendaItemsForGeneration
+} from "@/lib/llm/agendaItemReuse";
 import type { LlmReadyMeeting, PrimeGovMeeting, SimpleCitySummary } from "@/lib/types";
 import {
   ALL_JURISDICTIONS_SLUG,
@@ -408,6 +411,14 @@ export function orderSummaryTargets<
       return a.index - b.index;
     })
     .map(({ target }) => target);
+}
+
+/** The request never reached a model, so the item has not really been tried. */
+export function isStarvedSummaryError(error: unknown) {
+  if (!error) return false;
+  if (isLlmProcessBudgetExceededError(error) || isLlmRateLimitError(error)) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  return /LLM process budget exhausted|Pipeline deadline reached/i.test(message);
 }
 
 export function shouldReconcileMinutesWithoutGeneratingCards(
@@ -1114,7 +1125,7 @@ async function runSimpleCityPipelineInternal(
               : null;
             const generationMeeting = itemSelection?.meeting || item.meeting;
             if (itemSelection) {
-              log(`Item source audit for ${item.meeting.title}: ${itemSelection.retainedItemIds.length} unchanged cards retained; ${generationMeeting.items?.length || 0} changed, missing, or unverified items selected.`);
+              log(`Item source audit for ${item.meeting.title}: ${itemSelection.retainedItemIds.length} unchanged cards retained; ${generationMeeting.items?.length || 0} changed, missing, or unverified items selected${itemSelection.fallbackAttempts.size > 0 ? `, including ${itemSelection.fallbackAttempts.size} official-source fallback card(s) being retried` : ""}.`);
             }
 
             if (
@@ -1286,7 +1297,7 @@ async function runSimpleCityPipelineInternal(
             }
             if (coverage.fallbackItemIds.length > 0) {
               const message =
-                `Published official-source fallback coverage for ${coverage.fallbackItemIds.length} of ${requiredItemCount} required agenda item(s) in ${item.meeting.title}; detailed summaries can be retried when the item source changes.`;
+                `Published official-source fallback coverage for ${coverage.fallbackItemIds.length} of ${requiredItemCount} required agenda item(s) in ${item.meeting.title}; detailed summaries are retried on later runs, up to ${MAX_FALLBACK_SUMMARY_ATTEMPTS} real attempts per item.`;
               log(`Summary warning: ${message}`);
             }
             if (initialSummaryError) {
@@ -1299,9 +1310,23 @@ async function runSimpleCityPipelineInternal(
             }
 
             // Recovery has already been attempted for every uncovered item.
-            // Checkpoint the agenda-summary hash with the cards so unchanged
-            // fallback coverage is not regenerated. The full source hash is
-            // checkpointed separately only after outcome reconciliation.
+            // Checkpoint the agenda-summary hash with the cards; the full source
+            // hash is checkpointed separately only after outcome reconciliation.
+            //
+            // Fallback cards carry an attempt count so a later run tries them
+            // again. A run that was starved (budget, rate limit, or deadline)
+            // never gave the item a real attempt, so it does not use one up.
+            const summaryRunWasStarved =
+              isLlmProcessBudgetExhausted() ||
+              deadlineExceeded() ||
+              isStarvedSummaryError(initialSummaryError) ||
+              coverage.retryErrors.some((retryError) => isStarvedSummaryError(new Error(retryError)));
+            const itemFallbackAttempts = new Map(
+              coverage.fallbackItemIds.map((itemId) => [
+                itemId,
+                (itemSelection?.fallbackAttempts.get(itemId) ?? 0) + (summaryRunWasStarved ? 0 : 1)
+              ])
+            );
             if (persistSummaries && supabase && item.id) {
               const inserted = shouldAppendToExisting
                 ? await appendSummaryCardsForMeeting(
@@ -1316,6 +1341,7 @@ async function runSimpleCityPipelineInternal(
                       jurisdiction,
                       preserveMeetingTranslation: Boolean(itemSelection?.retainedItemIds.length),
                       itemInputHashes: itemSelection?.inputHashes,
+                      itemFallbackAttempts,
                       summarySourceHash: item.summarySourceHash
                     }
                   )
@@ -1331,6 +1357,7 @@ async function runSimpleCityPipelineInternal(
                         authoritativeAgendaItemSourceIds(item.meeting) || undefined,
                       jurisdiction,
                       itemInputHashes: itemSelection?.inputHashes,
+                      itemFallbackAttempts,
                       summarySourceHash: item.summarySourceHash
                     }
                   );

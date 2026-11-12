@@ -1,4 +1,8 @@
-import { withAgendaItemInputHash, type ExistingItemInput } from "@/lib/llm/agendaItemReuse";
+import {
+  withAgendaItemInputHash,
+  withFallbackSummaryAttempts,
+  type ExistingItemInput
+} from "@/lib/llm/agendaItemReuse";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   AgendaItem,
@@ -581,6 +585,8 @@ function cardInsertRow(
     adminNotes: string | null;
     modelInputText?: string | null;
     sourceInputHash?: string;
+    /** Set only on official-source fallback cards; see fallbackSummaryAttempts. */
+    fallbackAttempts?: number;
   }
 ) {
   // A card whose body is entirely the "not listed in the source document"
@@ -624,7 +630,10 @@ function cardInsertRow(
       : { model_input_text: options.modelInputText }),
     is_featured: options.isFeatured,
     admin_notes: options.adminNotes,
-    raw_llm_json: withAgendaItemInputHash(rawLlmJson, options.sourceInputHash)
+    raw_llm_json: withFallbackSummaryAttempts(
+      withAgendaItemInputHash(rawLlmJson, options.sourceInputHash),
+      options.fallbackAttempts
+    )
   });
 }
 
@@ -1319,7 +1328,7 @@ export async function loadExistingAgendaItemInputs(supabase: SupabaseClient, mee
   if (!(await supportsSourceItemId(supabase)) || !(await supportsModelInputText(supabase))) return null;
   const { data, error } = await retryTransientSupabaseWrite(
     () => supabase.from("summary_cards")
-      .select("source_item_id,model_input_text,raw_llm_json")
+      .select("source_item_id,model_input_text,why_it_matters,raw_llm_json")
       .eq("meeting_id", meetingId),
     {
       onRetry: (retryError, nextAttempt, delayMs) => {
@@ -1346,6 +1355,7 @@ export async function replaceSummaryCardsForMeeting(
     authoritativeSourceItemIds?: readonly string[];
     agendaItems?: readonly AgendaItem[];
     itemInputHashes?: ReadonlyMap<string, string>;
+    itemFallbackAttempts?: ReadonlyMap<string, number>;
   } = {}
 ) {
   const sourceItemIdAvailable = await supportsSourceItemId(supabase);
@@ -1448,6 +1458,7 @@ export async function replaceSummaryCardsForMeeting(
       includeSourceItemId: sourceItemIdAvailable,
       modelInputText: cardModelInputText(card, options.agendaItems, modelInputAvailable),
       sourceInputHash: options.itemInputHashes?.get(card.sourceItemId || ""),
+      fallbackAttempts: options.itemFallbackAttempts?.get(card.sourceItemId || ""),
       isPublished:
         typeof preserved?.is_published === "boolean" ? preserved.is_published : true,
       isFeatured:
@@ -1504,6 +1515,7 @@ export async function appendSummaryCardsForMeeting(
     authoritativeSourceItemIds?: readonly string[];
     agendaItems?: readonly AgendaItem[];
     itemInputHashes?: ReadonlyMap<string, string>;
+    itemFallbackAttempts?: ReadonlyMap<string, number>;
     preserveMeetingTranslation?: boolean;
   } = {}
 ) {
@@ -1709,6 +1721,7 @@ export async function appendSummaryCardsForMeeting(
         sourceItemId: entry.card.sourceItemId || existing.source_item_id || null,
         modelInputText: cardModelInputText(entry.card, options.agendaItems, modelInputAvailable),
         sourceInputHash: options.itemInputHashes?.get(entry.card.sourceItemId || ""),
+        fallbackAttempts: options.itemFallbackAttempts?.get(entry.card.sourceItemId || ""),
         isPublished: existing.is_published ?? true,
         isFeatured: existing.is_featured ?? false,
         adminNotes: existing.admin_notes || null
@@ -1739,6 +1752,7 @@ export async function appendSummaryCardsForMeeting(
           includeSourceItemId: sourceItemIdAvailable,
           modelInputText: cardModelInputText(card, options.agendaItems, modelInputAvailable),
           sourceInputHash: options.itemInputHashes?.get(card.sourceItemId || ""),
+      fallbackAttempts: options.itemFallbackAttempts?.get(card.sourceItemId || ""),
           isPublished: true,
           isFeatured: false,
           adminNotes: null

@@ -1384,6 +1384,7 @@ test("partial item regeneration preserves unchanged rows and prunes only outside
   await appendSummaryCardsForMeeting(supabase as never, "meeting", incoming, { response: "model" }, {
     authoritativeSourceItemIds: ["item-0", "item-1"],
     itemInputHashes: new Map([["item-1", "new-fingerprint"]]),
+    itemFallbackAttempts: new Map([["item-1", 2]]),
     preserveMeetingTranslation: true,
     summarySourceHash: "agenda-hash"
   });
@@ -1393,6 +1394,9 @@ test("partial item regeneration preserves unchanged rows and prunes only outside
   assert.equal(updated[0].row.is_featured, true);
   assert.equal(updated[0].row.admin_notes, "Reviewed");
   assert.equal((updated[0].row.raw_llm_json as Record<string, unknown>)._simplecitySourceInputHash, "new-fingerprint");
+  // A fallback card keeps its attempt count beside the fingerprint so a later
+  // run knows whether to try it again.
+  assert.equal((updated[0].row.raw_llm_json as Record<string, unknown>)._simplecityFallbackSummaryAttempts, 2);
 
   updated.length = 0;
   deleted.length = 0;

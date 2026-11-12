@@ -115,6 +115,14 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Run San Mateo pipeline
         run: npm run pipeline:san-mateo-city -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
 
@@ -146,6 +154,14 @@ jobs:
 
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
+
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
 
       - name: Run San Mateo County pipeline
         run: npm run pipeline:san-mateo-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage
@@ -179,6 +195,14 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Run Foster City pipeline
         run: xvfb-run -a npm run pipeline:foster-city -- --headful --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
 
@@ -210,6 +234,14 @@ jobs:
 
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
+
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
 
       - name: Run Santa Clara County pipeline
         run: npm run pipeline:santa-clara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=100 --require-results-coverage
@@ -243,6 +275,14 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Run Mountain View pipeline
         run: npm run pipeline:mountain-view -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage
 
@@ -274,6 +314,14 @@ jobs:
 
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
+
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
 
       - name: Run San Francisco pipeline
         run: npm run pipeline:san-francisco -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=75 --require-results-coverage
@@ -307,6 +355,14 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Run Los Altos pipeline
         run: npm run pipeline:los-altos -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 75 || echo 45) --require-results-coverage
 
@@ -338,6 +394,14 @@ jobs:
 
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
+
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
 
       - name: Run Redwood City pipeline
         env:
@@ -373,6 +437,14 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Run Los Altos Hills pipeline
         run: npm run pipeline:los-altos-hills -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 75 || echo 45) --require-results-coverage
 
@@ -404,6 +476,14 @@ jobs:
 
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
+
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
 
       - name: Run East Palo Alto pipeline
         run: npm run pipeline:east-palo-alto -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=45 --require-results-coverage

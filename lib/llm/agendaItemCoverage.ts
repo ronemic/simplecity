@@ -340,8 +340,11 @@ export async function completeAgendaItemCoverage(
 
   const missing = uncoveredAgendaItems(meeting, summary);
   const fallbackReasonForItem = (item: AgendaItem): OfficialSourceFallbackReason => {
-    if (validationFailedItemIds.has(item.externalId)) return "validation_failed";
+    // A failed request for this item is direct evidence; the validation flag
+    // is inferred from the whole meeting's response. Budget-blocked items were
+    // being published as "could not verify" when nothing had been generated.
     if (generationFailedItemIds.has(item.externalId)) return "generation_failed";
+    if (validationFailedItemIds.has(item.externalId)) return "validation_failed";
     return "summary_omitted";
   };
   if (missing.length > 0) {

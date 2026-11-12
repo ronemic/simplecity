@@ -64,6 +64,14 @@ jobs:
       - name: Install Playwright browser
         uses: ./.github/actions/setup-playwright
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Select meeting lookback
         id: lookback
         env:

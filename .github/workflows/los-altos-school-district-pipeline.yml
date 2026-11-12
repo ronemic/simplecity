@@ -63,6 +63,8 @@ jobs:
 
       - name: Install OCR tools
         uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
 
       - name: Select meeting lookback
         id: lookback

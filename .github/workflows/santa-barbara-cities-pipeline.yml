@@ -50,6 +50,13 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
       - name: Set up Playwright
         # eSCRIBE (Santa Maria), CivicClerk (Carpinteria) and PrimeGov (Solvang) scrape with Chromium.
         if: contains(fromJSON('["santa-maria", "carpinteria", "solvang"]'), matrix.city)

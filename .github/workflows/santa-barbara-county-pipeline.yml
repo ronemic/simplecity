@@ -48,5 +48,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install OCR tools
+        # Scanned minutes PDFs have no text layer; without these tools they are
+        # skipped and their recorded votes never reach the cards. Bounded and
+        # non-fatal so a package-mirror outage cannot cost the run.
+        uses: ./.github/actions/setup-ocr
+        timeout-minutes: 8
+        continue-on-error: true
+
       - name: Run Santa Barbara County pipeline
         run: npm run pipeline:santa-barbara-county -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 100 || echo 75) --require-results-coverage
