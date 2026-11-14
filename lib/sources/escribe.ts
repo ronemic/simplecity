@@ -51,6 +51,7 @@ type EscribePastMeetingsResponse = {
 
 export type ScrapeEscribeOptions = ScrapePortalOptions & {
   jurisdiction: JurisdictionConfig;
+  downloadAgendaFallbackOnly?: boolean;
   limit?: number;
   monthsBack?: number;
   monthsForward?: number;
@@ -87,8 +88,8 @@ export function classifyEscribeDocument(
   if (label.includes("ordinance")) return "Ordinance";
   if (label.includes("contract") || label.includes("agreement")) return "Contract";
   if (label.includes("exhibit")) return "Exhibit";
-  if (sourceType === "additionaldocuments") return "Attachment";
   if (label.includes("agenda") || sourceType === "agendacover") return "Agenda";
+  if (sourceType === "additionaldocuments") return "Attachment";
   if (format === "video" || sourceType === "video") return "Video";
   return "Document";
 }
@@ -430,6 +431,18 @@ export function shouldDownloadEscribeDocument(
   );
 }
 
+export function shouldDownloadEscribeAgendaFallback(
+  document: PrimeGovDocument,
+  meeting: PrimeGovMeeting,
+  portalUrl: string
+) {
+  return meeting.status !== "Cancelled" &&
+    !meeting.items?.length &&
+    !isUsablePrimeGovHtmlAgendaText(meeting.htmlAgendaText || "") &&
+    (document.type === "Agenda" || document.type === "Agenda Packet") &&
+    shouldDownloadEscribeDocument(document, portalUrl);
+}
+
 export async function scrapeEscribeMeetings(
   options: ScrapeEscribeOptions
 ): Promise<ScrapePortalResult> {
@@ -521,7 +534,9 @@ export async function scrapeEscribeMeetings(
         shouldStop: options.shouldStop,
         // Submitted comments remain linked as an official source, but their
         // bodies are neither downloaded nor extracted into SimpleCity.
-        documentFilter: (document) => shouldDownloadEscribeDocument(document, portalUrl),
+        documentFilter: (document, meeting) => options.downloadAgendaFallbackOnly
+          ? shouldDownloadEscribeAgendaFallback(document, meeting, portalUrl)
+          : shouldDownloadEscribeDocument(document, portalUrl),
         validateFinalUrl: (url) => isOfficialEscribeUrl(url, portalUrl),
         // Avoid bursts from fast CI runners that trigger eSCRIBE's rate limit.
         fetchImpl: createBrowserDocumentFetch(page, portalUrl, log, 2000)

@@ -85,6 +85,7 @@ import {
 } from "@/lib/llm/provider";
 
 export type RunSimpleCityPipelineOptions = ScrapePortalOptions & {
+  downloadAgendaFallbackOnly?: boolean;
   jurisdiction?: JurisdictionSlug | JurisdictionConfig;
   persist?: boolean;
   summarize?: boolean;

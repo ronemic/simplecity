@@ -4,6 +4,7 @@ import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import {
   classifyEscribeDocument,
   normalizeEscribeMeetingRecords,
+  shouldDownloadEscribeAgendaFallback,
   shouldDownloadEscribeDocument,
   type EscribeMeetingRecord
 } from "@/lib/sources/escribe";
@@ -29,6 +30,25 @@ test("classifies eSCRIBE meeting packages and supplemental documents", () => {
     classifyEscribeDocument({ Title: "TRC Meeting Cancellation.pdf", Type: "AdditionalDocuments", Format: ".pdf" }),
     "Notice of Cancellation"
   );
+});
+
+test("downloads an official PDF agenda when a meeting has no readable HTML agenda", () => {
+  const jurisdiction = getJurisdictionBySlug("santa-maria");
+  assert.ok(jurisdiction);
+  const portal = jurisdiction.escribeUrl!;
+  const [meeting] = normalizeEscribeMeetingRecords([{
+    Id: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    MeetingType: "City Council Meeting",
+    FormattedStart: "Tuesday, November 17, 2026 @ 5:30 PM",
+    MeetingLinks: [{ Title: "Agenda - Spanish.pdf", Type: "AdditionalDocuments", Url: "/FileStream.ashx?DocumentId=15337" }],
+    section: "Upcoming Meetings"
+  }], jurisdiction);
+  const agenda = meeting.documents[0];
+  assert.equal(shouldDownloadEscribeAgendaFallback(agenda, meeting, portal), true);
+  assert.equal(shouldDownloadEscribeAgendaFallback({ ...agenda, type: "Public Comments" }, meeting, portal), false);
+  assert.equal(shouldDownloadEscribeAgendaFallback({ ...agenda, url: "https://example.com/FileStream.ashx" }, meeting, portal), false);
+  assert.equal(shouldDownloadEscribeAgendaFallback(agenda, { ...meeting, status: "Cancelled" }, portal), false);
+  assert.equal(shouldDownloadEscribeAgendaFallback(agenda, { ...meeting, htmlAgendaText: `Agenda\nCall to order\n${"Business item ".repeat(50)}` }, portal), false);
 });
 
 test("normalizes stable eSCRIBE IDs, official links, and cancellation status", () => {
