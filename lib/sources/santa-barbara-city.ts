@@ -3,6 +3,7 @@ import type { AgendaItem, PrimeGovMeeting, ScrapePortalResult } from "@/lib/type
 import type { ScrapePortalOptions } from "@/lib/scraper/primegov";
 import { cleanText } from "@/lib/utils/slug";
 import { filterMeetingsToWindow } from "@/lib/utils/meetingWindow";
+import { retryInitialNavigation } from "@/lib/scraper/navigation";
 
 type OnBaseMeeting = {
   ID: number;
@@ -81,23 +82,28 @@ export function parseSantaBarbaraCityAgendaItems(html: string, sourceUrl: string
   return items;
 }
 
-async function fetchOfficialText(url: string) {
-  let failure: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+export async function fetchSantaBarbaraCityText(url: string, options: {
+  fetchImpl?: typeof fetch;
+  log?: (message: string) => void;
+  retryDelayMs?: number;
+} = {}) {
+  return retryInitialNavigation(async () => {
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+      const response = await (options.fetchImpl || fetch)(url, { signal: AbortSignal.timeout(60_000) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.text();
     } catch (error) {
-      failure = error;
+      const cause = error instanceof Error ? error.cause : undefined;
+      const detail = [error instanceof Error ? error.message : String(error),
+        cause instanceof Error ? cause.message : null].filter(Boolean).join(": ");
+      throw new Error(`Santa Barbara city OnBase source failed: ${url}: ${detail}`, { cause: error });
     }
-  }
-  throw new Error(`Santa Barbara city OnBase source failed: ${url}`, { cause: failure });
+  }, { label: `Santa Barbara city OnBase source ${url}`, log: options.log, retryDelayMs: options.retryDelayMs });
 }
 
 export async function scrapeSantaBarbaraCityMeetings(options: ScrapePortalOptions & { jurisdiction: JurisdictionConfig }): Promise<ScrapePortalResult> {
   const source = options.portalUrl || options.jurisdiction.sourceUrl;
-  const inventory = parseSantaBarbaraCityInventory(await fetchOfficialText(source));
+  const inventory = parseSantaBarbaraCityInventory(await fetchSantaBarbaraCityText(source, options));
   const meetings = filterMeetingsToWindow(inventory.map((entry): PrimeGovMeeting => {
     const detailsUrl = new URL(`/OnBaseAgendaOnline/Meetings/ViewMeeting?id=${entry.ID}&doctype=1`, source).toString();
     const agendaUrl = new URL(`/OnBaseAgendaOnline/Documents/ViewAgenda?meetingId=${entry.ID}&type=agenda&doctype=1`, source).toString();
@@ -132,7 +138,7 @@ export async function scrapeSantaBarbaraCityMeetings(options: ScrapePortalOption
     if (options.shouldStop?.()) break;
     const agenda = meeting.documents.find((document) => document.type === "Agenda");
     if (!agenda) continue;
-    const html = await fetchOfficialText(agenda.url);
+    const html = await fetchSantaBarbaraCityText(agenda.url, options);
     agenda.extractedText = plainText(html);
     agenda.extractionCharacterCount = agenda.extractedText.length;
     if (agenda.extractedText.length < 200) {

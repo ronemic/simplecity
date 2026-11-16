@@ -4,7 +4,7 @@ import {
   getJurisdictions,
   PUBLIC_JURISDICTION_OPTIONS
 } from "@/lib/config/jurisdictions";
-import { parseSantaBarbaraCityAgendaItems, parseSantaBarbaraCityInventory } from "@/lib/sources/santa-barbara-city";
+import { fetchSantaBarbaraCityText, parseSantaBarbaraCityAgendaItems, parseSantaBarbaraCityInventory } from "@/lib/sources/santa-barbara-city";
 import { isSantaMariaSectionHeading } from "@/lib/sources/escribe";
 import { parseLompocAgendaItems, parseLompocCouncilRows } from "@/lib/sources/lompoc";
 import {
@@ -65,6 +65,35 @@ test("Santa Barbara city reads nested OnBase meeting inventory without losing ro
     ']}));</script>';
   assert.deepEqual(parseSantaBarbaraCityInventory(html).map((meeting) => meeting.ID), [1, 2]);
   assert.throws(() => parseSantaBarbaraCityInventory("<html></html>"), /inventory was not found/);
+});
+
+test("Santa Barbara city recovers after repeated connection failures and a temporary HTTP outage", async () => {
+  let attempts = 0;
+  const logs: string[] = [];
+  const result = await fetchSantaBarbaraCityText("https://example.gov/OnBaseAgendaOnline/", {
+    retryDelayMs: 0,
+    log: (message) => logs.push(message),
+    fetchImpl: async () => {
+      attempts += 1;
+      if (attempts <= 2) throw new TypeError("fetch failed", { cause: new Error("connect ETIMEDOUT") });
+      return attempts === 3 ? new Response("Unavailable", { status: 503 }) : new Response("official inventory");
+    }
+  });
+  assert.equal(result, "official inventory");
+  assert.equal(attempts, 4);
+  assert.equal(logs.length, 3);
+});
+
+test("Santa Barbara city reports the underlying error when all bounded retries fail", async () => {
+  let attempts = 0;
+  await assert.rejects(fetchSantaBarbaraCityText("https://example.gov/OnBaseAgendaOnline/", {
+    retryDelayMs: 0,
+    fetchImpl: async () => {
+      attempts += 1;
+      throw new TypeError("fetch failed", { cause: new Error("connect ETIMEDOUT") });
+    }
+  }), /OnBase source failed:.*fetch failed: connect ETIMEDOUT/);
+  assert.equal(attempts, 4);
 });
 
 test("Santa Barbara city keeps numbered agenda subjects and recommendations together", () => {
