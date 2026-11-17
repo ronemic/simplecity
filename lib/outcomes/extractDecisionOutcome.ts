@@ -1037,10 +1037,22 @@ function minutesResultForCard(
         (candidate) => candidate.url === directInventoryMatch.item.sourceUrl
       ) || minutesDocuments(meeting)[0];
     if (document) {
+      // Minutes often give every item the same document URL. A legacy card's
+      // unique official agenda-item link still identifies the numbered item;
+      // preserve that evidence instead of downgrading it to a title match.
+      const agendaSourceMatch = findGuardedAgendaItemMatch(title, meeting.items || [], {
+        sourceUrl: card.source_url
+      });
+      const linkedNumber = comparableAgendaNumber(agendaSourceMatch?.item.agendaNumber);
+      const resultNumber = comparableAgendaNumber(directInventoryMatch.item.agendaNumber);
+      const match = agendaSourceMatch?.method === "source_url" &&
+        linkedNumber && linkedNumber === resultNumber
+        ? { ...directInventoryMatch, method: "source_url" as const, score: 1 }
+        : directInventoryMatch;
       return {
         item: directInventoryMatch.item,
         document,
-        match: directInventoryMatch
+        match
       };
     }
   }
@@ -1061,7 +1073,12 @@ function minutesResultForCard(
         (candidate) => candidate.url === inventoryMatch.item.sourceUrl
       ) || minutesDocuments(meeting)[0];
     if (document) {
-      return { item: inventoryMatch.item, document, match: inventoryMatch };
+      // A number inferred from a fuzzy agenda-title match is still title
+      // evidence. Preserve the original identity method so it cannot outrank
+      // a card carrying the official item's unique link.
+      const method = ownItem ? "source_item_id" as const
+        : agendaMatch && "method" in agendaMatch ? agendaMatch.method : "title" as const;
+      return { item: inventoryMatch.item, document, match: { ...inventoryMatch, method } };
     }
   }
 
@@ -1090,7 +1107,8 @@ function minutesResultForCard(
             sourceUrl: document.url,
             rowText: numberedBlock
           },
-          method: "agenda_number",
+          method: ownItem ? "source_item_id" :
+            agendaMatch && "method" in agendaMatch ? agendaMatch.method : "agenda_number",
           score: 1,
           runnerUpScore: null
         };

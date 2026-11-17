@@ -18,6 +18,7 @@ env:
   GROQ_MODEL: ${{ secrets.GROQ_MODEL || 'openai/gpt-oss-120b' }}
   MAPTILER_GEOCODING_API_KEY: ${{ secrets.MAPTILER_GEOCODING_API_KEY }}
   LOMPOC_PYTHON: ${{ github.workspace }}/.venv-lompoc/bin/python
+  ESCRIBE_PYTHON: ${{ github.workspace }}/.venv-lompoc/bin/python
   NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_URL }}
   NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SANTA_BARBARA_REGION_SUPABASE_ANON_KEY }}
   SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SANTA_BARBARA_REGION_SUPABASE_SERVICE_ROLE_KEY }}
@@ -61,8 +62,8 @@ jobs:
         # eSCRIBE (Santa Maria), CivicClerk (Carpinteria) and PrimeGov (Solvang) scrape with Chromium.
         if: contains(fromJSON('["santa-maria", "carpinteria", "solvang"]'), matrix.city)
         uses: ./.github/actions/setup-playwright
-      - name: Install Lompoc official-site fetcher
-        if: matrix.city == 'lompoc'
+      - name: Install official-site browser TLS fetcher
+        if: contains(fromJSON('["lompoc", "santa-maria"]'), matrix.city)
         run: |
           python3 -m venv .venv-lompoc
           .venv-lompoc/bin/python -m pip install curl_cffi==0.13.0

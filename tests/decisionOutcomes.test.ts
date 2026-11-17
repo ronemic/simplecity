@@ -971,7 +971,7 @@ test("extracts a Menlo Park agenda-item result from official minutes text", () =
   assert.equal(result.kind, "approved");
   assert.equal(result.headline, "Approved unanimously");
   assert.equal(result.vote, "Unanimous");
-  assert.equal(result.matchMethod, "agenda_number");
+  assert.equal(result.matchMethod, "source_url");
   assert.equal(result.sourceUrl, "https://example.com/menlo-park/minutes.pdf");
   assert.match(result.summary, /official minutes/i);
 });
@@ -1122,6 +1122,31 @@ test("uses a minutes source id when the current agenda item id changed", () => {
   assert.ok(result);
   assert.equal(result.matchMethod, "source_item_id");
   assert.equal(result.vote, "4–0–1");
+});
+
+test("preserves an official agenda-item link when legacy cards compete for a minutes result", () => {
+  const title = "Consider recommendations relating to the Final Grand Jury Report on transit management";
+  const itemUrl = "https://sccgov.iqm2.com/Citizens/Detail_LegiFile.aspx?ID=130072";
+  const record = meeting("santa-clara-county", {
+    items: [agendaItem({ externalId: "current-item-59", agendaNumber: "59", title,
+      sourceUrl: itemUrl, action: null, result: null })],
+    documents: [{ type: "Minutes", label: "Minutes", url: "https://example.com/minutes.pdf",
+      extractedText: `59. ${title}\nACTION: Approved unanimously, 5-0.\n60. Adjournment` }]
+  });
+  const original = extractDecisionOutcome({ id: "original", source_item_id: "legacy-59",
+    agenda_item: title, source_url: itemUrl }, record);
+  const duplicate = extractDecisionOutcome({ id: "duplicate", source_item_id: "legacy-subitem-b",
+    agenda_item: title, source_url: record.sourceUrl }, record);
+  assert.ok(original);
+  assert.ok(duplicate);
+  assert.equal(original.matchMethod, "source_url");
+  assert.equal(duplicate.matchMethod, "title");
+  assert.equal(original.matchedItemKey, duplicate.matchedItemKey);
+  const resolved = resolveCanonicalOutcomeAssignments([
+    { ...original, cardId: "original" }, { ...duplicate, cardId: "duplicate" }
+  ], new Set(["https://example.com/minutes.pdf"]));
+  assert.deepEqual(resolved.selected.map((proposal) => proposal.cardId), ["original"]);
+  assert.equal(resolved.rejectedAmbiguous, 0);
 });
 
 test("does not use prior-meeting minutes attached to a current agenda item", () => {

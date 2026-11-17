@@ -4,6 +4,7 @@ import { getJurisdictionBySlug } from "@/lib/config/jurisdictions";
 import {
   classifyEscribeDocument,
   normalizeEscribeMeetingRecords,
+  escribeHtmlAgendaFallback,
   shouldDownloadEscribeAgendaFallback,
   shouldDownloadEscribeDocument,
   type EscribeMeetingRecord
@@ -45,6 +46,11 @@ test("downloads an official PDF agenda when a meeting has no readable HTML agend
   }], jurisdiction);
   const agenda = meeting.documents[0];
   assert.equal(shouldDownloadEscribeAgendaFallback(agenda, meeting, portal), true);
+  const html = escribeHtmlAgendaFallback(meeting, portal);
+  assert.ok(html);
+  assert.equal(new URL(html.url).searchParams.get("Agenda"), "Agenda");
+  assert.equal(new URL(html.url).searchParams.get("Id"), "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+  assert.equal(escribeHtmlAgendaFallback({ ...meeting, status: "Cancelled" }, portal), null);
   assert.equal(shouldDownloadEscribeAgendaFallback({ ...agenda, type: "Public Comments" }, meeting, portal), false);
   assert.equal(shouldDownloadEscribeAgendaFallback({ ...agenda, url: "https://example.com/FileStream.ashx" }, meeting, portal), false);
   assert.equal(shouldDownloadEscribeAgendaFallback(agenda, { ...meeting, status: "Cancelled" }, portal), false);

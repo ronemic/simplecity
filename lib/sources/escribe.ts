@@ -20,6 +20,7 @@ import { parseMeetingDate } from "@/lib/utils/date";
 import { cleanText, slugify } from "@/lib/utils/slug";
 import { retryInitialNavigation } from "@/lib/scraper/navigation";
 import { createBrowserDocumentFetch } from "@/lib/scraper/browserDocumentFetch";
+import { withEscribeDocumentFallback } from "@/lib/scraper/escribeDocumentFetch";
 import { isUsableOfficialSourceText } from "@/lib/scraper/documentUsability";
 
 export type EscribeMeetingLink = {
@@ -280,12 +281,22 @@ export function isSantaMariaSectionHeading(title: string) {
   return SANTA_MARIA_SECTION_HEADING.test(title.trim());
 }
 
+export function escribeHtmlAgendaFallback(meeting: PrimeGovMeeting, portalUrl: string): PrimeGovDocument | null {
+  if (meeting.status === "Cancelled" || !meeting.documents.some((document) =>
+    shouldDownloadEscribeDocument(document, portalUrl))) return null;
+  const url = new URL(meeting.meetingDetailsUrl || meeting.sourceUrl || "", portalUrl);
+  if (url.origin !== new URL(portalUrl).origin || !url.searchParams.has("Id")) return null;
+  url.searchParams.set("Agenda", "Agenda");
+  return { type: "HTML Agenda", label: "Agenda (HTML)", url: url.toString() };
+}
+
 async function enrichHtmlAgenda(
   context: BrowserContext,
   meeting: PrimeGovMeeting,
   portalUrl: string
 ) {
-  const htmlAgenda = meeting.documents.find((document) => document.type === "HTML Agenda");
+  const linkedHtmlAgenda = meeting.documents.find((document) => document.type === "HTML Agenda");
+  const htmlAgenda = linkedHtmlAgenda || escribeHtmlAgendaFallback(meeting, portalUrl);
   if (!htmlAgenda) return;
   const page = await context.newPage();
 
@@ -298,6 +309,10 @@ async function enrichHtmlAgenda(
       else await route.abort();
     });
     await page.goto(htmlAgenda.url, { waitUntil: "domcontentloaded", timeout: 60_000 });
+    // Some portal cards expose only a PDF even when an English HTML agenda is
+    // published. The page is server-rendered; an absent .Agenda means this
+    // optional representation is unavailable, not an extraction failure.
+    if (!linkedHtmlAgenda && await page.locator(".Agenda").count() === 0) return;
     await page.waitForSelector(".Agenda", { timeout: 30_000 });
     const text = normalizePrimeGovHtmlAgendaText(await page.locator(".Agenda").innerText());
     if (isUsablePrimeGovHtmlAgendaText(text)) meeting.htmlAgendaText = text;
@@ -358,6 +373,10 @@ async function enrichHtmlAgenda(
 
     meeting.items = items;
     meeting.agendaItemInventoryComplete = true;
+    if (!linkedHtmlAgenda && (meeting.htmlAgendaText || items.length)) {
+      meeting.documents.push(htmlAgenda);
+      meeting.hasHtmlAgenda = true;
+    }
     const seenDocuments = new Set(meeting.documents.map((document) => document.url));
     for (const attachment of items.flatMap((item) => item.attachments || [])) {
       if (seenDocuments.has(attachment.url)) continue;
@@ -539,7 +558,7 @@ export async function scrapeEscribeMeetings(
           : shouldDownloadEscribeDocument(document, portalUrl),
         validateFinalUrl: (url) => isOfficialEscribeUrl(url, portalUrl),
         // Avoid bursts from fast CI runners that trigger eSCRIBE's rate limit.
-        fetchImpl: createBrowserDocumentFetch(page, portalUrl, log, 2000)
+        fetchImpl: withEscribeDocumentFallback(createBrowserDocumentFetch(page, portalUrl, log, 2000), log)
       });
       log(`eSCRIBE document downloads complete: ${result.downloaded} downloaded, ${result.failed} failed.`);
     }
