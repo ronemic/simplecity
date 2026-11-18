@@ -67,5 +67,11 @@ jobs:
         run: |
           python3 -m venv .venv-lompoc
           .venv-lompoc/bin/python -m pip install curl_cffi==0.13.0
+      - name: Run Santa Maria pipeline with full Chromium
+        # On GitHub runners, eSCRIBE's document challenge completes in full
+        # Chromium under a virtual display; headless requests remain HTTP 403.
+        if: matrix.city == 'santa-maria'
+        run: xvfb-run -a npm run pipeline:santa-maria -- --headful --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 100 || echo 75) --require-results-coverage
       - name: Run city pipeline
+        if: matrix.city != 'santa-maria'
         run: npm run pipeline:${{ matrix.city }} -- --months-back=$([ "$(date -u +%u)" = "1" ] && echo 3 || echo 1) --max-runtime-minutes=$([ "$(date -u +%u)" = "1" ] && echo 100 || echo 75) --require-results-coverage
