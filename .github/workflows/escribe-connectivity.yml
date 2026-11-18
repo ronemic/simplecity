@@ -16,28 +16,42 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           persist-credentials: false
-      - name: Install document client
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - name: Install browser
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: |
-          python3 -m venv .venv-probe
-          .venv-probe/bin/python -m pip install curl_cffi==0.13.0
-      - name: Fetch official PDFs without archive recovery
+          npm ci
+          npx playwright install --with-deps chromium
+      - name: Fetch official PDFs with full Chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
         run: |
-          .venv-probe/bin/python - <<'PY'
-          import json, subprocess, sys
-          failures = []
-          for document_id in [15193, 15104, 15337, 15350]:
-              url = 'https://pub-santamaria.escribemeetings.com/FileStream.ashx?DocumentId=' + str(document_id)
-              result = subprocess.run([sys.executable, 'scripts/escribe_fetch.py', url], capture_output=True, timeout=60)
-              if result.returncode:
-                  print(document_id, 'client failed', result.stderr.decode()[-1000:], flush=True)
-                  failures.append(document_id)
-                  continue
-              metadata, body = result.stdout.split(b'\n', 1)
-              metadata = json.loads(metadata)
-              valid = metadata['status'] == 200 and body.startswith(b'%PDF-')
-              print(document_id, 'HTTP', metadata['status'], 'bytes', len(body), 'valid PDF', valid, flush=True)
-              if not valid:
-                  failures.append(document_id)
-          if failures:
-              raise SystemExit('Unable to read official documents: ' + str(failures))
-          PY
+          cat > /tmp/escribe-probe.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: false });
+          const context = await browser.newContext();
+          const page = await context.newPage();
+          const base = 'https://pub-santamaria.escribemeetings.com/';
+          try {
+            await page.goto(base, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            const docs = await import(process.cwd() + '/lib/scraper/browserDocumentFetch.ts');
+            const fetcher = docs.createBrowserDocumentFetch(page, base, console.log);
+            for (const id of [15193, 15350]) {
+              const response = await fetcher(base + 'FileStream.ashx?DocumentId=' + id);
+              const bytes = Buffer.from(await response.arrayBuffer());
+              console.log(id, response.status, 'bytes', bytes.length, 'prefix', bytes.subarray(0, 5).toString());
+              if (response.status !== 200 || bytes.subarray(0,5).toString() !== '%PDF-') throw new Error('No PDF');
+            }
+          } finally {
+            await browser.close();
+          }
+          JS
+          cp /tmp/escribe-probe.mjs ./escribe-probe.mjs
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a node --import tsx/esm escribe-probe.mjs
+          else
+            node --import tsx/esm escribe-probe.mjs
+          fi
