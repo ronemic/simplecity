@@ -9,7 +9,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-24.04, macos-15]
+        runner: [ubuntu-24.04]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     steps:
@@ -24,7 +24,7 @@ jobs:
           PLAYWRIGHT_BROWSERS_PATH: '0'
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install chromium
       - name: Fetch official PDFs with full Chromium
         env:
           PLAYWRIGHT_BROWSERS_PATH: '0'
@@ -55,3 +55,7 @@ jobs:
           else
             node --import tsx/esm escribe-probe.mjs
           fi
+      - name: Verify study-session pipeline without archives
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: '0'
+        run: xvfb-run -a npm run pipeline:santa-maria -- --headful --body='Planning Commission Study Session' --months-back=1 --no-persist --no-summarize --max-runtime-minutes=5 --require-results-coverage
