@@ -1,0 +1,43 @@
+name: eSCRIBE connectivity probe
+on:
+  push:
+    branches: [codex/escribe-connectivity]
+permissions:
+  contents: read
+jobs:
+  documents:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install document client
+        run: |
+          python3 -m venv .venv-probe
+          .venv-probe/bin/python -m pip install curl_cffi==0.13.0
+      - name: Fetch official PDFs without archive recovery
+        run: |
+          .venv-probe/bin/python - <<'PY'
+          import json, subprocess, sys
+          failures = []
+          for document_id in [15193, 15104, 15337, 15350]:
+              url = 'https://pub-santamaria.escribemeetings.com/FileStream.ashx?DocumentId=' + str(document_id)
+              result = subprocess.run([sys.executable, 'scripts/escribe_fetch.py', url], capture_output=True, timeout=60)
+              if result.returncode:
+                  print(document_id, 'client failed', result.stderr.decode()[-1000:], flush=True)
+                  failures.append(document_id)
+                  continue
+              metadata, body = result.stdout.split(b'\n', 1)
+              metadata = json.loads(metadata)
+              valid = metadata['status'] == 200 and body.startswith(b'%PDF-')
+              print(document_id, 'HTTP', metadata['status'], 'bytes', len(body), 'valid PDF', valid, flush=True)
+              if not valid:
+                  failures.append(document_id)
+          if failures:
+              raise SystemExit('Unable to read official documents: ' + str(failures))
+          PY
