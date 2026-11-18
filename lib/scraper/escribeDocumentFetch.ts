@@ -31,6 +31,15 @@ export function withEscribeDocumentFallback(
       return await browserFetch(input, init);
     } catch (error) {
       if (init?.signal?.aborted || !(error instanceof Error) || !/Cloudflare browser challenge/.test(error.message)) throw error;
+      // A fresh challenge navigation can finish establishing the session after
+      // the first page timed out. Retry the same document before changing
+      // transports so the first agenda is not lost while later ones succeed.
+      log("Browser challenge timed out; retrying the document in a fresh challenge page.");
+      try {
+        return await browserFetch(input, init);
+      } catch (retryError) {
+        if (init?.signal?.aborted || !(retryError instanceof Error) || !/Cloudflare browser challenge/.test(retryError.message)) throw retryError;
+      }
       const url = input instanceof Request ? input.url : String(input);
       log("Browser challenge unresolved; retrying the official eSCRIBE document with the browser TLS client.");
       return fallback(url, init);

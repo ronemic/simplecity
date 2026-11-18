@@ -2,6 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { fetchEscribeDocument, withEscribeDocumentFallback } from "@/lib/scraper/escribeDocumentFetch";
 
+test("retries the first document after a transient browser challenge without changing transports", async () => {
+  let calls = 0;
+  let fallbacks = 0;
+  const fetcher = withEscribeDocumentFallback(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error("Cloudflare browser challenge was not resolved");
+    return new Response("%PDF-official");
+  }, () => undefined, async () => { fallbacks += 1; return new Response("unexpected"); });
+  assert.equal(await (await fetcher("https://pub-santamaria.escribemeetings.com/FileStream.ashx?DocumentId=15193")).text(), "%PDF-official");
+  assert.equal(calls, 2);
+  assert.equal(fallbacks, 0);
+});
+
 test("retries an unresolved browser challenge with the bounded official document fetcher", async () => {
   const url = "https://pub-santamaria.escribemeetings.com/FileStream.ashx?DocumentId=15193";
   let calls = 0;
