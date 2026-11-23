@@ -378,8 +378,11 @@ async function cardsForSubscription(subscription: EmailSubscriptionRow) {
   return applySpanishTranslations(supabase, digestCards);
 }
 
-function subscriptionLabel(subscriptions: EmailSubscriptionRow[]) {
-  return labelForEmailSelections(subscriptions.map((subscription) => subscription.jurisdiction_slug));
+function subscriptionLabel(subscriptions: EmailSubscriptionRow[], locale: "en" | "es" = "en") {
+  return labelForEmailSelections(
+    subscriptions.map((subscription) => subscription.jurisdiction_slug),
+    locale
+  );
 }
 
 async function sendDigestForSubscriber(
@@ -427,6 +430,7 @@ async function sendDigestForSubscriber(
     cards,
     appUrl: getEmailConfig().appUrl,
     selectionLabel: subscriptionLabel(updatedSubscriptions),
+    spanishSelectionLabel: subscriptionLabel(updatedSubscriptions, "es"),
     unsubscribeUrl: unsubscribeUrl(subscriber.unsubscribe_token)
   });
 

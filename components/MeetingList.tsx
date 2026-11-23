@@ -824,8 +824,8 @@ export function MeetingList({
                               )}
                               aria-label={
                                 locale === "es"
-                                  ? `Mostrar ${calendarDayLayout.overflowCount} reuniones más del ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
-                                  : `Show ${calendarDayLayout.overflowCount} more meetings on ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
+                                  ? `Mostrar ${calendarDayLayout.overflowCount} ${calendarDayLayout.overflowCount === 1 ? "reunión más" : "reuniones más"} del ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
+                                  : `Show ${calendarDayLayout.overflowCount} more ${calendarDayLayout.overflowCount === 1 ? "meeting" : "meetings"} on ${formatDateKey(day, { month: "long", day: "numeric" }, locale)}`
                               }
                             >
                               {locale === "es"
@@ -1009,8 +1009,8 @@ export function MeetingList({
               >
                 <span className="inline-flex items-center gap-1.5 text-sm font-bold text-civic">
                   {locale === "es"
-                    ? `Mostrar ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} reuniones más`
-                    : `Show ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} more meetings`}
+                    ? `Mostrar ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} ${Math.min(hiddenListCount, LIST_PAGE_SIZE) === 1 ? "reunión más" : "reuniones más"}`
+                    : `Show ${Math.min(hiddenListCount, LIST_PAGE_SIZE)} more ${Math.min(hiddenListCount, LIST_PAGE_SIZE) === 1 ? "meeting" : "meetings"}`}
                   <ChevronDown aria-hidden className="h-4 w-4 transition group-hover:translate-y-0.5" />
                 </span>
                 <span className="text-xs font-semibold tabular-nums text-black/55">

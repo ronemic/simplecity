@@ -656,9 +656,9 @@ export function selectDigestCardGroups<
     .filter((group): group is TGroup & { cards: TCard[] } => Boolean(group));
 }
 
-export function publicAgendaTitle(card: SummaryCardRow) {
+export function publicAgendaTitle(card: SummaryCardRow, locale: "en" | "es" = "en") {
   const agendaItem = String(card.agenda_item || "").trim();
-  if (!agendaItem) return "Agenda item not listed";
+  if (!agendaItem) return locale === "es" ? "Punto de agenda no indicado" : "Agenda item not listed";
 
   const title = cleanAgendaTitle(agendaItem)
     .replace(/\bEstablish Nominating Ad Hoc Committee\b/i, "Create a temporary nominating committee")

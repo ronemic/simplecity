@@ -20,3 +20,12 @@ test("Spanish not-applicable text is not treated as a comment option", () => {
     false
   );
 });
+
+test("Spanish action text yields a deadline the date formatter can read", () => {
+  const info = getCommentDeadlineInfo({
+    closes: "No indicado en el documento fuente.",
+    actionTexts: ["Envía comentarios por escrito antes del 5 de diciembre de 2026 a la secretaría."]
+  });
+
+  assert.deepEqual(info, { value: "December 5, 2026", source: "action" });
+});

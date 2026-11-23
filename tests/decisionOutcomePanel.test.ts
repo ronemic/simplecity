@@ -15,3 +15,9 @@ test("Planning Commission outcomes are presented as recommendations", () => {
   assert.equal(advisoryOutcomeHeadline("Motion denied", "en"), "Recommended denial");
   assert.equal(advisoryOutcomeHeadline("Approved unanimously", "es"), "Recomendó la aprobación");
 });
+
+test("advisory headlines also recognize translated Spanish results", () => {
+  assert.equal(advisoryOutcomeHeadline("Aprobado por unanimidad", "es"), "Recomendó la aprobación");
+  assert.equal(advisoryOutcomeHeadline("Moción rechazada", "es"), "Recomendó la denegación");
+  assert.equal(advisoryOutcomeHeadline("Recomendación enmendada", "es"), "Recomendación modificada");
+});

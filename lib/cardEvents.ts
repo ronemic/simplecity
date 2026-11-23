@@ -46,7 +46,7 @@ const outcomeKindLabels: Record<Locale, Record<string, string>> = {
 };
 
 function outcomeLabel(locale: Locale, kind: string | null) {
-  if (!kind) return locale === "es" ? "Desconocido" : "Unknown";
+  if (!kind) return locale === "es" ? "Desconocida" : "Unknown";
   return outcomeKindLabels[locale][kind] || kind;
 }
 

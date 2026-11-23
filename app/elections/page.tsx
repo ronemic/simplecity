@@ -41,7 +41,7 @@ export async function generateMetadata({
   const locale = await getPageLocale(lang);
   const title =
     locale === "es"
-      ? "Su boleta del 3 de noviembre de 2026 | SimpleCity"
+      ? "Tu boleta del 3 de noviembre de 2026 | SimpleCity"
       : "Your November 3, 2026 Ballot | SimpleCity";
   const description =
     locale === "es"
@@ -120,8 +120,8 @@ export default async function ElectionsPage({
       </p>
       <h1 className="page-title mt-2">
         {isAll
-          ? es ? "Su boleta del 3 de noviembre" : "Your November 3 ballot"
-          : es ? `Su boleta del 3 de noviembre: ${selectionLabel}` : `Your November 3 ballot: ${selectionLabel}`}
+          ? es ? "Tu boleta del 3 de noviembre" : "Your November 3 ballot"
+          : es ? `Tu boleta del 3 de noviembre: ${selectionLabel}` : `Your November 3 ballot: ${selectionLabel}`}
       </h1>
       <p className="page-copy mt-4 !max-w-none">
         {es
@@ -153,7 +153,7 @@ export default async function ElectionsPage({
 
       <nav aria-label={es ? "Elegir lugar" : "Choose a place"} className="mt-8">
         <p className="text-sm font-semibold text-black/60">
-          {es ? "Vea lo que hay en la boleta de:" : "See what's on the ballot in:"}
+          {es ? "Mira lo que hay en la boleta de:" : "See what's on the ballot in:"}
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {getPublicJurisdictionOptions().map((option) => {
@@ -256,7 +256,7 @@ export default async function ElectionsPage({
 
             <p className="mt-4 text-sm font-semibold text-black/70">
               {es
-                ? "Las medidas y contiendas en su boleta dependen de su dirección. Vea su boleta de muestra en"
+                ? "Las medidas y contiendas en tu boleta dependen de tu dirección. Consulta tu boleta de muestra en"
                 : "The measures and races on your ballot depend on your address. See your sample ballot at"}{" "}
               <a
                 href={tools.url}

@@ -11,8 +11,8 @@ export function cardSharePath(cardId: string) {
   return `/cards/${encodeURIComponent(cardId)}`;
 }
 
-export function cardShareTitle(card: SummaryCardRow) {
-  return publicAgendaTitle(card);
+export function cardShareTitle(card: SummaryCardRow, locale: "en" | "es" = "en") {
+  return publicAgendaTitle(card, locale);
 }
 
 export function cardShareDescription(card: SummaryCardRow, locale: Locale = "en") {

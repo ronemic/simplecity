@@ -156,7 +156,8 @@ Rules:
 - Always include translations.es.
 - translations.es.cards must have the same number of items as cards, in the exact same order.
 - Each translations.es.cards[*].whatIsHappening array must have the same number of points as its matching English card, in the exact same order.
-- Translate only public-facing text into Spanish. Preserve URLs, emails, phone numbers, dollar amounts, dates, times, item numbers, ordinance numbers, resolution numbers, vote counts, contract amounts, and project quantities exactly as written.
+- Translate only public-facing text into Spanish. Preserve URLs, emails, phone numbers, dollar amounts, item numbers, ordinance numbers, resolution numbers, vote counts, contract amounts, and project quantities exactly as written.
+- Keep every date and time value exactly, but write it in Spanish: translate month and weekday names and surrounding words ("October 14, 2026" becomes "14 de octubre de 2026").
 - In translations.es.cards[*].status, keep the exact same English enum value as the matching cards[*].status. Do not translate status.
 - If an English field says “Not listed in the source document.”, translate that field as “No indicado en el documento fuente.”
 - If cards is empty, return translations.es.cards as an empty array.

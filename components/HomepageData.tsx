@@ -271,7 +271,7 @@ export function MeetingsCalendarSidebar({
                           href={cardSharePath(card.id)}
                           className="mt-2 line-clamp-2 block text-sm font-semibold leading-5 text-[#285f75] underline-offset-4 hover:underline"
                         >
-                            {t(locale, "connectedDecision")}: {publicAgendaTitle(card)}
+                            {t(locale, "connectedDecision")}: {publicAgendaTitle(card, locale)}
                         </Link>
                       ) : null}
                     </div>
@@ -396,7 +396,7 @@ export function HomepageDataContent({
                 {hasSearch
                   ? t(locale, "trySearching")
                   : locale === "es"
-                    ? `Cuando se ejecuten el recopilador y el resumidor, aparecerán aquí tarjetas oficiales de agenda de ${jurisdictionLabel}.`
+                    ? `Las tarjetas de agenda oficiales de ${jurisdictionLabel} aparecerán aquí cuando se publiquen.`
                     : `Once the scraper and summarizer run, official ${jurisdictionLabel} agenda cards will appear here.`}
               </p>
             </div>

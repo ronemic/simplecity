@@ -257,7 +257,7 @@ export function SubscribeForm({
       <form className="redesign-briefing-form" onSubmit={handleSubmit}>
         <label className="sr-only" htmlFor="redesign-briefing-email">{t(locale, "subscribeEmailAddress")}</label>
         <input id="redesign-briefing-email" name="email" type="email" autoComplete="email" required
-          value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" />
+          value={email} onChange={(event) => setEmail(event.target.value)} placeholder={t(locale, "subscribeEmailPlaceholder")} />
         <input aria-hidden="true" autoComplete="off" className="hidden" name="company" tabIndex={-1} type="text" />
         <button className="redesign-button" disabled={isSubmitting || !selectedJurisdictions.length} type="submit">{t(locale, "subscribe")}</button>
         {message ? <p className="redesign-briefing-message" role="status">{message}</p> : null}
@@ -332,7 +332,8 @@ export function SubscribeForm({
             {t(locale, "subscribeWeeklyDigestAreas")}
           </legend>
           <span className="text-sm font-bold text-black/60" aria-live="polite">
-            {selectedJurisdictions.length} {t(locale, "subscribeSelected")}
+            {selectedJurisdictions.length}{" "}
+            {t(locale, selectedJurisdictions.length === 1 ? "subscribeSelectedOne" : "subscribeSelected")}
           </span>
         </div>
 
@@ -452,7 +453,7 @@ export function SubscribeForm({
                       >
                         {selectedCount > 0
                           ? `${selectedCount}/${allValues.length} ${t(locale, "subscribeSelected")}`
-                          : `${allValues.length} ${t(locale, "subscribeAreas")}`}
+                          : `${allValues.length} ${t(locale, allValues.length === 1 ? "subscribeAreaOne" : "subscribeAreas")}`}
                       </span>
                     </button>
                     <button

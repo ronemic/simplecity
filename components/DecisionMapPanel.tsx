@@ -236,7 +236,7 @@ export function DecisionMapPanel({
           <p className="text-xs font-semibold text-black/50">
             {refreshing ? (
               <Loader2 aria-hidden className="inline h-3.5 w-3.5 animate-spin" />
-            ) : locale === "es" ? `${points.length} decisiones` : `${points.length} decisions`}
+            ) : locale === "es" ? `${points.length} ${points.length === 1 ? "decisión" : "decisiones"}` : `${points.length} ${points.length === 1 ? "decision" : "decisions"}`}
           </p>
         </div>
       </div>
@@ -266,7 +266,7 @@ export function DecisionMapPanel({
               <p className="ml-auto text-xs font-semibold text-black/50">
                 {refreshing ? (
                   <Loader2 aria-hidden className="inline h-3.5 w-3.5 animate-spin" />
-                ) : locale === "es" ? `${points.length} decisiones` : `${points.length} decisions`}
+                ) : locale === "es" ? `${points.length} ${points.length === 1 ? "decisión" : "decisiones"}` : `${points.length} ${points.length === 1 ? "decision" : "decisions"}`}
               </p>
             </div>
             {controlPanels}

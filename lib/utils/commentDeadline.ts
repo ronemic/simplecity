@@ -1,8 +1,10 @@
+import { SPANISH_MONTH_DATE_PATTERN, spanishDateToEnglish } from "@/lib/utils/date";
+
 const MISSING_VALUE_PATTERN =
   /not listed|not applicable|not provided|n\/a|^na$|^none$|^null$|^tbd$|to be determined|^closed$|comments?\s+(?:are\s+)?(?:closed|not accepted|unavailable)|no comments?\s+(?:accepted|allowed)|no indicado|no aplica|no aplicable|no proporcionado|no se indica|sin comentarios?/i;
 
 const DEADLINE_SIGNAL_PATTERN =
-  /\b(by|before|deadline|due|no later than|until|through|prior to)\b/i;
+  /\b(by|before|deadline|due|no later than|until|through|prior to)\b|\b(?:antes del?|a más tardar|hasta el|fecha límite|plazo)(?=\s|$)/i;
 
 const MONTH_DATE_PATTERN =
   /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d{1,2},?\s+\d{4}\b/i;
@@ -28,6 +30,12 @@ function normalizeWhitespace(value: string) {
 function extractDeadlineDate(text: string) {
   const normalized = normalizeWhitespace(text);
   if (!DEADLINE_SIGNAL_PATTERN.test(normalized)) return null;
+
+  const spanishDate = normalized.match(SPANISH_MONTH_DATE_PATTERN);
+  if (spanishDate && !MONTH_DATE_PATTERN.test(normalized)) {
+    // Spanish card text: return the date alone, in the form the date formatter reads.
+    return spanishDateToEnglish(spanishDate[0]);
+  }
 
   const dateMatch = normalized.match(MONTH_DATE_PATTERN) || normalized.match(NUMERIC_DATE_PATTERN);
   if (!dateMatch || dateMatch.index === undefined) return null;

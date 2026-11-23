@@ -52,3 +52,8 @@ test("the page-level jurisdiction label tracks the same translations", () => {
   assert.equal(getJurisdictionLabel("all", "es"), "Todos");
   assert.equal(getJurisdictionLabel("mountain-view", "es"), "Mountain View");
 });
+
+test("compact dates read Spanish date text", () => {
+  assert.equal(formatCompactDisplayDate("5 de diciembre de 2026", null, "es"), "5 dic");
+  assert.equal(formatCompactDisplayDate("5 de diciembre de 2026", null, "en"), "Dec 5");
+});

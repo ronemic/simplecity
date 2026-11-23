@@ -293,7 +293,7 @@ export function SummaryCard({
   const showDetails = open || isSharePresentation;
   const TitleTag = isSharePresentation ? "h1" : "h3";
   const meeting = card.meetings;
-  const agendaTitle = publicAgendaTitle(card);
+  const agendaTitle = publicAgendaTitle(card, locale);
   const points = cardSummaryPoints(card, locale);
   const fallbackInfo = officialSourceFallbackInfo(card, locale);
   const officialSourceFallback = Boolean(fallbackInfo);
@@ -560,7 +560,7 @@ export function SummaryCard({
                     />
                   </p>
                   <p>
-                    <span className="font-bold text-ink">Email: </span>
+                    <span className="font-bold text-ink">{locale === "es" ? "Correo electrónico: " : "Email: "}</span>
                     <HighlightedText
                       text={card.how_to_act_email || t(locale, "notListedInSource")}
                       query={highlight}

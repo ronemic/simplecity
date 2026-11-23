@@ -24,8 +24,8 @@ function resultSummary(locale: Locale, start: number, end: number, total: number
   if (total === 0) return locale === "es" ? "0 decisiones" : "0 decisions";
 
   return locale === "es"
-    ? `Mostrando ${start}-${end} de ${total} decisiones`
-    : `Showing ${start}-${end} of ${total} decisions`;
+    ? `Mostrando ${start}-${end} de ${total} ${total === 1 ? "decisión" : "decisiones"}`
+    : `Showing ${start}-${end} of ${total} ${total === 1 ? "decision" : "decisions"}`;
 }
 
 export function DecisionBrowser({

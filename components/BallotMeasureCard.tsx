@@ -149,7 +149,7 @@ export function BallotMeasureCard({
 
             <section>
               <p className="text-xs font-black uppercase text-black/[0.55]">
-                {es ? "Qué significa su voto" : "What your vote means"}
+                {es ? "Qué significa tu voto" : "What your vote means"}
               </p>
               <div className="mt-2 grid gap-3">
                 <p>

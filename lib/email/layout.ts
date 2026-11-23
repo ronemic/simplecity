@@ -101,6 +101,9 @@ export function renderEmailLayout({ appUrl, lang = "en", preheader, body, footer
                 <p style="margin: 10px 0 0; font-size: 12px; line-height: 1.6; color: ${T.faint};">
                   SimpleCity is an independent, student-led platform, fiscally sponsored by Hack Club, a 501(c)(3) nonprofit.
                 </p>
+                <p style="margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: ${T.faint};" lang="es">
+                  SimpleCity es una plataforma independiente dirigida por estudiantes, con patrocinio fiscal de Hack Club, una organización sin fines de lucro 501(c)(3).
+                </p>
               </td>
             </tr>
           </table>

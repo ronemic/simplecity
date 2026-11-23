@@ -71,7 +71,7 @@ export function FollowButton({
         )}
         title={
           locale === "es"
-            ? "Guardado en este navegador. Ve los cambios en Siguiendo."
+            ? "Guardado en este navegador. Mira los cambios en Siguiendo."
             : "Saved on this browser. See changes under Following."
         }
       >

@@ -621,10 +621,10 @@ test("builds a bilingual subscription confirmation email", () => {
   });
 
   assert.match(email.subject, /Confirm your SimpleCity email updates/);
-  assert.match(email.subject, /Confirma tus actualizaciones por email de SimpleCity/);
+  assert.match(email.subject, /Confirma tus actualizaciones por correo electrónico de SimpleCity/);
   assert.match(email.html, /En español/);
   assert.match(email.html, /Condado de Santa Clara/);
-  assert.match(email.html, /Confirmar actualizaciones por email/);
+  assert.match(email.html, /Confirmar actualizaciones por correo/);
   assert.match(email.text, /resúmenes semanales de SimpleCity para Condado de Santa Clara/);
   assert.ok(email.html.indexOf("Confirm your email updates") < email.html.indexOf("En español"));
   assert.ok(
@@ -868,4 +868,16 @@ test("uses forwarded public host when configured app URL is local", () => {
     }),
     "https://simplecity.app"
   );
+});
+
+test("Spanish digest subjects use Spanish area labels", () => {
+  assert.equal(labelForEmailSelections(["santa-clara-county"], "es"), "Condado de Santa Clara");
+  assert.equal(labelForEmailSelections(["san-mateo-city", "mountain-view"], "es"), "2 áreas de SimpleCity");
+  const { subject } = buildNewPostsDigestEmail({
+    cards: [],
+    appUrl: "https://simplecity.app",
+    selectionLabel: "Santa Clara County",
+    spanishSelectionLabel: "Condado de Santa Clara"
+  });
+  assert.match(subject, /para Condado de Santa Clara$/);
 });

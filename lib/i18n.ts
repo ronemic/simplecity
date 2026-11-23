@@ -95,6 +95,8 @@ type TranslationKey =
   | "subscribeSearchPlaceholder"
   | "subscribeNoMatches"
   | "subscribeSelected"
+  | "subscribeSelectedOne"
+  | "subscribeAreaOne"
   | "subscribeAreas"
   | "subscribeNoneSelected"
   | "subscribeYourAreas"
@@ -228,6 +230,8 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeSearchPlaceholder: "Search cities, counties, schools",
     subscribeNoMatches: "No areas match that search.",
     subscribeSelected: "selected",
+    subscribeSelectedOne: "selected",
+    subscribeAreaOne: "area",
     subscribeAreas: "areas",
     subscribeNoneSelected: "Pick at least one area below.",
     subscribeYourAreas: "Your areas",
@@ -365,6 +369,8 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     subscribeSearchPlaceholder: "Busca ciudades, condados, escuelas",
     subscribeNoMatches: "Ningún área coincide con esa búsqueda.",
     subscribeSelected: "seleccionadas",
+    subscribeSelectedOne: "seleccionada",
+    subscribeAreaOne: "área",
     subscribeAreas: "áreas",
     subscribeNoneSelected: "Elige al menos un área abajo.",
     subscribeYourAreas: "Tus áreas",

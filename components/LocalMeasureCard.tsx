@@ -93,7 +93,7 @@ export function LocalMeasureCard({
         measure.allAddresses
           ? undefined
           : es
-            ? `Solo en algunas boletas${placeLabel ? ` de ${placeLabel}` : ""}. Revise su boleta de muestra.`
+            ? `Solo en algunas boletas${placeLabel ? ` de ${placeLabel}` : ""}. Revisa tu boleta de muestra.`
             : `Only on some ballots${placeLabel ? ` in ${placeLabel}` : ""}. Check your sample ballot.`
       }
       topic={{ icon: kind.icon, label: kind[locale] }}

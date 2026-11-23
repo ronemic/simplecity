@@ -67,13 +67,14 @@ export function isLongDecisionOutcomeSummary(summary: string) {
 
 export function advisoryOutcomeHeadline(headline: string, locale: "en" | "es") {
   const value = headline.trim();
-  if (/\b(?:approv(?:ed|al)|adopted|passed)\b/i.test(value)) {
+  // Spanish readers get translated headlines, so match the Spanish wording too.
+  if (/\b(?:approv(?:ed|al)|adopted|passed)\b|aprob(?:ó|ado|ada|ación)|adopt(?:ó|ado|ada)/i.test(value)) {
     return locale === "es" ? "Recomendó la aprobación" : "Recommended approval";
   }
-  if (/\b(?:reject(?:ed|ion)|denied|failed|defeated)\b/i.test(value)) {
+  if (/\b(?:reject(?:ed|ion)|denied|failed|defeated)\b|rechaz(?:ó|ado|ada|o)|deneg(?:ó|ado|ada|ación)/i.test(value)) {
     return locale === "es" ? "Recomendó la denegación" : "Recommended denial";
   }
-  if (/\bamended\b/i.test(value)) {
+  if (/\bamended\b|enmend(?:ó|ado|ada)|modific(?:ó|ado|ada)/i.test(value)) {
     return locale === "es" ? "Recomendación modificada" : "Recommendation amended";
   }
   return value;

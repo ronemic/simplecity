@@ -87,7 +87,8 @@ Rules:
 - Translate only the provided field values.
 - Return the same JSON shape with the same ids.
 - Do not add facts, remove facts, summarize, interpret, or explain.
-- Preserve URLs, email addresses, phone numbers, addresses, proper names, agency names, dates, times, dollar amounts, percentages, ordinance numbers, resolution numbers, agenda item numbers, decimals, and source-specific identifiers exactly as written.
+- Preserve URLs, email addresses, phone numbers, addresses, proper names, agency names, dollar amounts, percentages, ordinance numbers, resolution numbers, agenda item numbers, decimals, and source-specific identifiers exactly as written.
+- Keep every date and time value exactly (same day, month, year, and clock time), but write it in Spanish: translate month and weekday names and surrounding words, for example "October 14, 2026" as "14 de octubre de 2026" and "4:00 p.m. the day of the meeting" as "4:00 p.m. del día de la reunión".
 - Preserve only cards[].status values exactly as written. Do not translate card status values like "Upcoming vote", "Routine approval", "Information only", "Under discussion", "Passed", or "Cancelled".
 - Translate every non-null public field in outcomes[], including status-like headlines such as "Passed", vote descriptions such as "Unanimous", summaries, and next steps. Preserve numeric vote counts exactly.
 - Every outcomes[] field must be fully Spanish. Never leave English clauses or labels such as "Motion and second", "to approve", "passed", "No action taken", "City Council", "Commission Regular Meeting", "Approved Minutes", "ACTION", "staff report", or "Informational Items" in the translation. Translate generic civic body names and document labels; preserve only people's names, street/place names, formal program names, identifiers, and numbers.

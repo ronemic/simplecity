@@ -15,8 +15,8 @@ const RESULT_OPTIONS: Array<{
 }> = [
   { value: "approved", en: "Approved", es: "Aprobadas" },
   { value: "rejected", en: "Rejected", es: "Rechazadas" },
-  { value: "continued", en: "Continued", es: "Continuadas" },
-  { value: "amended", en: "Amended", es: "Enmendadas" },
+  { value: "continued", en: "Continued", es: "Aplazadas" },
+  { value: "amended", en: "Amended", es: "Modificadas" },
   { value: "awaiting", en: "Awaiting result", es: "Esperando resultado" }
 ];
 

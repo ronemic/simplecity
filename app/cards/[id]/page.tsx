@@ -31,7 +31,7 @@ export async function generateMetadata({
     return { title: locale === "es" ? "Decisión no encontrada | SimpleCity" : "Card not found | SimpleCity" };
   }
 
-  const title = `${cardShareTitle(card)} | SimpleCity`;
+  const title = `${cardShareTitle(card, locale)} | SimpleCity`;
   const description = cardShareDescription(card, locale);
   const urls = localizedSeoUrls(`/cards/${encodeURIComponent(id)}`, seoLocale(query.lang));
 
@@ -60,7 +60,7 @@ export default async function SharedCardPage({
   if (!card) notFound();
   const events = await getCardEvents(card);
   const canonical = `${getConfiguredAppUrl()}/cards/${encodeURIComponent(id)}`;
-  const title = cardShareTitle(card);
+  const title = cardShareTitle(card, locale);
   const description = cardShareDescription(card, locale);
   const articleJsonLd = {
     "@context": "https://schema.org",

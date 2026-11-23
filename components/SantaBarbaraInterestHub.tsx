@@ -166,7 +166,10 @@ export function SantaBarbaraInterestHub({
             <span className="tabular-nums text-black/45">{interests.length}</span>
             {updatedCount > 0 ? (
               <span className="h-2 w-2 rounded-full bg-civic">
-                <span className="sr-only">{updatedCount} {locale === "es" ? "actualizaciones" : "updates"}</span>
+                <span className="sr-only">{updatedCount}{" "}
+                  {locale === "es"
+                    ? updatedCount === 1 ? "actualización" : "actualizaciones"
+                    : updatedCount === 1 ? "update" : "updates"}</span>
               </span>
             ) : null}
           </button>

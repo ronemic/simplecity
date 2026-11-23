@@ -185,7 +185,7 @@ export function buildConfirmationEmail({
   const spanishLabelText =
     spanishLabels.length === 1 ? spanishLabels[0] : spanishLabels.join(", ");
   const subject =
-    "Confirm your SimpleCity email updates / Confirma tus actualizaciones por email de SimpleCity";
+    "Confirm your SimpleCity email updates / Confirma tus actualizaciones por correo electrónico de SimpleCity";
   const html = renderEmailLayout({
     appUrl: baseUrl,
     preheader: "Confirm your weekly SimpleCity digest. / Confirma tu resumen semanal de SimpleCity.",
@@ -200,13 +200,13 @@ export function buildConfirmationEmail({
                 </p>
                 ${emailDivider(32)}
                 ${emailEyebrow("En español")}
-                <h2 style="margin: 8px 0 0; font-size: 20px; font-weight: 900; line-height: 1.25; color: ${T.ink};">Confirma tus actualizaciones por email</h2>
+                <h2 style="margin: 8px 0 0; font-size: 20px; font-weight: 900; line-height: 1.25; color: ${T.ink};">Confirma tus actualizaciones por correo electrónico</h2>
                 <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
                   Confirma que <strong>${escapeHtml(email)}</strong> debe comenzar a recibir o actualizar los resúmenes semanales de SimpleCity para <strong>${escapeHtml(spanishLabelText)}</strong>.
                 </p>
-                ${emailPrimaryButton(link, "Confirmar actualizaciones por email")}
+                ${emailPrimaryButton(link, "Confirmar actualizaciones por correo")}
                 <p style="margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">
-                  Si no solicitaste esto, puedes ignorar este email.
+                  Si no solicitaste esto, puedes ignorar este correo.
                 </p>`
   });
   const text = [
@@ -220,13 +220,13 @@ export function buildConfirmationEmail({
     "",
     "En español",
     "",
-    "Confirma tus actualizaciones por email de SimpleCity",
+    "Confirma tus actualizaciones por correo electrónico de SimpleCity",
     "",
     `Confirma que ${email} debe comenzar a recibir o actualizar los resúmenes semanales de SimpleCity para ${spanishLabelText}.`,
     "",
     link,
     "",
-    "Si no solicitaste esto, puedes ignorar este email."
+    "Si no solicitaste esto, puedes ignorar este correo."
   ].join("\n");
 
   return { subject, html, text };
@@ -242,10 +242,11 @@ export function buildUnsubscribeConfirmationEmail({
   baseUrl?: string;
 }) {
   const link = unsubscribeUrl(token, baseUrl);
-  const subject = "Confirm that you want to unsubscribe from SimpleCity";
+  const subject =
+    "Confirm that you want to unsubscribe from SimpleCity / Confirma que quieres cancelar tu suscripción a SimpleCity";
   const html = renderEmailLayout({
     appUrl: baseUrl,
-    preheader: "Confirm that you want to stop SimpleCity emails. / Confirma que quieres dejar de recibir emails.",
+    preheader: "Confirm that you want to stop SimpleCity emails. / Confirma que quieres dejar de recibir correos de SimpleCity.",
     body: `${emailEyebrow("Unsubscribe")}
                 <h1 style="margin: 8px 0 0; font-size: 26px; font-weight: 900; line-height: 1.2; color: ${T.ink};">Stop all SimpleCity email updates</h1>
                 <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
@@ -257,13 +258,13 @@ export function buildUnsubscribeConfirmationEmail({
                 </p>
                 ${emailDivider(32)}
                 ${emailEyebrow("En español")}
-                <h2 style="margin: 8px 0 0; font-size: 20px; font-weight: 900; line-height: 1.25; color: ${T.ink};">Cancelar todas las actualizaciones por email</h2>
+                <h2 style="margin: 8px 0 0; font-size: 20px; font-weight: 900; line-height: 1.25; color: ${T.ink};">Cancelar todas las actualizaciones por correo electrónico</h2>
                 <p style="margin: 12px 0 0; font-size: 15px; line-height: 1.65; color: ${T.body};">
                   Confirma que <strong>${escapeHtml(email)}</strong> debe eliminarse de todos los resúmenes de SimpleCity.
                 </p>
                 ${emailPrimaryButton(link, "Confirmar cancelación")}
                 <p style="margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: ${T.muted};">
-                  Si no solicitaste esto, ignora este email y tu suscripción no cambiará.
+                  Si no solicitaste esto, ignora este correo y tu suscripción no cambiará.
                 </p>`
   });
   const text = [
@@ -274,12 +275,12 @@ export function buildUnsubscribeConfirmationEmail({
     "",
     "If you did not request this, ignore this email and your subscription will not change.",
     "",
-    "Cancelar todas las actualizaciones por email",
+    "Cancelar todas las actualizaciones por correo electrónico",
     "",
     `Confirma que ${email} debe eliminarse de todos los resúmenes de SimpleCity:`,
     link,
     "",
-    "Si no solicitaste esto, ignora este email y tu suscripción no cambiará."
+    "Si no solicitaste esto, ignora este correo y tu suscripción no cambiará."
   ].join("\n");
 
   return { subject, html, text };

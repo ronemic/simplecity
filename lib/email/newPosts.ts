@@ -23,6 +23,8 @@ type NewPostsDigestEmailInput = {
   cards: LocalizedDigestCard[];
   appUrl: string;
   selectionLabel?: string;
+  /** Spanish label for the selected areas; falls back to selectionLabel. */
+  spanishSelectionLabel?: string;
   unsubscribeUrl?: string | null;
 };
 
@@ -267,8 +269,10 @@ export function buildNewPostsDigestEmail({
   cards,
   appUrl,
   selectionLabel = "your area",
+  spanishSelectionLabel,
   unsubscribeUrl
 }: NewPostsDigestEmailInput) {
+  const spanishLabel = spanishSelectionLabel || (selectionLabel === "your area" ? "tu área" : selectionLabel);
   const count = cards.length;
   const englishSubject =
     count === 1
@@ -276,16 +280,16 @@ export function buildNewPostsDigestEmail({
       : `Weekly SimpleCity digest: ${count} civic updates for ${selectionLabel}`;
   const spanishSubject =
     count === 1
-      ? `Resumen semanal de SimpleCity: 1 actualización cívica para ${selectionLabel}`
-      : `Resumen semanal de SimpleCity: ${count} actualizaciones cívicas para ${selectionLabel}`;
+      ? `Resumen semanal de SimpleCity: 1 actualización cívica para ${spanishLabel}`
+      : `Resumen semanal de SimpleCity: ${count} actualizaciones cívicas para ${spanishLabel}`;
   const subject = `${englishSubject} / ${spanishSubject}`;
   const safeAppUrl = normalizeAppUrl(appUrl);
   const spanishCards = cards
     .map((card) => card.translations?.es)
     .filter((card): card is SummaryCardRow => Boolean(card));
   const preheader = spanishCards.length > 0
-    ? "Your weekly civic updates are ready in English and Spanish."
-    : "Your weekly civic updates are ready.";
+    ? "Your weekly civic updates are ready in English and Spanish. / Tus actualizaciones cívicas semanales están listas en inglés y español."
+    : "Your weekly civic updates are ready. / Tus actualizaciones cívicas semanales están listas.";
   const englishCardRows = cards
     .map((card) => htmlForCard(card, safeAppUrl, "en"))
     .join("");
@@ -391,14 +395,17 @@ export async function sendNewPostsDigestEmail({
   });
 }
 
-export function labelForEmailSelection(selection: JurisdictionSelection) {
-  return selection === "all" ? "all SimpleCity cities" : getJurisdictionDisplayLabel(selection);
+export function labelForEmailSelection(selection: JurisdictionSelection, locale: Locale = "en") {
+  if (selection === "all") {
+    return locale === "es" ? "todas las ciudades de SimpleCity" : "all SimpleCity cities";
+  }
+  return getJurisdictionDisplayLabel(selection, locale);
 }
 
-export function labelForEmailSelections(selections: JurisdictionSelection[]) {
+export function labelForEmailSelections(selections: JurisdictionSelection[], locale: Locale = "en") {
   if (selections.length === 1) {
-    return labelForEmailSelection(selections[0]);
+    return labelForEmailSelection(selections[0], locale);
   }
 
-  return `${selections.length} SimpleCity areas`;
+  return locale === "es" ? `${selections.length} áreas de SimpleCity` : `${selections.length} SimpleCity areas`;
 }

@@ -132,6 +132,21 @@ function boundsFor(groups: DecisionMapGroup[]) {
   return bounds.isEmpty() ? null : bounds;
 }
 
+// MapLibre's built-in control labels and gesture hints for Spanish readers.
+const SPANISH_MAP_LOCALE = {
+  "AttributionControl.ToggleAttribution": "Mostrar u ocultar atribución",
+  "AttributionControl.MapFeedback": "Comentarios sobre el mapa",
+  "CooperativeGesturesHandler.WindowsHelpText": "Usa Ctrl + desplazamiento para hacer zoom en el mapa",
+  "CooperativeGesturesHandler.MacHelpText": "Usa ⌘ + desplazamiento para hacer zoom en el mapa",
+  "CooperativeGesturesHandler.MobileHelpText": "Usa dos dedos para mover el mapa",
+  "Map.Title": "Mapa",
+  "Marker.Title": "Marcador del mapa",
+  "NavigationControl.ResetBearing": "Arrastra para girar el mapa; haz clic para restablecer el norte",
+  "NavigationControl.ZoomIn": "Acercar",
+  "NavigationControl.ZoomOut": "Alejar",
+  "Popup.Close": "Cerrar ventana emergente"
+};
+
 export function DecisionMapCanvas({
   points,
   apiKey,
@@ -215,7 +230,8 @@ export function DecisionMapCanvas({
       bounds: boundsFor(groupsRef.current) || undefined,
       fitBoundsOptions: { padding: FIT_PADDING, maxZoom: FIT_MAX_ZOOM },
       attributionControl: false,
-      cooperativeGestures: true
+      cooperativeGestures: true,
+      locale: locale === "es" ? SPANISH_MAP_LOCALE : undefined
     });
     mapRef.current = map;
 
@@ -377,7 +393,7 @@ export function DecisionMapCanvas({
       setReady(false);
       map.remove();
     };
-  }, [apiKey, markMoved]);
+  }, [apiKey, locale, markMoved]);
 
   useEffect(() => {
     const map = mapRef.current;

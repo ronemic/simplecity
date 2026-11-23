@@ -163,6 +163,37 @@ export function parseMeetingDate(dateText?: string | null) {
   return parsed.toISOString();
 }
 
+const SPANISH_MONTHS: Record<string, string> = {
+  enero: "January",
+  febrero: "February",
+  marzo: "March",
+  abril: "April",
+  mayo: "May",
+  junio: "June",
+  julio: "July",
+  agosto: "August",
+  septiembre: "September",
+  setiembre: "September",
+  octubre: "October",
+  noviembre: "November",
+  diciembre: "December"
+};
+
+export const SPANISH_MONTH_DATE_PATTERN =
+  /\b(\d{1,2}) de (enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|setiembre|octubre|noviembre|diciembre)(?:,? de (\d{4}))?/i;
+
+/**
+ * Rewrites the first Spanish date ("5 de diciembre de 2026") as the English
+ * form the date parsers understand ("December 5, 2026"). Returns null when the
+ * text has no Spanish date.
+ */
+export function spanishDateToEnglish(value: string) {
+  const match = value.match(SPANISH_MONTH_DATE_PATTERN);
+  if (!match) return null;
+  const month = SPANISH_MONTHS[match[2].toLowerCase()];
+  return match[3] ? `${month} ${match[1]}, ${match[3]}` : `${month} ${match[1]}`;
+}
+
 function parseDisplayDate(value: string) {
   const parsedValue = parseMeetingDate(value) || value;
   const parsed = new Date(parsedValue);
@@ -257,9 +288,11 @@ export function formatCompactDisplayDate(
   iso?: string | null,
   locale: "en" | "es" = "en"
 ) {
-  const value = iso || dateText;
-  if (!value) return locale === "es" ? "Fecha no indicada" : "Date not listed";
+  const rawValue = iso || dateText;
+  if (!rawValue) return locale === "es" ? "Fecha no indicada" : "Date not listed";
 
+  // Translated text carries Spanish dates; read them as the English form.
+  const value = iso ? rawValue : spanishDateToEnglish(rawValue) || rawValue;
   const parsed = parseDisplayDate(value);
   if (parsed) {
     return new Intl.DateTimeFormat(locale === "es" ? "es-US" : "en-US", {
