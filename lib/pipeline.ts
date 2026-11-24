@@ -71,6 +71,7 @@ import { enrichGuadalupeMeetings, scrapeGuadalupeMeetings } from "@/lib/sources/
 import { enrichSolvangMeetings } from "@/lib/sources/solvang";
 import { enrichCivicClerkItemsFromApi } from "@/lib/sources/civicclerk-agenda-api";
 import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAltoMinutes";
+import { attachSanMateoCouncilMinutesFromLaterAgendas } from "@/lib/db/sanMateoMinutes";
 import { reconcileEastPaloAltoMeetingIds } from "@/lib/db/eastPaloAltoMeetings";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
@@ -1495,6 +1496,24 @@ async function runSimpleCityPipelineInternal(
           }
         } catch (error) {
           const message = `East Palo Alto minutes from stored agenda packets failed: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          errors.push(message);
+          log(message);
+        }
+      }
+      if (jurisdiction.slug === "san-mateo-city" && !recordDeadline("San Mateo council minutes")) {
+        try {
+          const withMinutes = await attachSanMateoCouncilMinutesFromLaterAgendas(supabase, jurisdiction, log);
+          for (const meeting of withMinutes) {
+            if (recordDeadline("decision outcome reconciliation")) break;
+            // A meeting inside the scrape window was already reconciled this run,
+            // before it had minutes; reconcile it again now that it does.
+            reconciledOutcomeMeetingIds.delete(meeting.id as string);
+            await reconcileOutcomesForItem({ id: meeting.id as string, meeting });
+          }
+        } catch (error) {
+          const message = `San Mateo council minutes from later agendas failed: ${
             error instanceof Error ? error.message : "Unknown error"
           }`;
           errors.push(message);

@@ -14,7 +14,7 @@ import {
   agendaItemIdentityTokens,
   agendaItemSimilarity
 } from "@/lib/utils/agendaItemIdentity";
-import { parseMeetingDate } from "@/lib/utils/date";
+import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { KNOWN_JURISDICTION_SLUGS } from "@/lib/config/jurisdictions";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 
@@ -554,7 +554,9 @@ function minutesLabelMatchesMeeting(
   const labelDate = parseMeetingDate(String(label || ""));
   const meetingDate = parseMeetingDate(String(meetingDateText || ""));
   if (!labelDate || !meetingDate) return true;
-  return labelDate.slice(0, 10) === meetingDate.slice(0, 10);
+  // Compare local calendar days, not UTC ones: a 7:00 PM meeting is already the
+  // next day in UTC, while a label with only a date sits at local midnight.
+  return civicCalendarDay(null, labelDate) === civicCalendarDay(null, meetingDate);
 }
 
 function minutesDocuments(meeting: LlmReadyMeeting) {
@@ -904,10 +906,21 @@ function numberedMinuteBlock(
   const itemLinePattern =
     /^\s*(?:agenda\s+)?(?:item\s+)?([A-Z]?\d{1,2}(?:\.\d{1,3})?)\s*(?:[.)]|:\s+(?!\d)|-\s+(?!\d)|\s+)\s*\S/i;
   const sectionLinePattern = /^\s*[A-Z]\s*[.)-]\s+[A-Z][\s\S]{1,120}$/;
-  const starts = lines.flatMap((line, index) => {
+  // San Mateo heads agenda sections with a bare uppercase line. Without this
+  // stop, a presentation listed just before "CONSENT CALENDAR" took the
+  // calendar's "Motion passed 4-0" as its own result.
+  const unletteredSectionLinePattern =
+    /^\s*(?:CONSENT CALENDAR|PUBLIC HEARINGS?|NEW BUSINESS|OLD BUSINESS|UNFINISHED BUSINESS|CLOSED SESSION|STUDY SESSION|ADJOURNMENT)\s*$/;
+  const candidateStarts = lines.flatMap((line, index) => {
     const match = line.match(itemLinePattern);
     return normalizedIdentifier(match?.[1]) === requestedNumber ? [index] : [];
   });
+  // A bare number followed by a space also opens street addresses ("1 N. San
+  // Antonio Road") and wrapped sentences ("16 before Agenda Item No. 15."), so
+  // a heading punctuated as an item ("16." / "16)") is preferred when present.
+  const headingPattern = /^\s*(?:agenda\s+)?(?:item\s+)?[A-Z]?\d{1,2}(?:\.\d{1,3})?\s*[.)]/i;
+  const headingStarts = candidateStarts.filter((index) => headingPattern.test(lines[index]));
+  const starts = headingStarts.length > 0 ? headingStarts : candidateStarts;
   if (starts.length === 0) return null;
 
   const blockAt = (start: number) => {
@@ -918,7 +931,8 @@ function numberedMinuteBlock(
       const nextNumber = normalizedIdentifier(match?.[1]);
       if (
         (nextNumber && nextNumber !== requestedNumber) ||
-        sectionLinePattern.test(line)
+        sectionLinePattern.test(line) ||
+        unletteredSectionLinePattern.test(line)
       ) {
         end = index;
         break;
