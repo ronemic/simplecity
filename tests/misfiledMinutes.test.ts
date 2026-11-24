@@ -84,3 +84,23 @@ test("a passed motion's own purpose outranks a stray 'continued'", () => {
   assert.equal(classifyDecisionOutcome("Motion to continue the item to May 5 carried 4-0."), "continued");
   assert.equal(classifyDecisionOutcome("The public hearing was continued to October 6."), "continued");
 });
+
+test("a recap under Adjourn or Review action items is not that item's result", () => {
+  const recap = `Technology Committee Regular Meeting Minutes
+3. Approval of Prior Meeting Minutes
+Motion: Approve 6/10/26 Meeting Minutes. Motion carried 5-0.
+10. Adjourn 6:45pm
+The meeting began with a roll call. The committee then approved the minutes from the previous meeting.
+`;
+  const tech = {
+    ...meeting("aug12", "Technology Committee Regular Meeting", "Aug 12, 2026", { url: "https://example.test/tech", text: recap }),
+    items: [
+      { externalId: "tech-3", agendaNumber: "3", title: "Approval of Prior Meeting Minutes", rowText: "3 Approval of Prior Meeting Minutes" },
+      { externalId: "tech-10", agendaNumber: "10", title: "Adjourn", rowText: "10 Adjourn" }
+    ]
+  } as unknown as LlmReadyMeeting;
+  const card = (id: string, title: string) => ({ id, source_item_id: id, agenda_item: title, source_url: null }) as unknown as Card;
+
+  assert.equal(extractDecisionOutcome(card("tech-10", "Adjournment and public document access"), tech), null);
+  assert.ok(extractDecisionOutcome(card("tech-3", "Approve Prior Meeting Minutes"), tech));
+});

@@ -1353,6 +1353,24 @@ function isOtherMinutesApproval(cardTitle: string | null | undefined, rowText: s
     !/\bminutes\b/i.test(String(cardTitle || ""));
 }
 
+/**
+ * Los Altos Hills committee minutes close with a recap of the whole meeting
+ * under "10. Review action items from the meeting" or "10. Adjourn", so any
+ * vote found there belongs to an earlier item ("committee approved a budget
+ * request of $2,300 ..." is item 8.5's). An adjournment can be voted on
+ * (Santa Clara County boards record "9 RESULT: APPROVED MOVER: ..."), so it
+ * keeps a vote that is a formal record or names the adjournment.
+ */
+const ITEM_HEADING_PREFIX = "^\\W*(?:item\\s+)?(?:[A-Z]?\\d{1,3}(?:\\.[a-z0-9]{1,3})*[.)]?\\s*)?(?:[a-z][.)]\\s*)?";
+const ACTION_ITEMS_RECAP_HEADING = new RegExp(`${ITEM_HEADING_PREFIX}review\\s+(?:of\\s+)?(?:the\\s+)?action\\s+items\\b`, "i");
+const ADJOURN_HEADING = new RegExp(`${ITEM_HEADING_PREFIX}adjourn\\w*\\b`, "i");
+
+function isRecapResult(rowText: string | null | undefined, result: string) {
+  const heading = String(rowText || "").slice(0, 200);
+  if (ACTION_ITEMS_RECAP_HEADING.test(heading)) return true;
+  return ADJOURN_HEADING.test(heading) && !/\b(?:adjourn\w*|mover|seconder|ayes)\b/i.test(result);
+}
+
 export function extractDecisionOutcome(
   card: Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url">,
   meeting: LlmReadyMeeting
@@ -1369,6 +1387,7 @@ export function extractDecisionOutcome(
   const item = structuredMatch?.item || minutesMatch?.item;
   if (!item?.result) return null;
   if (minutesMatch && isOtherMinutesApproval(card.agenda_item, item.rowText)) return null;
+  if (minutesMatch && isRecapResult(item.rowText, item.result)) return null;
 
   const sourceText = [item.action, item.result].filter(Boolean).join(" | ");
   const canonical = interpretOfficialAction(item.action, item.result, meeting);
