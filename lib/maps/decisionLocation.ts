@@ -40,7 +40,7 @@ const NON_SITE_ITEM_PATTERN =
  * "the Department recommends a use permit for 503 O'Keefe Street" still pins.
  */
 const CIVIC_VENUE_BEFORE_PATTERN =
-  /\b(?:auditorium|chambers?|city\s+hall|town\s+hall|civic\s+center|government\s+center|administration\s+(?:building|center)|library|clerk(?:['’]s\s+office)?(?:\s+of\s+the\s+board)?|department(?:\s+office)?|office(?:\s+of\s+the\s+[A-Za-z'’ ]{2,40}?)?|headquarters|place\s+of\s+business|(?:vice\s+)?chair|commission|committee)\s*[,:]?\s*(?:(?:located\s+)?at\s+|located\s+)?$/i;
+  /(?:\b(?:auditorium|chambers?|city\s+hall|town\s+hall|civic\s+center|government\s+center|administration\s+(?:building|center)|library|clerk(?:['’]s\s+office)?(?:\s+of\s+the\s+board)?|department(?:\s+office)?|office(?:\s+of\s+the\s+[A-Za-z'’ ]{2,40}?)?|headquarters|place\s+of\s+business|(?:vice\s+)?chair|commission|committee|board\s+of\s+supervisors|\d{1,2}(?:st|nd|rd|th)\s+floor\s+of)|\bc\/o\s+[A-Z][\w.'’-]*(?:\s+[A-Z][\w.'’-]*){0,3})\s*[,:]?\s*(?:(?:located\s+)?at\s+|located\s+)?$/i;
 
 /**
  * A letterhead names its organization right before the address: "City of

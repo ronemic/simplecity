@@ -357,3 +357,17 @@ test("keeps a civic-building address when the item is about that building", () =
     "123 Castro Street"
   );
 });
+
+test("skips Board of Supervisors mailing lines, c/o addresses and office floors", () => {
+  for (const text of [
+    "Official title: Public Hearing - Purchase of land on Chynoweth Ave\nItem context: www.LegalAdstore.com DYLAN WEN SANTA CLARA CO. BOARD OF SUPERVISORS 70 W HEDDING ST 10TH FL EAST WNG SAN JOSE, CA 95110 GOV3 GOVERNMENT LEGAL NOTICE",
+    "Official title: Review 2027 Open World delegation recommendations\nItem context: Address (Cannot be a PO Box): c/o Anne Chang 70 West Hedding Street, East Wing, 10 th Floor City: San Jose",
+    "Official title: Review Management Audit Services RFP Report\nItem context: The auditor has historically been provided space within the Office of the Clerk of the Board on the 10th floor of 70 West Hedding Street, for which the vendor reimburses the County."
+  ]) {
+    assert.equal(extractStreetAddressCandidate(text), null, text);
+  }
+  assert.equal(
+    extractStreetAddressCandidate("Official title: Presentation on 70 West Hedding Street\nItem context: Members of the Board of Supervisors 70 West Hedding Street")?.address,
+    "70 West Hedding Street"
+  );
+});
