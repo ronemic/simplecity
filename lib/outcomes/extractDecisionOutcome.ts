@@ -18,6 +18,7 @@ import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { KNOWN_JURISDICTION_SLUGS } from "@/lib/config/jurisdictions";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
 import { parseMinutesOutline, type MinutesOutlineEntry } from "@/lib/outcomes/minutesOutline";
+import { minutesRecordedDay } from "@/lib/outcomes/minutesRecordedDay";
 
 export const DECISION_OUTCOME_JURISDICTIONS = new Set<string>(KNOWN_JURISDICTION_SLUGS);
 
@@ -219,21 +220,31 @@ export function classifyDecisionOutcome(value: string): DecisionOutcomeKind {
   // "Carried" only says the motion passed. A passed motion to reject or deny
   // rejected the item, and a passed motion to continue it continued it.
   const purpose = text.match(MOTION_PURPOSE_PATTERN)?.[1];
-  if (
+  const passedMotionPurpose =
     purpose &&
     !negatedApproval &&
     APPROVAL_TERM_PATTERN.test(text) &&
     !FAILURE_TERM_PATTERN.test(text)
-  ) {
-    if (/^(?:reject|deny)$/.test(purpose)) return "rejected";
-    if (/^(?:continue|postpone|table|defer|refer)$/.test(purpose)) return "continued";
+      ? purpose
+      : null;
+  if (passedMotionPurpose) {
+    if (/^(?:reject|deny)$/.test(passedMotionPurpose)) return "rejected";
+    if (/^(?:continue|postpone|table|defer|refer)$/.test(passedMotionPurpose)) return "continued";
   }
   // An amendment that was denied is a rejection, not an amendment, so the
   // amendment branch must yield whenever the record also carries a failure.
   if (/\bamend(?:ed|ment|ments)?\b/.test(text) && !FAILURE_TERM_PATTERN.test(text)) {
     return "amended";
   }
-  if (/\b(?:continued|postponed|tabled|deferred|referred)\b/.test(text)) return "continued";
+  // A passed motion with a known purpose already said what it did: "moved to
+  // direct staff to send a letter ... encouraging continued communication.
+  // MOTION CARRIED" (Los Altos Hills) gave direction; it continued nothing.
+  if (
+    !passedMotionPurpose &&
+    /\b(?:continued|postponed|tabled|deferred|referred)\b/.test(text)
+  ) {
+    return "continued";
+  }
   if (FAILURE_TERM_PATTERN.test(text) || negatedApproval) return "rejected";
   if (APPROVAL_TERM_PATTERN.test(text)) {
     return "approved";
@@ -551,46 +562,14 @@ function officialMinutesDocuments(meeting: LlmReadyMeeting) {
   );
 }
 
-const MINUTES_HEADER_CHARACTERS = 800;
-const MINUTES_HEADER_MEETING_DATE =
-  /\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4})/gi;
-/**
- * A title line without a weekday: "Open Space Management Advisory Board
- * Regular Meeting Minutes October 22, 2026" (Carpinteria). The date must follow
- * directly, so "approve the meeting minutes of April 1" does not qualify.
- */
-const MINUTES_TITLE_MEETING_DATE =
-  /\bmeeting\s+minutes\s+((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4})/gi;
-
-/**
- * Minutes plainly labelled "Minutes" can record another meeting: the Los Altos
- * Hills Oct 15, 2026 meetings carry the Sep 17 minutes they approved
- * ("Approved October 15, 2026 ... Thursday, September 17, 2026"). Their
- * header's meeting line -- a weekday and date -- names the meeting they record.
- * Short minutes can reach the adjournment or consent list inside the header
- * window, so a date that schedules another meeting ("the next regular meeting
- * is scheduled for Friday, July 10") or names minutes being approved
- * ("Approval of the City Council Special Meeting Minutes June 18, 2026") does
- * not count.
- */
+/** Minutes whose own header records a different day than this meeting's. */
 function minutesHeaderNamesAnotherMeeting(
   text: string | null | undefined,
   meetingDateText: string | null | undefined
 ) {
   const meetingDay = civicCalendarDay(meetingDateText);
-  if (!meetingDay) return false;
-  const header = String(text || "").slice(0, MINUTES_HEADER_CHARACTERS).replace(/\s+/g, " ");
-  const dates = [
-    ...header.matchAll(MINUTES_HEADER_MEETING_DATE),
-    ...header.matchAll(MINUTES_TITLE_MEETING_DATE)
-  ].sort((left, right) => (left.index ?? 0) - (right.index ?? 0));
-  const recorded = dates.find((match) =>
-    !/\b(?:next|scheduled|adjourn\w*|continued|until|reconvene\w*|approv\w*|adopt\w*)\b[^.]{0,60}$/i.test(
-      header.slice(Math.max(0, (match.index ?? 0) - 80), match.index)
-    )
-  );
-  const recordedDay = recorded ? civicCalendarDay(recorded[1]) : null;
-  return Boolean(recordedDay && recordedDay !== meetingDay);
+  const recordedDay = minutesRecordedDay(text);
+  return Boolean(meetingDay && recordedDay && recordedDay !== meetingDay);
 }
 
 function minutesLabelMatchesMeeting(
@@ -1360,6 +1339,20 @@ function meetingDecisionDate(meeting: LlmReadyMeeting) {
   return parseMeetingDate(dateText) || null;
 }
 
+/**
+ * Agenda and minutes can number items differently. Carpinteria's Oct 22, 2026
+ * agenda lists "COSMAB Priority List" as item 3, while its minutes give 3 to
+ * "Approve the minutes of the Regular Meeting held on September 17, 2026". A
+ * vote approving minutes is only ever the result of a card about minutes.
+ */
+const MINUTES_APPROVAL_HEADING =
+  /^\W*(?:item\s+)?(?:[A-Z]?\d{1,3}(?:\.[a-z0-9]{1,3})*[.)]?\s*)?(?:[a-z][.)]\s*)?(?:approv\w*|adopt\w*|accept\w*)\b[^\n.]{0,80}\bminutes\b/i;
+
+function isOtherMinutesApproval(cardTitle: string | null | undefined, rowText: string | null | undefined) {
+  return MINUTES_APPROVAL_HEADING.test(String(rowText || "").slice(0, 200)) &&
+    !/\bminutes\b/i.test(String(cardTitle || ""));
+}
+
 export function extractDecisionOutcome(
   card: Pick<SummaryCardRow, "id" | "source_item_id" | "agenda_item" | "source_url">,
   meeting: LlmReadyMeeting
@@ -1375,6 +1368,7 @@ export function extractDecisionOutcome(
   const match = structuredMatch || minutesMatch?.match;
   const item = structuredMatch?.item || minutesMatch?.item;
   if (!item?.result) return null;
+  if (minutesMatch && isOtherMinutesApproval(card.agenda_item, item.rowText)) return null;
 
   const sourceText = [item.action, item.result].filter(Boolean).join(" | ");
   const canonical = interpretOfficialAction(item.action, item.result, meeting);
