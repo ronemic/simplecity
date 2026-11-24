@@ -72,6 +72,10 @@ import { enrichSolvangMeetings } from "@/lib/sources/solvang";
 import { enrichCivicClerkItemsFromApi } from "@/lib/sources/civicclerk-agenda-api";
 import { attachEastPaloAltoMinutesFromStoredPackets } from "@/lib/db/eastPaloAltoMinutes";
 import { attachSanMateoCouncilMinutesFromLaterAgendas } from "@/lib/db/sanMateoMinutes";
+import {
+  attachMisfiledMinutesToRecordedMeetings,
+  MISFILED_MINUTES_JURISDICTIONS
+} from "@/lib/db/misfiledMinutes";
 import { reconcileEastPaloAltoMeetingIds } from "@/lib/db/eastPaloAltoMeetings";
 import { scrapeEscribeMeetings } from "@/lib/sources/escribe";
 import { redactPublicLogMessage } from "@/lib/logging/publicLog";
@@ -1518,6 +1522,24 @@ async function runSimpleCityPipelineInternal(
           }
         } catch (error) {
           const message = `San Mateo council minutes from later agendas failed: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`;
+          errors.push(message);
+          log(message);
+        }
+      }
+      if (MISFILED_MINUTES_JURISDICTIONS.has(jurisdiction.slug) && !recordDeadline("misfiled minutes")) {
+        try {
+          const withMinutes = await attachMisfiledMinutesToRecordedMeetings(supabase, jurisdiction, log);
+          for (const meeting of withMinutes) {
+            if (recordDeadline("decision outcome reconciliation")) break;
+            // The meeting may have been reconciled earlier this run without these
+            // minutes; later runs will not return it here again.
+            reconciledOutcomeMeetingIds.delete(meeting.id as string);
+            await reconcileOutcomesForItem({ id: meeting.id as string, meeting });
+          }
+        } catch (error) {
+          const message = `Misfiled minutes for ${jurisdiction.name} failed: ${
             error instanceof Error ? error.message : "Unknown error"
           }`;
           errors.push(message);
