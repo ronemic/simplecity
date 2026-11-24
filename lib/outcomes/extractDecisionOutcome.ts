@@ -17,6 +17,7 @@ import {
 import { civicCalendarDay, parseMeetingDate } from "@/lib/utils/date";
 import { KNOWN_JURISDICTION_SLUGS } from "@/lib/config/jurisdictions";
 import { uniqueSourceItemIds } from "@/lib/utils/sourceItemIdentity";
+import { parseMinutesOutline, type MinutesOutlineEntry } from "@/lib/outcomes/minutesOutline";
 
 export const DECISION_OUTCOME_JURISDICTIONS = new Set<string>(KNOWN_JURISDICTION_SLUGS);
 
@@ -98,8 +99,10 @@ const ITEM_RESULT_PATTERN = new RegExp(
   `(?:^|[.!?]\\s+)([^.!?]{0,220}\\b(?:item|motion|ordinance|resolution|application|contract|proposal|consent calendar)\\b[^.!?]{0,260}\\b(?:${OUTCOME_TERMS})\\b[^.!?]{0,260}[.!?]?)`,
   "i"
 );
-// "No. 2074" is part of the motion, not the end of its sentence.
-const RESULT_SENTENCE_FRAGMENT = "(?:\\bNo\\.\\s*(?=\\d)|[^.])";
+// "No. 2074" is part of the motion, not the end of its sentence, and neither
+// is the dot in a lettered item number ("approve Consent excluding Item 6.d
+// for discussion, carried 5/0", Solvang).
+const RESULT_SENTENCE_FRAGMENT = "(?:\\bNo\\.\\s*(?=\\d)|\\d\\.(?=[a-z]\\b)|[^.])";
 const CLEAR_RESULT_PATTERN = new RegExp(
   `\\b(?:motion|council|board|commission|committee|authority|supervisors?)\\b${RESULT_SENTENCE_FRAGMENT}{0,360}\\b(?:${OUTCOME_TERMS})\\b${RESULT_SENTENCE_FRAGMENT}{0,600}`,
   "i"
@@ -736,6 +739,115 @@ function parsedMinuteItems(meeting: LlmReadyMeeting, document: PrimeGovDocument)
     });
 }
 
+const MIN_OUTLINE_LETTER_TITLE_SIMILARITY = 0.6;
+
+/**
+ * The agenda item an outline entry names. Los Altos Hills agendas letter items
+ * without their section ("A" for the minutes' "5.A"), and the same letter recurs
+ * under each section, so a bare letter also needs the titles to agree.
+ */
+function outlineAgendaItem(entry: MinutesOutlineEntry, items: AgendaItem[]) {
+  const byNumber = (value: string) => {
+    const matches = items.filter((item) => comparableAgendaNumber(item.agendaNumber) === value);
+    return matches.length === 1 ? matches[0] : null;
+  };
+  const exact = byNumber(comparableAgendaNumber(entry.number) || "");
+  if (exact) return exact;
+  const letter = entry.number.match(/(?:^|\.)([A-Za-z])$/)?.[1]?.toLowerCase();
+  if (!letter || items.some((item) => /\d/.test(String(item.agendaNumber || "")))) return null;
+  const item = byNumber(letter);
+  return item && agendaItemSimilarity(entry.title, String(item.title || "")) >= MIN_OUTLINE_LETTER_TITLE_SIMILARITY
+    ? item
+    : null;
+}
+
+/** A pulled consent item's own vote: "to approve Item 6.d, carried 5/0". */
+function separatedConsentItemResult(number: string, section: string) {
+  const reference = new RegExp(`\\bitem\\s+${escapeRegExp(number)}(?![.\\w]\\w)`, "i");
+  for (const paragraph of section.split(/\n\s*\n/)) {
+    if (!reference.test(paragraph) || /\b(?:exclud|pulled|removed|separate|except)/i.test(paragraph)) {
+      continue;
+    }
+    const result = extractResultText(paragraph);
+    if (result) return result;
+  }
+  return null;
+}
+
+/**
+ * An outlined item takes a result only from a recorded motion or vote. Its
+ * block is the whole discussion, where prose such as "thanked the District for
+ * its continued partnership" would otherwise read as "Continued".
+ */
+const RECORDED_ACTION_PATTERN =
+  /\b(?:motion|moved|vote[ds]?|roll call|ayes|adopted as|no action)\b|\bresolution\s+no\b/i;
+const MOTION_TALLY_LINE = /^.*\bMOTION\s+(?:CARRIED|PASSED|FAILED|DENIED)\b.*$/m;
+
+/**
+ * Los Altos Hills records each vote as a motion paragraph ending in "MOTION
+ * CARRIED 5-0.". Read the result from that record: the first outcome word in
+ * the block can sit in a page header ("Council Meeting Minutes Page 3 ...
+ * Manager Einfalt confirmed that ...").
+ */
+function tallyedMotionResult(block: string) {
+  const tally = MOTION_TALLY_LINE.exec(block);
+  if (!tally) return null;
+  const before = block.slice(0, tally.index);
+  const anchor = (
+    Array.from(before.matchAll(/\bMOTION\s+MADE\b/g)).at(-1) ??
+    Array.from(before.matchAll(/\b(?:moved|made\s+a\s+motion|motioned)\b/gi)).at(-1)
+  )?.index;
+  if (anchor === undefined) return null;
+  // Start at the sentence that makes the motion ("Mayor Bhateja moved to ...").
+  const sentenceEnds = Array.from(before.slice(0, anchor).matchAll(/[.!?]\s/g), (match) => (match.index ?? 0) + 2);
+  const start = Math.max(0, anchor - 300, ...sentenceEnds);
+  return compactOutcomeText(block.slice(start, tally.index + tally[0].length));
+}
+
+function outlinedItemResult(block: string) {
+  if (!RECORDED_ACTION_PATTERN.test(block)) return null;
+  return tallyedMotionResult(block) || extractResultText(block);
+}
+
+function outlinedMinuteItems(meeting: LlmReadyMeeting, document: PrimeGovDocument): AgendaItem[] {
+  const entries = parseMinutesOutline(normalizeSourceText(document.extractedText || ""));
+  const usedIds = new Set<string>();
+  return entries.flatMap((entry) => {
+    const agendaItem = outlineAgendaItem(entry, meeting.items || []);
+    const externalId = agendaItem?.externalId && !usedIds.has(agendaItem.externalId)
+      ? agendaItem.externalId
+      : `${document.url}#minutes-item-${entry.number}`;
+    if (usedIds.has(externalId)) return [];
+    usedIds.add(externalId);
+
+    let result = outlinedItemResult(entry.block);
+    const isConsentItem = Boolean(
+      entry.sectionText &&
+      entry.number !== entry.sectionNumber &&
+      /\bconsent\b/i.test(entry.sectionTitle || "")
+    );
+    if (isConsentItem && !result) {
+      const section = entry.sectionText || "";
+      const separated = [entry.number, entry.number.replace(/\./g, "")]
+        .some((form) => consentItemWasSeparated(form, section));
+      result = separated
+        ? separatedConsentItemResult(entry.number, section)
+        : outlinedItemResult(section);
+    }
+    return [{
+      externalId,
+      fileNumber: agendaItem?.fileNumber || null,
+      agendaNumber: agendaItem?.agendaNumber || entry.number,
+      itemType: entry.sectionTitle,
+      title: entry.title,
+      action: null,
+      result,
+      sourceUrl: document.url,
+      rowText: cleanText(entry.block).slice(0, 12000)
+    } satisfies AgendaItem];
+  });
+}
+
 function majorSectionBlocks(title: string, text: string) {
   const lines = normalizeSourceText(text).split("\n");
   const escapedTitle = escapeRegExp(title);
@@ -869,8 +981,17 @@ export function extractMeetingOutcomeItems(meeting: LlmReadyMeeting) {
 
   for (const document of minutesDocuments(meeting)) {
     const parsed = parsedMinuteItems(meeting, document);
+    const outlined = outlinedMinuteItems(meeting, document);
     agendaItemsFound = Math.max(agendaItemsFound, parsed.length);
-    const parsedResults = parsed.filter((candidate) => Boolean(candidate.result));
+    // Outlined minutes (Santa Maria, Solvang, Los Altos Hills) replace the
+    // general parse only where they find more recorded results, so documents
+    // that parse well today keep exactly the results they had.
+    const outlinedResults = outlined.filter((candidate) => Boolean(candidate.result));
+    const useOutline = outlinedResults.length > parsed.filter((candidate) => Boolean(candidate.result)).length;
+    if (useOutline) agendaItemsFound = Math.max(agendaItemsFound, outlined.length);
+    const parsedResults = useOutline
+      ? outlinedResults
+      : parsed.filter((candidate) => Boolean(candidate.result));
     // The last item listed under a consent heading runs on into the consent
     // motion, so its own block yields the same result. Two copies under one id
     // read as ambiguous and the item would get no result at all.
@@ -880,7 +1001,9 @@ export function extractMeetingOutcomeItems(meeting: LlmReadyMeeting) {
     const consentItems = consentCalendarOutcomeItems(
       document,
       (meeting.items || []).length > 0 ? meeting.items || [] : parsed
-    ).filter((item) => !parsedResults.some((candidate) => sameMotion(candidate, item)));
+    ).filter((item) => !parsedResults.some((candidate) =>
+      useOutline ? candidate.externalId === item.externalId : sameMotion(candidate, item)
+    ));
     for (const item of [...parsedResults, ...consentItems]) {
       outcomes.set(outcomeItemIdentity(item), item);
     }
