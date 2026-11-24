@@ -546,8 +546,38 @@ function officialMinutesDocuments(meeting: LlmReadyMeeting) {
     (document) =>
       ["Minutes", "Accessible Minutes"].includes(document.type) &&
       !document.isAgendaItemAttachment &&
-      minutesLabelMatchesMeeting(document.label, meeting.dateText)
+      minutesLabelMatchesMeeting(document.label, meeting.dateText) &&
+      !minutesHeaderNamesAnotherMeeting(document.extractedText, meeting.dateText)
   );
+}
+
+const MINUTES_HEADER_CHARACTERS = 800;
+const MINUTES_HEADER_MEETING_DATE =
+  /\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4})/gi;
+
+/**
+ * Minutes plainly labelled "Minutes" can record another meeting: the Los Altos
+ * Hills Oct 15, 2026 meetings carry the Sep 17 minutes they approved
+ * ("Approved October 15, 2026 ... Thursday, September 17, 2026"). Their
+ * header's meeting line -- a weekday and date -- names the meeting they record.
+ * Short minutes can reach the adjournment inside the header window, so a date
+ * that schedules another meeting ("the next regular meeting is scheduled for
+ * Friday, July 10") does not count.
+ */
+function minutesHeaderNamesAnotherMeeting(
+  text: string | null | undefined,
+  meetingDateText: string | null | undefined
+) {
+  const meetingDay = civicCalendarDay(meetingDateText);
+  if (!meetingDay) return false;
+  const header = String(text || "").slice(0, MINUTES_HEADER_CHARACTERS).replace(/\s+/g, " ");
+  const recorded = Array.from(header.matchAll(MINUTES_HEADER_MEETING_DATE)).find((match) =>
+    !/\b(?:next|scheduled|adjourn\w*|continued|until|reconvene\w*)\b[^.]{0,60}$/i.test(
+      header.slice(Math.max(0, (match.index ?? 0) - 80), match.index)
+    )
+  );
+  const recordedDay = recorded ? civicCalendarDay(recorded[1]) : null;
+  return Boolean(recordedDay && recordedDay !== meetingDay);
 }
 
 function minutesLabelMatchesMeeting(

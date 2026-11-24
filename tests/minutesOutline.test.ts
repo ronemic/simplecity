@@ -228,3 +228,16 @@ test("ignores lettered outlines with a missing section or lettered sections", ()
     []
   );
 });
+
+test("ignores minutes whose header records another meeting (Los Altos Hills, Oct 15)", () => {
+  const sep17Minutes = `Approved October 15, 2026
+Town of Los Altos Hills
+City Council Regular Meeting Minutes
+Thursday, September 17, 2026 at 6:00 P.M.
+${LOS_ALTOS_HILLS_MINUTES}`;
+  const items = [{ agendaNumber: "A", title: "Resolution Authorizing the City Manager to Execute a Five-Year Law Enforcement Services Agreement", externalId: "lah-item-a" }];
+  const sheriff = card("lah-item-a", "Authorize five-year law enforcement services agreement");
+
+  assert.equal(extractDecisionOutcome(sheriff, meetingWithMinutes("los-altos-hills", "Oct 15, 2026", items, sep17Minutes)), null);
+  assert.ok(extractDecisionOutcome(sheriff, meetingWithMinutes("los-altos-hills", "Sep 17, 2026", items, sep17Minutes)));
+});
