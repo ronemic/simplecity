@@ -29,7 +29,39 @@ const WHOLE_ADDRESS_PATTERN = new RegExp(`^${ADDRESS_BODY}$`, "i");
  * city acted on that property, so these items get no pin at all.
  */
 const NON_SITE_ITEM_PATTERN =
-  /\b(?:warrants?\s+of\s+demands?|registers?\s+of\s+demands?|check\s+register|warrant\s+register|accounts?\s+payable|cash\s+disbursements?|disbursements?\s+report|list\s+of\s+(?:claims|demands|warrants)|claims?\s+register|payroll\s+register|salary\s+schedule|meeting\s+minutes|minutes\s+(?:of|for|from)\b|adjournment)\b/i;
+  /\b(?:warrants?\s+of\s+demands?|registers?\s+of\s+demands?|check\s+register|warrant\s+register|accounts?\s+payable|cash\s+disbursements?|disbursements?\s+report|list\s+of\s+(?:claims|demands|warrants)|claims?\s+register|payroll\s+register|salary\s+schedule|meeting\s+minutes|minutes\s+(?:of|for|from)\b|(?:council|commission|committee|board)\s+minutes|approv\w*\b[^\n]{0,80}\bminutes|adjourn(?:ment|ed)?)\b/i;
+
+/**
+ * Where a civic body sits rather than where it acted: "in the Isaac Newton
+ * Senter Auditorium, 70 West Hedding Street", "at Town Hall, 26379 Fremont
+ * Road", "on file in the Public Works Department Office, located at 123 E.
+ * Anapamu Street", "Attn: Clerk of the Board 70 W. Hedding Street". The label
+ * has to sit right before the address -- a few connecting words at most -- so
+ * "the Department recommends a use permit for 503 O'Keefe Street" still pins.
+ */
+const CIVIC_VENUE_BEFORE_PATTERN =
+  /\b(?:auditorium|chambers?|city\s+hall|town\s+hall|civic\s+center|government\s+center|administration\s+(?:building|center)|library|clerk(?:['’]s\s+office)?(?:\s+of\s+the\s+board)?|department(?:\s+office)?|office(?:\s+of\s+the\s+[A-Za-z'’ ]{2,40}?)?|headquarters|place\s+of\s+business|(?:vice\s+)?chair|commission|committee)\s*[,:]?\s*(?:(?:located\s+)?at\s+|located\s+)?$/i;
+
+/**
+ * A letterhead names its organization right before the address: "City of
+ * Menlo Park 701 Laurel St., Menlo Park". Case-sensitive, so prose such as
+ * "the city of 123 Main Street" cannot qualify.
+ */
+const ORGANIZATION_LETTERHEAD_BEFORE_PATTERN = /\b(?:City|County|Town)\s+of\s+[A-Z][A-Za-z.'’]*(?:\s+[A-Z][A-Za-z.'’]*){0,3}\s*$/;
+
+/**
+ * A match that runs across a letterhead ("2026 City Manager City of Solvang 411
+ * Second St", "94025 tel 650-330-6600 www.menlopark.gov ST") is not an address.
+ */
+const LETTERHEAD_FRAGMENT_PATTERN = /\b(?:City|County|Town)\s+of\b|\btel\b|\bwww\./i;
+
+/**
+ * Letterheads and signature blocks follow the address with contact details:
+ * "701 Laurel St., Menlo Park, CA 94025 tel 650-330-6600 www.menlopark.gov",
+ * "70 West Hedding Street, West Wing ... (408) 299-7400".
+ */
+const CONTACT_DETAILS_AFTER_PATTERN =
+  /^[^\n]{0,60}?(?:\btel\b|\bphone\b|\bfax\b|\bwww\.|\(\d{3}\)\s*\d{3}[-.\s]\d{4}|\b\d{3}[-.]\d{3}[-.]\d{4}\b)/i;
 
 type Bounds = readonly [west: number, south: number, east: number, north: number];
 
@@ -89,6 +121,36 @@ function itemTitle(text: string) {
 
 function isNonSiteItem(text: string) {
   return NON_SITE_ITEM_PATTERN.test(itemTitle(text));
+}
+
+/** Whether the item's own title names this house number on this street. */
+function titleNamesAddress(text: string, address: string) {
+  const number = addressNumber(address);
+  const street = streetKey(address);
+  if (!number || !street) return false;
+  return Array.from(itemTitle(text).matchAll(STREET_ADDRESS_PATTERN)).some((match) => {
+    const candidate = compact(match[0]).replace(/[.,;:]+$/, "");
+    return addressNumber(candidate) === number && streetKey(candidate) === street;
+  });
+}
+
+/**
+ * Civic-building addresses in letterheads, minutes mastheads, venue lines and
+ * "on file at" notices. A decision about the building itself names the address
+ * in its own title, and keeps it.
+ */
+function isCivicBuildingAddress(text: string, start: number, length: number, address: string) {
+  const before = text.slice(Math.max(0, start - 60), start);
+  const after = text.slice(start + length);
+  if (
+    !CIVIC_VENUE_BEFORE_PATTERN.test(before) &&
+    !ORGANIZATION_LETTERHEAD_BEFORE_PATTERN.test(before) &&
+    !CONTACT_DETAILS_AFTER_PATTERN.test(after) &&
+    !LETTERHEAD_FRAGMENT_PATTERN.test(address)
+  ) {
+    return false;
+  }
+  return !titleNamesAddress(text, address);
 }
 
 /**
@@ -194,6 +256,7 @@ export function extractStreetAddressCandidate(
     if (/\b(?:meeting|hearing|chambers?|room|mail|email|submit|comment|attend)\b/.test(nearby)) {
       continue;
     }
+    if (isCivicBuildingAddress(text, start, match[0].length, address)) continue;
 
     return {
       address,

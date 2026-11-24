@@ -292,3 +292,68 @@ test("requires the geocoder's label to name the street the source named", async 
   });
   assert.equal(result?.location_status, "geocode_failed");
 });
+
+test("skips staff-report letterheads and pins the project named after them", () => {
+  const candidate = extractStreetAddressCandidate(
+    "Official title: Accept grant for Belle Haven Child Development Center\n" +
+      "Item context: Library and Community Services City of Menlo Park 701 Laurel St., Menlo Park, CA 94025 " +
+      "tel 650-330-6600 www.menlopark.gov STAFF REPORT Staff Report Number: 26-190-CC " +
+      "Recommendation: accept the grant to electrify the Belle Haven Child Development Center at 410 Ivy Dr."
+  );
+  assert.equal(candidate?.address, "410 Ivy Dr");
+
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Official title: Update on major project status\n" +
+        "Item context: E1 Update on major project status City of Menlo Park 701 Laurel St., Menlo Park Item context"
+    ),
+    null
+  );
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Official title: Human Trafficking Task Force report\n" +
+        "Item context: Office of the District Attorney 70 West Hedding Street, West Wing, 5 th Floor San Jose, " +
+        "California 95110 (408) 299-7400 Jeffrey F. Rosen District Attorney"
+    ),
+    null
+  );
+});
+
+test("skips venue and on-file addresses of civic buildings", () => {
+  for (const text of [
+    "Official title: Approve 2027 meeting schedule\nItem context: Meetings are held in the Isaac Newton Senter Auditorium, 70 West Hedding Street, San Jose.",
+    "Official title: Shield Wildfire Detection Sensors update\nItem context: Reports are available for inspection at Town Hall, 26379 Fremont Road and the Los Altos Main Library.",
+    "Official title: Award contract for Foothill Bridge storm repair\nItem context: Approve the Project Plans and Specifications, on file in the Public Works Department Office, located at 123 E. Anapamu Street, Santa Barbara.",
+    "Official title: Reimburse Veolia for water system improvements\nItem context: The report is on a bulletin board located at City Hall: 2415 University Avenue, East Palo Alto.",
+    "Official title: Approve agreement\nItem context: 7M General Engineering, Inc. with its principal place of business located at 1479 Saratoga Avenue, Suite 110, San Jose."
+  ]) {
+    assert.equal(extractStreetAddressCandidate(text), null, text);
+  }
+});
+
+test("gives minutes approvals and adjournments no pin", () => {
+  for (const title of [
+    "Approve November 9, 2026 City Council minutes",
+    "Adjourn – Next meeting scheduled Feb 3, 2027 in the Senter Auditorium, 70 West Hedding Street"
+  ]) {
+    assert.equal(
+      extractStreetAddressCandidate(
+        `Official title: ${title}\nItem context: DRAFT MINUTES COUNCIL MEMBER ISABELLA CHU 1017 MIDDLEFIELD ROAD REDWOOD CITY, CA`
+      ),
+      null,
+      title
+    );
+  }
+});
+
+test("keeps a civic-building address when the item is about that building", () => {
+  const candidate = extractStreetAddressCandidate(
+    "Official title: Fast Track Site Development at 26379 W Fremont Rd\n" +
+      "Item context: Copies are available for inspection at Town Hall, 26379 W Fremont Rd."
+  );
+  assert.equal(candidate?.address, "26379 W Fremont Rd");
+  assert.equal(
+    extractStreetAddressCandidate("Approve a development permit for 123 Castro Street; the Department recommends approval.")?.address,
+    "123 Castro Street"
+  );
+});
