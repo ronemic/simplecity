@@ -225,6 +225,61 @@ test("streams Box PDFs beyond the old cap and strips authorization on the CDN re
   }
 });
 
+test("downloads public Box files when the page omits the prefetched token map", async (t) => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-box-public-"));
+  const meeting = boxDownloadMeeting();
+  const requests: string[] = [];
+  const cdnUrl = "https://public.boxcloud.com/d/public-agenda.pdf";
+  t.mock.method(globalThis, "fetch", async (input: unknown, init?: RequestInit) => {
+    const url = String(input);
+    requests.push(url);
+    assert.equal(new Headers(init?.headers).get("authorization"), null);
+    if (url === meeting.documents[0].url) {
+      return new Response(`<script>Box.prefetchedData = ${JSON.stringify({
+        preview_metadata: { id: "123", is_download_available: true, permissions: { can_download: true },
+          authenticated_download_url: "https://public.boxcloud.com/api/2.0/files/123/content" }
+      })};</script>`);
+    }
+    if (new URL(url).pathname === "/index.php") {
+      const params = new URL(url).searchParams;
+      assert.equal(params.get("rm"), "box_download_shared_file");
+      assert.equal(params.get("shared_name"), "q97rv82305oyfnbdjhcyxrrdhu3dgkqy");
+      assert.equal(params.get("file_id"), "f_123");
+      return new Response(null, { status: 302, headers: { location: cdnUrl } });
+    }
+    assert.equal(url, cdnUrl);
+    return new Response("%PDF-public-agenda", { headers: { "content-type": "application/pdf" } });
+  });
+  try {
+    assert.deepEqual(await downloadSantaBarbaraPlanningCommissionDocuments([meeting], outputDir, () => undefined,
+      undefined, globalThis.fetch), { downloaded: 1, failed: 0 });
+    assert.equal(await fs.readFile(meeting.documents[0].localPath!, "utf8"), "%PDF-public-agenda");
+    assert.equal(requests.length, 3);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
+test("does not use public Box downloads for a mismatched file or disabled download", async (t) => {
+  const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-box-disabled-"));
+  let metadata = { id: "456", is_download_available: true, permissions: { can_download: true } };
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    requests += 1;
+    return new Response(`<script>Box.prefetchedData = ${JSON.stringify({ preview_metadata: metadata })};</script>`);
+  });
+  try {
+    for (const file of [metadata, { id: "123", is_download_available: true, permissions: { can_download: false } }]) {
+      metadata = file;
+      assert.deepEqual(await downloadSantaBarbaraPlanningCommissionDocuments([boxDownloadMeeting()], outputDir,
+        () => undefined, undefined, globalThis.fetch), { downloaded: 0, failed: 1 });
+    }
+    assert.equal(requests, 2);
+  } finally {
+    await fs.rm(outputDir, { recursive: true, force: true });
+  }
+});
+
 test("keeps the prior Box PDF and cleans partial files when a refresh is invalid", async () => {
   const outputDir = await fs.mkdtemp(path.join(os.tmpdir(), "simplecity-santa-barbara-box-"));
   const meeting = boxDownloadMeeting();

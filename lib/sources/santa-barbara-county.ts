@@ -331,20 +331,38 @@ export function enrichSantaBarbaraPlanningCommissionItems(meetings: PrimeGovMeet
 
 type BoxFileDownloadMetadata = {
   downloadUrl: string;
-  token: string;
+  token?: string;
 };
 
 function parseBoxFileDownloadMetadata(html: string, fileId: number): BoxFileDownloadMetadata {
   const data = extractAssignedJson(html, "Box.prefetchedData = ") as {
-    preview_metadata?: { authenticated_download_url?: string };
+    preview_metadata?: {
+      id?: string | number;
+      authenticated_download_url?: string;
+      is_download_available?: boolean;
+      permissions?: { can_download?: boolean };
+    };
     preview_prefetch_token_map?: Record<string, { read?: string }>;
   };
   const downloadUrl = data.preview_metadata?.authenticated_download_url;
   const token = data.preview_prefetch_token_map?.[String(fileId)]?.read;
-  if (!downloadUrl || !token) {
-    throw new Error(`Box did not provide a public download token for file ${fileId}.`);
+  if (downloadUrl && token) return { downloadUrl, token };
+
+  // Box no longer always prefetches preview tokens for public shared files.
+  // Its normal shared-file download endpoint still redirects to the public
+  // PDF, using the same shared folder and exact file ID without a bearer token.
+  const file = data.preview_metadata;
+  if (String(file?.id) === String(fileId) &&
+    file?.permissions?.can_download !== false && file?.is_download_available !== false &&
+    (file?.permissions?.can_download === true || file?.is_download_available === true)) {
+    const sharedUrl = new URL(SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL);
+    const publicDownload = new URL("/index.php", sharedUrl);
+    publicDownload.searchParams.set("rm", "box_download_shared_file");
+    publicDownload.searchParams.set("shared_name", sharedUrl.pathname.split("/").at(-1)!);
+    publicDownload.searchParams.set("file_id", `f_${fileId}`);
+    return { downloadUrl: publicDownload.toString() };
   }
-  return { downloadUrl, token };
+  throw new Error(`Box did not provide a public download token or downloadable shared file ${fileId}.`);
 }
 
 function isAllowedBoxDownloadUrl(value: string) {
@@ -396,14 +414,16 @@ export async function downloadSantaBarbaraPlanningCommissionDocuments(
       try {
         const metadata = parseBoxFileDownloadMetadata(await fetchBoxHtml(document.url), fileId);
         const downloadUrl = new URL(metadata.downloadUrl);
-        downloadUrl.searchParams.set("shared_link", SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL);
+        if (metadata.token) {
+          downloadUrl.searchParams.set("shared_link", SANTA_BARBARA_PLANNING_COMMISSION_BOX_URL);
+        }
         transfer = await downloadOfficialDocumentWithRetries(
           null,
           downloadUrl.toString(),
           filePath,
           { shouldStop },
           {
-            headers: { Authorization: `Bearer ${metadata.token}` },
+            headers: metadata.token ? { Authorization: `Bearer ${metadata.token}` } : {},
             validateUrl: isAllowedBoxDownloadUrl,
             shouldStop,
             budget: downloadBudget,

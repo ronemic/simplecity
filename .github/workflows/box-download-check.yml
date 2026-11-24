@@ -1,0 +1,35 @@
+name: Verify public Box document downloads
+on:
+  push:
+    branches: [codex/box-download-check]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --import tsx/esm --test tests/santaBarbaraCountyIntegration.test.ts
+      - name: Verify live county archive without cached text
+        run: |
+          node --import tsx/esm --input-type=module <<'JS'
+          import {scrapeSantaBarbaraPlanningCommissionMeetings,enrichSantaBarbaraPlanningCommissionItems} from './lib/sources/santa-barbara-county.ts';
+          import {getJurisdictionBySlug} from './lib/config/jurisdictions.ts';
+          import {extractPdfTextForMeetings} from './lib/scraper/pdfText.ts';
+          import {agendaIngestionErrors,minutesIngestionErrors} from './lib/pipeline.ts';
+          const r=await scrapeSantaBarbaraPlanningCommissionMeetings({jurisdiction:getJurisdictionBySlug('santa-barbara-county'),monthsBack:3,downloadDocuments:true,documentOutputDir:'/tmp/simplecity-box-check',log:console.log});
+          await extractPdfTextForMeetings(r.meetings);
+          const items=enrichSantaBarbaraPlanningCommissionItems(r.meetings);
+          const failed=r.meetings.flatMap(m=>m.documents).filter(d=>d.downloadError);
+          const errors=[...agendaIngestionErrors(r.meetings),...minutesIngestionErrors(r.meetings)];
+          console.log(JSON.stringify({meetings:r.meetings.length,downloaded:r.meetings.flatMap(m=>m.documents).filter(d=>d.localPath).length,failed:failed.length,items,errors}));
+          if(!r.meetings.length||failed.length||errors.length)throw new Error('Live public Box document verification failed');
+          JS
