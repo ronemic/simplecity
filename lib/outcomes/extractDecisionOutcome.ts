@@ -554,15 +554,24 @@ function officialMinutesDocuments(meeting: LlmReadyMeeting) {
 const MINUTES_HEADER_CHARACTERS = 800;
 const MINUTES_HEADER_MEETING_DATE =
   /\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),?\s+((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4})/gi;
+/**
+ * A title line without a weekday: "Open Space Management Advisory Board
+ * Regular Meeting Minutes October 22, 2026" (Carpinteria). The date must follow
+ * directly, so "approve the meeting minutes of April 1" does not qualify.
+ */
+const MINUTES_TITLE_MEETING_DATE =
+  /\bmeeting\s+minutes\s+((?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s*\d{4})/gi;
 
 /**
  * Minutes plainly labelled "Minutes" can record another meeting: the Los Altos
  * Hills Oct 15, 2026 meetings carry the Sep 17 minutes they approved
  * ("Approved October 15, 2026 ... Thursday, September 17, 2026"). Their
  * header's meeting line -- a weekday and date -- names the meeting they record.
- * Short minutes can reach the adjournment inside the header window, so a date
- * that schedules another meeting ("the next regular meeting is scheduled for
- * Friday, July 10") does not count.
+ * Short minutes can reach the adjournment or consent list inside the header
+ * window, so a date that schedules another meeting ("the next regular meeting
+ * is scheduled for Friday, July 10") or names minutes being approved
+ * ("Approval of the City Council Special Meeting Minutes June 18, 2026") does
+ * not count.
  */
 function minutesHeaderNamesAnotherMeeting(
   text: string | null | undefined,
@@ -571,8 +580,12 @@ function minutesHeaderNamesAnotherMeeting(
   const meetingDay = civicCalendarDay(meetingDateText);
   if (!meetingDay) return false;
   const header = String(text || "").slice(0, MINUTES_HEADER_CHARACTERS).replace(/\s+/g, " ");
-  const recorded = Array.from(header.matchAll(MINUTES_HEADER_MEETING_DATE)).find((match) =>
-    !/\b(?:next|scheduled|adjourn\w*|continued|until|reconvene\w*)\b[^.]{0,60}$/i.test(
+  const dates = [
+    ...header.matchAll(MINUTES_HEADER_MEETING_DATE),
+    ...header.matchAll(MINUTES_TITLE_MEETING_DATE)
+  ].sort((left, right) => (left.index ?? 0) - (right.index ?? 0));
+  const recorded = dates.find((match) =>
+    !/\b(?:next|scheduled|adjourn\w*|continued|until|reconvene\w*|approv\w*|adopt\w*)\b[^.]{0,60}$/i.test(
       header.slice(Math.max(0, (match.index ?? 0) - 80), match.index)
     )
   );

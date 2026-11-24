@@ -241,3 +241,17 @@ ${LOS_ALTOS_HILLS_MINUTES}`;
   assert.equal(extractDecisionOutcome(sheriff, meetingWithMinutes("los-altos-hills", "Oct 15, 2026", items, sep17Minutes)), null);
   assert.ok(extractDecisionOutcome(sheriff, meetingWithMinutes("los-altos-hills", "Sep 17, 2026", items, sep17Minutes)));
 });
+
+test("reads the meeting date from a minutes title line without a weekday (Carpinteria)", () => {
+  const oct22Minutes = `City of Carpinteria
+Carpinteria Open Space Management Advisory Board Regular Meeting Minutes October 22, 2026, at 3:00 PM
+${LOS_ALTOS_HILLS_MINUTES}`;
+  const items = [{ agendaNumber: "A", title: "Resolution Authorizing the City Manager to Execute a Five-Year Law Enforcement Services Agreement", externalId: "item-a" }];
+  const sheriff = card("item-a", "Authorize five-year law enforcement services agreement");
+
+  assert.equal(extractDecisionOutcome(sheriff, meetingWithMinutes("carpinteria", "Nov 19, 2026", items, oct22Minutes)), null);
+  assert.ok(extractDecisionOutcome(sheriff, meetingWithMinutes("carpinteria", "Oct 22, 2026", items, oct22Minutes)));
+  // An approval line names the minutes being approved, not the meeting recorded.
+  const approval = `Housing Commission\nD1. Approve the Housing Commission meeting minutes for June 3, 2026\n${LOS_ALTOS_HILLS_MINUTES}`;
+  assert.ok(extractDecisionOutcome(sheriff, meetingWithMinutes("menlo-park", "Aug 5, 2026", items, approval)));
+});
