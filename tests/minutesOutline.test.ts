@@ -255,3 +255,18 @@ ${LOS_ALTOS_HILLS_MINUTES}`;
   const approval = `Housing Commission\nD1. Approve the Housing Commission meeting minutes for June 3, 2026\n${LOS_ALTOS_HILLS_MINUTES}`;
   assert.ok(extractDecisionOutcome(sheriff, meetingWithMinutes("menlo-park", "Aug 5, 2026", items, approval)));
 });
+
+test("a section heading in ordinary case does not read as a missed section", () => {
+  // Los Altos Hills, Aug 10, 2026: section 3 is not uppercase.
+  const entries = parseMinutesOutline(`1.PUBLIC COMMENT
+2.NEW BUSINESS
+A. Resolution Authorizing the City Manager to Submit Payment to the Santa Clara County Sheriff
+MOTION PASSED 4-1.
+3.Receive Update on Negotiations of the Law Enforcement Agreement with the Santa Clara County Sheriff
+1. Continue negotiations regarding the proposed services
+4.ADJOURNMENT
+`);
+  assert.deepEqual(entries.map((entry) => entry.number), ["1", "2", "2.A", "4"]);
+  // A speaker list ("4. Malika Junaid") does not cover a missing section.
+  assert.deepEqual(parseMinutesOutline("2. PRESENTATIONS\nA. Pathways\n3. Malika Junaid\n4. INFORMATIONAL REPORTS\n"), []);
+});

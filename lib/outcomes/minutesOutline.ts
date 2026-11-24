@@ -31,6 +31,13 @@ const BARE_NUMBER_LINE = /^\s*(\d{1,2}(?:\.[a-z0-9]{1,3}){0,3})\.?\s*$/i;
  */
 const NUMBERED_SECTION_LINE = /^\s*(\d{1,2})\s*\.\s*([A-Z][A-Z'’&/-]{1,}\b.*)$/;
 /**
+ * A section heading in ordinary case, such as "3.Receive Update on Negotiations
+ * of the Law Enforcement Agreement" (Los Altos Hills Aug 10, 2026): a titled
+ * line of four or more words. Not read as a heading, but it accounts for its
+ * number in the section sequence below.
+ */
+const NUMBERED_TITLE_LINE = /^\s*(\d{1,2})\s*\.\s*[A-Z]\S*(?:\s+\S+){3,}/;
+/**
  * "a. Approve ...", "A. Approval of ...", and "A.Resolution ..." without the
  * space -- but not "U.S. Highway", whose letter is followed by another.
  */
@@ -125,10 +132,20 @@ function letteredOutline(lines: string[]): MinutesOutlineEntry[] {
   // A section heading the pattern missed folds its items into the previous
   // section -- into the consent calendar, with its vote. Sections run in
   // sequence, so a gap ("7." then "13.") means one was missed.
-  const sectionNumbers = headings.filter((heading) => heading.isSection).map((heading) => Number(heading.number));
-  if (sectionNumbers.some((number, index) => index > 0 && number !== sectionNumbers[index - 1] + 1)) {
-    return [];
-  }
+  const sectionHeadings = headings.filter((heading) => heading.isSection);
+  const missedSection = sectionHeadings.some((heading, index) => {
+    if (index === 0) return false;
+    const previous = sectionHeadings[index - 1];
+    // Every skipped number must still appear as a titled line between the two.
+    for (let skipped = Number(previous.number) + 1; skipped < Number(heading.number); skipped += 1) {
+      const present = lines.slice(previous.index + 1, heading.index).some((line) =>
+        line.match(NUMBERED_TITLE_LINE)?.[1] === String(skipped)
+      );
+      if (!present) return true;
+    }
+    return Number(heading.number) <= Number(previous.number);
+  });
+  if (missedSection) return [];
   // Los Altos School District letters its sections and numbers the items
   // ("F. CONSENT CALENDAR", then "1."). Lettered headings ahead of the first
   // numbered section mean the letters are the sections.
