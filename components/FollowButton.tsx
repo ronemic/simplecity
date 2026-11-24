@@ -63,6 +63,7 @@ export function FollowButton({
       <button
         type="button"
         aria-pressed={following}
+        aria-label={following ? activeLabel : idleLabel}
         disabled={!loaded}
         onClick={toggleFollow}
         className={cn(

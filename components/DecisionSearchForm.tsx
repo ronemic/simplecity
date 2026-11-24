@@ -8,13 +8,15 @@ export function SearchInput({
   onSearchChange,
   placeholder,
   ariaLabel,
-  locale = "en"
+  locale = "en",
+  autoFocus = false
 }: {
   search: string;
   onSearchChange: (search: string) => void;
   placeholder: string;
   ariaLabel: string;
   locale?: Locale;
+  autoFocus?: boolean;
 }) {
   return (
     <div className="relative">
@@ -29,6 +31,7 @@ export function SearchInput({
         placeholder={placeholder}
         aria-label={ariaLabel}
         autoComplete="off"
+        autoFocus={autoFocus}
         className="input-control input-control--search input-control--hero-search"
       />
       {search ? (
@@ -49,12 +52,15 @@ export function DecisionSearchForm({
   search = "",
   onSearchChange,
   placeholder,
-  locale = "en"
+  locale = "en",
+  autoFocus = false
 }: {
   search?: string;
   onSearchChange: (search: string) => void;
   placeholder?: string;
   locale?: Locale;
+  /** Set when the reader just opened the search panel, never on page load. */
+  autoFocus?: boolean;
 }) {
   return (
     <div role="search">
@@ -64,6 +70,7 @@ export function DecisionSearchForm({
         placeholder={placeholder || `${t(locale, "searchDecisions")}...`}
         ariaLabel={t(locale, "searchDecisions")}
         locale={locale}
+        autoFocus={autoFocus}
       />
     </div>
   );

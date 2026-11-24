@@ -121,11 +121,61 @@ function withoutAgendaPrefix(address: string) {
   return trimmed !== address && WHOLE_ADDRESS_PATTERN.test(trimmed) ? trimmed : address;
 }
 
+/** The item's own number, from the "Agenda item N" line of the formatted context. */
+function agendaItemNumber(text: string) {
+  return text.match(/^Agenda item (\d{1,4})\b/m)?.[1] || null;
+}
+
+/**
+ * Agenda scrapes sometimes run an item's context on into the next item -- "24
+ * Tracking Survey Results ... DOWNLOAD PUBLIC HEARING ... 25. New Multi-Family
+ * Residential Development ... at 220 W. 20th Avenue" -- and the next item's
+ * address then pins the survey presentation at that housing site. The context
+ * is cut where the next numbered item ("25." for item 24) begins, through the
+ * end of that line, so later labelled lines still count.
+ */
+function withoutFollowingItems(text: string) {
+  const itemNumber = agendaItemNumber(text);
+  const contextStart = text.search(/^Item context:/m);
+  if (!itemNumber || contextStart < 0) return text;
+
+  const nextNumber = String(Number(itemNumber) + 1);
+  const nextItem = new RegExp(`(?<![\\d$.,])\\b${nextNumber}\\.\\s`, "g");
+  nextItem.lastIndex = contextStart;
+  const boundary = nextItem.exec(text);
+  if (!boundary) return text;
+
+  const lineEnd = text.indexOf("\n", boundary.index);
+  return text.slice(0, boundary.index) + (lineEnd < 0 ? "" : text.slice(lineEnd));
+}
+
+/**
+ * The item number heads the item's own context -- "Agenda section: OLD
+ * BUSINESS. 23 Humboldt Street Bike Lanes" -- and reads as house number 23. A
+ * number that equals the item's own number and directly follows the section
+ * label is that index, not an address. Without the "Agenda item N" line there
+ * is nothing to compare against, so older source text is left as it was.
+ */
+function isAgendaItemIndex(
+  address: string,
+  match: RegExpMatchArray,
+  text: string,
+  itemNumber: string | null
+) {
+  // Checked after `withoutAgendaPrefix`, so "15 445 S. B Street" (item 15)
+  // is judged by its real house number, 445.
+  if (!itemNumber || addressNumber(address) !== itemNumber) return false;
+  const before = text.slice(Math.max(0, (match.index || 0) - 160), match.index || 0);
+  return /(?:Agenda section:[^\n]*[.:]|Item context:)\s*$/i.test(before);
+}
+
 export function extractStreetAddressCandidate(
   sourceText: string | null | undefined
 ): DecisionLocationCandidate | null {
-  const text = String(sourceText || "");
-  if (isNonSiteItem(text)) return null;
+  const raw = String(sourceText || "");
+  if (isNonSiteItem(raw)) return null;
+  const text = withoutFollowingItems(raw);
+  const itemNumber = agendaItemNumber(text);
   STREET_ADDRESS_PATTERN.lastIndex = 0;
 
   // Skipping a match hands the card to the next one in the text, which is
@@ -135,6 +185,7 @@ export function extractStreetAddressCandidate(
   // rather than filtered out here.
   for (const match of text.matchAll(STREET_ADDRESS_PATTERN)) {
     const address = withoutAgendaPrefix(compact(match[0]).replace(/[.,;:]+$/, ""));
+    if (isAgendaItemIndex(address, match, text, itemNumber)) continue;
     const start = match.index || 0;
     const nearby = text.slice(Math.max(0, start - 90), start).toLowerCase();
 
@@ -156,6 +207,74 @@ export function extractStreetAddressCandidate(
 
 function addressNumber(value: string) {
   return value.match(/^\s*(\d{1,6})\b/)?.[1] || null;
+}
+
+const STREET_WORD_ALIASES: Record<string, string> = {
+  st: "street",
+  ave: "avenue",
+  av: "avenue",
+  rd: "road",
+  blvd: "boulevard",
+  dr: "drive",
+  ln: "lane",
+  ct: "court",
+  hwy: "highway",
+  pl: "place",
+  cir: "circle",
+  ter: "terrace",
+  pkwy: "parkway"
+};
+const DIRECTIONS = new Set(["n", "s", "e", "w", "north", "south", "east", "west"]);
+const ORDINAL_WORDS: Record<string, string> = {
+  first: "1st",
+  second: "2nd",
+  third: "3rd",
+  fourth: "4th",
+  fifth: "5th",
+  sixth: "6th",
+  seventh: "7th",
+  eighth: "8th",
+  ninth: "9th",
+  tenth: "10th",
+  eleventh: "11th",
+  twelfth: "12th"
+};
+
+/**
+ * The street a "123 Main St."-style address names, with its house number,
+ * compass prefix and punctuation dropped, its suffix spelled out and its
+ * ordinal in digits, so "220 W. 20th Ave" and "220 W 20th Avenue" -- or "349
+ * First Street" and "349 1st Street" -- compare equal.
+ */
+function streetKey(address: string) {
+  return address
+    .toLowerCase()
+    .replace(/[.'’]/g, "")
+    .replace(/^\s*\d{1,6}(?:-\d{1,6})?\s+/, "")
+    .split(/\s+/)
+    .filter((word) => word && !DIRECTIONS.has(word))
+    .map((word) => ORDINAL_WORDS[word] || STREET_WORD_ALIASES[word] || word)
+    .join(" ");
+}
+
+/**
+ * The geocoder's first label part has to be the street the source named. The
+ * region box is wide and the house-number check alone let "23 Humboldt Street,
+ * San Mateo" resolve to 23 Humboldt Court in Pacifica. The city is not
+ * compared: the geocoder labels unincorporated land by its county seat (a
+ * Santa Maria water sale on Patterson Road reads "Santa Barbara"), and those
+ * pins are correct.
+ *
+ * The address pattern can run past the street ("10320 Rolly Road for the
+ * Rolly Road"), so the source may continue after the label's street. It may
+ * not start elsewhere: "6 that conveyance of easements at 920 Thompson Street"
+ * is not 6 Thompson Street.
+ */
+export function labelMatchesAddress(label: string | null | undefined, address: string) {
+  const street = streetKey(String(label || "").split(",")[0] || "");
+  const expected = streetKey(address);
+  if (!street || !expected) return false;
+  return expected === street || expected.startsWith(`${street} `);
 }
 
 function withinBounds(longitude: number, latitude: number, bounds: Bounds) {
@@ -233,6 +352,7 @@ export async function geocodeDecisionAddress(
         return false;
       }
       const label = String(entry.place_name || "");
+      if (!labelMatchesAddress(label, geocodableAddress)) return false;
       return !expectedNumber || addressNumber(label) === expectedNumber;
     });
 

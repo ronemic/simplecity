@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   extractStreetAddressCandidate,
-  geocodeDecisionAddress
+  geocodeDecisionAddress,
+  labelMatchesAddress
 } from "@/lib/maps/decisionLocation";
 import type { JurisdictionConfig } from "@/lib/config/jurisdictions";
 
@@ -212,4 +213,82 @@ test("finds the real address after a comma-grouped square footage", () => {
     )?.address,
     "125 Bayshore Boulevard"
   );
+});
+
+test("does not read the agenda item's own number as a house number", () => {
+  // Item 23 was pinned at "23 Humboldt Court, Pacifica".
+  assert.equal(
+    extractStreetAddressCandidate(
+      [
+        "Agenda item 23",
+        "Official title: Humboldt Street Bike Lanes Alternatives — Update and Direction",
+        "Agenda section: OLD BUSINESS",
+        "Item context: Agenda section: OLD BUSINESS. 23 Humboldt Street Bike Lanes Alternatives — Update and Direction Receive an informational update."
+      ].join("\n")
+    ),
+    null
+  );
+  // The same index still drops off an address that follows it.
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Agenda item 15\nItem context: Agenda section: CONSENT CALENDAR. 15 445 S. B Street (Bespoke) mixed-use."
+    )?.address,
+    "445 S. B Street"
+  );
+  // A real address that shares the number but is not at the head of the item stays.
+  assert.equal(
+    extractStreetAddressCandidate(
+      "Agenda item 23\nItem context: Agenda section: NEW BUSINESS. Approve a permit for 23 Humboldt Street."
+    )?.address,
+    "23 Humboldt Street"
+  );
+});
+
+test("ignores addresses from the next agenda item that ran into this one's context", () => {
+  // The sales tax survey (item 24) was pinned at item 25's housing site.
+  const text = [
+    "Agenda item 24",
+    "Official title: Tracking Survey Results for the Potential Sales Tax Measure for November 2026 — Informational",
+    "Item context: Agenda section: NEW BUSINESS. 24 Tracking Survey Results — Informational Receive a presentation. DOWNLOAD PUBLIC HEARING City Council action. 25. \u200bNew Multi-Family Residential Development (PA-2025-063) — Approval for 232 units at 220 W. 20th Avenue.",
+    "Official source: "
+  ].join("\n");
+  assert.equal(extractStreetAddressCandidate(text), null);
+
+  // An address inside the item's own context is still found.
+  assert.equal(
+    extractStreetAddressCandidate(text.replace("Receive a presentation.", "Receive a presentation at 330 W. 20th Avenue."))?.address,
+    "330 W. 20th Avenue"
+  );
+});
+
+test("requires the geocoder's label to name the street the source named", async () => {
+  const pacifica = "23 Humboldt Court, Pacifica, California 94044, United States";
+  assert.equal(labelMatchesAddress(pacifica, "23 Humboldt Street"), false);
+  assert.equal(labelMatchesAddress("220 W 20th Avenue, San Mateo, California", "220 W. 20th Ave"), true);
+  assert.equal(labelMatchesAddress("616 South B Street, San Mateo, California", "616 S. B Street"), true);
+  assert.equal(labelMatchesAddress("349 1st Street, Los Altos, California", "349 First Street"), true);
+  // Unincorporated land is labelled by the county seat; the street still matches.
+  assert.equal(labelMatchesAddress("421 Patterson Road, Santa Barbara, California 93455", "421 Patterson Road"), true);
+  // The source may run on past the street, but may not start somewhere else.
+  assert.equal(labelMatchesAddress("10320 Rolly Road, Los Altos Hills, California", "10320 Rolly Road for the Rolly Road"), true);
+  assert.equal(
+    labelMatchesAddress("6 Thompson Street, Hollister, California", "6 that conveyance of easements at 920 Thompson Street"),
+    false
+  );
+  assert.equal(labelMatchesAddress("25, California, United States", "25 miles-per-hour speed limit is warranted for this road"), false);
+
+  const candidate = extractStreetAddressCandidate("Project at 23 Humboldt Street.");
+  assert.ok(candidate);
+  const result = await geocodeDecisionAddress(candidate, { ...jurisdiction, name: "San Mateo", regionSlug: "south-san-mateo" }, {
+    apiKey: "test-key",
+    fetchImpl: async () =>
+      new Response(JSON.stringify({
+        features: [{
+          center: [-122.468333, 37.583626],
+          place_name: pacifica,
+          relevance: 0.73
+        }]
+      }))
+  });
+  assert.equal(result?.location_status, "geocode_failed");
 });

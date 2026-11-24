@@ -7,6 +7,7 @@ import {
 import {
   clearedDecisionLocation,
   extractStreetAddressCandidate,
+  labelMatchesAddress,
   locateDecisionFromSource
 } from "@/lib/maps/decisionLocation";
 
@@ -69,11 +70,15 @@ for (const jurisdiction of jurisdictions) {
     // field available without trusting generated explanatory copy.
     const sourceText = card.model_input_text || card.agenda_item;
 
-    // Rechecks only ever retire a pin, so they re-run the extractor alone and
-    // leave every still-valid address at the coordinates it already has --
-    // no geocoding calls, and no chance of moving a correct pin.
+    // Rechecks only ever retire a pin, so they re-run the extractor and
+    // compare the stored label's street against it, and leave every
+    // still-valid address at the coordinates it already has -- no geocoding
+    // calls, and no chance of moving a correct pin.
     if (recheck) {
-      if (extractStreetAddressCandidate(sourceText)) continue;
+      const candidate = extractStreetAddressCandidate(sourceText);
+      if (candidate && labelMatchesAddress(card.location_label, candidate.address)) {
+        continue;
+      }
       cleared += 1;
       console.log(`  clearing ${card.agenda_item || card.id} -> ${card.location_label}`);
       if (execute) {

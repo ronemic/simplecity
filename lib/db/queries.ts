@@ -15,6 +15,7 @@ import {
   getPublicSupabaseProjectsForSelection,
   getServiceSupabaseClientsForSelection,
   getServiceSupabaseProjectsForSelection,
+  KNOWN_JURISDICTION_SLUGS,
   requireValidJurisdictionSlug,
   type JurisdictionConfig,
   type JurisdictionProject,
@@ -2181,6 +2182,38 @@ const getCachedMeetingDetail = unstable_cache(
   { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
 );
 
+/**
+ * Which jurisdiction a meeting belongs to, found from its id alone. Meeting
+ * links get shared without `?jurisdiction=` (or opened under a different saved
+ * place), and the id is a UUID, so it is enough to find the meeting. Each
+ * Supabase project is asked once.
+ */
+const getCachedMeetingJurisdiction = unstable_cache(
+  async (id: string): Promise<JurisdictionSlug | null> => {
+    const projects = getSafePublicProjects(ALL_JURISDICTIONS_SLUG);
+    const results = await Promise.all(
+      projects.map(async (project) => {
+        const { data, error } = await project.supabase
+          .from("meetings")
+          .select("jurisdiction_slug")
+          .eq("id", id)
+          .in("jurisdiction_slug", projectSlugs(project))
+          .limit(1);
+
+        logQueryError(`Failed to find the jurisdiction of meeting ${id} in ${projectLabel(project)}`, error);
+        const slug = (data as { jurisdiction_slug?: string | null }[] | null)?.[0]?.jurisdiction_slug;
+        return slug && KNOWN_JURISDICTION_SLUGS.includes(slug as JurisdictionSlug)
+          ? (slug as JurisdictionSlug)
+          : null;
+      })
+    );
+
+    return results.find(Boolean) || null;
+  },
+  ["public-meeting-jurisdiction"],
+  { revalidate: PUBLIC_CACHE_REVALIDATE_SECONDS, tags: [PUBLIC_CONTENT_CACHE_TAG] }
+);
+
 const getCachedAdjacentMeetings = unstable_cache(
   async (
     selection: JurisdictionSelection,
@@ -2619,6 +2652,28 @@ export async function getMeetingDetail(
   locale: Locale = "en"
 ) {
   return getCachedMeetingDetail(selection, id, locale);
+}
+
+/**
+ * The meeting under the requested jurisdiction, or -- when it is not there --
+ * under the jurisdiction it actually belongs to. `selection` is the
+ * jurisdiction the detail was found under, for adjacent-meeting navigation and
+ * other follow-up queries.
+ */
+export async function resolveMeetingDetail(
+  id: string,
+  requested: JurisdictionSelection = getDefaultJurisdiction().slug,
+  locale: Locale = "en"
+) {
+  const detail = await getCachedMeetingDetail(requested, id, locale);
+  if (detail.meeting || requested === ALL_JURISDICTIONS_SLUG) {
+    return { ...detail, selection: requested };
+  }
+
+  const owner = await getCachedMeetingJurisdiction(id);
+  if (!owner || owner === requested) return { ...detail, selection: requested };
+
+  return { ...(await getCachedMeetingDetail(owner, id, locale)), selection: owner as JurisdictionSelection };
 }
 
 export async function getAdjacentMeetingsForMeeting(

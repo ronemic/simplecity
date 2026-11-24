@@ -8,14 +8,15 @@ import { SummaryCard } from "@/components/SummaryCard";
 import { StatusPill } from "@/components/StatusPill";
 import {
   getAdjacentMeetingsForMeeting,
-  getMeetingDetail,
-  getMeetingRawVideoDocuments
+  getMeetingRawVideoDocuments,
+  resolveMeetingDetail
 } from "@/lib/db/queries";
 import {
   JURISDICTION_PREFERENCE_COOKIE,
   getJurisdictionDisplayLabel,
   normalizeJurisdictionSelection,
-  toPublicJurisdictionSlug
+  toPublicJurisdictionSlug,
+  type JurisdictionSelection
 } from "@/lib/config/jurisdictions";
 import { cookies } from "next/headers";
 import { displayMeetingTitle, displayMeetingType } from "@/lib/utils/meetingDisplay";
@@ -139,8 +140,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const locale = await getPageLocale(query.lang);
-  const jurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
-  const { meeting } = await getMeetingDetail(id, jurisdiction, locale);
+  const requestedJurisdiction = normalizeJurisdictionSelection(query.jurisdiction);
+  const { meeting } = await resolveMeetingDetail(id, requestedJurisdiction, locale);
   if (!meeting) {
     return {
       title: locale === "es" ? "Reunión no encontrada | SimpleCity" : "Meeting not found | SimpleCity",
@@ -148,7 +149,7 @@ export async function generateMetadata({
     };
   }
 
-  const jurisdictionSlug = toPublicJurisdictionSlug(jurisdiction);
+  const jurisdictionSlug = canonicalMeetingJurisdiction(meeting.jurisdiction_slug, requestedJurisdiction);
   const jurisdictionLabel = getJurisdictionDisplayLabel(
     meeting.jurisdiction_slug || meeting.jurisdiction_name,
     locale
@@ -183,6 +184,20 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * The canonical URL names the meeting's own jurisdiction, so every way of
+ * reaching a meeting (no parameter, a different saved place, "All") points
+ * search engines at one address.
+ */
+function canonicalMeetingJurisdiction(
+  meetingJurisdiction: string | null | undefined,
+  fallback: JurisdictionSelection
+) {
+  return toPublicJurisdictionSlug(
+    meetingJurisdiction ? normalizeJurisdictionSelection(meetingJurisdiction) : fallback
+  );
+}
+
 function meetingHref(meetingId: string, jurisdiction: string) {
   return `/meetings/${meetingId}?jurisdiction=${encodeURIComponent(jurisdiction)}`;
 }
@@ -209,13 +224,18 @@ export default async function MeetingDetailPage({
     getRequestLocale(),
     cookies()
   ]);
-  const jurisdiction = normalizeJurisdictionSelection(
+  const requestedJurisdiction = normalizeJurisdictionSelection(
     query.jurisdiction || cookieStore.get(JURISDICTION_PREFERENCE_COOKIE)?.value
   );
-  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
-  const { meeting, cards, documents } = await getMeetingDetail(id, jurisdiction, locale);
+  const {
+    meeting,
+    cards,
+    documents,
+    selection: jurisdiction
+  } = await resolveMeetingDetail(id, requestedJurisdiction, locale);
 
   if (!meeting) notFound();
+  const publicJurisdiction = toPublicJurisdictionSlug(jurisdiction);
   const [rawVideoDocuments, { newerMeeting, olderMeeting }] = await Promise.all([
     getEmbeddableVideoDocuments(documents).length > 0
       ? Promise.resolve([])
@@ -232,7 +252,10 @@ export default async function MeetingDetailPage({
   const officialSourceHost = sourceHost(meeting.source_url);
   const meetingTitleFallback = locale === "es" ? "Reunión no indicada" : "Meeting not listed";
   const canonicalUrl = new URL(`/meetings/${encodeURIComponent(id)}`, getConfiguredAppUrl());
-  canonicalUrl.searchParams.set("jurisdiction", publicJurisdiction);
+  canonicalUrl.searchParams.set(
+    "jurisdiction",
+    canonicalMeetingJurisdiction(meeting.jurisdiction_slug, jurisdiction)
+  );
   const eventJsonLd = meeting.meeting_datetime
     ? {
         "@context": "https://schema.org",

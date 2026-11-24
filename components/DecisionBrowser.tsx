@@ -76,6 +76,9 @@ export function DecisionBrowser({
   const [pendingPage, setPendingPage] = useState<number | null>(null);
   const [santaBarbaraView, setSantaBarbaraView] = useState<SantaBarbaraDecisionView>("all");
   const [showSearch, setShowSearch] = useState(Boolean(initialSearch));
+  // Only a click on Search moves focus into the box; a page that loads with
+  // ?q= already open leaves focus where the browser put it.
+  const [searchOpenedByReader, setSearchOpenedByReader] = useState(false);
   const [showFilters, setShowFilters] = useState(Boolean(selectedCategory || selectedResult));
   const [mapPointCount, setMapPointCount] = useState<{ key: string; count: number } | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -171,7 +174,10 @@ export function DecisionBrowser({
     <button
       type="button"
       aria-expanded={showSearch}
-      onClick={() => setShowSearch((value) => !value)}
+      onClick={() => {
+        setSearchOpenedByReader(!showSearch);
+        setShowSearch(!showSearch);
+      }}
       className="action-link !min-h-8 !px-1 !text-xs sm:!min-h-10 sm:!px-2 sm:!text-sm"
     >
       <Search aria-hidden className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -198,7 +204,12 @@ export function DecisionBrowser({
 
   const searchPanel = showSearch ? (
     <div className="max-w-3xl border-b border-black/10 py-3" aria-busy={isPending}>
-      <DecisionSearchForm search={search} onSearchChange={setSearch} locale={locale} />
+      <DecisionSearchForm
+        search={search}
+        onSearchChange={setSearch}
+        locale={locale}
+        autoFocus={searchOpenedByReader}
+      />
     </div>
   ) : null;
 

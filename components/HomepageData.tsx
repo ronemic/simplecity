@@ -1,7 +1,11 @@
 import Link from "next/link";
 import { ArrowRight, CalendarDays } from "lucide-react";
 import { SummaryCard } from "@/components/SummaryCard";
-import { getJurisdictionDisplayLabel } from "@/lib/config/jurisdictions";
+import {
+  getJurisdictionDisplayLabel,
+  normalizeJurisdictionSelection,
+  toPublicJurisdictionSlug
+} from "@/lib/config/jurisdictions";
 import type { Locale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import type { HomepageCardSelection } from "@/lib/db/queries";
@@ -139,6 +143,15 @@ export function upcomingHomepageMeetings(meetings: MeetingRow[]) {
     .sort((left, right) => sortKey(left).localeCompare(sortKey(right)));
 }
 
+/** Carries the meeting's own jurisdiction so the link works when shared. */
+function calendarMeetingHref(meeting: MeetingRow) {
+  const path = `/meetings/${encodeURIComponent(meeting.id)}`;
+  const jurisdiction = meeting.jurisdiction_slug
+    ? toPublicJurisdictionSlug(normalizeJurisdictionSelection(meeting.jurisdiction_slug))
+    : null;
+  return jurisdiction ? `${path}?jurisdiction=${encodeURIComponent(jurisdiction)}` : path;
+}
+
 function meetingDayHeading(day: string, locale: Locale) {
   if (!day) return locale === "es" ? "Fecha no indicada" : "Date not listed";
   return new Intl.DateTimeFormat(locale, {
@@ -252,7 +265,7 @@ export function MeetingsCalendarSidebar({
                     <span className="text-sm font-black text-[#12365f]">{time || "—"}</span>
                     <div className="min-w-0">
                       <Link
-                        href={`/meetings/${encodeURIComponent(meeting.id)}`}
+                        href={calendarMeetingHref(meeting)}
                         className="text-base font-black leading-snug text-ink underline-offset-4 hover:underline focus-visible:focus-ring"
                       >
                         {displayMeetingTitle(

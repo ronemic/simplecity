@@ -165,7 +165,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     dayView: "Day view",
     decisions: "Decisions",
     decisionsDescription:
-      "Read easy-to-understand, source-linked summaries of decisions being made by local government, ranked to show upcoming decisions first and then by recency and community impact.",
+      "Read easy-to-understand, source-linked summaries of decisions being made by local government, with the newest first. Choose Upcoming first to see what is coming up next.",
     everydayImpactTitle: "Find decisions by everyday impact",
     filter: "Filter",
     filterByTopic: "Filter by topic",
@@ -304,7 +304,7 @@ const translations: Record<Locale, Record<TranslationKey, string>> = {
     dayView: "Vista del día",
     decisions: "Decisiones",
     decisionsDescription:
-      "Lee resúmenes en lenguaje claro de decisiones del gobierno local, con enlaces a las fuentes, ordenados para mostrar primero las decisiones próximas y luego las más recientes y de mayor impacto comunitario.",
+      "Lee resúmenes en lenguaje claro de decisiones del gobierno local, con enlaces a las fuentes, con las más recientes primero. Elige Próximas primero para ver lo que viene.",
     everydayImpactTitle: "Encuentra decisiones por impacto cotidiano",
     filter: "Filtrar",
     filterByTopic: "Filtrar por tema",
