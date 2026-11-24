@@ -1492,6 +1492,10 @@ async function runSimpleCityPipelineInternal(
           const withMinutes = await attachEastPaloAltoMinutesFromStoredPackets(supabase, jurisdiction, log);
           for (const meeting of withMinutes) {
             if (recordDeadline("decision outcome reconciliation")) break;
+            // A meeting inside the scrape window was already reconciled this run,
+            // before it had minutes. Later runs never return it here again (its
+            // minutes are stored by then), so this is its only chance.
+            reconciledOutcomeMeetingIds.delete(meeting.id as string);
             await reconcileOutcomesForItem({ id: meeting.id as string, meeting });
           }
         } catch (error) {
